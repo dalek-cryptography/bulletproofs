@@ -8,7 +8,7 @@ use std::iter;
 use curve25519_dalek::ristretto::{RistrettoPoint};
 use curve25519_dalek::ristretto;
 use curve25519_dalek::traits::Identity;
-use sha2::{Digest, Sha256};
+use sha2::{Digest, Sha256, Sha512};
 use curve25519_dalek::scalar::Scalar;
 use rand::OsRng;
 
@@ -17,13 +17,21 @@ struct RangeProof {
 
 }
 
+struct Degree3Poly { 
+	pub t0: Scalar, 
+	pub t1: Scalar, 
+	pub t2: Scalar
+}
+
 impl RangeProof {
 	pub fn generate_proof(v: u64, len: usize, a: &RistrettoPoint, b: &RistrettoPoint) -> RangeProof {
 		let mut rng: OsRng = OsRng::new().unwrap();
 
+		// Generate groups a, b (in the paper: groups g, h)
 		let b_vec = make_generators(b, len);
 		let a_vec = make_generators(a, len);
 
+		// Compute big_a (in the paper: A; line 36-39)
 		let alpha = RistrettoPoint::random(&mut rng);
 		let mut big_a = alpha.clone();
 		for i in 0..len {
@@ -35,21 +43,44 @@ impl RangeProof {
 			}	
 		}
 
+		// Compute big_s (in the paper: S; line 40-42)
 		let points_iter = iter::once(a).chain(b_vec.iter()).chain(a_vec.iter());
 		let randomness: Vec<_> = (0..2*len+1).map(|_| Scalar::random(&mut rng)).collect();
 		let big_s = ristretto::multiscalar_mult(&randomness, points_iter);
 
+		// Save/label randomness (rho, s_L, s_R) to be used later
 		let _rho = &randomness[0];
 		let _s_l = &randomness[1..len+1];
 		let _s_r = &randomness[len+1..2*len+1];
 
-		let (_y, _z) = commit(&big_a, &big_s);
+		// Generate y, z by committing to A, S (line 43-45)
+		let (_y, z) = commit(&big_a, &big_s);
+
+		// Calculate t (line 46)
+		let mut product = Degree3Poly::new();
+		let z2 = z * z;
+		let z3 = z2 * z;
+		let k = -z2 + z3; // not correct yet
+		product.t0 = z + z2 + k; // not correct yet
+
+		// Generate x by committing to T_1, T_2 (line 47-51)
+		// let (x, _) = commit(t1, t2);
 
 		unimplemented!()
 	}
 
 	pub fn verify_proof() -> Result<(), ()> {
 		unimplemented!()
+	}
+}
+
+impl Degree3Poly {
+	pub fn new() -> Self {
+		Self {
+			t0: Scalar::zero(),
+			t1: Scalar::zero(),
+			t2: Scalar::zero(),
+		}
 	}
 }
 
@@ -66,17 +97,17 @@ pub fn make_generators(point: &RistrettoPoint, len: usize)
 	generators
 }
 
-pub fn commit(a: &RistrettoPoint, s: &RistrettoPoint) -> (RistrettoPoint, RistrettoPoint) {
-	let mut y_digest = Sha256::new();
+pub fn commit(a: &RistrettoPoint, b: &RistrettoPoint) -> (Scalar, Scalar) {
+	let mut y_digest = Sha512::new();
 	y_digest.input(a.compress().as_bytes());
-	y_digest.input(s.compress().as_bytes());
-	let y = RistrettoPoint::hash_from_bytes::<Sha256>(&y_digest.result());
+	y_digest.input(b.compress().as_bytes());
+	let y = Scalar::from_hash(y_digest);
 
-	let mut z_digest = Sha256::new();
+	let mut z_digest = Sha512::new();
 	z_digest.input(a.compress().as_bytes());
-	z_digest.input(s.compress().as_bytes());
-	z_digest.input(y.compress().as_bytes());
-	let z = RistrettoPoint::hash_from_bytes::<Sha256>(&z_digest.result());	
+	z_digest.input(b.compress().as_bytes());
+	z_digest.input(y.as_bytes());
+	let z = Scalar::from_hash(z_digest);	
 
 	(y, z)
 }
