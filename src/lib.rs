@@ -1,4 +1,5 @@
 #![feature(test)]
+#![allow(non_snake_case)]
 
 extern crate curve25519_dalek;
 extern crate sha2;
@@ -33,22 +34,22 @@ impl RangeProof {
 		let b_vec = make_generators(b, len);
 		let a_vec = make_generators(a, len);
 
-		// Compute big_a (in the paper: A; line 36-39)
+		// Compute A (in the paper: line 36-39)
 		let alpha = RistrettoPoint::random(&mut rng);
-		let mut big_a = alpha.clone();
+		let mut A = alpha.clone();
 		for i in 0..len {
 			let v_i = (v >> i) & 1;
 			if v_i == 0 {
-				big_a -= a_vec[i];
+				A -= a_vec[i];
 			} else {
-				big_a += b_vec[i];
+				A += b_vec[i];
 			}	
 		}
 
-		// Compute big_s (in the paper: S; line 40-42)
+		// Compute S (in the paper: line 40-42)
 		let points_iter = iter::once(a).chain(b_vec.iter()).chain(a_vec.iter());
 		let randomness: Vec<_> = (0..2*len+1).map(|_| Scalar::random(&mut rng)).collect();
-		let big_s = ristretto::multiscalar_mult(&randomness, points_iter);
+		let S = ristretto::multiscalar_mult(&randomness, points_iter);
 
 		// Save/label randomness (rho, s_L, s_R) to be used later
 		let _rho = &randomness[0];
@@ -56,7 +57,7 @@ impl RangeProof {
 		let _s_r = &randomness[len+1..2*len+1];
 
 		// Generate y, z by committing to A, S (line 43-45)
-		let (y, z) = commit(&big_a, &big_s);
+		let (y, z) = commit(&A, &S);
 
 		// Calculate t (line 46)
 		let a_l = Scalar::from_u64(v);
