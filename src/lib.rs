@@ -150,7 +150,7 @@ mod tests {
     #[test]
     fn test_make_generators() {
     	use curve25519_dalek::constants::RISTRETTO_BASEPOINT_POINT;
-    	println!("{:?}", make_generators(RISTRETTO_BASEPOINT_POINT, 20));
+    	println!("{:?}", make_generators(&RISTRETTO_BASEPOINT_POINT, 20));
     }
 }
 
@@ -161,6 +161,6 @@ mod bench {
 	#[bench]
     fn benchmark_make_generators(b: &mut Bencher) {
     	use curve25519_dalek::constants::RISTRETTO_BASEPOINT_POINT;
-    	b.iter(|| make_generators(RISTRETTO_BASEPOINT_POINT, 100));
+    	b.iter(|| make_generators(&RISTRETTO_BASEPOINT_POINT, 100));
     }
 }
