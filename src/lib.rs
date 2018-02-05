@@ -82,8 +82,11 @@ impl RangeProof {
         }
 
         // Generate x by committing to T_1, T_2 (line 47-51)
-        // let big_t_1 = b * t.d1 + h * tau_1
-        // let (x, _) = commit(t1, t2);
+        let tau_1 = Scalar::random(&mut rng);
+        let tau_2 = Scalar::random(&mut rng);
+        let big_t_1 = b * t.d1 + a * tau_1;
+        let big_t_2 = b * t.d2 + a * tau_2;
+        let (x, _) = commit(&big_t_1, &big_t_2);
 
         unimplemented!()
     }
