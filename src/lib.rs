@@ -19,12 +19,6 @@ struct RangeProof {
 
 }
 
-struct Degree3Poly { 
-	pub d0: Scalar, 
-	pub d1: Scalar, 
-	pub d2: Scalar
-}
-
 impl RangeProof {
 	pub fn generate_proof(v: u64, len: usize, a: &RistrettoPoint, b: &RistrettoPoint) -> RangeProof {
 		let mut rng: OsRng = OsRng::new().unwrap();
@@ -53,22 +47,36 @@ impl RangeProof {
 		// Save/label randomness (rho, s_L, s_R) to be used later
 		let _rho = &randomness[0];
 		let s_l = &randomness[1..len+1];
-		let _s_r = &randomness[len+1..2*len+1];
+		let s_r = &randomness[len+1..2*len+1];
 
 		// Generate y, z by committing to A, S (line 43-45)
 		let (y, z) = commit(&big_a, &big_s);
 
-		// Calculate t (line 46)
-		let a_l = Scalar::from_u64(v);
+		// Calculate t1, t2 (line 46)
+		let mut t1 = Scalar::zero();
+		let mut t2 = Scalar::zero();
+
+		let mut v_temp = v.clone();
+		let mut exp_y = Scalar::one(); // start at y^0 = 1
+		let mut exp_2 = Scalar::one(); // start at 2^0 = 1
 		let z2 = z * z;
-		let z3 = z2 * z;
-		let l0 = a_l - z;
-		let l1 = s_l;
-		let r0 = z2;
-		let mut r1: Vec<Scalar> = Vec::new();  // actually make this an iterator?
-		// calculate r1
-		let mut t = Degree3Poly::new();
-		t.d0 = z*y + (a_l - y)*z2 - z3;
+
+		for i in 0..len {
+			t1 += s_l[i] * exp_y * z + s_l[i] * z2 * exp_2 + s_r[i] * exp_y * (-z);
+			t2 += s_l[i] * exp_y * s_r[i];
+
+			// check if a_l is 0 or 1
+			if v_temp & 1 == 0 {
+				t1 -= s_l[i] * exp_y;
+			} else {
+				t1 += s_r[i] * exp_y;
+			}
+
+			v_temp = v_temp >> 1;  // bit-shift v by one
+			exp_y = exp_y * y;     // y^i -> y^(i+1)
+			exp_2 = exp_2 + exp_2; // 2^i -> 2^(i+1)
+		}
+
 		// t.d1 = r0*l1 + l0*r1;
 		// t.d2 = r1*l1;
 
@@ -81,16 +89,6 @@ impl RangeProof {
 
 	pub fn verify_proof() -> Result<(), ()> {
 		unimplemented!()
-	}
-}
-
-impl Degree3Poly {
-	pub fn new() -> Self {
-		Self {
-			d0: Scalar::zero(),
-			d1: Scalar::zero(),
-			d2: Scalar::zero(),
-		}
 	}
 }
 
