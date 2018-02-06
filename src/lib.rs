@@ -20,6 +20,8 @@ struct RangeProof {
     tau: Scalar,
     mu: Scalar,
     t: Scalar,
+    l: Scalar, // don't need if doing inner product proof
+    r: Scalar, // don't need if doing inner product proof
 }
 
 impl RangeProof {
@@ -97,10 +99,36 @@ impl RangeProof {
         let mu = alpha + rho * x;
         let t_total = t.0 + t.1 * x + t.2 * x * x;
 
+        // Calculate l, r - which is only necessary if not doing IPP (line 55-57)
+        // Adding this in a seperate loop so we can remove it easily later
+        let mut v_temp = v.clone();
+        let mut exp_y = Scalar::one(); // start at y^0 = 1
+        let mut exp_2 = Scalar::one(); // start at 2^0 = 1
+        let mut l = Scalar::zero();
+        let mut r = Scalar::zero();
+
+        for i in 0..len {
+            let a_l = v_temp & 1;
+
+            // is it ok to convert a_l to scalar?
+            l += Scalar::from_u64(a_l) - z + s_l[i] * x;
+            r += exp_y * (z + s_r[i] * x);
+            if a_l == 0 {
+                r -= exp_y
+            }
+
+            v_temp = v_temp >> 1; // bit-shift v by one
+            exp_y = exp_y * y; // y^i -> y^(i+1)
+            exp_2 = exp_2 + exp_2; // 2^i -> 2^(i+1)
+        }
+
+        // Send proof to verifier! (line 58)
         RangeProof {
             tau: tau_x,
             mu: mu,
             t: t_total,
+            l: l,
+            r: r,
         }
     }
 
