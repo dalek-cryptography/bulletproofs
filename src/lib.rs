@@ -22,6 +22,9 @@ struct RangeProof {
     t: Scalar,
     l: Scalar, // don't need if doing inner product proof
     r: Scalar, // don't need if doing inner product proof
+
+    b: RistrettoPoint,
+    a: RistrettoPoint,
 }
 
 impl RangeProof {
@@ -33,7 +36,7 @@ impl RangeProof {
     ) -> RangeProof {
         let mut rng: OsRng = OsRng::new().unwrap();
 
-        // Generate groups a, b (in the paper: groups g, h)
+        // Generate groups b, a (in the paper: groups g, h)
         let b_vec = make_generators(b, len);
         let a_vec = make_generators(a, len);
 
@@ -106,7 +109,6 @@ impl RangeProof {
         let mut exp_2 = Scalar::one(); // start at 2^0 = 1
         let mut l = Scalar::zero();
         let mut r = Scalar::zero();
-
         for i in 0..len {
             let a_l = v_temp & 1;
 
@@ -122,17 +124,24 @@ impl RangeProof {
             exp_2 = exp_2 + exp_2; // 2^i -> 2^(i+1)
         }
 
-        // Send proof to verifier! (line 58)
+        // Generate proof! (line 58)
         RangeProof {
             tau: tau_x,
             mu: mu,
             t: t_total,
             l: l,
             r: r,
+
+            b: *b,
+            a: *a,
         }
     }
 
-    pub fn verify_proof() -> Result<(), ()> {
+    pub fn verify_proof(&self) -> Result<(), ()> {
+        // line 60
+        if self.t != self.l * self.r {
+            // throw some error
+        }
         unimplemented!()
     }
 }
@@ -198,6 +207,14 @@ mod tests {
     fn test_make_generators() {
         use curve25519_dalek::constants::RISTRETTO_BASEPOINT_POINT;
         println!("{:?}", make_generators(&RISTRETTO_BASEPOINT_POINT, 20));
+    }
+    #[test]
+    fn test_t() {
+        let b = RistrettoPoint::hash_from_bytes::<Sha256>("hello".as_bytes());
+        let a = RistrettoPoint::hash_from_bytes::<Sha256>("hello".as_bytes());
+
+        let rp = RangeProof::generate_proof(153, 5, &b, &a);
+        assert_eq!(rp.t, rp.r * rp.l);
     }
 }
 
