@@ -10,9 +10,9 @@ use curve25519_dalek::ristretto;
 use curve25519_dalek::traits::Identity;
 use sha2::{Digest, Sha256, Sha512};
 use curve25519_dalek::scalar::Scalar;
-// use rand::OsRng;
-use rand::SeedableRng;
-use rand::StdRng;
+use rand::{OsRng, Rng};
+// use rand::SeedableRng
+// use rand::StdRng;
 
 struct PolyDeg3(Scalar, Scalar, Scalar);
 struct VecPoly2(Vec<Scalar>, Vec<Scalar>);
@@ -23,7 +23,7 @@ struct RangeProof {
     t: Scalar,
 
     // don't need if doing inner product proof
-    l: Vec<Scalar>, 
+    l: Vec<Scalar>,
     r: Vec<Scalar>,
 
     // committed values
@@ -40,14 +40,10 @@ struct RangeProof {
 }
 
 impl RangeProof {
-
-    pub fn generate_proof(
-        v: u64,
-        n: usize,
-    ) -> RangeProof {
-        // let mut rng: OsRng = OsRng::new().unwrap();
-        let mut rng: StdRng = StdRng::from_seed(&[1, 2, 3, 4]);
-
+    pub fn generate_proof(v: u64, n: usize) -> RangeProof {
+        let mut rng: OsRng = OsRng::new().unwrap();
+        // useful for debugging:
+        // let mut rng: StdRng = StdRng::from_seed(&[1, 2, 3, 4]);
 
         // Setup: generate groups g & h, commit to v (line 34)
         let g = &RistrettoPoint::hash_from_bytes::<Sha256>("hello".as_bytes());
@@ -84,6 +80,7 @@ impl RangeProof {
 
         // Calculate t
 
+        /*
         // APPROACH 1 TO CALCULATING T:
         // calculate vectors l0, l1, r0, r1 and multiply
         let mut l = VecPoly2::new(n);
@@ -113,29 +110,18 @@ impl RangeProof {
         t.0 = inner_product(&l.0, &r.0);
         t.1 = inner_product(&l.0, &r.1) + inner_product(&l.1, &r.0);
         t.2 = inner_product(&l.1, &r.1);
+        */
 
-        // let mut t2 = Polynomial::new();
-        // for i in 0..n {
-        // 	t2.0 += l0[i] * r0[i];
-        // 	t2.1 += l0[i] * r1[i] + l1[i] * r0[i];
-        // 	t2.2 += l1[i] * r1[i];
-        // }
-
-        // println!("t2_0: {:?}", t2.0);
-        // println!("t2_1: {:?}", t2.1);
-        // println!("t2_2: {:?}", t2.2);
-
-		/*
         // APPROACH 2 TO CALCULATING T:
         // calculate scalars t0, t1, t2 seperately
-        let mut t = Polynomial::new();
+        let mut t = PolyDeg3::new();
         let mut exp_y = Scalar::one(); // start at y^0 = 1
         let mut exp_2 = Scalar::one(); // start at 2^0 = 1
         let z2 = z * z;
         let z3 = z2 * z;
 
         for i in 0..n {
-        	let v_i = (v >> i) & 1;
+            let v_i = (v >> i) & 1;
             t.0 += exp_y * (z - z2) - z3 * exp_2;
             t.1 += s_l[i] * exp_y * z + s_l[i] * z2 * exp_2 + s_r[i] * exp_y * (-z);
             t.2 += s_l[i] * exp_y * s_r[i];
@@ -149,10 +135,6 @@ impl RangeProof {
             exp_y = exp_y * y; // y^i -> y^(i+1)
             exp_2 = exp_2 + exp_2; // 2^i -> 2^(i+1)
         }
-        println!("t0: {:?}", t.0);
-        println!("t1: {:?}", t.1);
-        println!("t2: {:?}", t.2);
-        */
 
         // Generate x by committing to big_t_1, big_t_2 (line 49-54)
         let tau_1 = Scalar::random(&mut rng);
@@ -169,27 +151,30 @@ impl RangeProof {
         // Calculate l, r - which is only necessary if not doing IPP (line 55-57)
         // Adding this in a seperate loop so we can remove it easily later
 
-        /* 
         // APPROACH 1 TO CALCULATING l, r
         let mut exp_y = Scalar::one(); // start at y^0 = 1
         let mut exp_2 = Scalar::one(); // start at 2^0 = 1
+        let mut l_total = Vec::new();
+        let mut r_total = Vec::new();
+
         for i in 0..n {
-        	let a_l = (v >> i) & 1;
+            let a_l = (v >> i) & 1;
 
             // is it ok to convert a_l to scalar?
-            l += Scalar::from_u64(a_l) - z + s_l[i] * x;
-            r += exp_y * (z + s_r[i] * x) + z * z * exp_2;
+            l_total.push(Scalar::from_u64(a_l) - z + s_l[i] * x);
+            r_total.push(exp_y * (z + s_r[i] * x) + z * z * exp_2);
             if a_l == 0 {
-                r -= exp_y
+                r_total[i] -= exp_y
             }
             exp_y = exp_y * y; // y^i -> y^(i+1)
             exp_2 = exp_2 + exp_2; // 2^i -> 2^(i+1)
-        } 
-        */
-        
+        }
+
+        /*
         // APPROACH 2 TO CALCULATING l, r
         let l_total = l.eval(x);
         let r_total = r.eval(x);
+        */
 
         // Generate proof! (line 61)
         RangeProof {
@@ -199,7 +184,7 @@ impl RangeProof {
             l: l_total,
             r: r_total,
 
-			big_v: big_v,
+            big_v: big_v,
             big_a: big_a,
             big_s: big_s,
             big_t_1: big_t_1,
@@ -211,42 +196,36 @@ impl RangeProof {
         }
     }
 
-    pub fn fancy_gen_proof(&self) -> RangeProof {
-
-
-    	unimplemented!()
-    }
-
     pub fn verify_proof(&self) -> bool {
-    	let (y, z) = commit(&self.big_a, &self.big_s);
-    	let (x, _) = commit(&self.big_t_1, &self.big_t_2);
+        let (y, z) = commit(&self.big_a, &self.big_s);
+        let (x, _) = commit(&self.big_t_1, &self.big_t_2);
         let g_vec = make_generators(&self.g, self.n);
         let mut hprime_vec = make_generators(&self.h, self.n);
 
-    	// line 62: calculate hprime_vec
-    	let mut exp_y = Scalar::one(); // start at y^0 = 1
-    	for i in 0..self.n {
-    		hprime_vec[i] = hprime_vec[i] * Scalar::invert(&exp_y);
-    		exp_y = exp_y * y; // y^i -> y^(i+1)
-    	}
+        // line 62: calculate hprime_vec
+        let mut exp_y = Scalar::one(); // start at y^0 = 1
+        for i in 0..self.n {
+            hprime_vec[i] = hprime_vec[i] * Scalar::invert(&exp_y);
+            exp_y = exp_y * y; // y^i -> y^(i+1)
+        }
 
         // line 63
         let z2 = z * z;
         let z3 = z2 * z;
         let mut power_g = Scalar::zero();
-		let mut exp_y = Scalar::one(); // start at y^0 = 1
+        let mut exp_y = Scalar::one(); // start at y^0 = 1
         let mut exp_2 = Scalar::one(); // start at 2^0 = 1
         for _ in 0..self.n {
-        	power_g += -z2 * exp_y - z3 * exp_2 + z * exp_y;
+            power_g += -z2 * exp_y - z3 * exp_2 + z * exp_y;
 
-       	    exp_y = exp_y * y; // y^i -> y^(i+1)
-            exp_2 = exp_2 + exp_2; // 2^i -> 2^(i+1) 	
+            exp_y = exp_y * y; // y^i -> y^(i+1)
+            exp_2 = exp_2 + exp_2; // 2^i -> 2^(i+1)
         }
         let t_check = self.g * power_g + self.big_v * z2 + self.big_t_1 * x + self.big_t_2 * x * x;
         let t_commit = self.g * self.t + self.h * self.tau_x;
         if t_commit != t_check {
-        	println!("fails check on line 63");
-        	return false
+            println!("fails check on line 63");
+            return false;
         }
 
         // line 64: calculate big_p
@@ -255,8 +234,8 @@ impl RangeProof {
         let mut exp_y = Scalar::one(); // start at y^0 = 1
         let mut exp_2 = Scalar::one(); // start at 2^0 = 1
         for i in 0..self.n {
-        	big_p -= g_vec[i] * z; // IS THIS RIGHT? 
-        	big_p += hprime_vec[i] * (z * exp_y + z * z * exp_2);
+            big_p -= g_vec[i] * z; // IS THIS RIGHT?
+            big_p += hprime_vec[i] * (z * exp_y + z * z * exp_2);
 
             exp_y = exp_y * y; // y^i -> y^(i+1)
             exp_2 = exp_2 + exp_2; // 2^i -> 2^(i+1)
@@ -265,20 +244,20 @@ impl RangeProof {
         // line 65: check big_p against l, r
         let mut big_p_check = self.h * self.mu;
         for i in 0..self.n {
-        	big_p_check += g_vec[i] * self.l[i] + hprime_vec[i] * self.r[i];
+            big_p_check += g_vec[i] * self.l[i] + hprime_vec[i] * self.r[i];
         }
         if big_p != big_p_check {
-        	println!("fails check on line 65: big_p != g * l + hprime * r");
-        	return false
+            println!("fails check on line 65: big_p != g * l + hprime * r");
+            return false;
         }
 
         // line 66: check t = l * r
         if self.t != inner_product(&self.l, &self.r) {
-        	println!("fails check on line 66: t != l * r");
-            return false
+            println!("fails check on line 66: t != l * r");
+            return false;
         }
 
-        return true
+        return true;
     }
 }
 
@@ -289,17 +268,17 @@ impl PolyDeg3 {
 }
 
 impl VecPoly2 {
-	pub fn new(n: usize) -> VecPoly2 {
-		VecPoly2(vec![Scalar::zero(); n], vec![Scalar::zero(); n])
-	}
-	pub fn eval(&self, x: Scalar) -> Vec<Scalar> {
-		let n = self.0.len();
-		let mut out = vec![Scalar::zero(); n];
-		for i in 0..n {
-			out[i] += self.0[i] + self.1[i] * x;
-		}
-		out
-	}
+    pub fn new(n: usize) -> VecPoly2 {
+        VecPoly2(vec![Scalar::zero(); n], vec![Scalar::zero(); n])
+    }
+    pub fn eval(&self, x: Scalar) -> Vec<Scalar> {
+        let n = self.0.len();
+        let mut out = vec![Scalar::zero(); n];
+        for i in 0..n {
+            out[i] += self.0[i] + self.1[i] * x;
+        }
+        out
+    }
 }
 
 pub fn make_generators(point: &RistrettoPoint, n: usize) -> Vec<RistrettoPoint> {
@@ -329,15 +308,15 @@ pub fn commit(v1: &RistrettoPoint, v2: &RistrettoPoint) -> (Scalar, Scalar) {
 }
 
 pub fn inner_product(a: &Vec<Scalar>, b: &Vec<Scalar>) -> Scalar {
-	let mut out = Scalar::zero();
-	if a.len() != b.len() {
-		// throw some error
-		println!("lengths of vectors don't match for inner product multiplication");
-	}
-	for i in 0..a.len() {
-		out += a[i] * b[i];
-	}
-	out
+    let mut out = Scalar::zero();
+    if a.len() != b.len() {
+        // throw some error
+        println!("lengths of vectors don't match for inner product multiplication");
+    }
+    for i in 0..a.len() {
+        out += a[i] * b[i];
+    }
+    out
 }
 
 #[cfg(test)]
@@ -345,9 +324,19 @@ mod tests {
     use super::*;
     #[test]
     fn test_inner_product() {
-    	let a = vec![Scalar::from_u64(1), Scalar::from_u64(2), Scalar::from_u64(3), Scalar::from_u64(4)];
-    	let b = vec![Scalar::from_u64(2), Scalar::from_u64(3), Scalar::from_u64(4), Scalar::from_u64(5)];
-    	assert_eq!(Scalar::from_u64(40), inner_product(&a, &b));
+        let a = vec![
+            Scalar::from_u64(1),
+            Scalar::from_u64(2),
+            Scalar::from_u64(3),
+            Scalar::from_u64(4),
+        ];
+        let b = vec![
+            Scalar::from_u64(2),
+            Scalar::from_u64(3),
+            Scalar::from_u64(4),
+            Scalar::from_u64(5),
+        ];
+        assert_eq!(Scalar::from_u64(40), inner_product(&a, &b));
     }
     #[test]
     fn test_t() {
@@ -357,27 +346,42 @@ mod tests {
         assert_eq!(rp.t, inner_product(&rp.l, &rp.r));
     }
     #[test]
-    fn test_verify() {
-    	for n in &[1, 2, 4, 8, 16, 32] {
-    		println!("n: {:?}", n);
-    		let rp = RangeProof::generate_proof(0, *n);
-    		assert_eq!(rp.verify_proof(), true);
-    		let rp = RangeProof::generate_proof(2u64.pow(*n as u32) - 1, *n);
-    		assert_eq!(rp.verify_proof(), true);
-     		let rp = RangeProof::generate_proof(2u64.pow(*n as u32), *n);
-    		assert_eq!(rp.verify_proof(), false);
-    		let rp = RangeProof::generate_proof(2u64.pow(*n as u32) + 1, *n);
-    		assert_eq!(rp.verify_proof(), false);
-    		let rp = RangeProof::generate_proof(u64::max_value(), *n);
-    		assert_eq!(rp.verify_proof(), false);
-    	}   	
+    fn test_verify_simple() {
+        for n in &[1, 2, 4, 8, 16, 32] {
+            println!("n: {:?}", n);
+            let rp = RangeProof::generate_proof(0, *n);
+            assert_eq!(rp.verify_proof(), true);
+            let rp = RangeProof::generate_proof(2u64.pow(*n as u32) - 1, *n);
+            assert_eq!(rp.verify_proof(), true);
+            let rp = RangeProof::generate_proof(2u64.pow(*n as u32), *n);
+            assert_eq!(rp.verify_proof(), false);
+            let rp = RangeProof::generate_proof(2u64.pow(*n as u32) + 1, *n);
+            assert_eq!(rp.verify_proof(), false);
+            let rp = RangeProof::generate_proof(u64::max_value(), *n);
+            assert_eq!(rp.verify_proof(), false);
+        }
     }
-    // #[test]
-    // fn test_verify_rand() {
-    // 	for i in 0..1000 {
-    // 		let n = 32;
-    // 	}
-    // }
+    #[test]
+    fn test_verify_rand_big() {
+        for i in 0..50 {
+            let mut rng: OsRng = OsRng::new().unwrap();
+            let v: u64 = rng.next_u64();
+            println!("v: {:?}", v);
+            let rp = RangeProof::generate_proof(v, 32);
+            let expected = v <= 2u64.pow(32);
+            assert_eq!(rp.verify_proof(), expected);
+        }
+    }
+    #[test]
+    fn test_verify_rand_small() {
+        for i in 0..50 {
+            let mut rng: OsRng = OsRng::new().unwrap();
+            let v: u32 = rng.next_u32();
+            println!("v: {:?}", v);
+            let rp = RangeProof::generate_proof(v as u64, 32);
+            assert_eq!(rp.verify_proof(), true);
+        }
+    }
 }
 
 mod bench {
@@ -391,12 +395,12 @@ mod bench {
     }
     #[bench]
     fn benchmark_make_proofs(b: &mut Bencher) {
-    	for n in &[4, 8, 16, 32] {
-    		b.iter(|| RangeProof::generate_proof(0, *n));
-	    	b.iter(|| RangeProof::generate_proof(2u64.pow(*n as u32) - 1, *n));
-	     	b.iter(|| RangeProof::generate_proof(2u64.pow(*n as u32), *n));
-	    	b.iter(|| RangeProof::generate_proof(2u64.pow(*n as u32) + 1, *n));
-	    	b.iter(|| RangeProof::generate_proof(u64::max_value(), *n));
-    	}
+        for n in &[4, 8, 16, 32] {
+            b.iter(|| RangeProof::generate_proof(0, *n));
+            b.iter(|| RangeProof::generate_proof(2u64.pow(*n as u32) - 1, *n));
+            b.iter(|| RangeProof::generate_proof(2u64.pow(*n as u32), *n));
+            b.iter(|| RangeProof::generate_proof(2u64.pow(*n as u32) + 1, *n));
+            b.iter(|| RangeProof::generate_proof(u64::max_value(), *n));
+        }
     }
 }
