@@ -22,8 +22,8 @@ struct RangeProof {
     t: Scalar,
 
     // don't need if doing inner product proof
-    l: Scalar, 
-    r: Scalar,
+    l: Vec<Scalar>, 
+    r: Vec<Scalar>,
 
     // committed values
     big_v: RistrettoPoint,
@@ -43,13 +43,14 @@ impl RangeProof {
     pub fn generate_proof(
         v: u64,
         n: usize,
-        g: &RistrettoPoint,
-        h: &RistrettoPoint,
     ) -> RangeProof {
         // let mut rng: OsRng = OsRng::new().unwrap();
         let mut rng: StdRng = StdRng::from_seed(&[1, 2, 3, 4]);
 
+
         // Setup: generate groups g & h, commit to v
+        let g = &RistrettoPoint::hash_from_bytes::<Sha256>("hello".as_bytes());
+        let h = &RistrettoPoint::hash_from_bytes::<Sha256>("there".as_bytes());
         let g_vec = make_generators(g, n);
         let h_vec = make_generators(h, n);
         let gamma = Scalar::random(&mut rng);
@@ -69,66 +70,144 @@ impl RangeProof {
 
         // Compute big_s (in the paper: S; line 40-42)
         let points_iter = iter::once(h).chain(g_vec.iter()).chain(h_vec.iter());
-        let randomness: Vec<_> = (0..2 * n + 1).map(|_| Scalar::random(&mut rng)).collect();
+        let randomness: Vec<_> = (0..(1 + 2 * n)).map(|_| Scalar::random(&mut rng)).collect();
         let big_s = ristretto::multiscalar_mult(&randomness, points_iter);
 
         // Save/label randomness (rho, s_L, s_R) to be used later
         let rho = &randomness[0];
-        let s_l = &randomness[1..n + 1];
-        let s_r = &randomness[n + 1..2 * n + 1];
+        let s_l = &randomness[1..(n + 1)];
+        let s_r = &randomness[(n + 1)..(1 + 2 * n)];
 
         // Generate y, z by committing to A, S (line 43-45)
         let (y, z) = commit(&big_a, &big_s);
 
         // Calculate t (line 46)
-        let mut t = Polynomial::new();
-        let mut l = Polynomial::new();
-        let mut r = Polynomial::new();
 
-        let mut v_temp = v.clone();
+        // APPROACH 1 TO CALCULATING T:
+        // calculate vectors l0, l1, r0, r1 and multiply
+        let mut l0 = vec![Scalar::zero(); n];
+        let mut l1 = vec![Scalar::zero(); n];
+        let mut r0 = vec![Scalar::zero(); n];
+        let mut r1 = vec![Scalar::zero(); n];
+        let mut t = Polynomial::new();
         let mut exp_y = Scalar::one(); // start at y^0 = 1
         let mut exp_2 = Scalar::one(); // start at 2^0 = 1
-        let z2 = z * z;
 
         for i in 0..n {
-            let a_l = v_temp & 1;
-            l.0 += -z;
-            l.1 += s_l[i];
-            r.0 += exp_y * z + z2 * exp_2;
-            r.1 += exp_y * s_r[i];
-            if a_l == 0 {
-                r.0 -= exp_y;
-            } else {
-            	l.0 += Scalar::one();
-            }
-            v_temp = v_temp >> 1; // bit-shift v by one
+        	let v_i = (v >> i) & 1;
+        	let a_l = Scalar::from_u64(v_i);
+        	let a_r = a_l - Scalar::one();
+
+            l0[i] += a_l - z;
+            l1[i] += s_l[i];
+            r0[i] += exp_y * (a_r + z) + z * z * exp_2;
+            r1[i] += exp_y * s_r[i];
+            println!("v_i at position {:?}: {:?}", i, v_i);
+            // if v_i == 0 {
+            //     r0[i] -= exp_y;
+            // } else {
+            // 	   l0[i] += Scalar::one();
+            // }
             exp_y = exp_y * y; // y^i -> y^(i+1)
             exp_2 = exp_2 + exp_2; // 2^i -> 2^(i+1)
         }
 
-        t.0 = l.0 * r.0;
-        t.1 = l.1 * r.0 + l.0 * r.1;
-        t.2 = l.1 * r.1;
+        t.0 = inner_product(&l0, &r0);
+        t.1 = inner_product(&l0, &r1) + inner_product(&l1, &r0);
+        t.2 = inner_product(&l1, &r1);
+        println!("t0: {:?}", t.0);
+        println!("t1: {:?}", t.1);
+        println!("t2: {:?}", t.2);
+
+        // let mut t2 = Polynomial::new();
+        // for i in 0..n {
+        // 	t2.0 += l0[i] * r0[i];
+        // 	t2.1 += l0[i] * r1[i] + l1[i] * r0[i];
+        // 	t2.2 += l1[i] * r1[i];
+        // }
+
+        // println!("t2_0: {:?}", t2.0);
+        // println!("t2_1: {:?}", t2.1);
+        // println!("t2_2: {:?}", t2.2);
+
+		/*
+        // APPROACH 2 TO CALCULATING T:
+        // calculate scalars t0, t1, t2 seperately
+        let mut t = Polynomial::new();
+        let mut exp_y = Scalar::one(); // start at y^0 = 1
+        let mut exp_2 = Scalar::one(); // start at 2^0 = 1
+        let z2 = z * z;
+        let z3 = z2 * z;
+
+        for i in 0..n {
+        	let v_i = (v >> i) & 1;
+            t.0 += exp_y * (z - z2) - z3 * exp_2;
+            t.1 += s_l[i] * exp_y * z + s_l[i] * z2 * exp_2 + s_r[i] * exp_y * (-z);
+            t.2 += s_l[i] * exp_y * s_r[i];
+            // check if a_l is 0 or 1
+            if v_i == 0 {
+                t.1 -= s_l[i] * exp_y;
+            } else {
+                t.0 += z2 * exp_2;
+                t.1 += s_r[i] * exp_y;
+            }
+            exp_y = exp_y * y; // y^i -> y^(i+1)
+            exp_2 = exp_2 + exp_2; // 2^i -> 2^(i+1)
+        }
+        println!("t0: {:?}", t.0);
+        println!("t1: {:?}", t.1);
+        println!("t2: {:?}", t.2);
+        */
 
         // Generate x by committing to big_t_1, big_t_2 (in the paper: T1, T2; line 47-51)
         let tau_1 = Scalar::random(&mut rng);
         let tau_2 = Scalar::random(&mut rng);
         let big_t_1 = g * t.1 + h * tau_1;
         let big_t_2 = g * t.2 + h * tau_2;
-        let (x, _) = commit(&big_t_1, &big_t_2); // TODO: use a different commit
+        let (x, _) = commit(&big_t_1, &big_t_2); // TODO: use a different commit?
 
         // Generate final values for proof (line 52-54)
-        let tau_x = tau_1 * x + tau_2 * x * x + z2 * gamma;
+        let tau_x = tau_1 * x + tau_2 * x * x + z * z * gamma;
         let mu = alpha + rho * x;
         let t_total = t.0 + t.1 * x + t.2 * x * x;
 
-        // Generate proof! (line 55-58)
+        // Calculate l, r - which is only necessary if not doing IPP (line 55-57)
+        // Adding this in a seperate loop so we can remove it easily later
+
+        let mut l = vec![Scalar::zero(); n];
+        let mut r = vec![Scalar::zero(); n];
+
+        /* 
+        // APPROACH 1 TO CALCULATING l, r
+        let mut exp_y = Scalar::one(); // start at y^0 = 1
+        let mut exp_2 = Scalar::one(); // start at 2^0 = 1
+        for i in 0..n {
+        	let a_l = (v >> i) & 1;
+
+            // is it ok to convert a_l to scalar?
+            l += Scalar::from_u64(a_l) - z + s_l[i] * x;
+            r += exp_y * (z + s_r[i] * x) + z * z * exp_2;
+            if a_l == 0 {
+                r -= exp_y
+            }
+            exp_y = exp_y * y; // y^i -> y^(i+1)
+            exp_2 = exp_2 + exp_2; // 2^i -> 2^(i+1)
+        } 
+        */
+        
+        // APPROACH 2 TO CALCULATING l, r
+        for i in 0..n {
+        	l[i] += l0[i] + l1[i] * x;
+        	r[i] += r0[i] + r1[i] * x;
+        }
+
+        // Generate proof! (line 58)
         RangeProof {
             tau_x: tau_x,
             mu: mu,
             t: t_total,
-            l: l.0 + l.1 * x,
-            r: r.0 + r.1 * x,
+            l: l,
+            r: r,
 
 			big_v: big_v,
             big_a: big_a,
@@ -147,7 +226,7 @@ impl RangeProof {
     	let (x, _) = commit(&self.big_t_1, &self.big_t_2);
 
         // line 60
-        if self.t != self.l * self.r {
+        if self.t != inner_product(&self.l, &self.r) {
         	println!("fails check on line 60: t != l * r");
             return false
         }
@@ -166,14 +245,13 @@ impl RangeProof {
             exp_2 = exp_2 + exp_2; // 2^i -> 2^(i+1) 	
         }
 
+
         let t_check = self.g * power_g + self.big_v * z2 + self.big_t_1 * x + self.big_t_2 * x * x;
         let t_commit = self.g * self.t + self.h * self.tau_x;
         if t_commit != t_check {
         	println!("fails check on line 61");
         	return false
         }
-
-        // line 62
 
         return true
     }
@@ -196,39 +274,82 @@ pub fn make_generators(point: &RistrettoPoint, n: usize) -> Vec<RistrettoPoint> 
     generators
 }
 
-pub fn commit(g: &RistrettoPoint, h: &RistrettoPoint) -> (Scalar, Scalar) {
-    let mut y_digest = Sha512::new();
-    y_digest.input(g.compress().as_bytes());
-    y_digest.input(h.compress().as_bytes());
-    let c1 = Scalar::from_hash(y_digest);
+pub fn commit(v1: &RistrettoPoint, v2: &RistrettoPoint) -> (Scalar, Scalar) {
+    let mut c1_digest = Sha512::new();
+    c1_digest.input(v1.compress().as_bytes());
+    c1_digest.input(v2.compress().as_bytes());
+    let c1 = Scalar::from_hash(c1_digest);
 
-    let mut z_digest = Sha512::new();
-    z_digest.input(g.compress().as_bytes());
-    z_digest.input(h.compress().as_bytes());
-    z_digest.input(c1.as_bytes());
-    let c2 = Scalar::from_hash(z_digest);
+    let mut c2_digest = Sha512::new();
+    c2_digest.input(v1.compress().as_bytes());
+    c2_digest.input(v2.compress().as_bytes());
+    c2_digest.input(c1.as_bytes());
+    let c2 = Scalar::from_hash(c2_digest);
 
     (c1, c2)
+}
+
+pub fn inner_product(a: &Vec<Scalar>, b: &Vec<Scalar>) -> Scalar {
+	let mut result = Scalar::zero();
+	if a.len() != b.len() {
+		// throw some error
+	}
+	for i in 0..a.len() {
+		result += a[i] * b[i];
+	}
+	result
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     #[test]
-    fn test_t() {
-        let g = RistrettoPoint::hash_from_bytes::<Sha256>("hello".as_bytes());
-        let h = RistrettoPoint::hash_from_bytes::<Sha256>("there".as_bytes());
-
-        let rp = RangeProof::generate_proof(153, 10, &g, &h);
-        assert_eq!(rp.t, rp.l * rp.r);
+    fn test_inner_product() {
+    	let a = vec![Scalar::from_u64(1), Scalar::from_u64(2), Scalar::from_u64(3), Scalar::from_u64(4)];
+    	let b = vec![Scalar::from_u64(2), Scalar::from_u64(3), Scalar::from_u64(4), Scalar::from_u64(5)];
+    	assert_eq!(Scalar::from_u64(40), inner_product(&a, &b));
     }
     #[test]
-    fn test_verify() {
-        let g = RistrettoPoint::hash_from_bytes::<Sha256>("hello".as_bytes());
-        let h = RistrettoPoint::hash_from_bytes::<Sha256>("there".as_bytes());
-
-        let rp = RangeProof::generate_proof(153, 10, &b, &a);
+    fn test_t() {
+        let rp = RangeProof::generate_proof(1, 1);
+        assert_eq!(rp.t, inner_product(&rp.l, &rp.r));
+        let rp = RangeProof::generate_proof(1, 2);
+        assert_eq!(rp.t, inner_product(&rp.l, &rp.r));
+    }
+    #[test]
+    fn test_verify_one() {
+        let rp = RangeProof::generate_proof(0, 1);
         assert_eq!(rp.verify_proof(), true);
+        let rp = RangeProof::generate_proof(1, 1);
+        assert_eq!(rp.verify_proof(), true);
+        let rp = RangeProof::generate_proof(2, 1);
+        assert_eq!(rp.verify_proof(), false);
+        let rp = RangeProof::generate_proof(3, 1);
+        assert_eq!(rp.verify_proof(), false);
+    }
+    #[test]
+    fn test_verify_two() {
+        let rp = RangeProof::generate_proof(0, 2);
+        assert_eq!(rp.verify_proof(), true);
+        let rp = RangeProof::generate_proof(1, 2);
+        assert_eq!(rp.verify_proof(), true);
+        let rp = RangeProof::generate_proof(3, 2);
+        assert_eq!(rp.verify_proof(), true);
+        let rp = RangeProof::generate_proof(4, 2);
+        assert_eq!(rp.verify_proof(), false);
+        let rp = RangeProof::generate_proof(8, 2);
+        assert_eq!(rp.verify_proof(), false);
+    }
+    #[test]
+    fn test_verify_large() {
+        let rp = RangeProof::generate_proof(250, 8);
+        assert_eq!(rp.verify_proof(), true);
+        let rp = RangeProof::generate_proof(300, 8);
+        assert_eq!(rp.verify_proof(), false);
+        let rp = RangeProof::generate_proof(1000000, 20);
+        assert_eq!(rp.verify_proof(), true);
+        let rp = RangeProof::generate_proof(1050000, 20);
+        assert_eq!(rp.verify_proof(), false);    	
     }
 }
 
