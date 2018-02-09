@@ -10,7 +10,7 @@ use curve25519_dalek::ristretto;
 use curve25519_dalek::traits::Identity;
 use sha2::{Digest, Sha256, Sha512};
 use curve25519_dalek::scalar::Scalar;
-use rand::{OsRng, Rng};
+use rand::OsRng;
 // use rand::SeedableRng
 // use rand::StdRng;
 
@@ -96,7 +96,7 @@ impl RangeProof {
 
             l.0[i] += a_l - z;
             l.1[i] += s_l[i];
-            r.0[i] += exp_y * (a_r + z) + z * z * exp_2;
+            r.0[i] += exp_y * (a_r + z) + z2 * exp_2;
             r.1[i] += exp_y * s_r[i];
             // if v_i == 0 {
             //     r0[i] -= exp_y;
@@ -144,7 +144,7 @@ impl RangeProof {
         let (x, _) = commit(&big_t_1, &big_t_2); // TODO: use a different commit?
 
         // Generate final values for proof (line 55-60)
-        let tau_x = tau_1 * x + tau_2 * x * x + z * z * gamma;
+        let tau_x = tau_1 * x + tau_2 * x * x + z2 * gamma;
         let mu = alpha + rho * x;
         let t_hat = t.0 + t.1 * x + t.2 * x * x;
 
@@ -162,7 +162,7 @@ impl RangeProof {
 
             // is it ok to convert a_l to scalar?
             l_total.push(Scalar::from_u64(a_l) - z + s_l[i] * x);
-            r_total.push(exp_y * (z + s_r[i] * x) + z * z * exp_2);
+            r_total.push(exp_y * (z + s_r[i] * x) + z2 * exp_2);
             if a_l == 0 {
                 r_total[i] -= exp_y
             }
@@ -233,24 +233,42 @@ impl RangeProof {
 
         let mut exp_y = Scalar::one(); // start at y^0 = 1
         let mut exp_2 = Scalar::one(); // start at 2^0 = 1
+        let mut sum_g_vec = RistrettoPoint::identity();
+
         for i in 0..self.n {
-            big_p -= g_vec[i] * z; // IS THIS RIGHT?
-            big_p += hprime_vec[i] * (z * exp_y + z * z * exp_2);
+            sum_g_vec += g_vec[i];
+        }
+        big_p -= sum_g_vec * z;
+
+        for i in 0..self.n {
+            // big_p -= g_vec[i] * z;
+            big_p += hprime_vec[i] * (z * exp_y + z2 * exp_2);
 
             exp_y = exp_y * y; // y^i -> y^(i+1)
             exp_2 = exp_2 + exp_2; // 2^i -> 2^(i+1)
         }
 
+        /*
+        // Compute big_s (in the paper: S; line 43-45)
+        let points_iter = iter::once(h).chain(g_vec.iter()).chain(h_vec.iter());
+        let randomness: Vec<_> = (0..(1 + 2 * n)).map(|_| Scalar::random(&mut rng)).collect();
+        let big_s = ristretto::multiscalar_mult(&randomness, points_iter);
+*/
         // line 65: check big_p against l, r
         let mut big_p_check = self.h * self.mu;
-        for i in 0..self.n {
-            big_p_check += g_vec[i] * self.l[i] + hprime_vec[i] * self.r[i];
-        }
-        if big_p != big_p_check {
-            println!("fails check on line 65: big_p != g * l + hprime * r");
-            return false;
-        }
+        {
 
+            let points_iter = g_vec.iter().chain(hprime_vec.iter());
+            let scalars_iter = self.l.iter().chain(self.r.iter());
+            big_p_check += ristretto::multiscalar_mult(scalars_iter, points_iter);
+            // for i in 0..self.n {
+            //     big_p_check += g_vec[i] * self.l[i] + hprime_vec[i] * self.r[i];
+            // }
+            if big_p != big_p_check {
+                println!("fails check on line 65: big_p != g * l + hprime * r");
+                return false;
+            }
+        }
         // line 66: check t = l * r
         if self.t != inner_product(&self.l, &self.r) {
             println!("fails check on line 66: t != l * r");
@@ -394,13 +412,25 @@ mod bench {
         b.iter(|| make_generators(&RISTRETTO_BASEPOINT_POINT, 100));
     }
     #[bench]
-    fn benchmark_make_proofs(b: &mut Bencher) {
-        for n in &[4, 8, 16, 32] {
-            b.iter(|| RangeProof::generate_proof(0, *n));
-            b.iter(|| RangeProof::generate_proof(2u64.pow(*n as u32) - 1, *n));
-            b.iter(|| RangeProof::generate_proof(2u64.pow(*n as u32), *n));
-            b.iter(|| RangeProof::generate_proof(2u64.pow(*n as u32) + 1, *n));
-            b.iter(|| RangeProof::generate_proof(u64::max_value(), *n));
-        }
+    fn benchmark_make_proofs_64(b: &mut Bencher) {
+        let mut rng: OsRng = OsRng::new().unwrap();
+        b.iter(|| RangeProof::generate_proof(rng.next_u64(), 64));
+    }
+    #[bench]
+    fn benchmark_make_proofs_32(b: &mut Bencher) {
+        let mut rng: OsRng = OsRng::new().unwrap();
+        b.iter(|| RangeProof::generate_proof(rng.next_u32() as u64, 32));
+    }
+    #[bench]
+    fn benchmark_verify_proof_64(b: &mut Bencher) {
+        let mut rng: OsRng = OsRng::new().unwrap();
+        let rp = RangeProof::generate_proof(rng.next_u64(), 64);
+        b.iter(|| rp.verify_proof());
+    }
+    #[bench]
+    fn benchmark_verify_proof_32(b: &mut Bencher) {
+        let mut rng: OsRng = OsRng::new().unwrap();
+        let rp = RangeProof::generate_proof(rng.next_u32() as u64, 32);
+        b.iter(|| rp.verify_proof());
     }
 }
