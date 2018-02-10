@@ -10,9 +10,7 @@ use curve25519_dalek::ristretto;
 use curve25519_dalek::traits::Identity;
 use sha2::{Digest, Sha256, Sha512};
 use curve25519_dalek::scalar::Scalar;
-use rand::OsRng;
-// use rand::SeedableRng
-// use rand::StdRng;
+use rand::{OsRng, Rng};
 
 struct PolyDeg3(Scalar, Scalar, Scalar);
 struct VecPoly2(Vec<Scalar>, Vec<Scalar>);
@@ -78,48 +76,12 @@ impl RangeProof {
         // Generate y, z by committing to A, S (line 46-48)
         let (y, z) = commit(&big_a, &big_s);
 
-        // Calculate t
-
-        /*
-        // APPROACH 1 TO CALCULATING T:
-        // calculate vectors l0, l1, r0, r1 and multiply
-        let mut l = VecPoly2::new(n);
-        let mut r = VecPoly2::new(n);
-        let mut t = PolyDeg3::new();
-        let mut exp_y = Scalar::one(); // start at y^0 = 1
-        let mut exp_2 = Scalar::one(); // start at 2^0 = 1
-
-        for i in 0..n {
-        	let v_i = (v >> i) & 1;
-        	let a_l = Scalar::from_u64(v_i);
-        	let a_r = a_l - Scalar::one();
-
-            l.0[i] += a_l - z;
-            l.1[i] += s_l[i];
-            r.0[i] += exp_y * (a_r + z) + z2 * exp_2;
-            r.1[i] += exp_y * s_r[i];
-            // if v_i == 0 {
-            //     r0[i] -= exp_y;
-            // } else {
-            // 	   l0[i] += Scalar::one();
-            // }
-            exp_y = exp_y * y; // y^i -> y^(i+1)
-            exp_2 = exp_2 + exp_2; // 2^i -> 2^(i+1)
-        }
-
-        t.0 = inner_product(&l.0, &r.0);
-        t.1 = inner_product(&l.0, &r.1) + inner_product(&l.1, &r.0);
-        t.2 = inner_product(&l.1, &r.1);
-        */
-
-        // APPROACH 2 TO CALCULATING T:
-        // calculate scalars t0, t1, t2 seperately
+        // Calculate t by calculating scalars t0, t1, t2 seperately
         let mut t = PolyDeg3::new();
         let mut exp_y = Scalar::one(); // start at y^0 = 1
         let mut exp_2 = Scalar::one(); // start at 2^0 = 1
         let z2 = z * z;
         let z3 = z2 * z;
-
         for i in 0..n {
             let v_i = (v >> i) & 1;
             t.0 += exp_y * (z - z2) - z3 * exp_2;
@@ -136,6 +98,35 @@ impl RangeProof {
             exp_2 = exp_2 + exp_2; // 2^i -> 2^(i+1)
         }
 
+        /*
+        // alternative approach to calculating t: calculate vectors l0, l1, r0, r1 and multiply
+        let mut l = VecPoly2::new(n);
+        let mut r = VecPoly2::new(n);
+        let z2 = z * z;
+        let mut t = PolyDeg3::new();
+        let mut exp_y = Scalar::one(); // start at y^0 = 1
+        let mut exp_2 = Scalar::one(); // start at 2^0 = 1
+        for i in 0..n {
+        	let v_i = (v >> i) & 1;
+
+            l.0[i] -= z;
+            l.1[i] += s_l[i];
+            r.0[i] += exp_y * z + z2 * exp_2;
+            r.1[i] += exp_y * s_r[i];
+            if v_i == 0 {
+                r.0[i] -= exp_y;
+            } else {
+            	l.0[i] += Scalar::one();
+            }
+            exp_y = exp_y * y; // y^i -> y^(i+1)
+            exp_2 = exp_2 + exp_2; // 2^i -> 2^(i+1)
+        }
+        t.0 = inner_product(&l.0, &r.0);
+        t.1 = inner_product(&l.0, &r.1) + inner_product(&l.1, &r.0);
+        t.2 = inner_product(&l.1, &r.1);
+        */
+
+
         // Generate x by committing to big_t_1, big_t_2 (line 49-54)
         let tau_1 = Scalar::random(&mut rng);
         let tau_2 = Scalar::random(&mut rng);
@@ -150,8 +141,6 @@ impl RangeProof {
 
         // Calculate l, r - which is only necessary if not doing IPP (line 55-57)
         // Adding this in a seperate loop so we can remove it easily later
-
-        // APPROACH 1 TO CALCULATING l, r
         let mut exp_y = Scalar::one(); // start at y^0 = 1
         let mut exp_2 = Scalar::one(); // start at 2^0 = 1
         let mut l_total = Vec::new();
@@ -159,19 +148,19 @@ impl RangeProof {
 
         for i in 0..n {
             let a_l = (v >> i) & 1;
-
-            // is it ok to convert a_l to scalar?
-            l_total.push(Scalar::from_u64(a_l) - z + s_l[i] * x);
+            l_total.push(-z + s_l[i] * x);
             r_total.push(exp_y * (z + s_r[i] * x) + z2 * exp_2);
             if a_l == 0 {
-                r_total[i] -= exp_y
+                r_total[i] -= exp_y;
+            } else {
+                l_total[i] += Scalar::one();
             }
             exp_y = exp_y * y; // y^i -> y^(i+1)
             exp_2 = exp_2 + exp_2; // 2^i -> 2^(i+1)
         }
 
         /*
-        // APPROACH 2 TO CALCULATING l, r
+        // alternative approach to calculating l, r: calculate from computed l0, l1, r0, r1
         let l_total = l.eval(x);
         let r_total = r.eval(x);
         */
@@ -202,21 +191,14 @@ impl RangeProof {
         let g_vec = make_generators(&self.g, self.n);
         let mut hprime_vec = make_generators(&self.h, self.n);
 
-        // line 62: calculate hprime_vec
-        let mut exp_y = Scalar::one(); // start at y^0 = 1
-        for i in 0..self.n {
-            hprime_vec[i] = hprime_vec[i] * Scalar::invert(&exp_y);
-            exp_y = exp_y * y; // y^i -> y^(i+1)
-        }
-
-        // line 63
+        // line 63: check that t = t0 + t1 * x + t2 * x * x
         let z2 = z * z;
         let z3 = z2 * z;
         let mut power_g = Scalar::zero();
         let mut exp_y = Scalar::one(); // start at y^0 = 1
         let mut exp_2 = Scalar::one(); // start at 2^0 = 1
         for _ in 0..self.n {
-            power_g += -z2 * exp_y - z3 * exp_2 + z * exp_y;
+            power_g += (z - z2) * exp_y - z3 * exp_2;
 
             exp_y = exp_y * y; // y^i -> y^(i+1)
             exp_2 = exp_2 + exp_2; // 2^i -> 2^(i+1)
@@ -228,48 +210,38 @@ impl RangeProof {
             return false;
         }
 
-        // line 64: calculate big_p
-        let mut big_p = self.big_a + self.big_s * x;
-
-        let mut exp_y = Scalar::one(); // start at y^0 = 1
-        let mut exp_2 = Scalar::one(); // start at 2^0 = 1
+        // line 62: calculate hprime
+        // line 64: compute commitment to l, r
         let mut sum_g_vec = RistrettoPoint::identity();
-
         for i in 0..self.n {
             sum_g_vec += g_vec[i];
         }
+        let mut big_p = self.big_a + self.big_s * x;
         big_p -= sum_g_vec * z;
 
+        let mut exp_y = Scalar::one(); // start at y^0 = 1
+        let mut exp_2 = Scalar::one(); // start at 2^0 = 1
+        let inverse_y = Scalar::invert(&y);
+        let mut inv_exp_y = Scalar::one(); // start at y^-0 = 1
         for i in 0..self.n {
-            // big_p -= g_vec[i] * z;
+            hprime_vec[i] = hprime_vec[i] * inv_exp_y;
             big_p += hprime_vec[i] * (z * exp_y + z2 * exp_2);
-
             exp_y = exp_y * y; // y^i -> y^(i+1)
             exp_2 = exp_2 + exp_2; // 2^i -> 2^(i+1)
+            inv_exp_y = inv_exp_y * inverse_y; // y^(-i) * y^(-1) -> y^(-(i+1))
         }
 
-        /*
-        // Compute big_s (in the paper: S; line 43-45)
-        let points_iter = iter::once(h).chain(g_vec.iter()).chain(h_vec.iter());
-        let randomness: Vec<_> = (0..(1 + 2 * n)).map(|_| Scalar::random(&mut rng)).collect();
-        let big_s = ristretto::multiscalar_mult(&randomness, points_iter);
-*/
-        // line 65: check big_p against l, r
+        // line 65: check that l, r are correct
         let mut big_p_check = self.h * self.mu;
-        {
-
-            let points_iter = g_vec.iter().chain(hprime_vec.iter());
-            let scalars_iter = self.l.iter().chain(self.r.iter());
-            big_p_check += ristretto::multiscalar_mult(scalars_iter, points_iter);
-            // for i in 0..self.n {
-            //     big_p_check += g_vec[i] * self.l[i] + hprime_vec[i] * self.r[i];
-            // }
-            if big_p != big_p_check {
-                println!("fails check on line 65: big_p != g * l + hprime * r");
-                return false;
-            }
+        let points_iter = g_vec.iter().chain(hprime_vec.iter());
+        let scalars_iter = self.l.iter().chain(self.r.iter());
+        big_p_check += ristretto::multiscalar_mult(scalars_iter, points_iter);
+        if big_p != big_p_check {
+            println!("fails check on line 65: big_p != g * l + hprime * r");
+            return false;
         }
-        // line 66: check t = l * r
+
+        // line 66: check that t is correct
         if self.t != inner_product(&self.l, &self.r) {
             println!("fails check on line 66: t != l * r");
             return false;
@@ -381,7 +353,7 @@ mod tests {
     }
     #[test]
     fn test_verify_rand_big() {
-        for i in 0..50 {
+        for _ in 0..50 {
             let mut rng: OsRng = OsRng::new().unwrap();
             let v: u64 = rng.next_u64();
             println!("v: {:?}", v);
@@ -392,7 +364,7 @@ mod tests {
     }
     #[test]
     fn test_verify_rand_small() {
-        for i in 0..50 {
+        for _ in 0..50 {
             let mut rng: OsRng = OsRng::new().unwrap();
             let v: u32 = rng.next_u32();
             println!("v: {:?}", v);
@@ -412,12 +384,12 @@ mod bench {
         b.iter(|| make_generators(&RISTRETTO_BASEPOINT_POINT, 100));
     }
     #[bench]
-    fn benchmark_make_proofs_64(b: &mut Bencher) {
+    fn benchmark_make_proof_64(b: &mut Bencher) {
         let mut rng: OsRng = OsRng::new().unwrap();
         b.iter(|| RangeProof::generate_proof(rng.next_u64(), 64));
     }
     #[bench]
-    fn benchmark_make_proofs_32(b: &mut Bencher) {
+    fn benchmark_make_proof_32(b: &mut Bencher) {
         let mut rng: OsRng = OsRng::new().unwrap();
         b.iter(|| RangeProof::generate_proof(rng.next_u32() as u64, 32));
     }
