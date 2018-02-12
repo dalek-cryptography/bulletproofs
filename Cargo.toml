@@ -9,6 +9,9 @@ sha2 = "^0.7"
 rand = "^0.4"
 tiny-keccak = "^1.4"
 
+[dev-dependencies]
+hex = "^0.3"
+
 [features]
 yolocrypto = ["curve25519-dalek/yolocrypto"]
 std = ["curve25519-dalek/std"]
