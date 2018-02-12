@@ -147,6 +147,16 @@ mod tests {
         }
         {
             let mut ro = RandomOracle::new(b"TestProtocol");
+            ro.commit(b"msg");
+            ro.commit(b"1msg2");
+            {
+                let mut ch = [0u8; 8];
+                ro.challenge_bytes(&mut ch);
+                assert_eq!(hex::encode(ch), "dbbd832ca1fd3c2f");
+            }
+        }
+        {
+            let mut ro = RandomOracle::new(b"TestProtocol");
             ro.commit(b"ms");
             ro.commit(b"g1ms");
             ro.commit(b"g2");
