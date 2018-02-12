@@ -24,13 +24,7 @@ impl RandomOracle {
     /// Sends a message to a random oracle.
     /// Each message must be less than 256 bytes long.
     pub fn commit(&mut self, message: &[u8]) {
-        match self.state {
-            SpongeState::Absorbing => {}
-            SpongeState::Squeezing => {
-                self.pad();
-                self.state = SpongeState::Absorbing;
-            }			
-        }
+        self.set_state(SpongeState::Absorbing);
         let len = message.len();
         if len > 255 {
             panic!("Committed message must be less than 256 bytes!");
@@ -43,13 +37,7 @@ impl RandomOracle {
 
     /// Extracts an arbitrary-sized number of bytes as a challenge.
     pub fn challenge_bytes(&mut self, mut output: &mut [u8]) {
-        match self.state {
-            SpongeState::Absorbing => {
-                self.pad();
-                self.state = SpongeState::Squeezing;
-            }
-            SpongeState::Squeezing => {}
-        }
+        self.set_state(SpongeState::Squeezing);
         self.hash.squeeze(&mut output);
     }
 
@@ -61,6 +49,15 @@ impl RandomOracle {
         Scalar::from_bytes_mod_order_wide(&buf)
     }
 
+    /// Ensures that the state is correct.
+    /// Does necessary padding+permutation if needed to transition from one state to another.
+    fn set_state(&mut self, newstate: SpongeState) {
+        if self.state != newstate {
+            self.pad();
+            self.state = newstate;
+        }
+    }
+
     /// Pad separates the prior operations by a full permutation.
     /// Each incoming message is length-prefixed anyway, but padding
     /// enables pre-computing and re-using the oracle state.
@@ -69,8 +66,7 @@ impl RandomOracle {
         // so we'd probably need to fork and either document it, or tweak to make it more sensible.
         // 1. pad() only adds keccak padding, but does not advance internal offset and
         //    does not perform a permutation round.
-        // 2. fill_block() does not pad, but resets the internal offset and does a permutation round.        
-
+        // 2. fill_block() does not pad, but resets the internal offset and does a permutation round.
         match self.state {
             SpongeState::Absorbing => {
                 self.hash.pad();
@@ -86,7 +82,7 @@ impl RandomOracle {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone,PartialEq)]
 enum SpongeState {
     Absorbing,
     Squeezing,
