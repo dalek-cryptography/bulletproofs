@@ -1,5 +1,4 @@
 #![feature(test)]
-#![feature(non_ascii_idents)]
 #![allow(non_snake_case)]
 
 extern crate core;
@@ -9,7 +8,7 @@ extern crate test;
 extern crate rand;
 extern crate tiny_keccak;
 
-mod fiatshamir;
+mod random_oracle;
 
 use std::iter;
 use sha2::{Digest, Sha256, Sha512};
