@@ -1,21 +1,28 @@
 #![feature(test)]
+#![feature(non_ascii_idents)]
+#![allow(non_snake_case)]
 
+extern crate core;
 extern crate curve25519_dalek;
 extern crate sha2;
 extern crate test;
 extern crate rand;
+extern crate tiny_keccak;
+
+mod fiatshamir;
+
 use std::iter;
+use sha2::{Digest, Sha256, Sha512};
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::ristretto;
 use curve25519_dalek::traits::Identity;
-use sha2::{Digest, Sha256, Sha512};
 use curve25519_dalek::scalar::Scalar;
-use rand::{OsRng, Rng};
+use rand::OsRng;
 
 struct PolyDeg3(Scalar, Scalar, Scalar);
 struct VecPoly2(Vec<Scalar>, Vec<Scalar>);
 
-struct RangeProof {
+pub struct RangeProof {
     tau_x: Scalar,
     mu: Scalar,
     t: Scalar,
@@ -312,6 +319,8 @@ pub fn inner_product(a: &Vec<Scalar>, b: &Vec<Scalar>) -> Scalar {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rand::Rng;
+
     #[test]
     fn test_inner_product() {
         let a = vec![
@@ -376,6 +385,7 @@ mod tests {
 
 mod bench {
     use super::*;
+    use rand::Rng;
     use test::Bencher;
 
     #[bench]
