@@ -16,7 +16,8 @@ impl RandomOracle {
             state: SpongeState::Absorbing,
         };
         ro.commit(label);
-        ro.pad(); // makes sure the label is disambiguated from the rest of the messages.
+        // makes sure the label is disambiguated from the rest of the messages.
+        ro.pad();
         ro
     }
 
@@ -26,7 +27,6 @@ impl RandomOracle {
         match self.state {
             SpongeState::Absorbing => {}
             SpongeState::Squeezing => {
-                // no padding because squeeze phase does not insert data
                 self.pad();
                 self.state = SpongeState::Absorbing;
             }			
