@@ -41,7 +41,7 @@ impl RandomOracle {
         self.hash.squeeze(&mut output);
     }
 
-    /// Gets a challenge in a form of a scalar by squeezing 
+    /// Gets a challenge in a form of a scalar by squeezing
     /// 64 bytes and reducing them to a scalar.
     pub fn challenge_scalar(&mut self) -> Scalar {
         let mut buf = [0u8; 64];
@@ -62,11 +62,12 @@ impl RandomOracle {
     /// Each incoming message is length-prefixed anyway, but padding
     /// enables pre-computing and re-using the oracle state.
     fn pad(&mut self) {
-        // tiny_keccak's API is not very clear, 
+        // tiny_keccak's API is not very clear,
         // so we'd probably need to fork and either document it, or tweak to make it more sensible.
         // 1. pad() only adds keccak padding, but does not advance internal offset and
         //    does not perform a permutation round.
-        // 2. fill_block() does not pad, but resets the internal offset and does a permutation round.
+        // 2. fill_block() does not pad, but resets the internal offset
+        //    and does a permutation round.
         match self.state {
             SpongeState::Absorbing => {
                 self.hash.pad();
@@ -82,7 +83,7 @@ impl RandomOracle {
     }
 }
 
-#[derive(Clone,PartialEq)]
+#[derive(Clone, PartialEq)]
 enum SpongeState {
     Absorbing,
     Squeezing,
