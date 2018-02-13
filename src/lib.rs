@@ -19,7 +19,6 @@ use curve25519_dalek::scalar::Scalar;
 use rand::OsRng;
 
 struct PolyDeg3(Scalar, Scalar, Scalar);
-struct VecPoly2(Vec<Scalar>, Vec<Scalar>);
 
 pub struct RangeProof {
     tau_x: Scalar,
@@ -104,35 +103,6 @@ impl RangeProof {
             exp_2 = exp_2 + exp_2; // 2^i -> 2^(i+1)
         }
 
-        /*
-        // alternative approach to calculating t: calculate vectors l0, l1, r0, r1 and multiply
-        let mut l = VecPoly2::new(n);
-        let mut r = VecPoly2::new(n);
-        let z2 = z * z;
-        let mut t = PolyDeg3::new();
-        let mut exp_y = Scalar::one(); // start at y^0 = 1
-        let mut exp_2 = Scalar::one(); // start at 2^0 = 1
-        for i in 0..n {
-        	let v_i = (v >> i) & 1;
-
-            l.0[i] -= z;
-            l.1[i] += s_l[i];
-            r.0[i] += exp_y * z + z2 * exp_2;
-            r.1[i] += exp_y * s_r[i];
-            if v_i == 0 {
-                r.0[i] -= exp_y;
-            } else {
-            	l.0[i] += Scalar::one();
-            }
-            exp_y = exp_y * y; // y^i -> y^(i+1)
-            exp_2 = exp_2 + exp_2; // 2^i -> 2^(i+1)
-        }
-        t.0 = inner_product(&l.0, &r.0);
-        t.1 = inner_product(&l.0, &r.1) + inner_product(&l.1, &r.0);
-        t.2 = inner_product(&l.1, &r.1);
-        */
-
-
         // Generate x by committing to big_t_1, big_t_2 (line 49-54)
         let tau_1 = Scalar::random(&mut rng);
         let tau_2 = Scalar::random(&mut rng);
@@ -164,12 +134,6 @@ impl RangeProof {
             exp_y = exp_y * y; // y^i -> y^(i+1)
             exp_2 = exp_2 + exp_2; // 2^i -> 2^(i+1)
         }
-
-        /*
-        // alternative approach to calculating l, r: calculate from computed l0, l1, r0, r1
-        let l_total = l.eval(x);
-        let r_total = r.eval(x);
-        */
 
         // Generate proof! (line 61)
         RangeProof {
@@ -260,20 +224,6 @@ impl RangeProof {
 impl PolyDeg3 {
     pub fn new() -> PolyDeg3 {
         PolyDeg3(Scalar::zero(), Scalar::zero(), Scalar::zero())
-    }
-}
-
-impl VecPoly2 {
-    pub fn new(n: usize) -> VecPoly2 {
-        VecPoly2(vec![Scalar::zero(); n], vec![Scalar::zero(); n])
-    }
-    pub fn eval(&self, x: Scalar) -> Vec<Scalar> {
-        let n = self.0.len();
-        let mut out = vec![Scalar::zero(); n];
-        for i in 0..n {
-            out[i] += self.0[i] + self.1[i] * x;
-        }
-        out
     }
 }
 
