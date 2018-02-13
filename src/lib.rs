@@ -9,6 +9,7 @@ extern crate rand;
 extern crate tiny_keccak;
 
 mod random_oracle;
+mod scalar;
 
 use std::iter;
 use sha2::{Digest, Sha256, Sha512};
