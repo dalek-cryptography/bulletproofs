@@ -140,11 +140,9 @@ impl RangeProof {
         }
     }
 
-    pub fn verify_proof(&self) -> bool {
+    pub fn verify_proof(&self, g_vec: Vec<RistrettoPoint>, mut hprime_vec: Vec<RistrettoPoint>) -> bool {
         let (y, z) = commit(&self.big_a, &self.big_s);
         let (x, _) = commit(&self.big_t_1, &self.big_t_2);
-        let g_vec = make_generators(&self.g, self.n);
-        let mut hprime_vec = make_generators(&self.h, self.n);
 
         // line 63: check that t = t0 + t1 * x + t2 * x * x
         let z2 = z * z;
@@ -252,7 +250,7 @@ pub fn commit(v1: &RistrettoPoint, v2: &RistrettoPoint) -> (Scalar, Scalar) {
     (c1, c2)
 }
 
-pub fn inner_product(a: &Vec<Scalar>, b: &Vec<Scalar>) -> Scalar {
+pub fn inner_product(a: &[Scalar], b: &[Scalar]) -> Scalar {
     let mut out = Scalar::zero();
     if a.len() != b.len() {
         // throw some error
@@ -264,7 +262,7 @@ pub fn inner_product(a: &Vec<Scalar>, b: &Vec<Scalar>) -> Scalar {
     out
 }
 
-pub fn add_vec(a: &Vec<Scalar>, b: &Vec<Scalar>) -> Vec<Scalar> {
+pub fn add_vec(a: &[Scalar], b: &[Scalar]) -> Vec<Scalar> {
     let mut out = Vec::new();
     if a.len() != b.len() {
         // throw some error
@@ -309,15 +307,29 @@ mod tests {
         for n in &[1, 2, 4, 8, 16, 32] {
             //println!("n: {:?}", n);
             let rp = RangeProof::generate_proof(0, *n);
-            assert_eq!(rp.verify_proof(), true);
+            let g_vec = make_generators(&rp.g, rp.n);
+            let mut h_vec = make_generators(&rp.h, rp.n);
+            assert_eq!(rp.verify_proof(g_vec, h_vec), true);
+
             let rp = RangeProof::generate_proof(2u64.pow(*n as u32) - 1, *n);
-            assert_eq!(rp.verify_proof(), true);
+            let g_vec = make_generators(&rp.g, rp.n);
+            let mut h_vec = make_generators(&rp.h, rp.n);
+            assert_eq!(rp.verify_proof(g_vec, h_vec), true);
+
             let rp = RangeProof::generate_proof(2u64.pow(*n as u32), *n);
-            assert_eq!(rp.verify_proof(), false);
+            let g_vec = make_generators(&rp.g, rp.n);
+            let mut h_vec = make_generators(&rp.h, rp.n);            
+            assert_eq!(rp.verify_proof(g_vec, h_vec), false);
+
             let rp = RangeProof::generate_proof(2u64.pow(*n as u32) + 1, *n);
-            assert_eq!(rp.verify_proof(), false);
+            let g_vec = make_generators(&rp.g, rp.n);
+            let mut h_vec = make_generators(&rp.h, rp.n);  
+            assert_eq!(rp.verify_proof(g_vec, h_vec), false);
+
             let rp = RangeProof::generate_proof(u64::max_value(), *n);
-            assert_eq!(rp.verify_proof(), false);
+            let g_vec = make_generators(&rp.g, rp.n);
+            let mut h_vec = make_generators(&rp.h, rp.n);  
+            assert_eq!(rp.verify_proof(g_vec, h_vec), false);
         }
     }
     #[test]
@@ -327,8 +339,10 @@ mod tests {
             let v: u64 = rng.next_u64();
             //println!("v: {:?}", v);
             let rp = RangeProof::generate_proof(v, 32);
-            let expected = v <= 2u64.pow(32);
-            assert_eq!(rp.verify_proof(), expected);
+            let g_vec = make_generators(&rp.g, rp.n);
+            let mut h_vec = make_generators(&rp.h, rp.n);
+            let expected = v <= 2u64.pow(32); 
+            assert_eq!(rp.verify_proof(g_vec, h_vec), expected);
         }
     }
     #[test]
@@ -338,7 +352,9 @@ mod tests {
             let v: u32 = rng.next_u32();
             //println!("v: {:?}", v);
             let rp = RangeProof::generate_proof(v as u64, 32);
-            assert_eq!(rp.verify_proof(), true);
+            let g_vec = make_generators(&rp.g, rp.n);
+            let mut h_vec = make_generators(&rp.h, rp.n);
+            assert_eq!(rp.verify_proof(g_vec, h_vec), true);
         }
     }
 }
@@ -368,12 +384,16 @@ mod bench {
     fn benchmark_verify_proof_64(b: &mut Bencher) {
         let mut rng: OsRng = OsRng::new().unwrap();
         let rp = RangeProof::generate_proof(rng.next_u64(), 64);
-        b.iter(|| rp.verify_proof());
+        let g_vec = make_generators(&rp.g, rp.n);
+        let mut h_vec = make_generators(&rp.h, rp.n);
+        b.iter(|| rp.verify_proof(g_vec.clone(), h_vec.clone));
     }
     #[bench]
     fn benchmark_verify_proof_32(b: &mut Bencher) {
         let mut rng: OsRng = OsRng::new().unwrap();
         let rp = RangeProof::generate_proof(rng.next_u32() as u64, 32);
-        b.iter(|| rp.verify_proof());
+        let g_vec = make_generators(&rp.g, rp.n);
+        let mut h_vec = make_generators(&rp.h, rp.n);
+        b.iter(|| rp.verify_proof(g_vec.clone(), h_vec.clone()));
     }
 }
