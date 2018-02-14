@@ -252,7 +252,7 @@ pub fn commit(v1: &RistrettoPoint, v2: &RistrettoPoint) -> (Scalar, Scalar) {
     (c1, c2)
 }
 
-pub fn inner_product(a: &Vec<Scalar>, b: &Vec<Scalar>) -> Scalar {
+pub fn inner_product(a: &[Scalar], b: &[Scalar]) -> Scalar {
     let mut out = Scalar::zero();
     if a.len() != b.len() {
         // throw some error
@@ -264,7 +264,7 @@ pub fn inner_product(a: &Vec<Scalar>, b: &Vec<Scalar>) -> Scalar {
     out
 }
 
-pub fn add_vec(a: &Vec<Scalar>, b: &Vec<Scalar>) -> Vec<Scalar> {
+pub fn add_vec(a: &[Scalar], b: &[Scalar]) -> Vec<Scalar> {
     let mut out = Vec::new();
     if a.len() != b.len() {
         // throw some error
