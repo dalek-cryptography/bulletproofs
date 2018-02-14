@@ -343,7 +343,7 @@ mod tests {
     }
 }
 
-#[cfg(all(test, feature = "bench"))]
+#[cfg(test)]
 mod bench {
     use super::*;
     use rand::Rng;

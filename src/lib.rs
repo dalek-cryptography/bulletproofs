@@ -1,11 +1,11 @@
-#![cfg_attr(feature = "bench", feature(test))]
+#![feature(test)]
 
 extern crate curve25519_dalek;
 extern crate sha2;
 extern crate rand;
 extern crate tiny_keccak;
 
-#[cfg(all(test, feature = "bench"))]
+#[cfg(test)]
 extern crate test;
 
 mod random_oracle;

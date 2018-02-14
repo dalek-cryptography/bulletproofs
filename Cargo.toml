@@ -15,4 +15,3 @@ hex = "^0.3"
 [features]
 yolocrypto = ["curve25519-dalek/yolocrypto"]
 std = ["curve25519-dalek/std"]
-bench = []
