@@ -1,4 +1,5 @@
 #![allow(non_snake_case)]
+#![feature(nll)]
 
 use std::iter;
 use curve25519_dalek::ristretto::RistrettoPoint;
@@ -6,17 +7,14 @@ use curve25519_dalek::ristretto;
 use curve25519_dalek::scalar::Scalar;
 use range_proof::inner_product;
 use range_proof::commit; // replace with the random oracle
+use range_proof::make_generators;
+use sha2::Sha256;
 
 pub struct Prover {
 
 }
 
 pub struct Proof {
-	// g_vec: Vec<RistrettoPoint>,
-	// h_vec: Vec<RistrettoPoint>,
-	// u: RistrettoPoint,
-	// p: RistrettoPoint,
-
 	l_vec: Vec<RistrettoPoint>,
 	r_vec: Vec<RistrettoPoint>,
 	a_final: Scalar,
@@ -27,15 +25,15 @@ impl Prover {
 	pub fn prove(
 		mut G_vec: Vec<RistrettoPoint>,
 		mut H_vec: Vec<RistrettoPoint>,
-		Q: RistrettoPoint,
 		mut P: RistrettoPoint,
+		Q: RistrettoPoint,
 		mut a_vec: Vec<Scalar>,
 		mut b_vec: Vec<Scalar>,		
 	) -> Proof {
-		let G = &mut G_vec[..];
-		let H = &mut H_vec[..];
-		let a = &mut a_vec[..];
-		let b = &mut b_vec[..];
+		let mut G = &mut G_vec[..];
+		let mut H = &mut H_vec[..];
+		let mut a = &mut a_vec[..];
+		let mut b = &mut b_vec[..];
 
 		let mut n = G.len();
 		let lg_n = n.next_power_of_two().trailing_zeros() as usize;
@@ -46,9 +44,16 @@ impl Prover {
 			n = n/2;
 			let (a_l, a_r) = a.split_at_mut(n);
 			let (b_l, b_r) = b.split_at_mut(n);
-
 			let (G_l, G_r) = G.split_at_mut(n);
 			let (H_l, H_r) = H.split_at_mut(n);
+			// let a_l = &a[0..n];
+			// let a_r = &a[n..n*2];
+			// let b_l = &b[0..n];
+			// let b_r = &b[n..n*2];
+			// let G_l = &G[0..n];
+			// let G_r = &G[n..n*2];
+			// let H_l = &H[0..n];
+			// let H_r = &H[n..n*2];	
 
 			let c_l = inner_product(&a_l, &b_r);
 			let c_r = inner_product(&a_r, &b_l);
@@ -90,4 +95,35 @@ impl Prover {
 			b_final: b[0],
 		}
 	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	#[test]
+	fn test_prover_basic() {
+
+	}
+}
+
+#[cfg(test)]
+mod bench {
+
+    use super::*;
+    use test::Bencher;
+
+    #[bench]
+    fn benchmark_prover_basic(b: &mut Bencher) {
+    	let n = 64;
+        let G = &RistrettoPoint::hash_from_bytes::<Sha256>("hello".as_bytes());
+        let H = &RistrettoPoint::hash_from_bytes::<Sha256>("there".as_bytes());
+        let G_vec = make_generators(G, n);
+        let H_vec = make_generators(H, n);
+        let Q = RistrettoPoint::hash_from_bytes::<Sha256>("more".as_bytes());
+        let P = RistrettoPoint::hash_from_bytes::<Sha256>("points".as_bytes());
+        let a_vec = vec![Scalar::from_u64(1); n];
+        let b_vec = vec![Scalar::from_u64(2); n];
+
+        b.iter(|| Prover::prove(G_vec.clone(), H_vec.clone(), P, Q, a_vec.clone(), b_vec.clone()));
+    }
 }
