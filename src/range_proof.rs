@@ -41,7 +41,7 @@ impl RangeProof {
         // useful for debugging:
         // let mut rng: StdRng = StdRng::from_seed(&[1, 2, 3, 4]);
 
-        // Setup (line 34)
+        // Setup: generate points, commit to v (in the paper: g, h, bold(g), bolg(h); line 34)
         let B = &RistrettoPoint::hash_from_bytes::<Sha256>("hello".as_bytes());
         let B_blinding = &RistrettoPoint::hash_from_bytes::<Sha256>("there".as_bytes());
         let G = make_generators(B, n);
@@ -61,12 +61,12 @@ impl RangeProof {
             }
         }
 
-        // Compute S (in the paper: S; line 43-45)
+        // Compute S (line 43-45)
         let points_iter = iter::once(B_blinding).chain(G.iter()).chain(H.iter());
         let randomness: Vec<_> = (0..(1 + 2 * n)).map(|_| Scalar::random(&mut rng)).collect();
         let S = ristretto::multiscalar_mult(&randomness, points_iter);
 
-        // Save/label randomness (s_blinding, s_a, s_b) to be used later
+        // Save/label randomness to be used later (in the paper: rho, s_L, s_R)
         let s_blinding = &randomness[0];
         let s_a = &randomness[1..(n + 1)];
         let s_b = &randomness[(n + 1)..(1 + 2 * n)];
