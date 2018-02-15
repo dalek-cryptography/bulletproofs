@@ -15,5 +15,5 @@ cargo test
 Run benchmarks:
 
 ```
-cargo bench --features="bench"
+cargo bench
 ```
