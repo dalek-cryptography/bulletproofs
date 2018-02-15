@@ -31,8 +31,8 @@ pub struct RangeProof {
 
     // public knowledge
     n: usize,
-    g: RistrettoPoint,
-    h: RistrettoPoint,
+    B: RistrettoPoint,
+    B_blinding: RistrettoPoint,
 }
 
 impl RangeProof {
@@ -135,16 +135,16 @@ impl RangeProof {
             T_2: T_2,
 
             n: n,
-            g: *B,
-            h: *B_blinding,
+            B: *B,
+            B_blinding: *B_blinding,
         }
     }
 
     pub fn verify_proof(&self) -> bool {
         let (y, z) = commit(&self.A, &self.S);
         let (x, _) = commit(&self.T_1, &self.T_2);
-        let G = make_generators(&self.g, self.n);
-        let mut hprime_vec = make_generators(&self.h, self.n);
+        let G = make_generators(&self.B, self.n);
+        let mut hprime_vec = make_generators(&self.B_blinding, self.n);
 
         // line 63: check that t = t0 + t1 * x + t2 * x * x
         let z2 = z * z;
@@ -158,8 +158,8 @@ impl RangeProof {
             exp_y = exp_y * y; // y^i -> y^(i+1)
             exp_2 = exp_2 + exp_2; // 2^i -> 2^(i+1)
         }
-        let t_check = self.g * power_g + self.V * z2 + self.T_1 * x + self.T_2 * x * x;
-        let t_commit = self.g * self.t + self.h * self.t_x_blinding;
+        let t_check = self.B * power_g + self.V * z2 + self.T_1 * x + self.T_2 * x * x;
+        let t_commit = self.B * self.t + self.B_blinding * self.t_x_blinding;
         if t_commit != t_check {
             //println!("fails check on line 63");
             return false;
@@ -187,7 +187,7 @@ impl RangeProof {
         }
 
         // line 65: check that l, r are correct
-        let mut big_p_check = self.h * self.mu;
+        let mut big_p_check = self.B_blinding * self.e_blinding;
         let points_iter = G.iter().chain(hprime_vec.iter());
         let scalars_iter = self.l.iter().chain(self.r.iter());
         big_p_check += ristretto::multiscalar_mult(scalars_iter, points_iter);
