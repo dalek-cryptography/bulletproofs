@@ -343,14 +343,14 @@ mod tests {
     }
 }
 
-#[cfg(all(test, feature = "bench"))]
+#[cfg(test)]
 mod bench {
     use super::*;
     use rand::Rng;
     use test::Bencher;
 
     #[bench]
-    fn make_generators(b: &mut Bencher) {
+    fn generators(b: &mut Bencher) {
         use curve25519_dalek::constants::RISTRETTO_BASEPOINT_POINT;
         b.iter(|| make_generators(&RISTRETTO_BASEPOINT_POINT, 100));
     }
