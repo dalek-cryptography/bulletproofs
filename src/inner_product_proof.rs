@@ -70,8 +70,8 @@ impl Prover {
 			for i in 0..n {
 				a_l[i] = a_l[i] * x + a_r[i] * x_inv;
 				b_l[i] = b_l[i] * x_inv + b_r[i] * x;
-				// G_l[i] = ristretto::multiscalar_mult(&[x_inv, x], &[G_l[i], G_r[i]]);
-				// H_l[i] = ristretto::multiscalar_mult(&[x, x_inv], &[H_l[i], H_r[i]]);
+				G_l[i] = ristretto::multiscalar_mult(&[x_inv, x], &[G_l[i], G_r[i]]);
+				H_l[i] = ristretto::multiscalar_mult(&[x, x_inv], &[H_l[i], H_r[i]]);
 			}
 
 			// rayon::join(||
@@ -87,17 +87,17 @@ impl Prover {
 			// 			}
 			// 		).last()			
 			// );
-			rayon::join(||
-				for i in 0..n {
-					G_l[i] = ristretto::multiscalar_mult(&[x_inv, x], &[G_l[i], G_r[i]]);
+			// rayon::join(||
+			// 	for i in 0..n {
+			// 		G_l[i] = ristretto::multiscalar_mult(&[x_inv, x], &[G_l[i], G_r[i]]);
 
-				},
-				||
-				for i in 0..n {
-					H_l[i] = ristretto::multiscalar_mult(&[x, x_inv], &[H_l[i], H_r[i]]);
+			// 	},
+			// 	||
+			// 	for i in 0..n {
+			// 		H_l[i] = ristretto::multiscalar_mult(&[x, x_inv], &[H_l[i], H_r[i]]);
 
-				}
-			);
+			// 	}
+			// );
 
 			P += ristretto::multiscalar_mult(&[x*x, x_inv*x_inv], &[L, R]);
 			a = a_l;
