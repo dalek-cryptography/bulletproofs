@@ -85,12 +85,12 @@ impl Prover {
 				.map(|(G_l_i, G_r_i)| {
 					*G_l_i = ristretto::multiscalar_mult(&[x_inv, x], &[*G_l_i, *G_r_i]);
 					}
-				).collect_into_vec(&mut Vec::new());
+				).for_each(|()|{});
 			H_l.par_iter_mut().zip(H_r.par_iter())
 				.map(|(H_l_i, H_r_i)| {
 					*H_l_i = ristretto::multiscalar_mult(&[x, x_inv], &[*H_l_i, *H_r_i]);
 					}
-				).collect_into_vec(&mut Vec::new());		
+				).for_each(|()|{});	
 			// rayon::join(||
 			// 	G_l.par_iter_mut().zip(G_r.par_iter())
 			// 		.map(|(G_l_i, G_r_i)| {
