@@ -72,31 +72,20 @@ impl Prover {
 				b_l[i] = b_l[i] * x_inv + b_r[i] * x;
 				// G_l[i] = ristretto::multiscalar_mult(&[x_inv, x], &[G_l[i], G_r[i]]);
 				// H_l[i] = ristretto::multiscalar_mult(&[x, x_inv], &[H_l[i], H_r[i]]);
-			}
-			G_l.iter_mut().zip(G_r.iter())
-				.map(|(G_l_i, G_r_i)| {
-					*G_l_i = ristretto::multiscalar_mult(&[x_inv, x], &[*G_l_i, *G_r_i]);
-					}
-				).last();
-			H_l.iter_mut().zip(H_r.iter())
-				.map(|(H_l_i, H_r_i)| {
-					*H_l_i = ristretto::multiscalar_mult(&[x, x_inv], &[*H_l_i, *H_r_i]);
-					}
-				).last();		
-
-			// rayon::join(||
-			// 	G_l.iter_mut().zip(G_r.iter())
-			// 		.map(|(G_l_i, G_r_i)| {
-			// 			*G_l_i = ristretto::multiscalar_mult(&[x_inv, x], &[*G_l_i, *G_r_i]);
-			// 			}
-			// 		).last(),
-			// 	||
-			// 	H_l.iter_mut().zip(H_r.iter())
-			// 		.map(|(H_l_i, H_r_i)| {
-			// 			*H_l_i = ristretto::multiscalar_mult(&[x, x_inv], &[*H_l_i, *H_r_i]);
-			// 			}
-			// 		).last()			
-			// );
+			}	
+			rayon::join(||
+				G_l.iter_mut().zip(G_r.iter())
+					.map(|(G_l_i, G_r_i)| {
+						*G_l_i = ristretto::multiscalar_mult(&[x_inv, x], &[*G_l_i, *G_r_i]);
+						}
+					).last(),
+				||
+				H_l.iter_mut().zip(H_r.iter())
+					.map(|(H_l_i, H_r_i)| {
+						*H_l_i = ristretto::multiscalar_mult(&[x, x_inv], &[*H_l_i, *H_r_i]);
+						}
+					).last()			
+			);
 			// rayon::join(||
 			// 	for i in 0..n {
 			// 		G_l[i] = ristretto::multiscalar_mult(&[x_inv, x], &[G_l[i], G_r[i]]);
