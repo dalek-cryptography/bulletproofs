@@ -9,7 +9,6 @@ use range_proof::inner_product;
 use range_proof::commit; // replace with the random oracle
 use range_proof::make_generators;
 use sha2::Sha256;
-
 pub struct Prover {
 
 }
@@ -45,15 +44,7 @@ impl Prover {
 			let (a_l, a_r) = a.split_at_mut(n);
 			let (b_l, b_r) = b.split_at_mut(n);
 			let (G_l, G_r) = G.split_at_mut(n);
-			let (H_l, H_r) = H.split_at_mut(n);
-			// let a_l = &a[0..n];
-			// let a_r = &a[n..n*2];
-			// let b_l = &b[0..n];
-			// let b_r = &b[n..n*2];
-			// let G_l = &G[0..n];
-			// let G_r = &G[n..n*2];
-			// let H_l = &H[0..n];
-			// let H_r = &H[n..n*2];	
+			let (H_l, H_r) = H.split_at_mut(n);	
 
 			let c_l = inner_product(&a_l, &b_r);
 			let c_r = inner_product(&a_r, &b_l);
@@ -81,6 +72,7 @@ impl Prover {
 				G_l[i] = ristretto::multiscalar_mult(&[x_inv, x], &[G_l[i], G_r[i]]);
 				H_l[i] = ristretto::multiscalar_mult(&[x, x_inv], &[H_l[i], H_r[i]]);
 			}
+
 			P += ristretto::multiscalar_mult(&[x*x, x_inv*x_inv], &[L, R]);
 			a = a_l;
 			b = b_l;
@@ -101,8 +93,42 @@ impl Prover {
 mod tests {
 	use super::*;
 	#[test]
-	fn test_prover_basic() {
+	fn make_ipp_64() {
+    	let n = 64;
+        let G = &RistrettoPoint::hash_from_bytes::<Sha256>("hello".as_bytes());
+        let H = &RistrettoPoint::hash_from_bytes::<Sha256>("there".as_bytes());
+        let G_vec = make_generators(G, n);
+        let H_vec = make_generators(H, n);
+        let Q = RistrettoPoint::hash_from_bytes::<Sha256>("more".as_bytes());
+        let P = RistrettoPoint::hash_from_bytes::<Sha256>("points".as_bytes());
+        let a_vec = vec![Scalar::from_u64(1); n];
+        let b_vec = vec![Scalar::from_u64(2); n];
 
+        let proof = Prover::prove(G_vec.clone(), H_vec.clone(), P, Q, a_vec.clone(), b_vec.clone());
+
+        assert_eq!(proof.a_final.as_bytes(), 
+        	&[61, 162, 237, 210, 105, 26, 179, 39, 111, 70, 186, 58, 83, 18, 46, 189, 41, 225, 70, 190, 73, 180, 43, 17, 86, 38, 166, 174, 31, 71, 100, 4]);
+        assert_eq!(proof.b_final.as_bytes(), 
+        	&[122, 68, 219, 165, 211, 52, 102, 79, 222, 140, 116, 117, 166, 36, 92, 122, 83, 194, 141, 124, 147, 104, 87, 34, 172, 76, 76, 93, 63, 142, 200, 8]);
+	}
+	#[test]
+	fn make_ipp_32() {
+    	let n = 32;
+        let G = &RistrettoPoint::hash_from_bytes::<Sha256>("hello".as_bytes());
+        let H = &RistrettoPoint::hash_from_bytes::<Sha256>("there".as_bytes());
+        let G_vec = make_generators(G, n);
+        let H_vec = make_generators(H, n);
+        let Q = RistrettoPoint::hash_from_bytes::<Sha256>("more".as_bytes());
+        let P = RistrettoPoint::hash_from_bytes::<Sha256>("points".as_bytes());
+        let a_vec = vec![Scalar::from_u64(1); n];
+        let b_vec = vec![Scalar::from_u64(2); n];
+
+        let proof = Prover::prove(G_vec.clone(), H_vec.clone(), P, Q, a_vec.clone(), b_vec.clone());
+
+        assert_eq!(proof.a_final.as_bytes(), 
+        	&[108, 163, 168, 218, 202, 249, 219, 101, 99, 124, 105, 179, 50, 105, 192, 39, 195, 72, 222, 43, 160, 80, 14, 59, 46, 245, 156, 102, 39, 63, 166, 10]);
+        assert_eq!(proof.b_final.as_bytes(), 
+        	&[235, 114, 91, 88, 123, 144, 165, 115, 240, 91, 219, 195, 134, 216, 161, 58, 134, 145, 188, 87, 64, 161, 28, 118, 92, 234, 57, 205, 78, 126, 76, 5]);
 	}
 }
 
@@ -113,8 +139,22 @@ mod bench {
     use test::Bencher;
 
     #[bench]
-    fn benchmark_prover_basic(b: &mut Bencher) {
+    fn make_ipp_64(b: &mut Bencher) {
     	let n = 64;
+        let G = &RistrettoPoint::hash_from_bytes::<Sha256>("hello".as_bytes());
+        let H = &RistrettoPoint::hash_from_bytes::<Sha256>("there".as_bytes());
+        let G_vec = make_generators(G, n);
+        let H_vec = make_generators(H, n);
+        let Q = RistrettoPoint::hash_from_bytes::<Sha256>("more".as_bytes());
+        let P = RistrettoPoint::hash_from_bytes::<Sha256>("points".as_bytes());
+        let a_vec = vec![Scalar::from_u64(1); n];
+        let b_vec = vec![Scalar::from_u64(2); n];
+
+        b.iter(|| Prover::prove(G_vec.clone(), H_vec.clone(), P, Q, a_vec.clone(), b_vec.clone()));
+    }
+    #[bench]
+    fn make_ipp_32(b: &mut Bencher) {
+    	let n = 32;
         let G = &RistrettoPoint::hash_from_bytes::<Sha256>("hello".as_bytes());
         let H = &RistrettoPoint::hash_from_bytes::<Sha256>("there".as_bytes());
         let G_vec = make_generators(G, n);

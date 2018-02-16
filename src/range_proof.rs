@@ -298,14 +298,14 @@ mod tests {
         assert_eq!(Scalar::from_u64(40), inner_product(&a, &b));
     }
     #[test]
-    fn test_t() {
+    fn test_rp_t() {
         let rp = RangeProof::generate_proof(1, 1);
         assert_eq!(rp.t, inner_product(&rp.l, &rp.r));
         let rp = RangeProof::generate_proof(1, 2);
         assert_eq!(rp.t, inner_product(&rp.l, &rp.r));
     }
     #[test]
-    fn test_verify_simple() {
+    fn verify_rp_simple() {
         for n in &[1, 2, 4, 8, 16, 32] {
             //println!("n: {:?}", n);
             let rp = RangeProof::generate_proof(0, *n);
@@ -321,7 +321,7 @@ mod tests {
         }
     }
     #[test]
-    fn test_verify_rand_big() {
+    fn verify_rp_rand_big() {
         for _ in 0..50 {
             let mut rng: OsRng = OsRng::new().unwrap();
             let v: u64 = rng.next_u64();
@@ -332,7 +332,7 @@ mod tests {
         }
     }
     #[test]
-    fn test_verify_rand_small() {
+    fn verify_rp_rand_small() {
         for _ in 0..50 {
             let mut rng: OsRng = OsRng::new().unwrap();
             let v: u32 = rng.next_u32();
@@ -350,28 +350,28 @@ mod bench {
     use test::Bencher;
 
     #[bench]
-    fn benchmark_make_generators(b: &mut Bencher) {
+    fn make_generators(b: &mut Bencher) {
         use curve25519_dalek::constants::RISTRETTO_BASEPOINT_POINT;
         b.iter(|| make_generators(&RISTRETTO_BASEPOINT_POINT, 100));
     }
     #[bench]
-    fn benchmark_make_proof_64(b: &mut Bencher) {
+    fn make_rp_64(b: &mut Bencher) {
         let mut rng: OsRng = OsRng::new().unwrap();
         b.iter(|| RangeProof::generate_proof(rng.next_u64(), 64));
     }
     #[bench]
-    fn benchmark_make_proof_32(b: &mut Bencher) {
+    fn make_rp_32(b: &mut Bencher) {
         let mut rng: OsRng = OsRng::new().unwrap();
         b.iter(|| RangeProof::generate_proof(rng.next_u32() as u64, 32));
     }
     #[bench]
-    fn benchmark_verify_proof_64(b: &mut Bencher) {
+    fn verify_rp_64(b: &mut Bencher) {
         let mut rng: OsRng = OsRng::new().unwrap();
         let rp = RangeProof::generate_proof(rng.next_u64(), 64);
         b.iter(|| rp.verify_proof());
     }
     #[bench]
-    fn benchmark_verify_proof_32(b: &mut Bencher) {
+    fn verify_rp_32(b: &mut Bencher) {
         let mut rng: OsRng = OsRng::new().unwrap();
         let rp = RangeProof::generate_proof(rng.next_u32() as u64, 32);
         b.iter(|| rp.verify_proof());
