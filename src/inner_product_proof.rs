@@ -10,6 +10,12 @@ use range_proof::commit; // replace with the random oracle
 use range_proof::make_generators;
 use sha2::Sha256;
 use rayon;
+use rayon::iter::*;
+// use rayon::iter::IntoParallelRefIterator;
+// use rayon::iter::IntoParallelRefMutIterator;
+// use rayon::iter::IndexedParallelIterator;
+// use rayon::iter::ParallelIterator;
+
 pub struct Prover {
 
 }
@@ -73,19 +79,33 @@ impl Prover {
 				// G_l[i] = ristretto::multiscalar_mult(&[x_inv, x], &[G_l[i], G_r[i]]);
 				// H_l[i] = ristretto::multiscalar_mult(&[x, x_inv], &[H_l[i], H_r[i]]);
 			}	
-			rayon::join(||
-				G_l.iter_mut().zip(G_r.iter())
-					.map(|(G_l_i, G_r_i)| {
-						*G_l_i = ristretto::multiscalar_mult(&[x_inv, x], &[*G_l_i, *G_r_i]);
-						}
-					).last(),
-				||
-				H_l.iter_mut().zip(H_r.iter())
-					.map(|(H_l_i, H_r_i)| {
-						*H_l_i = ristretto::multiscalar_mult(&[x, x_inv], &[*H_l_i, *H_r_i]);
-						}
-					).last()			
-			);
+
+			// parallelize x-axis
+			G_l.par_iter_mut().zip(G_r.par_iter())
+				.map(|(G_l_i, G_r_i)| {
+					*G_l_i = ristretto::multiscalar_mult(&[x_inv, x], &[*G_l_i, *G_r_i]);
+					}
+				).collect_into_vec(&mut Vec::new());
+			H_l.par_iter_mut().zip(H_r.par_iter())
+				.map(|(H_l_i, H_r_i)| {
+					*H_l_i = ristretto::multiscalar_mult(&[x, x_inv], &[*H_l_i, *H_r_i]);
+					}
+				).collect_into_vec(&mut Vec::new());		
+			// rayon::join(||
+			// 	G_l.par_iter_mut().zip(G_r.par_iter())
+			// 		.map(|(G_l_i, G_r_i)| {
+			// 			*G_l_i = ristretto::multiscalar_mult(&[x_inv, x], &[*G_l_i, *G_r_i]);
+			// 			}
+			// 		).skip(n),
+			// 	||
+			// 	H_l.par_iter_mut().zip(H_r.par_iter())
+			// 		.map(|(H_l_i, H_r_i)| {
+			// 			*H_l_i = ristretto::multiscalar_mult(&[x, x_inv], &[*H_l_i, *H_r_i]);
+			// 			}
+			// 		).skip(n),		
+			// );
+
+			// parallelize y-axis
 			// rayon::join(||
 			// 	for i in 0..n {
 			// 		G_l[i] = ristretto::multiscalar_mult(&[x_inv, x], &[G_l[i], G_r[i]]);
