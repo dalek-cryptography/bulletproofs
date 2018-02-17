@@ -37,22 +37,22 @@ impl Proof {
 
         while n != 1 {
             n = n / 2;
-            let (a_l, a_r) = a.split_at_mut(n);
-            let (b_l, b_r) = b.split_at_mut(n);
-            let (G_l, G_r) = G.split_at_mut(n);
-            let (H_l, H_r) = H.split_at_mut(n);
+            let (a_L, a_R) = a.split_at_mut(n);
+            let (b_L, b_R) = b.split_at_mut(n);
+            let (G_L, G_R) = G.split_at_mut(n);
+            let (H_L, H_R) = H.split_at_mut(n);
 
-            let c_l = inner_product(&a_l, &b_r);
-            let c_r = inner_product(&a_r, &b_l);
+            let c_L = inner_product(&a_L, &b_R);
+            let c_R = inner_product(&a_R, &b_L);
 
             let L = ristretto::multiscalar_mult(
-                a_l.iter().chain(b_r.iter()).chain(iter::once(&c_l)),
-                G_r.iter().chain(H_l.iter()).chain(iter::once(&Q)),
+                a_L.iter().chain(b_R.iter()).chain(iter::once(&c_L)),
+                G_R.iter().chain(H_L.iter()).chain(iter::once(&Q)),
             );
 
             let R = ristretto::multiscalar_mult(
-                a_r.iter().chain(b_l.iter()).chain(iter::once(&c_r)),
-                G_l.iter().chain(H_r.iter()).chain(iter::once(&Q)),
+                a_R.iter().chain(b_L.iter()).chain(iter::once(&c_R)),
+                G_L.iter().chain(H_R.iter()).chain(iter::once(&Q)),
             );
 
             L_vec.push(L);
@@ -63,16 +63,16 @@ impl Proof {
             let x_inv = x.invert();
 
             for i in 0..n {
-                a_l[i] = a_l[i] * x + x_inv * a_r[i];
-                b_l[i] = b_l[i] * x_inv + x * b_r[i];
-                G_l[i] = ristretto::multiscalar_mult(&[x_inv, x], &[G_l[i], G_r[i]]);
-                H_l[i] = ristretto::multiscalar_mult(&[x, x_inv], &[H_l[i], H_r[i]]);
+                a_L[i] = a_L[i] * x + x_inv * a_R[i];
+                b_L[i] = b_L[i] * x_inv + x * b_R[i];
+                G_L[i] = ristretto::multiscalar_mult(&[x_inv, x], &[G_L[i], G_R[i]]);
+                H_L[i] = ristretto::multiscalar_mult(&[x, x_inv], &[H_L[i], H_R[i]]);
             }
 
-            a = a_l;
-            b = b_l;
-            G = G_l;
-            H = H_l;
+            a = a_L;
+            b = b_L;
+            G = G_L;
+            H = H_L;
         }
 
         return Proof {
