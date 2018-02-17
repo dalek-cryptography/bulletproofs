@@ -34,12 +34,22 @@ impl Proof {
         mut a_vec: Vec<Scalar>,
         mut b_vec: Vec<Scalar>,
     ) -> Proof {
+        // Create slices G, H, a, b backed by their respective
+        // vectors.  This lets us reslice as we compress the lengths
+        // of the vectors in the main loop below.
         let mut G = &mut G_vec[..];
         let mut H = &mut H_vec[..];
         let mut a = &mut a_vec[..];
         let mut b = &mut b_vec[..];
 
         let mut n = G.len();
+
+        // All of the input vectors must have the same length.
+        assert_eq!(G.len(), n);
+        assert_eq!(H.len(), n);
+        assert_eq!(a.len(), n);
+        assert_eq!(b.len(), n);
+
         let lg_n = n.next_power_of_two().trailing_zeros() as usize;
         let mut L_vec = Vec::with_capacity(lg_n);
         let mut R_vec = Vec::with_capacity(lg_n);
