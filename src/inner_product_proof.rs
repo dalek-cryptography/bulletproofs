@@ -8,7 +8,6 @@ use range_proof::inner_product;
 use range_proof::commit; // replace with the random oracle
 use range_proof::make_generators;
 use sha2::Sha256;
-pub struct Prover {}
 
 pub struct Proof {
     l_vec: Vec<RistrettoPoint>,
@@ -17,8 +16,8 @@ pub struct Proof {
     b_final: Scalar,
 }
 
-impl Prover {
-    pub fn prove(
+impl Proof {
+    pub fn create(
         mut G_vec: Vec<RistrettoPoint>,
         mut H_vec: Vec<RistrettoPoint>,
         mut P: RistrettoPoint,
@@ -100,7 +99,7 @@ mod tests {
         let a_vec = vec![Scalar::from_u64(1); n];
         let b_vec = vec![Scalar::from_u64(2); n];
 
-        let proof = Prover::prove(
+        let proof = Proof::create(
             G_vec.clone(),
             H_vec.clone(),
             P,
@@ -130,7 +129,7 @@ mod tests {
         let a_vec = vec![Scalar::from_u64(1); n];
         let b_vec = vec![Scalar::from_u64(2); n];
 
-        let proof = Prover::prove(
+        let proof = Proof::create(
             G_vec.clone(),
             H_vec.clone(),
             P,
@@ -169,7 +168,7 @@ mod bench {
         let b_vec = vec![Scalar::from_u64(2); n];
 
         b.iter(|| {
-            Prover::prove(
+            Proof::create(
                 G_vec.clone(),
                 H_vec.clone(),
                 P,
@@ -192,7 +191,7 @@ mod bench {
         let b_vec = vec![Scalar::from_u64(2); n];
 
         b.iter(|| {
-            Prover::prove(
+            Proof::create(
                 G_vec.clone(),
                 H_vec.clone(),
                 P,
