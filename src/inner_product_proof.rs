@@ -64,8 +64,8 @@ impl Prover {
             let x_inv = x.invert();
 
             for i in 0..n {
-                a_l[i] = a_l[i] * x + a_r[i] * x_inv;
-                b_l[i] = b_l[i] * x_inv + b_r[i] * x;
+                a_l[i] = a_l[i] * x + x_inv * a_r[i];
+                b_l[i] = b_l[i] * x_inv + x * b_r[i];
                 G_l[i] = ristretto::multiscalar_mult(&[x_inv, x], &[G_l[i], G_r[i]]);
                 H_l[i] = ristretto::multiscalar_mult(&[x, x_inv], &[H_l[i], H_r[i]]);
             }
