@@ -70,13 +70,12 @@ impl Prover {
                 H_l[i] = ristretto::multiscalar_mult(&[x, x_inv], &[H_l[i], H_r[i]]);
             }
 
-            P += ristretto::multiscalar_mult(&[x * x, x_inv * x_inv], &[L, R]);
             a = a_l;
             b = b_l;
             G = G_l;
             H = H_l;
         }
-        debug_assert_eq!(a.len(), 1);
+
         return Proof {
             l_vec: L_vec,
             r_vec: R_vec,
