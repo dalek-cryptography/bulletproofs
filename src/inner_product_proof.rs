@@ -87,64 +87,47 @@ impl Proof {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn test_helper_create(n: usize, expected_a: &[u8; 32], expected_b: &[u8; 32]) {
+        let G = &RistrettoPoint::hash_from_bytes::<Sha256>("hello".as_bytes());
+        let H = &RistrettoPoint::hash_from_bytes::<Sha256>("there".as_bytes());
+        let G_vec = make_generators(G, n);
+        let H_vec = make_generators(H, n);
+        let Q = RistrettoPoint::hash_from_bytes::<Sha256>("more".as_bytes());
+        let P = RistrettoPoint::hash_from_bytes::<Sha256>("points".as_bytes());
+        let a_vec = vec![Scalar::from_u64(1); n];
+        let b_vec = vec![Scalar::from_u64(2); n];
+
+        let proof = Proof::create(
+            G_vec.clone(),
+            H_vec.clone(),
+            P,
+            Q,
+            a_vec.clone(),
+            b_vec.clone(),
+        );
+
+        assert_eq!(proof.a_final.as_bytes(), expected_a);
+        assert_eq!(proof.b_final.as_bytes(), expected_b);
+    }
+
     #[test]
     fn make_ipp_64() {
-        let n = 64;
-        let G = &RistrettoPoint::hash_from_bytes::<Sha256>("hello".as_bytes());
-        let H = &RistrettoPoint::hash_from_bytes::<Sha256>("there".as_bytes());
-        let G_vec = make_generators(G, n);
-        let H_vec = make_generators(H, n);
-        let Q = RistrettoPoint::hash_from_bytes::<Sha256>("more".as_bytes());
-        let P = RistrettoPoint::hash_from_bytes::<Sha256>("points".as_bytes());
-        let a_vec = vec![Scalar::from_u64(1); n];
-        let b_vec = vec![Scalar::from_u64(2); n];
-
-        let proof = Proof::create(
-            G_vec.clone(),
-            H_vec.clone(),
-            P,
-            Q,
-            a_vec.clone(),
-            b_vec.clone(),
-        );
-
-        assert_eq!(
-            proof.a_final.as_bytes(),
-            b"=\xa2\xed\xd2i\x1a\xb3'oF\xba:S\x12.\xbd)\xe1F\xbeI\xb4+\x11V&\xa6\xae\x1fGd\x04"
-        );
-        assert_eq!(
-            proof.b_final.as_bytes(),
-            b"zD\xdb\xa5\xd34fO\xde\x8ctu\xa6$\\zS\xc2\x8d|\x93hW\"\xacLL]?\x8e\xc8\x08"
+        // These test vectors don't have a ground truth, they're just to catch accidental changes to the computation.
+        test_helper_create(
+            64,
+            b"=\xa2\xed\xd2i\x1a\xb3'oF\xba:S\x12.\xbd)\xe1F\xbeI\xb4+\x11V&\xa6\xae\x1fGd\x04",
+            b"zD\xdb\xa5\xd34fO\xde\x8ctu\xa6$\\zS\xc2\x8d|\x93hW\"\xacLL]?\x8e\xc8\x08",
         );
     }
+
     #[test]
     fn make_ipp_32() {
-        let n = 32;
-        let G = &RistrettoPoint::hash_from_bytes::<Sha256>("hello".as_bytes());
-        let H = &RistrettoPoint::hash_from_bytes::<Sha256>("there".as_bytes());
-        let G_vec = make_generators(G, n);
-        let H_vec = make_generators(H, n);
-        let Q = RistrettoPoint::hash_from_bytes::<Sha256>("more".as_bytes());
-        let P = RistrettoPoint::hash_from_bytes::<Sha256>("points".as_bytes());
-        let a_vec = vec![Scalar::from_u64(1); n];
-        let b_vec = vec![Scalar::from_u64(2); n];
-
-        let proof = Proof::create(
-            G_vec.clone(),
-            H_vec.clone(),
-            P,
-            Q,
-            a_vec.clone(),
-            b_vec.clone(),
-        );
-
-        assert_eq!(
-            proof.a_final.as_bytes(),
-            b"l\xa3\xa8\xda\xca\xf9\xdbec|i\xb32i\xc0'\xc3H\xde+\xa0P\x0e;.\xf5\x9cf'?\xa6\n"
-        );
-        assert_eq!(
-            proof.b_final.as_bytes(),
-            b"\xebr[X{\x90\xa5s\xf0[\xdb\xc3\x86\xd8\xa1:\x86\x91\xbcW@\xa1\x1cv\\\xea9\xcdN~L\x05"
+        // These test vectors don't have a ground truth, they're just to catch accidental changes to the computation.
+        test_helper_create(
+            32,
+            b"l\xa3\xa8\xda\xca\xf9\xdbec|i\xb32i\xc0'\xc3H\xde+\xa0P\x0e;.\xf5\x9cf'?\xa6\n",
+            b"\xebr[X{\x90\xa5s\xf0[\xdb\xc3\x86\xd8\xa1:\x86\x91\xbcW@\xa1\x1cv\\\xea9\xcdN~L\x05",
         );
     }
 }
@@ -155,9 +138,7 @@ mod bench {
     use super::*;
     use test::Bencher;
 
-    #[bench]
-    fn make_ipp_64(b: &mut Bencher) {
-        let n = 64;
+    fn bench_helper_create(n: usize, b: &mut Bencher) {
         let G = &RistrettoPoint::hash_from_bytes::<Sha256>("hello".as_bytes());
         let H = &RistrettoPoint::hash_from_bytes::<Sha256>("there".as_bytes());
         let G_vec = make_generators(G, n);
@@ -178,27 +159,19 @@ mod bench {
             )
         });
     }
-    #[bench]
-    fn make_ipp_32(b: &mut Bencher) {
-        let n = 32;
-        let G = &RistrettoPoint::hash_from_bytes::<Sha256>("hello".as_bytes());
-        let H = &RistrettoPoint::hash_from_bytes::<Sha256>("there".as_bytes());
-        let G_vec = make_generators(G, n);
-        let H_vec = make_generators(H, n);
-        let Q = RistrettoPoint::hash_from_bytes::<Sha256>("more".as_bytes());
-        let P = RistrettoPoint::hash_from_bytes::<Sha256>("points".as_bytes());
-        let a_vec = vec![Scalar::from_u64(1); n];
-        let b_vec = vec![Scalar::from_u64(2); n];
 
-        b.iter(|| {
-            Proof::create(
-                G_vec.clone(),
-                H_vec.clone(),
-                P,
-                Q,
-                a_vec.clone(),
-                b_vec.clone(),
-            )
-        });
+    #[bench]
+    fn create_n_eq_64(b: &mut Bencher) {
+        bench_helper_create(64, b);
+    }
+
+    #[bench]
+    fn create_n_eq_32(b: &mut Bencher) {
+        bench_helper_create(32, b);
+    }
+
+    #[bench]
+    fn create_n_eq_16(b: &mut Bencher) {
+        bench_helper_create(16, b);
     }
 }
