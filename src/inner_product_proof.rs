@@ -1,5 +1,4 @@
 #![allow(non_snake_case)]
-#![feature(nll)]
 
 use std::iter;
 use curve25519_dalek::ristretto::RistrettoPoint;
