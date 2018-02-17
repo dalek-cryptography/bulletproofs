@@ -106,10 +106,8 @@ mod tests {
 
         let proof = Prover::prove(G_vec.clone(), H_vec.clone(), P, Q, a_vec.clone(), b_vec.clone());
 
-        assert_eq!(proof.a_final.as_bytes(), 
-        	&[61, 162, 237, 210, 105, 26, 179, 39, 111, 70, 186, 58, 83, 18, 46, 189, 41, 225, 70, 190, 73, 180, 43, 17, 86, 38, 166, 174, 31, 71, 100, 4]);
-        assert_eq!(proof.b_final.as_bytes(), 
-        	&[122, 68, 219, 165, 211, 52, 102, 79, 222, 140, 116, 117, 166, 36, 92, 122, 83, 194, 141, 124, 147, 104, 87, 34, 172, 76, 76, 93, 63, 142, 200, 8]);
+        assert_eq!(proof.a_final.as_bytes(), b"=\xa2\xed\xd2i\x1a\xb3'oF\xba:S\x12.\xbd)\xe1F\xbeI\xb4+\x11V&\xa6\xae\x1fGd\x04");
+        assert_eq!(proof.b_final.as_bytes(), b"zD\xdb\xa5\xd34fO\xde\x8ctu\xa6$\\zS\xc2\x8d|\x93hW\"\xacLL]?\x8e\xc8\x08");
 	}
 	#[test]
 	fn make_ipp_32() {
@@ -125,10 +123,8 @@ mod tests {
 
         let proof = Prover::prove(G_vec.clone(), H_vec.clone(), P, Q, a_vec.clone(), b_vec.clone());
 
-        assert_eq!(proof.a_final.as_bytes(), 
-        	&[108, 163, 168, 218, 202, 249, 219, 101, 99, 124, 105, 179, 50, 105, 192, 39, 195, 72, 222, 43, 160, 80, 14, 59, 46, 245, 156, 102, 39, 63, 166, 10]);
-        assert_eq!(proof.b_final.as_bytes(), 
-        	&[235, 114, 91, 88, 123, 144, 165, 115, 240, 91, 219, 195, 134, 216, 161, 58, 134, 145, 188, 87, 64, 161, 28, 118, 92, 234, 57, 205, 78, 126, 76, 5]);
+        assert_eq!(proof.a_final.as_bytes(), b"l\xa3\xa8\xda\xca\xf9\xdbec|i\xb32i\xc0'\xc3H\xde+\xa0P\x0e;.\xf5\x9cf'?\xa6\n");
+        assert_eq!(proof.b_final.as_bytes(), b"\xebr[X{\x90\xa5s\xf0[\xdb\xc3\x86\xd8\xa1:\x86\x91\xbcW@\xa1\x1cv\\\xea9\xcdN~L\x05");
 	}
 }
 
