@@ -5,6 +5,9 @@ use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::ristretto;
 use curve25519_dalek::scalar::Scalar;
 
+// XXX upstream into dalek
+use scalar;
+
 use random_oracle::RandomOracle;
 
 use range_proof::inner_product;
@@ -13,8 +16,8 @@ use range_proof::make_generators;
 use sha2::Sha256;
 
 pub struct Proof {
-    l_vec: Vec<RistrettoPoint>,
-    r_vec: Vec<RistrettoPoint>,
+    L_vec: Vec<RistrettoPoint>,
+    R_vec: Vec<RistrettoPoint>,
     a: Scalar,
     b: Scalar,
 }
@@ -97,11 +100,89 @@ impl Proof {
         }
 
         return Proof {
-            l_vec: L_vec,
-            r_vec: R_vec,
+            L_vec: L_vec,
+            R_vec: R_vec,
             a: a[0],
             b: b[0],
         };
+    }
+
+    fn verify(
+        self,
+        verifier: &mut RandomOracle,
+        P: &RistrettoPoint,
+        Q: &RistrettoPoint,
+        G_vec: &Vec<RistrettoPoint>,
+        H_vec: &Vec<RistrettoPoint>,
+    ) -> Result<(), ()> {
+        // XXX prover should commit to n
+        let lg_n = self.L_vec.len();
+        let n = 1 << lg_n;
+
+        // XXX figure out how ser/deser works for Proofs
+        // maybe avoid this compression
+        let mut challenges = Vec::with_capacity(lg_n);
+        for (L, R) in self.L_vec.iter().zip(self.R_vec.iter()) {
+            verifier.commit(L.compress().as_bytes());
+            verifier.commit(R.compress().as_bytes());
+
+            challenges.push(verifier.challenge_scalar());
+        }
+
+        let mut inv_challenges = challenges.clone();
+        let allinv = scalar::batch_invert(&mut inv_challenges);
+
+        for x in challenges.iter_mut() {
+            *x = &*x * &*x; // wtf
+        }
+        let challenges_sq = challenges;
+
+        // j-th bit of i
+        let bit = |i, j| 1 & (i >> j);
+
+        let mut s = Vec::with_capacity(n);
+        for i in 0..n {
+            let mut s_i = allinv;
+            for j in 0..lg_n {
+                if bit(i, j) == 1 {
+                    s_i *= challenges_sq[j];
+                }
+            }
+            s.push(s_i);
+        }
+        let s = s;
+
+        // so many allocs :(
+        // these were supposed to be iterators but the dalek trait doesn't accept values
+
+        let ab = self.a * self.b;
+
+        let a_times_s: Vec<_> = s.iter().map(|s_i| self.a * s_i).collect();
+
+        let b_div_s: Vec<_> = s.iter().rev().map(|s_i_inv| self.b * s_i_inv).collect();
+
+        let neg_x_sq: Vec<_> = challenges_sq.iter().map(|x| -x).collect();
+
+        let neg_x_inv_sq: Vec<_> = inv_challenges
+            .iter()
+            .map(|x_inv| -(x_inv * x_inv))
+            .collect();
+
+        let scalar_iter = iter::once(&ab)
+            .chain(a_times_s.iter())
+            .chain(b_div_s.iter())
+            .chain(neg_x_sq.iter())
+            .chain(neg_x_inv_sq.iter());
+
+        let points_iter = iter::once(Q)
+            .chain(G_vec.iter())
+            .chain(H_vec.iter())
+            .chain(self.L_vec.iter())
+            .chain(self.R_vec.iter());
+
+        let expect_P = ristretto::multiscalar_mult(scalar_iter, points_iter);
+
+        if expect_P == *P { Ok(()) } else { Err(()) }
     }
 }
 
@@ -129,6 +210,9 @@ mod tests {
             a_vec.clone(),
             b_vec.clone(),
         );
+
+        let mut verifier = RandomOracle::new(b"innerproducttest");
+        assert!(proof.verify(&mut verifier, &P, &Q, &G_vec, &H_vec).is_ok());
 
         //assert_eq!(proof.a.as_bytes(), expected_a);
         //assert_eq!(proof.b.as_bytes(), expected_b);
