@@ -1,6 +1,11 @@
 use curve25519_dalek::scalar::Scalar;
 
-pub fn batch_invert(inputs: &mut [Scalar]) {
+/// Replace each element of `inputs` with its inverse.
+///
+/// All inputs must be nonzero.
+///
+/// Returns the inverse of the product of all inputs.
+pub fn batch_invert(inputs: &mut [Scalar]) -> Scalar {
     // First, compute the product of all inputs using a product
     // tree:
     //
@@ -48,6 +53,8 @@ pub fn batch_invert(inputs: &mut [Scalar]) {
         }
         inputs[i] = inv;
     }
+
+    allinv
 }
 
 #[cfg(test)]
