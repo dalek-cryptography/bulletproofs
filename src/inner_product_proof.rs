@@ -18,10 +18,10 @@ pub struct Proof {
 
 impl Proof {
     pub fn create(
+        P: &RistrettoPoint,
+        Q: &RistrettoPoint,
         mut G_vec: Vec<RistrettoPoint>,
         mut H_vec: Vec<RistrettoPoint>,
-        mut P: RistrettoPoint,
-        Q: RistrettoPoint,
         mut a_vec: Vec<Scalar>,
         mut b_vec: Vec<Scalar>,
     ) -> Proof {
@@ -47,12 +47,12 @@ impl Proof {
 
             let L = ristretto::multiscalar_mult(
                 a_L.iter().chain(b_R.iter()).chain(iter::once(&c_L)),
-                G_R.iter().chain(H_L.iter()).chain(iter::once(&Q)),
+                G_R.iter().chain(H_L.iter()).chain(iter::once(Q)),
             );
 
             let R = ristretto::multiscalar_mult(
                 a_R.iter().chain(b_L.iter()).chain(iter::once(&c_R)),
-                G_L.iter().chain(H_R.iter()).chain(iter::once(&Q)),
+                G_L.iter().chain(H_R.iter()).chain(iter::once(Q)),
             );
 
             L_vec.push(L);
@@ -99,10 +99,10 @@ mod tests {
         let b_vec = vec![Scalar::from_u64(2); n];
 
         let proof = Proof::create(
+            &P,
+            &Q,
             G_vec.clone(),
             H_vec.clone(),
-            P,
-            Q,
             a_vec.clone(),
             b_vec.clone(),
         );
@@ -150,10 +150,10 @@ mod bench {
 
         b.iter(|| {
             Proof::create(
+                &P,
+                &Q,
                 G_vec.clone(),
                 H_vec.clone(),
-                P,
-                Q,
                 a_vec.clone(),
                 b_vec.clone(),
             )
