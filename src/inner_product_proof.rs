@@ -12,8 +12,8 @@ use sha2::Sha256;
 pub struct Proof {
     l_vec: Vec<RistrettoPoint>,
     r_vec: Vec<RistrettoPoint>,
-    a_final: Scalar,
-    b_final: Scalar,
+    a: Scalar,
+    b: Scalar,
 }
 
 impl Proof {
@@ -78,8 +78,8 @@ impl Proof {
         return Proof {
             l_vec: L_vec,
             r_vec: R_vec,
-            a_final: a[0],
-            b_final: b[0],
+            a: a[0],
+            b: b[0],
         };
     }
 }
@@ -107,8 +107,8 @@ mod tests {
             b_vec.clone(),
         );
 
-        assert_eq!(proof.a_final.as_bytes(), expected_a);
-        assert_eq!(proof.b_final.as_bytes(), expected_b);
+        assert_eq!(proof.a.as_bytes(), expected_a);
+        assert_eq!(proof.b.as_bytes(), expected_b);
     }
 
     #[test]
