@@ -108,7 +108,7 @@ impl Proof {
     }
 
     fn verify(
-        self,
+        &self,
         verifier: &mut RandomOracle,
         P: &RistrettoPoint,
         Q: &RistrettoPoint,
@@ -269,6 +269,31 @@ mod bench {
         });
     }
 
+    fn bench_helper_verify(n: usize, b: &mut Bencher) {
+        let mut verifier = RandomOracle::new(b"innerproducttest");
+        let G = &RistrettoPoint::hash_from_bytes::<Sha256>("hello".as_bytes());
+        let H = &RistrettoPoint::hash_from_bytes::<Sha256>("there".as_bytes());
+        let G_vec = make_generators(G, n);
+        let H_vec = make_generators(H, n);
+        let Q = RistrettoPoint::hash_from_bytes::<Sha256>("more".as_bytes());
+        let P = RistrettoPoint::hash_from_bytes::<Sha256>("points".as_bytes());
+        let a_vec = vec![Scalar::from_u64(1); n];
+        let b_vec = vec![Scalar::from_u64(2); n];
+
+        let proof = Proof::create(
+            &mut verifier,
+            &P,
+            &Q,
+            G_vec.clone(),
+            H_vec.clone(),
+            a_vec.clone(),
+            b_vec.clone(),
+        );
+
+        let mut verifier = RandomOracle::new(b"innerproducttest");
+        b.iter(|| proof.verify(&mut verifier, &P, &Q, &G_vec, &H_vec));
+    }
+
     #[bench]
     fn create_n_eq_64(b: &mut Bencher) {
         bench_helper_create(64, b);
@@ -282,5 +307,20 @@ mod bench {
     #[bench]
     fn create_n_eq_16(b: &mut Bencher) {
         bench_helper_create(16, b);
+    }
+
+    #[bench]
+    fn verify_n_eq_64(b: &mut Bencher) {
+        bench_helper_verify(64, b);
+    }
+
+    #[bench]
+    fn verify_n_eq_32(b: &mut Bencher) {
+        bench_helper_verify(32, b);
+    }
+
+    #[bench]
+    fn verify_n_eq_16(b: &mut Bencher) {
+        bench_helper_verify(16, b);
     }
 }
