@@ -196,10 +196,17 @@ mod tests {
         let H = &RistrettoPoint::hash_from_bytes::<Sha256>("there".as_bytes());
         let G_vec = make_generators(G, n);
         let H_vec = make_generators(H, n);
-        let Q = RistrettoPoint::hash_from_bytes::<Sha256>("more".as_bytes());
-        let P = RistrettoPoint::hash_from_bytes::<Sha256>("points".as_bytes());
+
         let a_vec = vec![Scalar::from_u64(1); n];
         let b_vec = vec![Scalar::from_u64(2); n];
+
+        let Q = RistrettoPoint::hash_from_bytes::<Sha256>(b"test point");
+        let c = inner_product(&a_vec, &b_vec);
+
+        let P = ristretto::multiscalar_mult(
+            a_vec.iter().chain(b_vec.iter()).chain(iter::once(&c)),
+            G_vec.iter().chain(H_vec.iter()).chain(iter::once(&Q)),
+        );
 
         let proof = Proof::create(
             &mut verifier,
@@ -275,10 +282,17 @@ mod bench {
         let H = &RistrettoPoint::hash_from_bytes::<Sha256>("there".as_bytes());
         let G_vec = make_generators(G, n);
         let H_vec = make_generators(H, n);
-        let Q = RistrettoPoint::hash_from_bytes::<Sha256>("more".as_bytes());
-        let P = RistrettoPoint::hash_from_bytes::<Sha256>("points".as_bytes());
+
         let a_vec = vec![Scalar::from_u64(1); n];
         let b_vec = vec![Scalar::from_u64(2); n];
+
+        let Q = RistrettoPoint::hash_from_bytes::<Sha256>(b"test point");
+        let c = inner_product(&a_vec, &b_vec);
+
+        let P = ristretto::multiscalar_mult(
+            a_vec.iter().chain(b_vec.iter()).chain(iter::once(&c)),
+            G_vec.iter().chain(H_vec.iter()).chain(iter::once(&Q)),
+        );
 
         let proof = Proof::create(
             &mut verifier,
