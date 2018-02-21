@@ -67,12 +67,12 @@ impl Proof {
             let c_L = inner_product(&a_L, &b_R);
             let c_R = inner_product(&a_R, &b_L);
 
-            let L = ristretto::multiscalar_mult(
+            let L = ristretto::vartime::multiscalar_mult(
                 a_L.iter().chain(b_R.iter()).chain(iter::once(&c_L)),
                 G_R.iter().chain(H_L.iter()).chain(iter::once(Q)),
             );
 
-            let R = ristretto::multiscalar_mult(
+            let R = ristretto::vartime::multiscalar_mult(
                 a_R.iter().chain(b_L.iter()).chain(iter::once(&c_R)),
                 G_L.iter().chain(H_R.iter()).chain(iter::once(Q)),
             );
@@ -89,8 +89,8 @@ impl Proof {
             for i in 0..n {
                 a_L[i] = a_L[i] * x + x_inv * a_R[i];
                 b_L[i] = b_L[i] * x_inv + x * b_R[i];
-                G_L[i] = ristretto::multiscalar_mult(&[x_inv, x], &[G_L[i], G_R[i]]);
-                H_L[i] = ristretto::multiscalar_mult(&[x, x_inv], &[H_L[i], H_R[i]]);
+                G_L[i] = ristretto::vartime::multiscalar_mult(&[x_inv, x], &[G_L[i], G_R[i]]);
+                H_L[i] = ristretto::vartime::multiscalar_mult(&[x, x_inv], &[H_L[i], H_R[i]]);
             }
 
             a = a_L;
@@ -181,7 +181,7 @@ impl Proof {
             .chain(self.L_vec.iter())
             .chain(self.R_vec.iter());
 
-        let expect_P = ristretto::multiscalar_mult(scalar_iter, points_iter);
+        let expect_P = ristretto::vartime::multiscalar_mult(scalar_iter, points_iter);
 
         if expect_P == *P { Ok(()) } else { Err(()) }
     }
@@ -204,7 +204,7 @@ mod tests {
         let Q = RistrettoPoint::hash_from_bytes::<Sha256>(b"test point");
         let c = inner_product(&a_vec, &b_vec);
 
-        let P = ristretto::multiscalar_mult(
+        let P = ristretto::vartime::multiscalar_mult(
             a_vec.iter().chain(b_vec.iter()).chain(iter::once(&c)),
             G_vec.iter().chain(H_vec.iter()).chain(iter::once(&Q)),
         );
@@ -305,7 +305,7 @@ mod bench {
         let Q = RistrettoPoint::hash_from_bytes::<Sha256>(b"test point");
         let c = inner_product(&a_vec, &b_vec);
 
-        let P = ristretto::multiscalar_mult(
+        let P = ristretto::vartime::multiscalar_mult(
             a_vec.iter().chain(b_vec.iter()).chain(iter::once(&c)),
             G_vec.iter().chain(H_vec.iter()).chain(iter::once(&Q)),
         );
