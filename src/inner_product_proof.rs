@@ -226,6 +226,21 @@ mod tests {
     }
 
     #[test]
+    fn make_ipp_1() {
+        test_helper_create(1, &[0; 32], &[0; 32]);
+    }
+
+    #[test]
+    fn make_ipp_2() {
+        test_helper_create(2, &[0; 32], &[0; 32]);
+    }
+
+    #[test]
+    fn make_ipp_4() {
+        test_helper_create(4, &[0; 32], &[0; 32]);
+    }
+
+    #[test]
     fn make_ipp_64() {
         // These test vectors don't have a ground truth, they're just to catch accidental changes to the computation.
         test_helper_create(
