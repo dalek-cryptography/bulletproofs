@@ -145,7 +145,8 @@ impl Proof {
             let mut s_i = allinv;
             for j in 0..lg_n {
                 if bit(i, j) == 1 {
-                    s_i *= challenges_sq[j];
+                    // The challenges are stored in "creation order" as [x_k,...,x_1]
+                    s_i *= challenges_sq[(lg_n - 1) - j];
                 }
             }
             s.push(s_i);
