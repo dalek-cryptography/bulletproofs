@@ -30,13 +30,19 @@ pub struct RangeProof {
     T_2: RistrettoPoint,
 
     // public knowledge
+    j: u16,
     n: usize,
     B: RistrettoPoint,
     B_blinding: RistrettoPoint,
 }
 
 impl RangeProof {
-    pub fn generate_proof(v: u64, n: usize) -> RangeProof {
+    pub fn setup() -> RangeProof {
+        // potentially generate the generators, store... 
+        // useful if need to make multiple range proofs for 1 set of generators
+        unimplemented!()
+    }
+    pub fn generate_proof(v: u64, n: usize, j: u16) -> RangeProof {
         let mut rng: OsRng = OsRng::new().unwrap();
         // useful for debugging:
         // let mut rng: StdRng = StdRng::from_seed(&[1, 2, 3, 4]);
@@ -74,6 +80,16 @@ impl RangeProof {
         // Generate y, z by committing to A, S (line 46-48)
         let (y, z) = commit(&A, &S);
 
+        // needed for multi-range-proof only: generate y, z offsets
+        let mut offset_y = Scalar::one(); // offset_y = y^((j-1)*n);
+        let mut offset_z = Scalar::one(); // offset_z = z^(j-1); 
+        for _ in 0..(j-1) {
+            for _ in 0..n {
+                offset_y = offset_y*y;
+            }
+            offset_z = offset_z*z;
+        }
+
         // Calculate t by calculating vectors l0, l1, r0, r1 and multiplying
         let mut l = VecPoly2::new(n);
         let mut r = VecPoly2::new(n);
@@ -85,10 +101,10 @@ impl RangeProof {
             let v_i = (v >> i) & 1;
             l.0[i] -= z;
             l.1[i] += s_a[i];
-            r.0[i] += exp_y * z + z2 * exp_2;
-            r.1[i] += exp_y * s_b[i];
+            r.0[i] += exp_y * offset_y * z + z2 * offset_z * exp_2;
+            r.1[i] += exp_y * offset_y * s_b[i];
             if v_i == 0 {
-                r.0[i] -= exp_y;
+                r.0[i] -= exp_y * offset_y;
             } else {
                 l.0[i] += Scalar::one();
             }
@@ -111,7 +127,7 @@ impl RangeProof {
         let (x, _) = commit(&T_1, &T_2); // TODO: use a different commit?
 
         // Generate final values for proof (line 55-60)
-        let t_x_blinding = t_1_blinding * x + t_2_blinding * x * x + z2 * v_blinding;
+        let t_x_blinding = t_1_blinding * x + t_2_blinding * x * x + z2 * offset_z * v_blinding;
         let e_blinding = a_blinding + s_blinding * x;
         let t_hat = t.0 + t.1 * x + t.2 * x * x;
 
@@ -134,13 +150,18 @@ impl RangeProof {
             T_1: T_1,
             T_2: T_2,
 
+            j: j,
             n: n,
             B: *B,
             B_blinding: *B_blinding,
         }
     }
 
-    pub fn verify_proof(&self) -> bool {
+    pub fn aggregate_proofs(_rps: Vec<RangeProof>) -> RangeProof {
+        unimplemented!()
+    }
+
+    pub fn verify_proof(&self, m: u16) -> bool {
         let (y, z) = commit(&self.A, &self.S);
         let (x, _) = commit(&self.T_1, &self.T_2);
         let G = make_generators(&self.B, self.n);
@@ -158,6 +179,17 @@ impl RangeProof {
             exp_y = exp_y * y; // y^i -> y^(i+1)
             exp_2 = exp_2 + exp_2; // 2^i -> 2^(i+1)
         }
+
+        // needed for multi-range-proof only: generate y, z offsets
+        let mut offset_y = Scalar::one(); // offset_y = y^((j-1)*n);
+        let mut offset_z = Scalar::one(); // offset_z = z^(j-1); 
+        for _ in 0..(m-1) { // TOFIX: should be j instead of m
+            for _ in 0..self.n {
+                offset_y = offset_y*y;
+            }
+            offset_z = offset_z*z;
+        }
+
         let t_check = self.B * power_g + self.V * z2 + self.T_1 * x + self.T_2 * x * x;
         let t_commit = self.B * self.t + self.B_blinding * self.t_x_blinding;
         if t_commit != t_check {
@@ -180,7 +212,7 @@ impl RangeProof {
         let mut inv_exp_y = Scalar::one(); // start at y^-0 = 1
         for i in 0..self.n {
             hprime_vec[i] = hprime_vec[i] * inv_exp_y;
-            big_p += hprime_vec[i] * (z * exp_y + z2 * exp_2);
+            big_p += hprime_vec[i] * (z * exp_y * offset_y + z2 * offset_z * exp_2);
             exp_y = exp_y * y; // y^i -> y^(i+1)
             exp_2 = exp_2 + exp_2; // 2^i -> 2^(i+1)
             inv_exp_y = inv_exp_y * inverse_y; // y^(-i) * y^(-1) -> y^(-(i+1))
@@ -299,25 +331,25 @@ mod tests {
     }
     #[test]
     fn test_rp_t() {
-        let rp = RangeProof::generate_proof(1, 1);
+        let rp = RangeProof::generate_proof(1, 1, 1);
         assert_eq!(rp.t, inner_product(&rp.l, &rp.r));
-        let rp = RangeProof::generate_proof(1, 2);
+        let rp = RangeProof::generate_proof(1, 2, 1);
         assert_eq!(rp.t, inner_product(&rp.l, &rp.r));
     }
     #[test]
     fn verify_rp_simple() {
         for n in &[1, 2, 4, 8, 16, 32] {
             //println!("n: {:?}", n);
-            let rp = RangeProof::generate_proof(0, *n);
-            assert_eq!(rp.verify_proof(), true);
-            let rp = RangeProof::generate_proof(2u64.pow(*n as u32) - 1, *n);
-            assert_eq!(rp.verify_proof(), true);
-            let rp = RangeProof::generate_proof(2u64.pow(*n as u32), *n);
-            assert_eq!(rp.verify_proof(), false);
-            let rp = RangeProof::generate_proof(2u64.pow(*n as u32) + 1, *n);
-            assert_eq!(rp.verify_proof(), false);
-            let rp = RangeProof::generate_proof(u64::max_value(), *n);
-            assert_eq!(rp.verify_proof(), false);
+            let rp = RangeProof::generate_proof(0, *n, 1);
+            assert_eq!(rp.verify_proof(1), true);
+            let rp = RangeProof::generate_proof(2u64.pow(*n as u32) - 1, *n, 1);
+            assert_eq!(rp.verify_proof(1), true);
+            let rp = RangeProof::generate_proof(2u64.pow(*n as u32), *n, 1);
+            assert_eq!(rp.verify_proof(1), false);
+            let rp = RangeProof::generate_proof(2u64.pow(*n as u32) + 1, *n, 1);
+            assert_eq!(rp.verify_proof(1), false);
+            let rp = RangeProof::generate_proof(u64::max_value(), *n, 1);
+            assert_eq!(rp.verify_proof(1), false);
         }
     }
     #[test]
@@ -326,9 +358,9 @@ mod tests {
             let mut rng: OsRng = OsRng::new().unwrap();
             let v: u64 = rng.next_u64();
             //println!("v: {:?}", v);
-            let rp = RangeProof::generate_proof(v, 32);
+            let rp = RangeProof::generate_proof(v, 32, 1);
             let expected = v <= 2u64.pow(32);
-            assert_eq!(rp.verify_proof(), expected);
+            assert_eq!(rp.verify_proof(1), expected);
         }
     }
     #[test]
@@ -337,8 +369,8 @@ mod tests {
             let mut rng: OsRng = OsRng::new().unwrap();
             let v: u32 = rng.next_u32();
             //println!("v: {:?}", v);
-            let rp = RangeProof::generate_proof(v as u64, 32);
-            assert_eq!(rp.verify_proof(), true);
+            let rp = RangeProof::generate_proof(v as u64, 32, 1);
+            assert_eq!(rp.verify_proof(1), true);
         }
     }
 }
@@ -357,23 +389,23 @@ mod bench {
     #[bench]
     fn make_rp_64(b: &mut Bencher) {
         let mut rng: OsRng = OsRng::new().unwrap();
-        b.iter(|| RangeProof::generate_proof(rng.next_u64(), 64));
+        b.iter(|| RangeProof::generate_proof(rng.next_u64(), 64, 1));
     }
     #[bench]
     fn make_rp_32(b: &mut Bencher) {
         let mut rng: OsRng = OsRng::new().unwrap();
-        b.iter(|| RangeProof::generate_proof(rng.next_u32() as u64, 32));
+        b.iter(|| RangeProof::generate_proof(rng.next_u32() as u64, 32, 1));
     }
     #[bench]
     fn verify_rp_64(b: &mut Bencher) {
         let mut rng: OsRng = OsRng::new().unwrap();
-        let rp = RangeProof::generate_proof(rng.next_u64(), 64);
-        b.iter(|| rp.verify_proof());
+        let rp = RangeProof::generate_proof(rng.next_u64(), 64, 1);
+        b.iter(|| rp.verify_proof(1));
     }
     #[bench]
     fn verify_rp_32(b: &mut Bencher) {
         let mut rng: OsRng = OsRng::new().unwrap();
-        let rp = RangeProof::generate_proof(rng.next_u32() as u64, 32);
-        b.iter(|| rp.verify_proof());
+        let rp = RangeProof::generate_proof(rng.next_u32() as u64, 32, 1);
+        b.iter(|| rp.verify_proof(1));
     }
 }
