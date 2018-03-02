@@ -14,6 +14,7 @@ extern crate test;
 pub mod proof_transcript;
 pub mod generators;
 mod range_proof;
+mod multi_range_proof;
 mod inner_product_proof;
 
 pub mod scalar;

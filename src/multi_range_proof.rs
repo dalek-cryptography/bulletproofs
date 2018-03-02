@@ -7,7 +7,7 @@ use curve25519_dalek::ristretto;
 use curve25519_dalek::traits::Identity;
 use curve25519_dalek::scalar::Scalar;
 use rand::OsRng;
-use range_proof::{make_generators, inner_product, add_vec};
+use range_proof::{make_generators, inner_product, add_vec, commit};
 
 struct PolyDeg3(Scalar, Scalar, Scalar);
 
@@ -245,6 +245,14 @@ impl State2 {
 }
 
 impl State3 {
+    pub fn prove_single(v: u64, n: usize) -> State3 {
+        let state1 = Generators::make(n).prove(v);
+        let (y, z) = commit(&state1.A, &state1.S);
+        let state2 = state1.prove(y, z);
+        let (x, _) = commit(&state2.T_1, &state2.T_2);
+        state2.prove(x)
+    }
+
     pub fn verify_proof(&self) -> bool {
         let (y, z) = commit(&self.A, &self.S);
         let (x, _) = commit(&self.T_1, &self.T_2);
@@ -331,67 +339,43 @@ impl VecPoly2 {
     }
 }
 
-pub fn commit(v1: &RistrettoPoint, v2: &RistrettoPoint) -> (Scalar, Scalar) {
-    let mut c1_digest = Sha512::new();
-    c1_digest.input(v1.compress().as_bytes());
-    c1_digest.input(v2.compress().as_bytes());
-    let c1 = Scalar::from_hash(c1_digest);
-
-    let mut c2_digest = Sha512::new();
-    c2_digest.input(v1.compress().as_bytes());
-    c2_digest.input(v2.compress().as_bytes());
-    c2_digest.input(c1.as_bytes());
-    let c2 = Scalar::from_hash(c2_digest);
-
-    (c1, c2)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use rand::Rng;
 
     #[test]
-    fn test_rp_t() {
-        let rp = RangeProof::generate_proof(1, 1);
-        assert_eq!(rp.t, inner_product(&rp.l, &rp.r));
-        let rp = RangeProof::generate_proof(1, 2);
-        assert_eq!(rp.t, inner_product(&rp.l, &rp.r));
-    }
-    #[test]
-    fn verify_rp_simple() {
+    fn verify_smrp_simple() {
         for n in &[1, 2, 4, 8, 16, 32] {
             //println!("n: {:?}", n);
-            let rp = RangeProof::generate_proof(0, *n);
+            let rp = State3::prove_single(0, *n);
             assert_eq!(rp.verify_proof(), true);
-            let rp = RangeProof::generate_proof(2u64.pow(*n as u32) - 1, *n);
+            let rp = State3::prove_single(2u64.pow(*n as u32) - 1, *n);
             assert_eq!(rp.verify_proof(), true);
-            let rp = RangeProof::generate_proof(2u64.pow(*n as u32), *n);
+            let rp = State3::prove_single(2u64.pow(*n as u32), *n);
             assert_eq!(rp.verify_proof(), false);
-            let rp = RangeProof::generate_proof(2u64.pow(*n as u32) + 1, *n);
+            let rp = State3::prove_single(2u64.pow(*n as u32) + 1, *n);
             assert_eq!(rp.verify_proof(), false);
-            let rp = RangeProof::generate_proof(u64::max_value(), *n);
+            let rp = State3::prove_single(u64::max_value(), *n);
             assert_eq!(rp.verify_proof(), false);
         }
     }
     #[test]
-    fn verify_rp_rand_big() {
+    fn verify_smrp_rand_big() {
         for _ in 0..50 {
             let mut rng: OsRng = OsRng::new().unwrap();
             let v: u64 = rng.next_u64();
-            //println!("v: {:?}", v);
-            let rp = RangeProof::generate_proof(v, 32);
+            let rp = State3::prove_single(v, 32);
             let expected = v <= 2u64.pow(32);
             assert_eq!(rp.verify_proof(), expected);
         }
     }
     #[test]
-    fn verify_rp_rand_small() {
+    fn verify_smrp_rand_small() {
         for _ in 0..50 {
             let mut rng: OsRng = OsRng::new().unwrap();
             let v: u32 = rng.next_u32();
-            //println!("v: {:?}", v);
-            let rp = RangeProof::generate_proof(v as u64, 32);
+            let rp = State3::prove_single(v as u64, 32);
             assert_eq!(rp.verify_proof(), true);
         }
     }
@@ -404,31 +388,25 @@ mod bench {
     use test::Bencher;
 
     #[bench]
-    fn generators(b: &mut Bencher) {
-        use curve25519_dalek::constants::RISTRETTO_BASEPOINT_POINT;
-        b.iter(|| make_generators(&RISTRETTO_BASEPOINT_POINT, 100));
+    fn make_smrp_64(b: &mut Bencher) {
+        let mut rng: OsRng = OsRng::new().unwrap();
+        b.iter(|| State3::prove_single(rng.next_u64(), 64));
     }
     #[bench]
-    fn make_rp_64(b: &mut Bencher) {
+    fn make_smrp_32(b: &mut Bencher) {
         let mut rng: OsRng = OsRng::new().unwrap();
-        b.iter(|| RangeProof::generate_proof(rng.next_u64(), 64));
+        b.iter(|| State3::prove_single(rng.next_u32() as u64, 32));
     }
     #[bench]
-    fn make_rp_32(b: &mut Bencher) {
+    fn verify_smrp_64(b: &mut Bencher) {
         let mut rng: OsRng = OsRng::new().unwrap();
-        b.iter(|| RangeProof::generate_proof(rng.next_u32() as u64, 32));
-    }
-    #[bench]
-    fn verify_rp_64(b: &mut Bencher) {
-        let mut rng: OsRng = OsRng::new().unwrap();
-        let rp = RangeProof::generate_proof(rng.next_u64(), 64);
+        let rp = State3::prove_single(rng.next_u64(), 64);
         b.iter(|| rp.verify_proof());
     }
     #[bench]
-    fn verify_rp_32(b: &mut Bencher) {
+    fn verify_smrp_32(b: &mut Bencher) {
         let mut rng: OsRng = OsRng::new().unwrap();
-        let rp = RangeProof::generate_proof(rng.next_u32() as u64, 32);
+        let rp = State3::prove_single(rng.next_u32() as u64, 32);
         b.iter(|| rp.verify_proof());
     }
 }
-*/
