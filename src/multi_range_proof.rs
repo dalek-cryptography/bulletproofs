@@ -21,6 +21,7 @@ pub struct Generators {
     G: Vec<RistrettoPoint>,
     H: Vec<RistrettoPoint>,
     n: usize,
+    j: u16,
 }
 
 #[derive(Clone)]
@@ -54,6 +55,7 @@ pub struct Statement {
     // intermediate values (private)
     y: Scalar,
     z: Scalar,
+    offset_z: Scalar,
     l: VecPoly2,
     r: VecPoly2,
     t: PolyDeg3,
@@ -80,7 +82,7 @@ pub struct Proof {
 
 
 impl Generators {
-    pub fn new(n: usize) -> Generators {
+    pub fn new(n: usize, j: u16) -> Generators {
         let B = RistrettoPoint::hash_from_bytes::<Sha256>("hello".as_bytes());
         let B_blinding = RistrettoPoint::hash_from_bytes::<Sha256>("there".as_bytes());
         Generators {
@@ -89,6 +91,7 @@ impl Generators {
             G: make_generators(&B, n),
             H: make_generators(&B_blinding, n),
             n: n,
+            j: j,
         }
     }
 
@@ -140,6 +143,17 @@ impl Input {
         // useful for debugging:
         // let mut rng: StdRng = StdRng::from_seed(&[1, 2, 3, 4]);
         let n = self.gen.n;
+        let j = self.gen.j;
+
+        // needed for multi-range-proof only: generate y, z offsets
+        let mut offset_y = Scalar::one(); // offset_y = y^((j-1)*n);
+        let mut offset_z = Scalar::one(); // offset_z = z^(j-1); 
+        for _ in 0..(j-1) {
+            for _ in 0..n {
+                offset_y = offset_y*y;
+            }
+            offset_z = offset_z*z;
+        }
 
         // Save/label randomness to be used later (in the paper: rho, s_L, s_R)
         let s_blinding = self.randomness[0];
@@ -157,10 +171,10 @@ impl Input {
             let v_i = (self.v >> i) & 1;
             l.0[i] -= z;
             l.1[i] += s_a[i];
-            r.0[i] += exp_y * z + z2 * exp_2;
-            r.1[i] += exp_y * s_b[i];
+            r.0[i] += exp_y * offset_y * z + z2 * offset_z * exp_2;
+            r.1[i] += exp_y * offset_y * s_b[i];
             if v_i == 0 {
-                r.0[i] -= exp_y;
+                r.0[i] -= exp_y * offset_y;
             } else {
                 l.0[i] += Scalar::one();
             }
@@ -191,6 +205,7 @@ impl Input {
             st_comm: st_comm,
             y: y,
             z: z,
+            offset_z: offset_z,
             l: l,
             r: r,
             t: t,
@@ -206,7 +221,7 @@ impl Input {
 impl Statement {
     pub fn make_proof(&self, x: Scalar) -> Proof {
         // Generate final values for proof (line 55-60)
-        let t_x_blinding = self.t_1_blinding * x + self.t_2_blinding * x * x + self.z * self.z * self.v_blinding;
+        let t_x_blinding = self.t_1_blinding * x + self.t_2_blinding * x * x + self.z * self.z * self.offset_z * self.v_blinding;
         let e_blinding = self.a_blinding + self.s_blinding * x;
         let t_hat = self.t.0 + self.t.1 * x + self.t.2 * x * x;
 
@@ -230,7 +245,7 @@ impl Statement {
 
 impl Proof {
     pub fn create_one(v: u64, n: usize) -> Proof {
-        let input = Generators::new(n).make_input(v);
+        let input = Generators::new(n, 1).make_input(v);
         // TODO: swap out this commitment with use of RO
         let (y, z) = commit(&input.inp_comm.A, &input.inp_comm.S);
         let statement = input.make_statement(y, z);
@@ -243,7 +258,7 @@ impl Proof {
         unimplemented!()
     }
 
-    pub fn verify_proof(&self) -> bool {
+    pub fn verify(&self, m: u16) -> bool {
         let V = &self.inp_comm.V;
         let A = &self.inp_comm.A;
         let S = &self.inp_comm.S;
@@ -257,6 +272,16 @@ impl Proof {
         let (x, _) = commit(T_1, T_2);
         let G = make_generators(B, n);
         let mut hprime_vec = make_generators(B_blinding, n);
+
+        // needed for multi-range-proof only: generate y, z offsets
+        let mut offset_y = Scalar::one(); // offset_y = y^((j-1)*n);
+        let mut offset_z = Scalar::one(); // offset_z = z^(j-1); 
+        for _ in 0..(m-1) { // TOFIX: should be j instead of m (do this per-party?)
+            for _ in 0..n {
+                offset_y = offset_y*y;
+            }
+            offset_z = offset_z*z;
+        }
 
         // line 63: check that t = t0 + t1 * x + t2 * x * x
         let z2 = z * z;
@@ -292,7 +317,7 @@ impl Proof {
         let mut inv_exp_y = Scalar::one(); // start at y^-0 = 1
         for i in 0..n {
             hprime_vec[i] = hprime_vec[i] * inv_exp_y;
-            big_p += hprime_vec[i] * (z * exp_y + z2 * exp_2);
+            big_p += hprime_vec[i] * (z * exp_y * offset_y + z2 * offset_z * exp_2);
             exp_y = exp_y * y; // y^i -> y^(i+1)
             exp_2 = exp_2 + exp_2; // 2^i -> 2^(i+1)
             inv_exp_y = inv_exp_y * inverse_y; // y^(-i) * y^(-1) -> y^(-(i+1))
@@ -348,15 +373,15 @@ mod tests {
         for n in &[1, 2, 4, 8, 16, 32] {
             //println!("n: {:?}", n);
             let rp = Proof::create_one(0, *n);
-            assert_eq!(rp.verify_proof(), true);
+            assert_eq!(rp.verify(1), true);
             let rp = Proof::create_one(2u64.pow(*n as u32) - 1, *n);
-            assert_eq!(rp.verify_proof(), true);
+            assert_eq!(rp.verify(1), true);
             let rp = Proof::create_one(2u64.pow(*n as u32), *n);
-            assert_eq!(rp.verify_proof(), false);
+            assert_eq!(rp.verify(1), false);
             let rp = Proof::create_one(2u64.pow(*n as u32) + 1, *n);
-            assert_eq!(rp.verify_proof(), false);
+            assert_eq!(rp.verify(1), false);
             let rp = Proof::create_one(u64::max_value(), *n);
-            assert_eq!(rp.verify_proof(), false);
+            assert_eq!(rp.verify(1), false);
         }
     }
     #[test]
@@ -366,7 +391,7 @@ mod tests {
             let v: u64 = rng.next_u64();
             let rp = Proof::create_one(v, 32);
             let expected = v <= 2u64.pow(32);
-            assert_eq!(rp.verify_proof(), expected);
+            assert_eq!(rp.verify(1), expected);
         }
     }
     #[test]
@@ -375,7 +400,7 @@ mod tests {
             let mut rng: OsRng = OsRng::new().unwrap();
             let v: u32 = rng.next_u32();
             let rp = Proof::create_one(v as u64, 32);
-            assert_eq!(rp.verify_proof(), true);
+            assert_eq!(rp.verify(1), true);
         }
     }
 }
@@ -400,12 +425,12 @@ mod bench {
     fn verify_multirp_64(b: &mut Bencher) {
         let mut rng: OsRng = OsRng::new().unwrap();
         let rp = Proof::create_one(rng.next_u64(), 64);
-        b.iter(|| rp.verify_proof());
+        b.iter(|| rp.verify(1));
     }
     #[bench]
     fn verify_multirp_32(b: &mut Bencher) {
         let mut rng: OsRng = OsRng::new().unwrap();
         let rp = Proof::create_one(rng.next_u32() as u64, 32);
-        b.iter(|| rp.verify_proof());
+        b.iter(|| rp.verify(1));
     }
 }
