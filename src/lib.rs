@@ -13,6 +13,7 @@ extern crate test;
 
 pub mod random_oracle;
 mod range_proof;
+mod multi_range_proof;
 mod inner_product_proof;
 
 pub mod scalar;
