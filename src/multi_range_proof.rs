@@ -7,12 +7,14 @@ use curve25519_dalek::ristretto;
 use curve25519_dalek::traits::Identity;
 use curve25519_dalek::scalar::Scalar;
 use rand::OsRng;
+use std::clone::Clone;
 use range_proof::{make_generators, inner_product, add_vec, commit};
 
 struct PolyDeg3(Scalar, Scalar, Scalar);
 
 struct VecPoly2(Vec<Scalar>, Vec<Scalar>);
 
+#[derive(Clone)]
 pub struct Generators {
     B: RistrettoPoint,
     B_blinding: RistrettoPoint,
@@ -21,14 +23,15 @@ pub struct Generators {
     n: usize,
 }
 
+#[derive(Clone)]
 pub struct InputCommitment {
-    pub V: RistrettoPoint,
-    pub A: RistrettoPoint,
-    pub S: RistrettoPoint,    
+    V: RistrettoPoint,
+    A: RistrettoPoint,
+    S: RistrettoPoint,    
 }
 
 pub struct Input {
-    pub gen: Generators,
+    gen: Generators,
     pub inp_comm: InputCommitment,
 
     v_blinding: Scalar,
@@ -37,14 +40,15 @@ pub struct Input {
     v: u64,  
 }
 
+#[derive(Clone)]
 pub struct StatementCommitment {
-    pub T_1: RistrettoPoint,
-    pub T_2: RistrettoPoint, 
+    T_1: RistrettoPoint,
+    T_2: RistrettoPoint, 
 }
 
 pub struct Statement {
-    pub gen: Generators,
-    pub inp_comm: InputCommitment,
+    gen: Generators,
+    inp_comm: InputCommitment,
     pub st_comm: StatementCommitment,
 
     // intermediate values (private)
@@ -61,9 +65,9 @@ pub struct Statement {
 }
 
 pub struct Proof {
-    pub gen: Generators,
-    pub inp_comm: InputCommitment,
-    pub st_comm: StatementCommitment,
+    gen: Generators,
+    inp_comm: InputCommitment,
+    st_comm: StatementCommitment,
 
     t_x_blinding: Scalar,
     e_blinding: Scalar,
@@ -120,7 +124,7 @@ impl Generators {
         };
 
         Input {
-            gen: *self,
+            gen: self.clone(),
             inp_comm: inp_comm,
             v_blinding: v_blinding,
             a_blinding: a_blinding,
@@ -182,8 +186,8 @@ impl Input {
         };
 
         Statement {
-            gen: self.gen,
-            inp_comm: self.inp_comm,
+            gen: self.gen.clone(),
+            inp_comm: self.inp_comm.clone(),
             st_comm: st_comm,
             y: y,
             z: z,
@@ -212,9 +216,9 @@ impl Statement {
         let r_total = self.r.eval(x);
 
         Proof {
-            gen: self.gen,
-            inp_comm: self.inp_comm,
-            st_comm: self.st_comm,
+            gen: self.gen.clone(),
+            inp_comm: self.inp_comm.clone(),
+            st_comm: self.st_comm.clone(),
             t_x_blinding: t_x_blinding,
             e_blinding: e_blinding,
             t: t_hat,
@@ -225,7 +229,7 @@ impl Statement {
 }
 
 impl Proof {
-    pub fn prove_single(v: u64, n: usize) -> Proof {
+    pub fn create_one(v: u64, n: usize) -> Proof {
         let input = Generators::new(n).make_input(v);
         // TODO: swap out this commitment with use of RO
         let (y, z) = commit(&input.inp_comm.A, &input.inp_comm.S);
@@ -343,15 +347,15 @@ mod tests {
     fn verify_multirp_simple() {
         for n in &[1, 2, 4, 8, 16, 32] {
             //println!("n: {:?}", n);
-            let rp = State3::prove_single(0, *n);
+            let rp = Proof::create_one(0, *n);
             assert_eq!(rp.verify_proof(), true);
-            let rp = State3::prove_single(2u64.pow(*n as u32) - 1, *n);
+            let rp = Proof::create_one(2u64.pow(*n as u32) - 1, *n);
             assert_eq!(rp.verify_proof(), true);
-            let rp = State3::prove_single(2u64.pow(*n as u32), *n);
+            let rp = Proof::create_one(2u64.pow(*n as u32), *n);
             assert_eq!(rp.verify_proof(), false);
-            let rp = State3::prove_single(2u64.pow(*n as u32) + 1, *n);
+            let rp = Proof::create_one(2u64.pow(*n as u32) + 1, *n);
             assert_eq!(rp.verify_proof(), false);
-            let rp = State3::prove_single(u64::max_value(), *n);
+            let rp = Proof::create_one(u64::max_value(), *n);
             assert_eq!(rp.verify_proof(), false);
         }
     }
@@ -360,7 +364,7 @@ mod tests {
         for _ in 0..50 {
             let mut rng: OsRng = OsRng::new().unwrap();
             let v: u64 = rng.next_u64();
-            let rp = State3::prove_single(v, 32);
+            let rp = Proof::create_one(v, 32);
             let expected = v <= 2u64.pow(32);
             assert_eq!(rp.verify_proof(), expected);
         }
@@ -370,7 +374,7 @@ mod tests {
         for _ in 0..50 {
             let mut rng: OsRng = OsRng::new().unwrap();
             let v: u32 = rng.next_u32();
-            let rp = State3::prove_single(v as u64, 32);
+            let rp = Proof::create_one(v as u64, 32);
             assert_eq!(rp.verify_proof(), true);
         }
     }
@@ -385,23 +389,23 @@ mod bench {
     #[bench]
     fn make_multirp_64(b: &mut Bencher) {
         let mut rng: OsRng = OsRng::new().unwrap();
-        b.iter(|| State3::prove_single(rng.next_u64(), 64));
+        b.iter(|| Proof::create_one(rng.next_u64(), 64));
     }
     #[bench]
     fn make_multirp_32(b: &mut Bencher) {
         let mut rng: OsRng = OsRng::new().unwrap();
-        b.iter(|| State3::prove_single(rng.next_u32() as u64, 32));
+        b.iter(|| Proof::create_one(rng.next_u32() as u64, 32));
     }
     #[bench]
     fn verify_multirp_64(b: &mut Bencher) {
         let mut rng: OsRng = OsRng::new().unwrap();
-        let rp = State3::prove_single(rng.next_u64(), 64);
+        let rp = Proof::create_one(rng.next_u64(), 64);
         b.iter(|| rp.verify_proof());
     }
     #[bench]
     fn verify_multirp_32(b: &mut Bencher) {
         let mut rng: OsRng = OsRng::new().unwrap();
-        let rp = State3::prove_single(rng.next_u32() as u64, 32);
+        let rp = Proof::create_one(rng.next_u32() as u64, 32);
         b.iter(|| rp.verify_proof());
     }
 }
