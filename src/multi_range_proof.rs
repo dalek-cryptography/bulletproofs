@@ -21,7 +21,7 @@ pub struct Generators {
     G: Vec<RistrettoPoint>,
     H: Vec<RistrettoPoint>,
     n: usize,
-    j: u16,
+    j: usize,
 }
 
 #[derive(Clone)]
@@ -82,7 +82,7 @@ pub struct Proof {
 
 
 impl Generators {
-    pub fn new(n: usize, j: u16) -> Generators {
+    pub fn new(n: usize, j: usize) -> Generators {
         let B = RistrettoPoint::hash_from_bytes::<Sha256>("hello".as_bytes());
         let B_blinding = RistrettoPoint::hash_from_bytes::<Sha256>("there".as_bytes());
         Generators {
@@ -258,7 +258,7 @@ impl Proof {
         unimplemented!()
     }
 
-    pub fn verify(&self, m: u16) -> bool {
+    pub fn verify(&self, m: usize) -> bool {
         let V = &self.inp_comm.V;
         let A = &self.inp_comm.A;
         let S = &self.inp_comm.S;
@@ -273,16 +273,6 @@ impl Proof {
         let G = make_generators(B, n);
         let mut hprime_vec = make_generators(B_blinding, n);
 
-        // needed for multi-range-proof only: generate y, z offsets
-        let mut offset_y = Scalar::one(); // offset_y = y^((j-1)*n);
-        let mut offset_z = Scalar::one(); // offset_z = z^(j-1); 
-        for _ in 0..(m-1) { // TOFIX: should be j instead of m (do this per-party?)
-            for _ in 0..n {
-                offset_y = offset_y*y;
-            }
-            offset_z = offset_z*z;
-        }
-
         // line 63: check that t = t0 + t1 * x + t2 * x * x
         let z2 = z * z;
         let z3 = z2 * z;
@@ -295,41 +285,60 @@ impl Proof {
             exp_y = exp_y * y; // y^i -> y^(i+1)
             exp_2 = exp_2 + exp_2; // 2^i -> 2^(i+1)
         }
-        let t_check = B * power_g + V * z2 + T_1 * x + T_2 * x * x;
+        let mut t_check = B * power_g + T_1 * x + T_2 * x * x;
+        let mut exp_z = Scalar::one();
+        for _ in 0..m {
+            t_check += V * z2 * exp_z;
+            exp_z = exp_z * z;
+        }
         let t_commit = B * self.t + B_blinding * self.t_x_blinding;
         if t_commit != t_check {
             //println!("fails check on line 63");
             return false;
         }
 
-        // line 62: calculate hprime
+        
         // line 64: compute commitment to l, r
+        // calculate P: add A + S*x - G*z
         let mut sum_G = RistrettoPoint::identity();
-        for i in 0..n {
+        for i in 0..n*m {
             sum_G += G[i];
         }
-        let mut big_p = A + S * x;
-        big_p -= sum_G * z;
+        let mut P = A + S * x;
+        P -= sum_G * z;
 
+        // line 62: calculate hprime
+        // calculate P: add < vec(h'), z * vec(y)^n*m >
         let mut exp_y = Scalar::one(); // start at y^0 = 1
-        let mut exp_2 = Scalar::one(); // start at 2^0 = 1
-        let inverse_y = Scalar::invert(&y);
+        let inverse_y = Scalar::invert(&y); // inverse_y = 1/y
         let mut inv_exp_y = Scalar::one(); // start at y^-0 = 1
-        for i in 0..n {
+        for i in 0..n*m {
             hprime_vec[i] = hprime_vec[i] * inv_exp_y;
-            big_p += hprime_vec[i] * (z * exp_y * offset_y + z2 * offset_z * exp_2);
+            P += hprime_vec[i] * z * exp_y;
+
             exp_y = exp_y * y; // y^i -> y^(i+1)
             exp_2 = exp_2 + exp_2; // 2^i -> 2^(i+1)
             inv_exp_y = inv_exp_y * inverse_y; // y^(-i) * y^(-1) -> y^(-(i+1))
         }
 
+        // calculate P: add sum(j_1^m)(<H[(j-1)*n:j*n-1], z^(j+1)*vec(2)^n>)
+        let mut exp_z = z * z;
+        for j in 1..(m+1) {
+            exp_2 = Scalar::one();
+            for index in (j-1)*n..j*n {
+                P += hprime_vec[index] * exp_z * exp_2;
+                exp_2 = exp_2 + exp_2;
+            }
+            exp_z = exp_z * z;
+        }
+
         // line 65: check that l, r are correct
-        let mut big_p_check = B_blinding * self.e_blinding;
+        let mut P_check = B_blinding * self.e_blinding;
         let points_iter = G.iter().chain(hprime_vec.iter());
         let scalars_iter = self.l.iter().chain(self.r.iter());
-        big_p_check += ristretto::multiscalar_mult(scalars_iter, points_iter);
-        if big_p != big_p_check {
-            //println!("fails check on line 65: big_p != g * l + hprime * r");
+        P_check += ristretto::multiscalar_mult(scalars_iter, points_iter);
+        if P != P_check {
+            //println!("fails check on line 65: P != g * l + hprime * r");
             return false;
         }
 
