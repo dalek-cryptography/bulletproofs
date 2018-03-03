@@ -66,6 +66,7 @@ pub struct Statement {
     t_2_blinding: Scalar,
 }
 
+#[derive(Clone)]
 pub struct Proof {
     gen: Generators,
     inp_comm: InputCommitment,
@@ -88,8 +89,8 @@ impl Generators {
         Generators {
             B: B,
             B_blinding: B_blinding,
-            G: make_generators(&B, n),
-            H: make_generators(&B_blinding, n),
+            G: make_generators(&B, n*j),
+            H: make_generators(&B_blinding, n*j),
             n: n,
             j: j,
         }
@@ -97,8 +98,8 @@ impl Generators {
 
     pub fn make_input(&self, v: u64) -> Input {
         let mut rng: OsRng = OsRng::new().unwrap();
-        // useful for debugging:
-        // let mut rng: StdRng = StdRng::from_seed(&[1, 2, 3, 4]); 
+        let n = self.n;
+        let j = self.j;
 
         // Compute V
         let v_blinding = Scalar::random(&mut rng);
@@ -107,17 +108,17 @@ impl Generators {
         // Compute A
         let a_blinding = Scalar::random(&mut rng);
         let mut A = self.B_blinding * a_blinding;
-        for i in 0..self.n {
+        for i in 0..n {
             let v_i = (v >> i) & 1;
             if v_i == 0 {
-                A -= self.H[i];
+                A -= self.H[i + (j-1)*n];
             } else {
-                A += self.G[i];
+                A += self.G[i + (j-1)*n];
             }
         }
 
         // Compute S
-        let points_iter = iter::once(&self.B_blinding).chain((&self.G).iter()).chain((&self.H).iter());
+        let points_iter = iter::once(&self.B_blinding).chain((&self.G[(j-1)*n..j*n]).iter()).chain((&self.H[(j-1)*n..j*n]).iter());
         let randomness: Vec<_> = (0..(1 + 2 * self.n)).map(|_| Scalar::random(&mut rng)).collect();
         let S = ristretto::multiscalar_mult(&randomness, points_iter);
         let inp_comm = InputCommitment {
@@ -140,8 +141,6 @@ impl Generators {
 impl Input {
     pub fn make_statement(&self, y: Scalar, z: Scalar) -> Statement {
         let mut rng: OsRng = OsRng::new().unwrap();
-        // useful for debugging:
-        // let mut rng: StdRng = StdRng::from_seed(&[1, 2, 3, 4]);
         let n = self.gen.n;
         let j = self.gen.j;
 
@@ -254,8 +253,46 @@ impl Proof {
         statement.make_proof(x)
     }
 
+    // TODO: generalize from this case to any # of parties
+    pub fn create_two(v1: u64, v2: u64, n: usize) -> Proof {
+        let gen = Generators::new(n, 2);
+        let inp1 = gen.make_input(v1);
+        let inp2 = gen.make_input(v2);
+        let A = inp1.inp_comm.A + inp2.inp_comm.A;
+        let S = inp1.inp_comm.S + inp2.inp_comm.S;
+        let (y, z) = commit(&A, &S);
+
+        let st1 = inp1.make_statement(y, z);
+        let st2 = inp2.make_statement(y, z);
+        let T_1 = st1.st_comm.T_1 + st2.st_comm.T_1;
+        let T_2 = st1.st_comm.T_2 + st2.st_comm.T_2;
+        let (x, _) = commit(&T_1, &T_2);
+
+        let proof1 = st1.make_proof(x);
+        let proof2 = st2.make_proof(x);
+        Proof::combine([proof1, proof2].to_vec())
+    }
+
     pub fn combine(proofs: Vec<Proof>) -> Proof {
-        unimplemented!()
+        let mut new = proofs[0].clone();
+        for proof in &proofs[1..] {
+            new.inp_comm.V = new.inp_comm.V + proof.inp_comm.V;
+            new.inp_comm.A = new.inp_comm.A + proof.inp_comm.A;
+            new.inp_comm.S = new.inp_comm.S + proof.inp_comm.S;
+            new.st_comm.T_1 = new.st_comm.T_1 + proof.st_comm.T_1;
+            new.st_comm.T_2 = new.st_comm.T_2 + proof.st_comm.T_2;
+            new.t_x_blinding = new.t_x_blinding + proof.t_x_blinding;
+            new.e_blinding = new.e_blinding + proof.e_blinding;
+            new.t = new.t + proof.t;
+            // "interleaved concatenation" of l and r (?)
+            for i in 0..new.gen.n {
+                new.l[i] = new.l[i] + proof.l[i];
+                new.r[i] = new.r[i] + proof.r[i];
+            }
+            // new.l.extend(&proof.l);
+            // new.r.extend(&proof.r);
+        }
+        new
     }
 
     pub fn verify(&self, m: usize) -> bool {
@@ -296,7 +333,6 @@ impl Proof {
             //println!("fails check on line 63");
             return false;
         }
-
         
         // line 64: compute commitment to l, r
         // calculate P: add A + S*x - G*z
@@ -325,8 +361,9 @@ impl Proof {
         let mut exp_z = z * z;
         for j in 1..(m+1) {
             exp_2 = Scalar::one();
-            for index in (j-1)*n..j*n {
-                P += hprime_vec[index] * exp_z * exp_2;
+            for index in 0..n {
+                // index into hprime, from [(j-1)*n : j*n-1]
+                P += hprime_vec[index + (j-1)*n] * exp_z * exp_2;
                 exp_2 = exp_2 + exp_2;
             }
             exp_z = exp_z * z;
@@ -378,7 +415,7 @@ mod tests {
     use rand::Rng;
 
     #[test]
-    fn verify_multirp_simple() {
+    fn verify_multirp_simple_one() {
         for n in &[1, 2, 4, 8, 16, 32] {
             //println!("n: {:?}", n);
             let rp = Proof::create_one(0, *n);
@@ -391,6 +428,14 @@ mod tests {
             assert_eq!(rp.verify(1), false);
             let rp = Proof::create_one(u64::max_value(), *n);
             assert_eq!(rp.verify(1), false);
+        }
+    }
+    #[test]
+    fn verify_multirp_simple_two() {
+        for n in &[1, 2, 4, 8, 16, 32] {
+            println!("n: {:?}", n);
+            let rp = Proof::create_two(0, 1, *n);
+            assert_eq!(rp.verify(2), true);
         }
     }
     #[test]
