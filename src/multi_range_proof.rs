@@ -266,12 +266,15 @@ impl Proof {
         let A = inp1.inp_comm.A + inp2.inp_comm.A;
         let S = inp1.inp_comm.S + inp2.inp_comm.S;
         let (y, z) = commit(&A, &S);
+        // println!("creating y: {:?}", y);
+        // println!("creating z: {:?}", z);
 
         let st1 = inp1.make_statement(y, z);
         let st2 = inp2.make_statement(y, z);
         let T_1 = st1.st_comm.T_1 + st2.st_comm.T_1;
         let T_2 = st1.st_comm.T_2 + st2.st_comm.T_2;
         let (x, _) = commit(&T_1, &T_2);
+        // println!("creating x: {:?}", x);
 
         let proof1 = st1.make_proof(x);
         let proof2 = st2.make_proof(x);
@@ -279,25 +282,47 @@ impl Proof {
     }
 
     pub fn combine(proofs: Vec<Proof>) -> Proof {
-        let mut new = proofs[0].clone();
-        for proof in &proofs[1..] {
-            new.inp_comm.V.push(proof.inp_comm.V[0]);
-            new.inp_comm.A = new.inp_comm.A + proof.inp_comm.A;
-            new.inp_comm.S = new.inp_comm.S + proof.inp_comm.S;
-            new.st_comm.T_1 = new.st_comm.T_1 + proof.st_comm.T_1;
-            new.st_comm.T_2 = new.st_comm.T_2 + proof.st_comm.T_2;
-            new.t_x_blinding = new.t_x_blinding + proof.t_x_blinding;
-            new.e_blinding = new.e_blinding + proof.e_blinding;
-            new.t = new.t + proof.t;
-            // "interleaved concatenation" of l and r (?)
-            for i in 0..new.gen.n {
-                new.l[i] = new.l[i] + proof.l[i];
-                new.r[i] = new.r[i] + proof.r[i];
-            }
-            // new.l.extend(&proof.l);
-            // new.r.extend(&proof.r);
+        let mut V = Vec::new();
+        let mut A = RistrettoPoint::identity();
+        let mut S = RistrettoPoint::identity();
+        let mut T_1 = RistrettoPoint::identity();
+        let mut T_2 = RistrettoPoint::identity();
+        let mut t_x_blinding = Scalar::zero();
+        let mut e_blinding = Scalar::zero();
+        let mut t = Scalar::zero();
+        let mut l:Vec<Scalar> = Vec::new();
+        let mut r:Vec<Scalar> = Vec::new();
+
+        for proof in &proofs {
+            V.push(proof.inp_comm.V[0]);
+            A += proof.inp_comm.A;
+            S += proof.inp_comm.S;
+            T_1 += proof.st_comm.T_1;
+            T_2 += proof.st_comm.T_2;
+            t_x_blinding += proof.t_x_blinding;
+            e_blinding += proof.e_blinding;
+            t += proof.t;
+            l.extend(&proof.l);
+            r.extend(&proof.r);
         }
-        new
+
+        Proof {
+            gen: proofs[0].gen.clone(),
+            inp_comm: InputCommitment {
+                V: V,
+                A: A,
+                S: S,
+            },
+            st_comm: StatementCommitment {
+                T_1: T_1,
+                T_2: T_2,
+            },
+            t_x_blinding: t_x_blinding,
+            e_blinding,
+            t: t,
+            l: l,
+            r: r,
+        }
     }
 
     pub fn verify(&self, m: usize) -> bool {
@@ -335,7 +360,7 @@ impl Proof {
         }
         let t_commit = B * self.t + B_blinding * self.t_x_blinding;
         if t_commit != t_check {
-            //println!("fails check on line 63");
+            println!("fails check on line 63");
             return false;
         }
         
@@ -380,13 +405,13 @@ impl Proof {
         let scalars_iter = self.l.iter().chain(self.r.iter());
         P_check += ristretto::multiscalar_mult(scalars_iter, points_iter);
         if P != P_check {
-            //println!("fails check on line 65: P != g * l + hprime * r");
+            println!("fails check on line 65: P != g * l + hprime * r");
             return false;
         }
 
         // line 66: check that t is correct
         if self.t != inner_product(&self.l, &self.r) {
-            //println!("fails check on line 66: t != l * r");
+            println!("fails check on line 66: t != l * r");
             return false;
         }
 
@@ -421,8 +446,8 @@ mod tests {
 
     #[test]
     fn verify_multirp_simple_one() {
-        for n in vec![1, 32] {
-            //println!("n: {:?}", n);
+        for n in vec![1, 2, 4, 16, 32] {
+            println!("n: {:?}", n);
             let rp = Proof::create_one(0, n);
             assert_eq!(rp.verify(1), true);
             let rp = Proof::create_one(2u64.pow(n as u32) - 1, n);
@@ -437,9 +462,9 @@ mod tests {
     }
     #[test]
     fn verify_multirp_simple_two() {
-        for n in vec![1, 16, 32] {
+        for n in vec![1] {
             println!("n: {:?}", n);
-            let rp = Proof::create_two(0, 1, n);
+            let rp = Proof::create_two(1, 1, n);
             assert_eq!(rp.verify(2), true);
         }
     }
