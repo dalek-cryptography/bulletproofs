@@ -26,9 +26,9 @@ pub struct Generators {
 
 #[derive(Clone)]
 pub struct InputCommitment {
-    V: RistrettoPoint,
+    V: Vec<RistrettoPoint>,
     A: RistrettoPoint,
-    S: RistrettoPoint,    
+    S: RistrettoPoint,
 }
 
 pub struct Input {
@@ -109,32 +109,38 @@ impl Generators {
         let a_blinding = Scalar::random(&mut rng);
         let mut A = self.B_blinding * a_blinding;
         for i in 0..n {
-            let v_i = (v >> i) & 1;
-            if v_i == 0 {
-                A -= self.H[i + (j-1)*n];
+            let bit = (v >> i) & 1;
+            if bit == 1 {
+                // a_L = bit, bit = 1, so a_L=1, a_R=0
+                A += self.G[(j-1)*n + i];
             } else {
-                A += self.G[i + (j-1)*n];
+                // a_R = bit - 1, bit = 0, so a_L=0, a_R=-1
+                A -= self.H[(j-1)*n + i];
             }
         }
 
         // Compute S
-        let points_iter = iter::once(&self.B_blinding).chain((&self.G[(j-1)*n..j*n]).iter()).chain((&self.H[(j-1)*n..j*n]).iter());
+        let points_iter = iter::once(&self.B_blinding).
+            chain((&self.G[(j-1)*n..j*n]).iter()).
+            chain((&self.H[(j-1)*n..j*n]).iter());
         let randomness: Vec<_> = (0..(1 + 2 * self.n)).map(|_| Scalar::random(&mut rng)).collect();
         let S = ristretto::multiscalar_mult(&randomness, points_iter);
         let inp_comm = InputCommitment {
-            V: V,
+            V: vec![V],
             A: A,
             S: S,            
         };
+        
+        let gen = self.clone();
 
         Input {
-            gen: self.clone(),
-            j: j,
-            inp_comm: inp_comm,
-            v_blinding: v_blinding,
-            a_blinding: a_blinding,
-            randomness: randomness,
-            v: v,
+            gen,
+            j,
+            inp_comm,
+            v_blinding,
+            a_blinding,
+            randomness,
+            v,
         }
     }
 }
@@ -146,11 +152,11 @@ impl Input {
 
         // needed for multi-range-proof only: generate y, z offsets
         let mut offset_y = Scalar::one(); // offset_y = y^((j-1)*n);
+        for _ in 0..((self.j-1)*n) {
+            offset_y = offset_y*y;
+        }
         let mut offset_z = Scalar::one(); // offset_z = z^(j-1); 
         for _ in 0..(self.j-1) {
-            for _ in 0..n {
-                offset_y = offset_y*y;
-            }
             offset_z = offset_z*z;
         }
 
@@ -167,16 +173,15 @@ impl Input {
         let mut exp_y = Scalar::one(); // start at y^0 = 1
         let mut exp_2 = Scalar::one(); // start at 2^0 = 1
         for i in 0..n {
-            let v_i = (self.v >> i) & 1;
-            l.0[i] -= z;
-            l.1[i] += s_a[i];
-            r.0[i] += exp_y * offset_y * z + z2 * offset_z * exp_2;
-            r.1[i] += exp_y * offset_y * s_b[i];
-            if v_i == 0 {
-                r.0[i] -= exp_y * offset_y;
-            } else {
-                l.0[i] += Scalar::one();
-            }
+            let a_l = Scalar::from_u64((self.v >> i) & 1);
+            let a_r = a_l - Scalar::one();
+            
+            l.0[i] = a_l - z;
+            l.1[i] = s_a[i];
+
+            r.0[i] = exp_y * offset_y * (a_r + z) + z2 * offset_z * exp_2;
+            r.1[i] = exp_y * offset_y * s_b[i];
+
             exp_y = exp_y * y; // y^i -> y^(i+1)
             exp_2 = exp_2 + exp_2; // 2^i -> 2^(i+1)
         }
@@ -276,7 +281,7 @@ impl Proof {
     pub fn combine(proofs: Vec<Proof>) -> Proof {
         let mut new = proofs[0].clone();
         for proof in &proofs[1..] {
-            new.inp_comm.V = new.inp_comm.V + proof.inp_comm.V;
+            new.inp_comm.V.push(proof.inp_comm.V[0]);
             new.inp_comm.A = new.inp_comm.A + proof.inp_comm.A;
             new.inp_comm.S = new.inp_comm.S + proof.inp_comm.S;
             new.st_comm.T_1 = new.st_comm.T_1 + proof.st_comm.T_1;
@@ -324,8 +329,8 @@ impl Proof {
         }
         let mut t_check = B * power_g + T_1 * x + T_2 * x * x;
         let mut exp_z = Scalar::one();
-        for _ in 0..m {
-            t_check += V * z2 * exp_z;
+        for j in 0..m {
+            t_check += V[j] * z2 * exp_z;
             exp_z = exp_z * z;
         }
         let t_commit = B * self.t + B_blinding * self.t_x_blinding;
@@ -416,31 +421,31 @@ mod tests {
 
     #[test]
     fn verify_multirp_simple_one() {
-        for n in &[1, 2, 4, 8, 16, 32] {
+        for n in vec![1, 32] {
             //println!("n: {:?}", n);
-            let rp = Proof::create_one(0, *n);
+            let rp = Proof::create_one(0, n);
             assert_eq!(rp.verify(1), true);
-            let rp = Proof::create_one(2u64.pow(*n as u32) - 1, *n);
+            let rp = Proof::create_one(2u64.pow(n as u32) - 1, n);
             assert_eq!(rp.verify(1), true);
-            let rp = Proof::create_one(2u64.pow(*n as u32), *n);
+            let rp = Proof::create_one(2u64.pow(n as u32), n);
             assert_eq!(rp.verify(1), false);
-            let rp = Proof::create_one(2u64.pow(*n as u32) + 1, *n);
+            let rp = Proof::create_one(2u64.pow(n as u32) + 1, n);
             assert_eq!(rp.verify(1), false);
-            let rp = Proof::create_one(u64::max_value(), *n);
+            let rp = Proof::create_one(u64::max_value(), n);
             assert_eq!(rp.verify(1), false);
         }
     }
     #[test]
     fn verify_multirp_simple_two() {
-        for n in &[1, 2, 4, 8, 16, 32] {
+        for n in vec![1, 16, 32] {
             println!("n: {:?}", n);
-            let rp = Proof::create_two(0, 1, *n);
+            let rp = Proof::create_two(0, 1, n);
             assert_eq!(rp.verify(2), true);
         }
     }
     #[test]
     fn verify_multirp_rand_big() {
-        for _ in 0..50 {
+        for _ in 0..10 {
             let mut rng: OsRng = OsRng::new().unwrap();
             let v: u64 = rng.next_u64();
             let rp = Proof::create_one(v, 32);
@@ -450,7 +455,7 @@ mod tests {
     }
     #[test]
     fn verify_multirp_rand_small() {
-        for _ in 0..50 {
+        for _ in 0..10 {
             let mut rng: OsRng = OsRng::new().unwrap();
             let v: u32 = rng.next_u32();
             let rp = Proof::create_one(v as u64, 32);
