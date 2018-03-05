@@ -2,6 +2,7 @@
 #![feature(nll)]
 
 #![feature(test)]
+#![feature(i128_type)]
 
 extern crate curve25519_dalek;
 extern crate sha2;
