@@ -337,21 +337,30 @@ impl Proof {
 
         let (y, z) = commit(A, S);
         let (x, _) = commit(T_1, T_2);
-        let G = make_generators(B, n);
-        let mut hprime_vec = make_generators(B_blinding, n);
+        let G = make_generators(B, n*m);
+        let mut hprime_vec = make_generators(B_blinding, n*m);
 
         // line 63: check that t = t0 + t1 * x + t2 * x * x
         let z2 = z * z;
         let z3 = z2 * z;
-        let mut power_g = Scalar::zero();
+        let mut power_g = Scalar::zero(); // delta(y,z)
+
+        // calculate power_g += (z - z^2) * <1^(n*m), y^(n*m)>
         let mut exp_y = Scalar::one(); // start at y^0 = 1
         let mut exp_2 = Scalar::one(); // start at 2^0 = 1
-        for _ in 0..n {
-            power_g += (z - z2) * exp_y - z3 * exp_2;
+        for _ in 0..n*m {
+            power_g += (z - z2) * exp_y;
 
             exp_y = exp_y * y; // y^i -> y^(i+1)
             exp_2 = exp_2 + exp_2; // 2^i -> 2^(i+1)
         }
+        // calculate power_g += sum_(j=1)^(m)(z^(j+2) * (2^n - 1))
+        let mut exp_z = z3;
+        for _ in 1..(m+1) {
+            power_g -= exp_z * Scalar::from_u64((2^n as u64) - 1);
+            exp_z = exp_z * z;
+        }
+
         let mut t_check = B * power_g + T_1 * x + T_2 * x * x;
         let mut exp_z = Scalar::one();
         for j in 0..m {
