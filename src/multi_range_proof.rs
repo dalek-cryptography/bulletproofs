@@ -21,7 +21,7 @@ pub struct Generators {
     G: Vec<RistrettoPoint>,
     H: Vec<RistrettoPoint>,
     n: usize,
-    j: usize,
+    m: usize,
 }
 
 #[derive(Clone)]
@@ -35,9 +35,10 @@ pub struct Input {
     gen: Generators,
     pub inp_comm: InputCommitment,
 
+    j: usize,  // index of the party, 1..m as in original paper
     v_blinding: Scalar,
     a_blinding: Scalar,
-    randomness: Vec<Scalar>,
+    randomness: Vec<Scalar>, // s_blinding (aka s_tilde), {s_a},  {s_b}
     v: u64,  
 }
 
@@ -83,23 +84,22 @@ pub struct Proof {
 
 
 impl Generators {
-    pub fn new(n: usize, j: usize) -> Generators {
+    pub fn new(n: usize, m: usize) -> Generators {
         let B = RistrettoPoint::hash_from_bytes::<Sha256>("hello".as_bytes());
         let B_blinding = RistrettoPoint::hash_from_bytes::<Sha256>("there".as_bytes());
         Generators {
             B: B,
             B_blinding: B_blinding,
-            G: make_generators(&B, n*j),
-            H: make_generators(&B_blinding, n*j),
+            G: make_generators(&B, n*m),
+            H: make_generators(&B_blinding, n*m),
             n: n,
-            j: j,
+            m: m,
         }
     }
 
-    pub fn make_input(&self, v: u64) -> Input {
+    pub fn make_input(&self, j: usize, v: u64) -> Input {
         let mut rng: OsRng = OsRng::new().unwrap();
         let n = self.n;
-        let j = self.j;
 
         // Compute V
         let v_blinding = Scalar::random(&mut rng);
@@ -129,6 +129,7 @@ impl Generators {
 
         Input {
             gen: self.clone(),
+            j: j,
             inp_comm: inp_comm,
             v_blinding: v_blinding,
             a_blinding: a_blinding,
@@ -142,12 +143,11 @@ impl Input {
     pub fn make_statement(&self, y: Scalar, z: Scalar) -> Statement {
         let mut rng: OsRng = OsRng::new().unwrap();
         let n = self.gen.n;
-        let j = self.gen.j;
 
         // needed for multi-range-proof only: generate y, z offsets
         let mut offset_y = Scalar::one(); // offset_y = y^((j-1)*n);
         let mut offset_z = Scalar::one(); // offset_z = z^(j-1); 
-        for _ in 0..(j-1) {
+        for _ in 0..(self.j-1) {
             for _ in 0..n {
                 offset_y = offset_y*y;
             }
@@ -244,7 +244,7 @@ impl Statement {
 
 impl Proof {
     pub fn create_one(v: u64, n: usize) -> Proof {
-        let input = Generators::new(n, 1).make_input(v);
+        let input = Generators::new(n, 1).make_input(1, v);
         // TODO: swap out this commitment with use of RO
         let (y, z) = commit(&input.inp_comm.A, &input.inp_comm.S);
         let statement = input.make_statement(y, z);
@@ -256,8 +256,8 @@ impl Proof {
     // TODO: generalize from this case to any # of parties
     pub fn create_two(v1: u64, v2: u64, n: usize) -> Proof {
         let gen = Generators::new(n, 2);
-        let inp1 = gen.make_input(v1);
-        let inp2 = gen.make_input(v2);
+        let inp1 = gen.make_input(1, v1);
+        let inp2 = gen.make_input(2, v2);
         let A = inp1.inp_comm.A + inp2.inp_comm.A;
         let S = inp1.inp_comm.S + inp2.inp_comm.S;
         let (y, z) = commit(&A, &S);
