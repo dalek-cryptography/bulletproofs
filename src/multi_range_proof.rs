@@ -357,7 +357,7 @@ impl Proof {
         // calculate power_g += sum_(j=1)^(m)(z^(j+2) * (2^n - 1))
         let mut exp_z = z3;
         for _ in 1..(m+1) {
-            power_g -= exp_z * Scalar::from_u64((2^n as u64) - 1);
+            power_g -= exp_z * Scalar::from_u64(((1u128<<n) - 1) as u64);
             exp_z = exp_z * z;
         }
 
@@ -455,7 +455,7 @@ mod tests {
 
     #[test]
     fn verify_multirp_simple_one() {
-        for n in vec![1, 2, 4, 16, 32] {
+        for n in vec![1, 2, 4, 8, 16, 32] {
             println!("n: {:?}", n);
             let rp = Proof::create_one(0, n);
             assert_eq!(rp.verify(1), true);
@@ -471,9 +471,15 @@ mod tests {
     }
     #[test]
     fn verify_multirp_simple_two() {
-        for n in vec![1] {
+        for n in vec![1, 2, 4, 8, 16, 32] {
             println!("n: {:?}", n);
             let rp = Proof::create_two(1, 1, n);
+            assert_eq!(rp.verify(2), true);
+            let rp = Proof::create_two(0, 1, n);
+            assert_eq!(rp.verify(2), true);
+            let rp = Proof::create_two(1, 0, n);
+            assert_eq!(rp.verify(2), true);
+            let rp = Proof::create_two(0, 0, n);
             assert_eq!(rp.verify(2), true);
         }
     }

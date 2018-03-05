@@ -1,6 +1,7 @@
 #![cfg_attr(feature = "bench", feature(test))]
 #![feature(nll)]
 #![feature(test)]
+#![feature(i128_type)]
 
 extern crate byteorder;
 extern crate curve25519_dalek;
