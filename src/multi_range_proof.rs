@@ -258,27 +258,37 @@ impl Proof {
         statement.make_proof(x)
     }
 
-    // TODO: generalize from this case to any # of parties
-    pub fn create_two(v1: u64, v2: u64, n: usize) -> Proof {
-        let gen = Generators::new(n, 2);
-        let inp1 = gen.make_input(1, v1);
-        let inp2 = gen.make_input(2, v2);
-        let A = inp1.inp_comm.A + inp2.inp_comm.A;
-        let S = inp1.inp_comm.S + inp2.inp_comm.S;
+    pub fn create_multi(values: Vec<u64>, n: usize) -> Proof {
+        let m = values.len();
+        let gen = Generators::new(n, m);
+        let mut A = RistrettoPoint::identity();
+        let mut S = RistrettoPoint::identity();
+        let mut inputs = Vec::new();
+        for j in 0..m {
+            let input = gen.make_input(j+1, values[j]);
+            A += input.inp_comm.A;
+            S += input.inp_comm.S;
+            inputs.push(input);
+        }
         let (y, z) = commit(&A, &S);
-        // println!("creating y: {:?}", y);
-        // println!("creating z: {:?}", z);
 
-        let st1 = inp1.make_statement(y, z);
-        let st2 = inp2.make_statement(y, z);
-        let T_1 = st1.st_comm.T_1 + st2.st_comm.T_1;
-        let T_2 = st1.st_comm.T_2 + st2.st_comm.T_2;
+        let mut T_1 = RistrettoPoint::identity();
+        let mut T_2 = RistrettoPoint::identity();
+        let mut statements = Vec::new();
+        for j in 0..m {
+            let statement = inputs[j].make_statement(y,z);
+            T_1 += statement.st_comm.T_1;
+            T_2 += statement.st_comm.T_2;
+            statements.push(statement);
+        }
         let (x, _) = commit(&T_1, &T_2);
-        // println!("creating x: {:?}", x);
 
-        let proof1 = st1.make_proof(x);
-        let proof2 = st2.make_proof(x);
-        Proof::combine([proof1, proof2].to_vec())
+        let mut proofs = Vec::new();
+        for j in 0..m {
+            let proof = statements[j].make_proof(x);
+            proofs.push(proof);
+        }
+        Proof::combine(proofs)
     }
 
     pub fn combine(proofs: Vec<Proof>) -> Proof {
@@ -455,8 +465,7 @@ mod tests {
 
     #[test]
     fn verify_multirp_simple_one() {
-        for n in vec![1, 2, 4, 8, 16, 32] {
-            println!("n: {:?}", n);
+        for n in vec![1, 16, 32] {
             let rp = Proof::create_one(0, n);
             assert_eq!(rp.verify(1), true);
             let rp = Proof::create_one(2u64.pow(n as u32) - 1, n);
@@ -471,16 +480,21 @@ mod tests {
     }
     #[test]
     fn verify_multirp_simple_two() {
-        for n in vec![1, 2, 4, 8, 16, 32] {
-            println!("n: {:?}", n);
-            let rp = Proof::create_two(1, 1, n);
+        for n in vec![1, 16, 32] {
+            let rp = Proof::create_multi(vec![1, 1], n);
             assert_eq!(rp.verify(2), true);
-            let rp = Proof::create_two(0, 1, n);
+            let rp = Proof::create_multi(vec![0, 1], n);
             assert_eq!(rp.verify(2), true);
-            let rp = Proof::create_two(1, 0, n);
+            let rp = Proof::create_multi(vec![1, 0], n);
             assert_eq!(rp.verify(2), true);
-            let rp = Proof::create_two(0, 0, n);
+            let rp = Proof::create_multi(vec![0, 0], n);
             assert_eq!(rp.verify(2), true);
+            let rp = Proof::create_multi(vec![2u64.pow(n as u32) - 1, 1], n);
+            assert_eq!(rp.verify(2), true);
+            let rp = Proof::create_multi(vec![2u64.pow(n as u32) + 1, 0], n);
+            assert_eq!(rp.verify(2), false);
+            let rp = Proof::create_multi(vec![0, u64::max_value()], n);
+            assert_eq!(rp.verify(2), false);
         }
     }
     #[test]
