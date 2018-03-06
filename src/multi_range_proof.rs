@@ -464,7 +464,7 @@ mod tests {
     use rand::Rng;
 
     #[test]
-    fn verify_multirp_simple_one() {
+    fn one_party_small() {
         for n in vec![1, 16, 32] {
             let rp = Proof::create_one(0, n);
             assert_eq!(rp.verify(1), true);
@@ -479,7 +479,17 @@ mod tests {
         }
     }
     #[test]
-    fn verify_multirp_simple_two() {
+    fn one_party_u64() {
+        let n = 64;
+        let rp = Proof::create_one(0, n);
+        assert_eq!(rp.verify(1), true);
+        let rp = Proof::create_one(1, n);
+        assert_eq!(rp.verify(1), true);
+        let rp = Proof::create_one(u64::max_value(), n);
+        assert_eq!(rp.verify(1), true);    
+    }
+    #[test]
+    fn two_party_small() {
         for n in vec![1, 16, 32] {
             let rp = Proof::create_multi(vec![1, 1], n);
             assert_eq!(rp.verify(2), true);
@@ -498,7 +508,38 @@ mod tests {
         }
     }
     #[test]
-    fn verify_multirp_rand_big() {
+    fn two_party_u64() {
+        let n = 64;
+        let rp = Proof::create_multi(vec![u64::max_value(), 1], n);
+        assert_eq!(rp.verify(2), true);
+        let rp = Proof::create_multi(vec![0, u64::max_value()-1], n);
+        assert_eq!(rp.verify(2), true);
+    }
+    #[test]
+    fn eight_party_small() {
+        let m = 8;
+        for n in vec![1, 16, 32] {
+            let rp = Proof::create_multi(vec![1, 1, 0, 0, 1, 1, 0, 0], n);
+            assert_eq!(rp.verify(m), true);
+            let rp = Proof::create_multi(vec![2u64.pow(n as u32) - 1, 2u64.pow(n as u32) - 1, 0, 0, 0, 0, 0, 0], n);
+            assert_eq!(rp.verify(m), true);
+            let rp = Proof::create_multi(vec![2u64.pow(n as u32) + 1, 0, 0, 0, 0, 0, 0, 0], n);
+            assert_eq!(rp.verify(m), false);
+            let rp = Proof::create_multi(vec![0, u64::max_value(), 0, 0, 0, 0, 0, 0], n);
+            assert_eq!(rp.verify(m), false);
+        }
+    }
+    #[test]
+    fn rand_small() {
+        for _ in 0..10 {
+            let mut rng: OsRng = OsRng::new().unwrap();
+            let v: u32 = rng.next_u32();
+            let rp = Proof::create_one(v as u64, 32);
+            assert_eq!(rp.verify(1), true);
+        }
+    }
+    #[test]
+    fn rand_u32() {
         for _ in 0..10 {
             let mut rng: OsRng = OsRng::new().unwrap();
             let v: u64 = rng.next_u64();
@@ -508,12 +549,13 @@ mod tests {
         }
     }
     #[test]
-    fn verify_multirp_rand_small() {
+    fn rand_u64() {
         for _ in 0..10 {
             let mut rng: OsRng = OsRng::new().unwrap();
-            let v: u32 = rng.next_u32();
-            let rp = Proof::create_one(v as u64, 32);
-            assert_eq!(rp.verify(1), true);
+            let v: u64 = rng.next_u64();
+            let rp = Proof::create_one(v, 32);
+            let expected = v <= 2u64.pow(32);
+            assert_eq!(rp.verify(1), expected);
         }
     }
 }
