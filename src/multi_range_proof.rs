@@ -530,6 +530,15 @@ mod tests {
         }
     }
     #[test]
+    fn ten_party_u64() {
+        let m = 10;
+        let n = 64;
+        let rp = Proof::create_multi(vec![u64::max_value(), u64::max_value(), 0, 0, 1, 1, 0, 0, 1, 1], n);
+        assert_eq!(rp.verify(m), true);
+        let rp = Proof::create_multi(vec![u64::max_value() - 1, 1, 0, 0, 0, 0, 0, 0, 1, u64::max_value()/2], n);
+        assert_eq!(rp.verify(m), true);
+    }
+    #[test]
     fn rand_small() {
         for _ in 0..10 {
             let mut rng: OsRng = OsRng::new().unwrap();
