@@ -516,16 +516,16 @@ mod tests {
         assert_eq!(rp.verify(2), true);
     }
     #[test]
-    fn eight_party_small() {
-        let m = 8;
+    fn ten_party_small() {
+        let m = 10;
         for n in vec![1, 16, 32] {
-            let rp = Proof::create_multi(vec![1, 1, 0, 0, 1, 1, 0, 0], n);
+            let rp = Proof::create_multi(vec![1, 1, 0, 0, 1, 1, 0, 0, 1, 1], n);
             assert_eq!(rp.verify(m), true);
-            let rp = Proof::create_multi(vec![2u64.pow(n as u32) - 1, 2u64.pow(n as u32) - 1, 0, 0, 0, 0, 0, 0], n);
+            let rp = Proof::create_multi(vec![2u64.pow(n as u32) - 1, 2u64.pow(n as u32) - 1, 0, 0, 0, 0, 0, 0, 1, 1], n);
             assert_eq!(rp.verify(m), true);
-            let rp = Proof::create_multi(vec![2u64.pow(n as u32) + 1, 0, 0, 0, 0, 0, 0, 0], n);
+            let rp = Proof::create_multi(vec![2u64.pow(n as u32) + 1, 0, 0, 0, 0, 0, 0, 0, 1, 1], n);
             assert_eq!(rp.verify(m), false);
-            let rp = Proof::create_multi(vec![0, u64::max_value(), 0, 0, 0, 0, 0, 0], n);
+            let rp = Proof::create_multi(vec![0, u64::max_value(), 0, 0, 0, 0, 0, 0, 1, 1], n);
             assert_eq!(rp.verify(m), false);
         }
     }
