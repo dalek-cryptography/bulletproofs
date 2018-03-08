@@ -595,20 +595,18 @@ mod tests {
     fn rand_u32() {
         for _ in 0..10 {
             let mut rng: OsRng = OsRng::new().unwrap();
-            let v: u64 = rng.next_u64();
+            let v = rng.next_u32() as u64;
             let rp = Proof::create_one(v, 32);
-            let expected = v <= 2u64.pow(32);
-            assert_eq!(rp.verify(1), expected);
+            assert_eq!(rp.verify(1), true);
         }
     }
     #[test]
     fn rand_u64() {
         for _ in 0..10 {
             let mut rng: OsRng = OsRng::new().unwrap();
-            let v: u64 = rng.next_u64();
-            let rp = Proof::create_one(v, 32);
-            let expected = v <= 2u64.pow(32);
-            assert_eq!(rp.verify(1), expected);
+            let v = rng.next_u64();
+            let rp = Proof::create_one(v, 64);
+            assert_eq!(rp.verify(1), true);
         }
     }
 }
