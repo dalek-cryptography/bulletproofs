@@ -39,7 +39,9 @@ pub struct Input {
     j: usize, // index of the party, 1..m as in original paper
     v_blinding: Scalar,
     a_blinding: Scalar,
-    randomness: Vec<Scalar>, // s_blinding (aka s_tilde), {s_a},  {s_b}
+    s_blinding: Scalar,
+    s_l: Vec<Scalar>,
+    s_r: Vec<Scalar>,
     v: u64,
 }
 
@@ -121,13 +123,13 @@ impl Generators {
         }
 
         // Compute S
-        let points_iter = iter::once(&self.B_blinding)
-            .chain((&self.G[j * n..(j + 1) * n]).iter())
-            .chain((&self.H[j * n..(j + 1) * n]).iter());
-        let randomness: Vec<_> = (0..(1 + 2 * self.n))
-            .map(|_| Scalar::random(&mut rng))
-            .collect();
-        let S = ristretto::multiscalar_mult(&randomness, points_iter);
+        let s_blinding = Scalar::random(&mut rng);
+        let s_l:Vec<Scalar> = (0..n).map(|_| Scalar::random(&mut rng)).collect();
+        let s_r:Vec<Scalar> = (0..n).map(|_| Scalar::random(&mut rng)).collect();
+        let S = ristretto::multiscalar_mult(
+            iter::once(&s_blinding).chain(s_l.iter()).chain(s_r.iter()),
+            iter::once(&self.B_blinding).chain(self.G[j*n..(j+1)*n].iter()).chain(self.H[j*n..(j+1)*n].iter()));
+
         let inp_comm = InputCommitment {
             V: vec![V],
             A: A,
@@ -142,7 +144,9 @@ impl Generators {
             inp_comm,
             v_blinding,
             a_blinding,
-            randomness,
+            s_blinding,
+            s_l,
+            s_r,
             v,
         }
     }
@@ -163,11 +167,6 @@ impl Input {
             offset_z = offset_z * z;
         }
 
-        // Save/label randomness to be used later (in the paper: rho, s_L, s_R)
-        let s_blinding = self.randomness[0];
-        let s_a = &self.randomness[1..(n + 1)];
-        let s_b = &self.randomness[(n + 1)..(1 + 2 * n)];
-
         // Calculate t by calculating vectors l0, l1, r0, r1 and multiplying
         let mut l = VecPoly2::new(n);
         let mut r = VecPoly2::new(n);
@@ -180,10 +179,10 @@ impl Input {
             let a_r = a_l - Scalar::one();
 
             l.0[i] = a_l - z;
-            l.1[i] = s_a[i];
+            l.1[i] = self.s_l[i];
 
             r.0[i] = exp_y * offset_y * (a_r + z) + z2 * offset_z * exp_2;
-            r.1[i] = exp_y * offset_y * s_b[i];
+            r.1[i] = exp_y * offset_y * self.s_r[i];
 
             exp_y = exp_y * y; // y^i -> y^(i+1)
             exp_2 = exp_2 + exp_2; // 2^i -> 2^(i+1)
@@ -215,7 +214,7 @@ impl Input {
             t,
             v_blinding: self.v_blinding,
             a_blinding: self.a_blinding,
-            s_blinding,
+            s_blinding: self.s_blinding,
             t_1_blinding,
             t_2_blinding,
         }
