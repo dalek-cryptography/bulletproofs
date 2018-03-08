@@ -8,7 +8,8 @@ use curve25519_dalek::traits::Identity;
 use curve25519_dalek::scalar::Scalar;
 use rand::OsRng;
 use std::clone::Clone;
-use range_proof::{make_generators, inner_product, add_vec, commit};
+use range_proof::{make_generators, inner_product, add_vec};
+use random_oracle::RandomOracle;
 
 struct PolyDeg3(Scalar, Scalar, Scalar);
 
@@ -248,17 +249,12 @@ impl Statement {
 }
 
 impl Proof {
-    pub fn create_one(v: u64, n: usize) -> Proof {
-        let input = Generators::new(n, 1).make_input(1, v);
-        // TODO: swap out this commitment with use of RO
-        let (y, z) = commit(&input.inp_comm.A, &input.inp_comm.S);
-        let statement = input.make_statement(y, z);
-        // TODO: swap out this commitment with use of RO
-        let (x, _) = commit(&statement.st_comm.T_1, &statement.st_comm.T_2);
-        statement.make_proof(x)
+    pub fn create_one(v: u64, n: usize) -> Self {
+        Self::create_multi(vec![v], n)
     }
 
-    pub fn create_multi(values: Vec<u64>, n: usize) -> Proof {
+    pub fn create_multi(values: Vec<u64>, n: usize) -> Self {
+        let mut ro = RandomOracle::new(b"RangeProof");
         let m = values.len();
         let gen = Generators::new(n, m);
         let mut A = RistrettoPoint::identity();
@@ -270,7 +266,10 @@ impl Proof {
             S += input.inp_comm.S;
             inputs.push(input);
         }
-        let (y, z) = commit(&A, &S);
+        ro.commit(A.compress().as_bytes());
+        ro.commit(S.compress().as_bytes());
+        let y = ro.challenge_scalar();
+        let z = ro.challenge_scalar();
 
         let mut T_1 = RistrettoPoint::identity();
         let mut T_2 = RistrettoPoint::identity();
@@ -281,7 +280,10 @@ impl Proof {
             T_2 += statement.st_comm.T_2;
             statements.push(statement);
         }
-        let (x, _) = commit(&T_1, &T_2);
+
+        ro.commit(T_1.compress().as_bytes());
+        ro.commit(T_2.compress().as_bytes());
+        let x = ro.challenge_scalar();
 
         let mut proofs = Vec::new();
         for j in 0..m {
@@ -345,8 +347,15 @@ impl Proof {
         let B = &self.gen.B;
         let B_blinding = &self.gen.B_blinding;
 
-        let (y, z) = commit(A, S);
-        let (x, _) = commit(T_1, T_2);
+        let mut ro = RandomOracle::new(b"RangeProof");
+        ro.commit(A.compress().as_bytes());
+        ro.commit(S.compress().as_bytes());
+        let y = ro.challenge_scalar();
+        let z = ro.challenge_scalar();
+        ro.commit(T_1.compress().as_bytes());
+        ro.commit(T_2.compress().as_bytes());        
+        let x = ro.challenge_scalar();
+
         let G = make_generators(B, n*m);
         let mut hprime_vec = make_generators(B_blinding, n*m);
 
@@ -576,23 +585,23 @@ mod bench {
     use test::Bencher;
 
     #[bench]
-    fn make_multirp_64(b: &mut Bencher) {
+    fn make_u64(b: &mut Bencher) {
         let mut rng: OsRng = OsRng::new().unwrap();
         b.iter(|| Proof::create_one(rng.next_u64(), 64));
     }
     #[bench]
-    fn make_multirp_32(b: &mut Bencher) {
+    fn make_u32(b: &mut Bencher) {
         let mut rng: OsRng = OsRng::new().unwrap();
         b.iter(|| Proof::create_one(rng.next_u32() as u64, 32));
     }
     #[bench]
-    fn verify_multirp_64(b: &mut Bencher) {
+    fn verify_u64(b: &mut Bencher) {
         let mut rng: OsRng = OsRng::new().unwrap();
         let rp = Proof::create_one(rng.next_u64(), 64);
         b.iter(|| rp.verify(1));
     }
     #[bench]
-    fn verify_multirp_32(b: &mut Bencher) {
+    fn verify_u32(b: &mut Bencher) {
         let mut rng: OsRng = OsRng::new().unwrap();
         let rp = Proof::create_one(rng.next_u32() as u64, 32);
         b.iter(|| rp.verify(1));
