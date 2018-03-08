@@ -113,17 +113,17 @@ impl Generators {
             let bit = (v >> i) & 1;
             if bit == 1 {
                 // a_L = bit, bit = 1, so a_L=1, a_R=0
-                A += self.G[(j - 1) * n + i];
+                A += self.G[j * n + i];
             } else {
                 // a_R = bit - 1, bit = 0, so a_L=0, a_R=-1
-                A -= self.H[(j - 1) * n + i];
+                A -= self.H[j * n + i];
             }
         }
 
         // Compute S
         let points_iter = iter::once(&self.B_blinding)
-            .chain((&self.G[(j - 1) * n..j * n]).iter())
-            .chain((&self.H[(j - 1) * n..j * n]).iter());
+            .chain((&self.G[j * n..(j + 1) * n]).iter())
+            .chain((&self.H[j * n..(j + 1) * n]).iter());
         let randomness: Vec<_> = (0..(1 + 2 * self.n))
             .map(|_| Scalar::random(&mut rng))
             .collect();
@@ -138,7 +138,7 @@ impl Generators {
 
         Input {
             gen,
-            j,
+            j: j,
             inp_comm,
             v_blinding,
             a_blinding,
@@ -155,11 +155,11 @@ impl Input {
 
         // needed for multi-range-proof only: generate y, z offsets
         let mut offset_y = Scalar::one(); // offset_y = y^((j-1)*n);
-        for _ in 0..((self.j - 1) * n) {
+        for _ in 0..self.j*n {
             offset_y = offset_y * y;
         }
         let mut offset_z = Scalar::one(); // offset_z = z^(j-1);
-        for _ in 0..(self.j - 1) {
+        for _ in 0..self.j {
             offset_z = offset_z * z;
         }
 
@@ -206,18 +206,18 @@ impl Input {
         Statement {
             gen: self.gen.clone(),
             inp_comm: self.inp_comm.clone(),
-            st_comm: st_comm,
-            y: y,
-            z: z,
-            offset_z: offset_z,
-            l: l,
-            r: r,
-            t: t,
+            st_comm,
+            y,
+            z,
+            offset_z,
+            l,
+            r,
+            t,
             v_blinding: self.v_blinding,
             a_blinding: self.a_blinding,
-            s_blinding: s_blinding,
-            t_1_blinding: t_1_blinding,
-            t_2_blinding: t_2_blinding,
+            s_blinding,
+            t_1_blinding,
+            t_2_blinding,
         }
     }
 }
@@ -261,7 +261,7 @@ impl Proof {
         let mut S = RistrettoPoint::identity();
         let mut inputs = Vec::new();
         for j in 0..m {
-            let input = gen.make_input(j + 1, values[j]);
+            let input = gen.make_input(j, values[j]);
             A += input.inp_comm.A;
             S += input.inp_comm.S;
             inputs.push(input);
@@ -424,7 +424,7 @@ impl Proof {
             exp_2 = Scalar::one();
             for index in 0..n {
                 // index into hprime, from [(j-1)*n : j*n-1]
-                P += hprime_vec[index + (j - 1) * n] * exp_z * exp_2;
+                P += hprime_vec[(j - 1) * n + index] * exp_z * exp_2;
                 exp_2 = exp_2 + exp_2;
             }
             exp_z = exp_z * z;
