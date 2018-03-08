@@ -4,6 +4,7 @@
 #![feature(i128_type)]
 
 extern crate byteorder;
+extern crate core;
 extern crate curve25519_dalek;
 extern crate rand;
 extern crate sha2;

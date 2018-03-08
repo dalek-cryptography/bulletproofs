@@ -38,7 +38,7 @@ pub struct RangeProof {
 
 impl RangeProof {
     pub fn setup() -> RangeProof {
-        // potentially generate the generators, store... 
+        // potentially generate the generators, store...
         // useful if need to make multiple range proofs for 1 set of generators
         unimplemented!()
     }
@@ -82,12 +82,12 @@ impl RangeProof {
 
         // needed for multi-range-proof only: generate y, z offsets
         let mut offset_y = Scalar::one(); // offset_y = y^((j-1)*n);
-        let mut offset_z = Scalar::one(); // offset_z = z^(j-1); 
-        for _ in 0..(j-1) {
+        let mut offset_z = Scalar::one(); // offset_z = z^(j-1);
+        for _ in 0..(j - 1) {
             for _ in 0..n {
-                offset_y = offset_y*y;
+                offset_y = offset_y * y;
             }
-            offset_z = offset_z*z;
+            offset_z = offset_z * z;
         }
 
         // Calculate t by calculating vectors l0, l1, r0, r1 and multiplying
@@ -182,12 +182,13 @@ impl RangeProof {
 
         // needed for multi-range-proof only: generate y, z offsets
         let mut offset_y = Scalar::one(); // offset_y = y^((j-1)*n);
-        let mut offset_z = Scalar::one(); // offset_z = z^(j-1); 
-        for _ in 0..(m-1) { // TOFIX: should be j instead of m
+        let mut offset_z = Scalar::one(); // offset_z = z^(j-1);
+        for _ in 0..(m - 1) {
+            // TOFIX: should be j instead of m
             for _ in 0..self.n {
-                offset_y = offset_y*y;
+                offset_y = offset_y * y;
             }
-            offset_z = offset_z*z;
+            offset_z = offset_z * z;
         }
 
         let t_check = self.B * power_g + self.V * z2 + self.T_1 * x + self.T_2 * x * x;
