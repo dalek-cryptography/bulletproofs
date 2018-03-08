@@ -36,17 +36,17 @@ pub struct Input {
     gen: Generators,
     pub inp_comm: InputCommitment,
 
-    j: usize,  // index of the party, 1..m as in original paper
+    j: usize, // index of the party, 1..m as in original paper
     v_blinding: Scalar,
     a_blinding: Scalar,
     randomness: Vec<Scalar>, // s_blinding (aka s_tilde), {s_a},  {s_b}
-    v: u64,  
+    v: u64,
 }
 
 #[derive(Clone)]
 pub struct StatementCommitment {
     T_1: RistrettoPoint,
-    T_2: RistrettoPoint, 
+    T_2: RistrettoPoint,
 }
 
 pub struct Statement {
@@ -91,8 +91,8 @@ impl Generators {
         Generators {
             B: B,
             B_blinding: B_blinding,
-            G: make_generators(&B, n*m),
-            H: make_generators(&B_blinding, n*m),
+            G: make_generators(&B, n * m),
+            H: make_generators(&B_blinding, n * m),
             n: n,
             m: m,
         }
@@ -113,25 +113,27 @@ impl Generators {
             let bit = (v >> i) & 1;
             if bit == 1 {
                 // a_L = bit, bit = 1, so a_L=1, a_R=0
-                A += self.G[(j-1)*n + i];
+                A += self.G[(j - 1) * n + i];
             } else {
                 // a_R = bit - 1, bit = 0, so a_L=0, a_R=-1
-                A -= self.H[(j-1)*n + i];
+                A -= self.H[(j - 1) * n + i];
             }
         }
 
         // Compute S
-        let points_iter = iter::once(&self.B_blinding).
-            chain((&self.G[(j-1)*n..j*n]).iter()).
-            chain((&self.H[(j-1)*n..j*n]).iter());
-        let randomness: Vec<_> = (0..(1 + 2 * self.n)).map(|_| Scalar::random(&mut rng)).collect();
+        let points_iter = iter::once(&self.B_blinding)
+            .chain((&self.G[(j - 1) * n..j * n]).iter())
+            .chain((&self.H[(j - 1) * n..j * n]).iter());
+        let randomness: Vec<_> = (0..(1 + 2 * self.n))
+            .map(|_| Scalar::random(&mut rng))
+            .collect();
         let S = ristretto::multiscalar_mult(&randomness, points_iter);
         let inp_comm = InputCommitment {
             V: vec![V],
             A: A,
-            S: S,            
+            S: S,
         };
-        
+
         let gen = self.clone();
 
         Input {
@@ -153,12 +155,12 @@ impl Input {
 
         // needed for multi-range-proof only: generate y, z offsets
         let mut offset_y = Scalar::one(); // offset_y = y^((j-1)*n);
-        for _ in 0..((self.j-1)*n) {
-            offset_y = offset_y*y;
+        for _ in 0..((self.j - 1) * n) {
+            offset_y = offset_y * y;
         }
-        let mut offset_z = Scalar::one(); // offset_z = z^(j-1); 
-        for _ in 0..(self.j-1) {
-            offset_z = offset_z*z;
+        let mut offset_z = Scalar::one(); // offset_z = z^(j-1);
+        for _ in 0..(self.j - 1) {
+            offset_z = offset_z * z;
         }
 
         // Save/label randomness to be used later (in the paper: rho, s_L, s_R)
@@ -176,7 +178,7 @@ impl Input {
         for i in 0..n {
             let a_l = Scalar::from_u64((self.v >> i) & 1);
             let a_r = a_l - Scalar::one();
-            
+
             l.0[i] = a_l - z;
             l.1[i] = s_a[i];
 
@@ -199,10 +201,7 @@ impl Input {
         let t_2_blinding = Scalar::random(&mut rng);
         let T_1 = self.gen.B * t.1 + self.gen.B_blinding * t_1_blinding;
         let T_2 = self.gen.B * t.2 + self.gen.B_blinding * t_2_blinding;
-        let st_comm = StatementCommitment {
-            T_1: T_1,
-            T_2: T_2,            
-        };
+        let st_comm = StatementCommitment { T_1: T_1, T_2: T_2 };
 
         Statement {
             gen: self.gen.clone(),
@@ -226,7 +225,8 @@ impl Input {
 impl Statement {
     pub fn make_proof(&self, x: Scalar) -> Proof {
         // Generate final values for proof (line 55-60)
-        let t_x_blinding = self.t_1_blinding * x + self.t_2_blinding * x * x + self.z * self.z * self.offset_z * self.v_blinding;
+        let t_x_blinding = self.t_1_blinding * x + self.t_2_blinding * x * x +
+            self.z * self.z * self.offset_z * self.v_blinding;
         let e_blinding = self.a_blinding + self.s_blinding * x;
         let t_hat = self.t.0 + self.t.1 * x + self.t.2 * x * x;
 
@@ -254,20 +254,25 @@ impl Proof {
     }
 
     pub fn create_multi(values: Vec<u64>, n: usize) -> Self {
-        let mut ro = RandomOracle::new(b"RangeProof");
+        let mut ro = RandomOracle::new(b"MultiRangeProof");
         let m = values.len();
         let gen = Generators::new(n, m);
         let mut A = RistrettoPoint::identity();
         let mut S = RistrettoPoint::identity();
         let mut inputs = Vec::new();
         for j in 0..m {
-            let input = gen.make_input(j+1, values[j]);
+            let input = gen.make_input(j + 1, values[j]);
             A += input.inp_comm.A;
             S += input.inp_comm.S;
             inputs.push(input);
         }
-        ro.commit(A.compress().as_bytes());
-        ro.commit(S.compress().as_bytes());
+        ro.commit_integer(n as u64);
+        ro.commit_integer(m as u64);
+        for j in 0..m {
+            ro.commit_point(&inputs[j].inp_comm.V[0].compress());
+        }
+        ro.commit_point(&A.compress());
+        ro.commit_point(&S.compress());
         let y = ro.challenge_scalar();
         let z = ro.challenge_scalar();
 
@@ -275,14 +280,14 @@ impl Proof {
         let mut T_2 = RistrettoPoint::identity();
         let mut statements = Vec::new();
         for j in 0..m {
-            let statement = inputs[j].make_statement(y,z);
+            let statement = inputs[j].make_statement(y, z);
             T_1 += statement.st_comm.T_1;
             T_2 += statement.st_comm.T_2;
             statements.push(statement);
         }
 
-        ro.commit(T_1.compress().as_bytes());
-        ro.commit(T_2.compress().as_bytes());
+        ro.commit_point(&T_1.compress());
+        ro.commit_point(&T_2.compress());
         let x = ro.challenge_scalar();
 
         let mut proofs = Vec::new();
@@ -302,8 +307,8 @@ impl Proof {
         let mut t_x_blinding = Scalar::zero();
         let mut e_blinding = Scalar::zero();
         let mut t = Scalar::zero();
-        let mut l:Vec<Scalar> = Vec::new();
-        let mut r:Vec<Scalar> = Vec::new();
+        let mut l: Vec<Scalar> = Vec::new();
+        let mut r: Vec<Scalar> = Vec::new();
 
         for proof in &proofs {
             V.push(proof.inp_comm.V[0]);
@@ -320,15 +325,8 @@ impl Proof {
 
         Proof {
             gen: proofs[0].gen.clone(),
-            inp_comm: InputCommitment {
-                V: V,
-                A: A,
-                S: S,
-            },
-            st_comm: StatementCommitment {
-                T_1: T_1,
-                T_2: T_2,
-            },
+            inp_comm: InputCommitment { V: V, A: A, S: S },
+            st_comm: StatementCommitment { T_1: T_1, T_2: T_2 },
             t_x_blinding: t_x_blinding,
             e_blinding,
             t: t,
@@ -347,17 +345,22 @@ impl Proof {
         let B = &self.gen.B;
         let B_blinding = &self.gen.B_blinding;
 
-        let mut ro = RandomOracle::new(b"RangeProof");
-        ro.commit(A.compress().as_bytes());
-        ro.commit(S.compress().as_bytes());
+        let mut ro = RandomOracle::new(b"MultiRangeProof");
+        ro.commit_integer(n as u64);
+        ro.commit_integer(m as u64);
+        for j in 0..m {
+            ro.commit_point(&V[j].compress());
+        }
+        ro.commit_point(&A.compress());
+        ro.commit_point(&S.compress());
         let y = ro.challenge_scalar();
         let z = ro.challenge_scalar();
-        ro.commit(T_1.compress().as_bytes());
-        ro.commit(T_2.compress().as_bytes());        
+        ro.commit_point(&T_1.compress());
+        ro.commit_point(&T_2.compress());
         let x = ro.challenge_scalar();
 
-        let G = make_generators(B, n*m);
-        let mut hprime_vec = make_generators(B_blinding, n*m);
+        let G = make_generators(B, n * m);
+        let mut hprime_vec = make_generators(B_blinding, n * m);
 
         // line 63: check that t = t0 + t1 * x + t2 * x * x
         let z2 = z * z;
@@ -367,7 +370,7 @@ impl Proof {
         // calculate power_g += (z - z^2) * <1^(n*m), y^(n*m)>
         let mut exp_y = Scalar::one(); // start at y^0 = 1
         let mut exp_2 = Scalar::one(); // start at 2^0 = 1
-        for _ in 0..n*m {
+        for _ in 0..n * m {
             power_g += (z - z2) * exp_y;
 
             exp_y = exp_y * y; // y^i -> y^(i+1)
@@ -375,8 +378,8 @@ impl Proof {
         }
         // calculate power_g += sum_(j=1)^(m)(z^(j+2) * (2^n - 1))
         let mut exp_z = z3;
-        for _ in 1..(m+1) {
-            power_g -= exp_z * Scalar::from_u64(((1u128<<n) - 1) as u64);
+        for _ in 1..(m + 1) {
+            power_g -= exp_z * Scalar::from_u64(((1u128 << n) - 1) as u64);
             exp_z = exp_z * z;
         }
 
@@ -391,11 +394,11 @@ impl Proof {
             println!("fails check on line 63");
             return false;
         }
-        
+
         // line 64: compute commitment to l, r
         // calculate P: add A + S*x - G*z
         let mut sum_G = RistrettoPoint::identity();
-        for i in 0..n*m {
+        for i in 0..n * m {
             sum_G += G[i];
         }
         let mut P = A + S * x;
@@ -406,7 +409,7 @@ impl Proof {
         let mut exp_y = Scalar::one(); // start at y^0 = 1
         let inverse_y = Scalar::invert(&y); // inverse_y = 1/y
         let mut inv_exp_y = Scalar::one(); // start at y^-0 = 1
-        for i in 0..n*m {
+        for i in 0..n * m {
             hprime_vec[i] = hprime_vec[i] * inv_exp_y;
             P += hprime_vec[i] * z * exp_y;
 
@@ -417,11 +420,11 @@ impl Proof {
 
         // calculate P: add sum(j_1^m)(<H[(j-1)*n:j*n-1], z^(j+1)*vec(2)^n>)
         let mut exp_z = z * z;
-        for j in 1..(m+1) {
+        for j in 1..(m + 1) {
             exp_2 = Scalar::one();
             for index in 0..n {
                 // index into hprime, from [(j-1)*n : j*n-1]
-                P += hprime_vec[index + (j-1)*n] * exp_z * exp_2;
+                P += hprime_vec[index + (j - 1) * n] * exp_z * exp_2;
                 exp_2 = exp_2 + exp_2;
             }
             exp_z = exp_z * z;
@@ -495,7 +498,7 @@ mod tests {
         let rp = Proof::create_one(1, n);
         assert_eq!(rp.verify(1), true);
         let rp = Proof::create_one(u64::max_value(), n);
-        assert_eq!(rp.verify(1), true);    
+        assert_eq!(rp.verify(1), true);
     }
     #[test]
     fn two_party_small() {
@@ -521,7 +524,7 @@ mod tests {
         let n = 64;
         let rp = Proof::create_multi(vec![u64::max_value(), 1], n);
         assert_eq!(rp.verify(2), true);
-        let rp = Proof::create_multi(vec![0, u64::max_value()-1], n);
+        let rp = Proof::create_multi(vec![0, u64::max_value() - 1], n);
         assert_eq!(rp.verify(2), true);
     }
     #[test]
@@ -530,9 +533,24 @@ mod tests {
         for n in vec![1, 16, 32] {
             let rp = Proof::create_multi(vec![1, 1, 0, 0, 1, 1, 0, 0, 1, 1], n);
             assert_eq!(rp.verify(m), true);
-            let rp = Proof::create_multi(vec![2u64.pow(n as u32) - 1, 2u64.pow(n as u32) - 1, 0, 0, 0, 0, 0, 0, 1, 1], n);
+            let rp = Proof::create_multi(
+                vec![
+                    2u64.pow(n as u32) - 1,
+                    2u64.pow(n as u32) - 1,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    1,
+                    1,
+                ],
+                n,
+            );
             assert_eq!(rp.verify(m), true);
-            let rp = Proof::create_multi(vec![2u64.pow(n as u32) + 1, 0, 0, 0, 0, 0, 0, 0, 1, 1], n);
+            let rp =
+                Proof::create_multi(vec![2u64.pow(n as u32) + 1, 0, 0, 0, 0, 0, 0, 0, 1, 1], n);
             assert_eq!(rp.verify(m), false);
             let rp = Proof::create_multi(vec![0, u64::max_value(), 0, 0, 0, 0, 0, 0, 1, 1], n);
             assert_eq!(rp.verify(m), false);
@@ -542,9 +560,26 @@ mod tests {
     fn ten_party_u64() {
         let m = 10;
         let n = 64;
-        let rp = Proof::create_multi(vec![u64::max_value(), u64::max_value(), 0, 0, 1, 1, 0, 0, 1, 1], n);
+        let rp = Proof::create_multi(
+            vec![u64::max_value(), u64::max_value(), 0, 0, 1, 1, 0, 0, 1, 1],
+            n,
+        );
         assert_eq!(rp.verify(m), true);
-        let rp = Proof::create_multi(vec![u64::max_value() - 1, 1, 0, 0, 0, 0, 0, 0, 1, u64::max_value()/2], n);
+        let rp = Proof::create_multi(
+            vec![
+                u64::max_value() - 1,
+                1,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                1,
+                u64::max_value() / 2,
+            ],
+            n,
+        );
         assert_eq!(rp.verify(m), true);
     }
     #[test]

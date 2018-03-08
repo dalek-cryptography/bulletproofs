@@ -1,5 +1,7 @@
 use curve25519_dalek::scalar::Scalar;
+use curve25519_dalek::ristretto::CompressedRistretto;
 use tiny_keccak::Keccak;
+use core::intrinsics::transmute;
 
 #[derive(Clone)]
 pub struct RandomOracle {
@@ -33,6 +35,18 @@ impl RandomOracle {
         let lenprefix = [len as u8; 1];
         self.hash.absorb(&lenprefix);
         self.hash.absorb(message);
+    }
+
+    /// Commits a compressed point. Verifier typically receives pre-computed compressed points,
+    /// so they can avoid compressing them again and send the bytes straight here.
+    pub fn commit_point(&mut self, point: &CompressedRistretto) {
+        self.commit(point.as_bytes());
+    }
+
+    /// Commits a 64-bit unsigned integer using little-endian convention.
+    pub fn commit_integer(&mut self, integer: u64) {
+        let bytes: [u8; 8] = unsafe { transmute(integer.to_le()) };
+        self.commit(&bytes[..]);
     }
 
     /// Extracts an arbitrary-sized number of bytes as a challenge.
