@@ -8,7 +8,7 @@ use curve25519_dalek::scalar::Scalar;
 // XXX upstream into dalek
 use scalar;
 
-use random_oracle::RandomOracle;
+use proof_transcript::RandomOracle;
 
 use range_proof::inner_product;
 use range_proof::make_generators;
