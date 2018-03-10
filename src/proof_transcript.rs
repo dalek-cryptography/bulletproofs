@@ -103,6 +103,17 @@ impl ProofTranscript {
         self.hash.absorb(message);
     }
 
+    /// Commit a `u64` to the proof transcript.
+    ///
+    /// This is a convenience method that commits the little-endian
+    /// bytes of `value`.
+    pub fn commit_u64(&mut self, value: u64) {
+        let mut value_bytes = [0u8; 8];
+        LittleEndian::write_u64(&mut value_bytes, value);
+
+        self.commit(&value_bytes);
+    }
+
     /// Extracts an arbitrary-sized challenge byte slice.
     pub fn challenge_bytes(&mut self, mut output: &mut [u8]) {
         self.set_state(SpongeState::Squeezing);
