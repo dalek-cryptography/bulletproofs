@@ -36,7 +36,10 @@ enum SpongeState {
 /// ensure that their challenge values are bound to the *entire* proof
 /// transcript, not just the sub-protocol.
 ///
-/// Internally, the `ProofTranscript` uses the Keccak sponge to
+/// Internally, the `ProofTranscript` uses the Keccak sponge in half-duplex
+/// mode with at most 128-bit collision resistance and 256-bit preimage
+/// resistance security.
+///
 /// absorb messages and squeeze challenges.
 ///
 /// # Example
@@ -74,12 +77,22 @@ impl ProofTranscript {
     /// for domain separation.
     pub fn new(label: &[u8]) -> Self {
         let mut ro = ProofTranscript {
-            hash: Keccak::new_shake128(),
+            // NIST currently does not define a half-duplex Keccak instance
+            // (meaning, the one that allows switching between squeezing and absorbing
+            // multiple times). So we use the delimiter from the
+            // raw Keccak instances which is 0x01 (aka "no delimiter", where 1
+            // is a the pre-computed padding bit of the 10*1 sequence).
+            // Note that due to this padding, the empty delimiter is fully domain-separated
+            // from all NIST delimiters, current or future ones.
+            //
+            // We use the same security level as SHAKE-128 which gives us 256-bit capacity
+            // and 1344 bits (168 bytes) of absorbing/squeezing rate per permutation.
+            hash: Keccak::new((1600 - 2*128)/8, 0x01),
             state: SpongeState::Absorbing,
         };
         ro.commit(label);
         // makes sure the label is disambiguated from the rest of the messages.
-        ro.pad();
+        ro.permute();
         ro
     }
 
@@ -136,21 +149,20 @@ impl ProofTranscript {
     /// from one state to another.
     fn set_state(&mut self, new_state: SpongeState) {
         if self.state != new_state {
-            self.pad();
+            self.permute();
             self.state = new_state;
         }
     }
 
-    /// Pad separates the prior operations by a full permutation.
+    /// Permute separates the prior operations by a full permutation.
     /// Each incoming message is length-prefixed anyway, but padding
     /// enables pre-computing and re-using the oracle state.
-    fn pad(&mut self) {
-        // tiny_keccak's API is not very clear,
-        // so we'd probably need to fork and either document it, or tweak to make it more sensible.
-        // 1. pad() only adds keccak padding, but does not advance internal offset and
-        //    does not perform a permutation round.
-        // 2. fill_block() does not pad, but resets the internal offset
-        //    and does a permutation round.
+    fn permute(&mut self) {
+        // API of tiny_keccak is weird, so here's a documentation of its internals:
+        // 1. Keccak.pad() adds padding 10*1.
+        //    It does not advance internal offset or perform a permutation round.
+        // 2. Keccak.fill_block() does not pad,
+        //    but resets the internal offset to zero and applies Keccak-f permutation round.
         //
         // XXX(hdevalence) before this is "production-ready", we
         // should sort out what tiny_keccak is actually doing and
@@ -158,13 +170,15 @@ impl ProofTranscript {
         // Noise NXOF work?
         match self.state {
             SpongeState::Absorbing => {
+                // Pad the message with 10*1, 
+                // then permute and reset the offset to 0.
                 self.hash.pad();
                 self.hash.fill_block();
             }
             SpongeState::Squeezing => {
-                // in the squeezing state we are not feeding messages,
-                // only reading portions of a state, so padding does not make sense.
-                // what we need is to perform computation and reset the internal offset to zero.
+                // Permute and reset the offset to 0.
+                // Note: in the squeezing state we are not feeding messages,
+                // only reading portions of a state, so padding with 10*1 does not make sense.
                 self.hash.fill_block();
             }
         }
@@ -184,7 +198,7 @@ mod tests {
             {
                 let mut ch = [0u8; 8];
                 ro.challenge_bytes(&mut ch);
-                assert_eq!(hex::encode(ch), "039f39a21e3cce4a");
+                assert_eq!(hex::encode(ch), "0b0150d57ba6bd60");
             }
         }
         {
@@ -194,7 +208,7 @@ mod tests {
             {
                 let mut ch = [0u8; 8];
                 ro.challenge_bytes(&mut ch);
-                assert_eq!(hex::encode(ch), "b4c47055cfcec1d2");
+                assert_eq!(hex::encode(ch), "b31e295b180fee9f");
             }
         }
         {
@@ -204,7 +218,7 @@ mod tests {
             {
                 let mut ch = [0u8; 8];
                 ro.challenge_bytes(&mut ch);
-                assert_eq!(hex::encode(ch), "325247ab6948b7a1");
+                assert_eq!(hex::encode(ch), "286c139c1606518d");
             }
         }
         {
@@ -215,7 +229,7 @@ mod tests {
             {
                 let mut ch = [0u8; 8];
                 ro.challenge_bytes(&mut ch);
-                assert_eq!(hex::encode(ch), "04068112e4fa0f44");
+                assert_eq!(hex::encode(ch), "9bc04ae9835d000b");
             }
         }
     }
