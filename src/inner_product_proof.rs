@@ -12,6 +12,8 @@ use scalar;
 
 use proof_transcript::ProofTranscript;
 
+use util;
+
 use range_proof::inner_product;
 use range_proof::make_generators;
 
@@ -221,88 +223,82 @@ mod tests {
 
     use rand::OsRng;
 
-    fn test_helper_create(n: usize, expected_a: &[u8; 32], expected_b: &[u8; 32]) {
+    fn test_helper_create(n: usize) {
         let mut rng = OsRng::new().unwrap();
 
-        let G = &RistrettoPoint::hash_from_bytes::<Sha256>("hello".as_bytes());
-        let H = &RistrettoPoint::hash_from_bytes::<Sha256>("there".as_bytes());
-        let G_vec = make_generators(G, n);
-        let H_vec = make_generators(H, n);
+        // XXX fix up generators
+        let B = &RistrettoPoint::hash_from_bytes::<Sha256>("hello".as_bytes());
+        let B_blinding = &RistrettoPoint::hash_from_bytes::<Sha256>("there".as_bytes());
+        let G = make_generators(B, n);
+        let H = make_generators(B_blinding, n);
 
-        let a_vec = vec![Scalar::from_u64(982345); n];
-        let b_vec = vec![Scalar::from_u64(827394); n];
-
-        let H_adjustments: Vec<_> = (0..n).map(|_| Scalar::random(&mut rng)).collect();
-
+        // Q would be determined upstream in the protocol, so we pick a random one.
         let Q = RistrettoPoint::hash_from_bytes::<Sha256>(b"test point");
-        let c = inner_product(&a_vec, &b_vec);
 
-        let b_adj: Vec<_> = b_vec
-            .iter()
-            .zip(H_adjustments.iter())
-            .map(|(b_i, h_i)| b_i * h_i)
-            .collect();
+        // a and b are the vectors for which we want to prove c = <a,b>
+        let a: Vec<_> = (0..n).map(|_| Scalar::random(&mut rng)).collect();
+        let b: Vec<_> = (0..n).map(|_| Scalar::random(&mut rng)).collect();
+        let c = inner_product(&a, &b);
+
+        // y_inv is (the inverse of) a random challenge
+        let y_inv = Scalar::random(&mut rng);
+
+        // P would be determined upstream, but we need a correct P to check the proof.
+        //
+        // To generate P = <a,G> + <b,H'> + <a,b> Q, compute
+        //             P = <a,G> + <b',H> + <a,b> Q,
+        // where b' = b \circ y^(-n)
+        let b_prime = b.iter().zip(util::exp_iter(y_inv)).map(|(bi, yi)| bi * yi);
+        // a.iter() has Item=&Scalar, need Item=Scalar to chain with b_prime
+        let a_prime = a.iter().cloned();
 
         let P = ristretto::vartime::multiscalar_mult(
-            a_vec.iter().chain(b_adj.iter()).chain(iter::once(&c)),
-            G_vec.iter().chain(H_vec.iter()).chain(iter::once(&Q)),
+            a_prime.chain(b_prime).chain(iter::once(c)),
+            G.iter().chain(H.iter()).chain(iter::once(&Q)),
         );
 
         let mut verifier = ProofTranscript::new(b"innerproducttest");
         let proof = Proof::create(
             &mut verifier,
             &Q,
-            &H_adjustments,
-            G_vec.clone(),
-            H_vec.clone(),
-            a_vec.clone(),
-            b_vec.clone(),
+            util::exp_iter(y_inv),
+            G.clone(),
+            H.clone(),
+            a.clone(),
+            b.clone(),
         );
 
         let mut verifier = ProofTranscript::new(b"innerproducttest");
         assert!(
             proof
-                .verify(&mut verifier, &H_adjustments, &P, &Q, &G_vec, &H_vec)
+                .verify(&mut verifier, util::exp_iter(y_inv), &P, &Q, &G, &H)
                 .is_ok()
         );
-
-        //assert_eq!(proof.a.as_bytes(), expected_a);
-        //assert_eq!(proof.b.as_bytes(), expected_b);
     }
 
     #[test]
     fn make_ipp_1() {
-        test_helper_create(1, &[0; 32], &[0; 32]);
+        test_helper_create(1);
     }
 
     #[test]
     fn make_ipp_2() {
-        test_helper_create(2, &[0; 32], &[0; 32]);
+        test_helper_create(2);
     }
 
     #[test]
     fn make_ipp_4() {
-        test_helper_create(4, &[0; 32], &[0; 32]);
-    }
-
-    #[test]
-    fn make_ipp_64() {
-        // These test vectors don't have a ground truth, they're just to catch accidental changes to the computation.
-        test_helper_create(
-            64,
-            b"=\xa2\xed\xd2i\x1a\xb3'oF\xba:S\x12.\xbd)\xe1F\xbeI\xb4+\x11V&\xa6\xae\x1fGd\x04",
-            b"zD\xdb\xa5\xd34fO\xde\x8ctu\xa6$\\zS\xc2\x8d|\x93hW\"\xacLL]?\x8e\xc8\x08",
-        );
+        test_helper_create(4);
     }
 
     #[test]
     fn make_ipp_32() {
-        // These test vectors don't have a ground truth, they're just to catch accidental changes to the computation.
-        test_helper_create(
-            32,
-            b"l\xa3\xa8\xda\xca\xf9\xdbec|i\xb32i\xc0'\xc3H\xde+\xa0P\x0e;.\xf5\x9cf'?\xa6\n",
-            b"\xebr[X{\x90\xa5s\xf0[\xdb\xc3\x86\xd8\xa1:\x86\x91\xbcW@\xa1\x1cv\\\xea9\xcdN~L\x05",
-        );
+        test_helper_create(32);
+    }
+
+    #[test]
+    fn make_ipp_64() {
+        test_helper_create(64);
     }
 }
 
