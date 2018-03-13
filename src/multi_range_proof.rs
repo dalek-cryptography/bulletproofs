@@ -9,26 +9,32 @@ use curve25519_dalek::scalar::Scalar;
 use rand::OsRng;
 use std::clone::Clone;
 use range_proof::{make_generators, inner_product, add_vec};
-use random_oracle::RandomOracle;
+use proof_transcript::ProofTranscript;
 
 struct PolyDeg3(Scalar, Scalar, Scalar);
 
 struct VecPoly2(Vec<Scalar>, Vec<Scalar>);
 
-// formerly: Generators
-pub struct PartyAwaitingPosition {
+pub struct GeneratorPoints {
+    n: usize,
+    m: usize,
     B: RistrettoPoint,
     B_blinding: RistrettoPoint,
     G: Vec<RistrettoPoint>,
-    H: Vec<RistrettoPoint>,
-    n: usize,
-    m: usize,
+    H: Vec<RistrettoPoint>,   
+}
+
+pub struct PartyAwaitingPosition {
+    gen: GeneratorPoints,
+    rng: rng,
+    v: u64,
+    v_blinding: Scalar
 }
 
 // formerly: Input
 pub struct PartyAwaitingValueChallenge {
-    gen: Generators,
-    pub inp_comm: InputCommitment,
+    gen: GeneratorPoints,
+    val_comm: ValueCommitment,
 
     j: usize, // index of the party, 1..m as in original paper
     v_blinding: Scalar,
@@ -41,9 +47,9 @@ pub struct PartyAwaitingValueChallenge {
 
 // formerly: Statement
 pub struct PartyAwaitingPolyChallenge {
-    gen: Generators,
-    inp_comm: InputCommitment,
-    pub st_comm: StatementCommitment,
+    gen: GeneratorPoints,
+    val_comm: ValueCommitment,
+    poly_comm: PolyCommitment,
 
     // intermediate values (private)
     y: Scalar,
@@ -60,7 +66,7 @@ pub struct PartyAwaitingPolyChallenge {
 }
 
 pub struct DealerAwaitingValues {
-    pt: ProofTranscript
+    pt: ProofTranscript,
     m: usize,
 }
 
@@ -74,23 +80,21 @@ pub struct DealerAwaitingShares {
     m: usize,
 }
 
-#[derive(Clone)]
 pub struct ValueCommitment {
     V: Vec<RistrettoPoint>,
     A: RistrettoPoint,
     S: RistrettoPoint,
 }
 
-#[derive(Clone)]
 pub struct PolyCommitment {
     T_1: RistrettoPoint,
     T_2: RistrettoPoint,
 }
 
 pub struct ProofShare {
-    gen: Generators,
-    inp_comm: InputCommitment,
-    st_comm: StatementCommitment,
+    gen: GeneratorPoints,
+    inp_comm: ValueCommitment,
+    st_comm: PolyCommitment,
 
     t_x_blinding: Scalar,
     e_blinding: Scalar,
@@ -101,11 +105,10 @@ pub struct ProofShare {
     r: Vec<Scalar>, 
 }
 
-#[derive(Clone)]
 pub struct AggregatedProof {
-    gen: Generators,
-    inp_comm: InputCommitment,
-    st_comm: StatementCommitment,
+    gen: GeneratorPoints,
+    inp_comm: ValueCommitment,
+    st_comm: PolyCommitment,
 
     t_x_blinding: Scalar,
     e_blinding: Scalar,
@@ -114,6 +117,66 @@ pub struct AggregatedProof {
     // don't need if doing inner product proof
     l: Vec<Scalar>,
     r: Vec<Scalar>,
+}
+
+impl GeneratorPoints {
+    pub fn new(n: usize, m: usize) -> Self {
+        unimplemented!()
+    }
+}
+
+impl PartyAwaitingPosition {
+    pub fn new(gen: GeneratorPoints, v: u64, rng: OsRng) -> Self {
+        PartyAwaitingPosition {
+            gen: gen,
+            rng: rng,
+            v: v,
+            v_blinding: Scalar::random(&mut rng),
+        }
+    }
+
+    pub fn new_with_blinding(gen: GeneratorPoints, v: u64, v_blinding: Scalar) -> Self {
+        PartyAwaitingPosition {
+            gen: gen,
+            rng: OsRng::new().unwrap(),
+            v: v,
+            v_blinding: v_blinding,
+        }
+    }
+
+    pub fn get_position(&self, j: usize) -> (PartyAwaitingValueChallenge, ValueCommitment) {
+        unimplemented!()
+    }
+}
+
+impl PartyAwaitingValueChallenge {
+    pub fn get_value_challenge(&self, y: Scalar, z: Scalar) -> (PartyAwaitingPolyChallenge, PolyCommitment) {
+        unimplemented!()
+    }
+}
+
+impl PartyAwaitingPolyChallenge {
+    pub fn get_poly_challenge(&self, x: Scalar) -> ProofShare {
+        unimplemented!()
+    }
+}
+
+impl DealerAwaitingValues {
+    pub fn get_values(&self, vc: Vec<ValueCommitment>) -> (DealerAwaitingPoly, Scalar, Scalar) {
+        unimplemented!()
+    }
+}
+
+impl DealerAwaitingPoly {
+    pub fn get_poly(&self, pc: Vec<PolyCommitment>) -> (DealerAwaitingShares, Scalar) {
+        unimplemented!()
+    }
+}
+
+impl DealerAwaitingShares {
+    pub fn get_shares(&self, ps: Vec<ProofShare>) -> AggregatedProof {
+        unimplemented!()
+    }
 }
 
 
