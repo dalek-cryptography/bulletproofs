@@ -67,7 +67,7 @@ pub struct PartyAwaitingPolyChallenge {
     t_2_blinding: Scalar,
 }
 
-/// When dealer is initialized, it only knows the size of the set.
+/// When the dealer is initialized, it only knows the size of the set.
 pub struct DealerAwaitingValues {
     pt: ProofTranscript,
     n: usize,
@@ -131,7 +131,6 @@ pub struct Aggregator {
     n: usize,
     m: usize,
 }
-
 
 impl Party {
     pub fn new<R:Rng>(value: u64, n: usize, rng: &mut R) -> PartyAwaitingPosition {
