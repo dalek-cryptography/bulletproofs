@@ -8,22 +8,16 @@ use curve25519_dalek::ristretto;
 use curve25519_dalek::traits::Identity;
 use curve25519_dalek::scalar::Scalar;
 use std::clone::Clone;
+use scalar::{scalar_pow_vartime_slow,scalar_pow_vartime_fast};
 use proof_transcript::ProofTranscript;
 use self::generators::Generators;
+use self::rangeproof_generators::RangeproofGenerators;
 
 /// Party is an entry-point API for setting up a party.
 pub struct Party {}
 
 /// Dealer is an entry-point API for setting up a dealer
 pub struct Dealer {}
-
-/// Each party has their own set of generators based on their position (`j`).
-pub struct PartyGenerators {
-    B: RistrettoPoint, // main base of the pedersen commitment
-    B_blinding: RistrettoPoint, // base for the blinding factor in the pedersen commitment
-    G: Vec<RistrettoPoint>,
-    H: Vec<RistrettoPoint>,
-}
 
 /// As party awaits its position, they only know their value and desired bit-size of the proof.
 pub struct PartyAwaitingPosition {
@@ -40,7 +34,7 @@ pub struct PartyAwaitingValueChallenge {
     v_blinding: Scalar,
 
     j: usize, // index of the party, 1..m as in original paper
-    generators: PartyGenerators,
+    generators: RangeproofGenerators,
     val_comm: ValueCommitment,
     a_blinding: Scalar,
     s_blinding: Scalar,
@@ -49,7 +43,7 @@ pub struct PartyAwaitingValueChallenge {
 }
 
 pub struct PartyAwaitingPolyChallenge {
-    generators: PartyGenerators,
+    generators: RangeproofGenerators,
 
     val_comm:  ValueCommitment,
     poly_comm: PolyCommitment,
@@ -98,7 +92,7 @@ pub struct PolyCommitment {
 }
 
 pub struct ProofShare {
-    generators: PartyGenerators,
+    generators: RangeproofGenerators,
     val_comm: ValueCommitment,
     poly_comm: PolyCommitment,
 
@@ -112,7 +106,7 @@ pub struct ProofShare {
 }
 
 pub struct AggregatedProof {
-    generators: PartyGenerators,
+    generators: RangeproofGenerators,
 
     inp_comm: ValueCommitment,
     st_comm: PolyCommitment,
@@ -156,40 +150,19 @@ impl Dealer {
     }
 }
 
-impl PartyGenerators {
-    /// Creates new set of generators for j-th party and n-bit proofs.
-    pub fn new(n: usize, j: usize) -> Self {
-        let mut gen = Generators::new();
-        let B = gen.next_point();
-        let B_blinding = gen.next_point();
-        for _ in 0..(2*n*j) {
-            let _ = gen.next_point();
-        }
-        let G  = gen.next_points(n);
-        let H  = gen.next_points(n);
-
-        PartyGenerators {
-            B,
-            B_blinding,
-            G,
-            H,
-        }
-    }
-}
-
 impl PartyAwaitingPosition {
     /// Assigns the position to a party, 
     /// at which point the party knows its generators.
     pub fn assign_position<R: Rng>(&self, j: usize, rng: &mut R) -> (PartyAwaitingValueChallenge, ValueCommitment) {
         let n = self.n;
-        let gen = PartyGenerators::new(n, j);
+        let gen = RangeproofGenerators::share(n, j);
 
         // Compute V
-        let V = gen.B_blinding * self.v_blinding + gen.B * Scalar::from_u64(self.v);
+        let V = gen.B_b * self.v_blinding + gen.B * Scalar::from_u64(self.v);
 
         // Compute A
         let a_blinding = Scalar::random(&mut rng);
-        let mut A = gen.B_blinding * a_blinding;
+        let mut A = gen.B_b * a_blinding;
         for i in 0..n {
             let bit = (self.v >> i) & 1;
             if bit == 1 {
@@ -207,7 +180,8 @@ impl PartyAwaitingPosition {
         let s_r:Vec<Scalar> = (0..n).map(|_| Scalar::random(&mut rng)).collect();
         let S = ristretto::multiscalar_mult(
             iter::once(&s_blinding).chain(s_l.iter()).chain(s_r.iter()),
-            iter::once(&gen.B_blinding).chain(gen.G.iter()).chain(gen.H.iter()));
+            iter::once(&gen.B_b).chain(gen.G.iter()).chain(gen.H.iter())
+        );
 
         // Return next state and all commitments
         let val_comm = ValueCommitment { V, A, S };
@@ -651,6 +625,66 @@ mod generators {
                 points.push(self.next_point())
             }
             points
+        }
+    }
+    impl Iterator for Generators {
+        type Item = RistrettoPoint;
+        fn next(&mut self) -> Option<Self::Item> {
+            Some(self.next_point())
+        }
+    }
+}
+
+mod rangeproof_generators {
+    use curve25519_dalek::ristretto::RistrettoPoint;
+        /// Each party has their own set of generators based on their position (`j`).
+    pub struct RangeproofGenerators {
+        /// Main base of the pedersen commitment
+        pub B: RistrettoPoint,
+        /// Base for the blinding factor in the pedersen commitment
+        pub B_b: RistrettoPoint,
+        /// Aux base for IPP
+        pub Q: RistrettoPoint,
+        /// Per-bit generators for the bit values
+        pub G: Vec<RistrettoPoint>,
+        /// Per-bit generators for the bit blinding factors
+        pub H: Vec<RistrettoPoint>,
+    }
+
+    impl RangeproofGenerators {
+        /// Creates a set of generators for an n-bit range proof.
+        /// This can be used for an aggregated rangeproof from `m` parties using `new(n*m)`.
+        pub fn new(n: usize) -> Self {
+            let mut gen = super::generators::Generators::new();
+            let B = gen.next_point();
+            let B_b = gen.next_point();
+            let Q = gen.next_point();
+
+            // remaining points are: G0, H0, ..., G_(n-1), H_(n-1)
+            let (G, H): (Vec<_>, Vec<_>) = gen.take(2 * n).enumerate().partition(|&(i, _)| i % 2 == 0);
+            let G: Vec<_> = G.iter().map(|&(_, p)| p).collect();
+            let H: Vec<_> = H.iter().map(|&(_, p)| p).collect();
+
+            RangeproofGenerators { B, B_b, Q, G, H }
+        }
+
+        /// Creates a set of generators for an n-bit proof j-th party and n-bit proofs.
+        pub fn share(n: usize, j: usize) -> Self {
+            let mut gen = super::generators::Generators::new();
+            let B = gen.next_point();
+            let B_b = gen.next_point();
+            let Q = gen.next_point();
+
+            // remaining points are: G0, H0, ..., G_(n-1), H_(n-1)
+            let (G, H): (Vec<_>, Vec<_>) = gen.skip(2 * n * j).take(2 * n).enumerate().partition(
+                |&(i, _)| {
+                    i % 2 == 0
+                },
+            );
+            let G: Vec<_> = G.iter().map(|&(_, p)| p).collect();
+            let H: Vec<_> = H.iter().map(|&(_, p)| p).collect();
+
+            RangeproofGenerators { B, B_b, Q, G, H }
         }
     }
 }

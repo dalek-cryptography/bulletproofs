@@ -57,9 +57,46 @@ pub fn batch_invert(inputs: &mut [Scalar]) -> Scalar {
     allinv
 }
 
+/// Raises `x` to the power `n`.
+pub fn scalar_pow_vartime_slow(x: &Scalar, n: u64) -> Scalar {
+    let mut result = Scalar::one();
+    for _ in 0..n {
+        result = result * x;
+    }
+    result
+}
+
+/// Raises `x` to the power `n` in (1 to 2)*lg(n) scalar multiplications.
+/// TODO: a consttime version of this would be awfully similar to a Montgomery ladder.
+pub fn scalar_pow_vartime_fast(x: &Scalar, mut n: u64) -> Scalar {
+    let mut result = Scalar::one();
+    let mut aux = *x; // x, x^2, x^4, x^8, ...
+    while n > 0 {
+        let bit = n & 1;
+        if bit == 1 {
+            result = result * aux;
+        }
+        n = n >> 1;
+        aux = aux * aux; // FIXME: one unnecessary mult at the last step here!
+    }
+    result
+}
+
+
 #[cfg(test)]
 mod test {
     use super::*;
+
+    #[test]
+    fn scalar_pow() {
+        let x = Scalar::from_bits(
+            *b"\x84\xfc\xbcOx\x12\xa0\x06\xd7\x91\xd9z:'\xdd\x1e!CE\xf7\xb1\xb9Vz\x810sD\x96\x85\xb5\x07",
+        );
+        assert_eq!(scalar_pow_vartime_slow(&x, 0),   scalar_pow_vartime_fast(&x, 0));
+        assert_eq!(scalar_pow_vartime_slow(&x, 0b1), scalar_pow_vartime_fast(&x, 0b1));
+        assert_eq!(scalar_pow_vartime_slow(&x, 64),  scalar_pow_vartime_fast(&x, 64));
+        assert_eq!(scalar_pow_vartime_slow(&x, 0b11001010), scalar_pow_vartime_fast(&x, 0b11001010));
+    }
 
     #[test]
     fn batch_invert_matches_nonbatched() {
