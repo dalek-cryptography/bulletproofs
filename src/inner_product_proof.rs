@@ -8,7 +8,7 @@ use curve25519_dalek::scalar::Scalar;
 // XXX upstream into dalek
 use scalar;
 
-use random_oracle::RandomOracle;
+use proof_transcript::ProofTranscript;
 
 use range_proof::inner_product;
 use range_proof::make_generators;
@@ -29,7 +29,7 @@ impl Proof {
     /// challenges depend on the *entire* transcript (including parent
     /// protocols).
     pub fn create(
-        verifier: &mut RandomOracle,
+        verifier: &mut ProofTranscript,
         P: &RistrettoPoint,
         Q: &RistrettoPoint,
         mut G_vec: Vec<RistrettoPoint>,
@@ -109,7 +109,7 @@ impl Proof {
 
     fn verify(
         &self,
-        verifier: &mut RandomOracle,
+        verifier: &mut ProofTranscript,
         P: &RistrettoPoint,
         Q: &RistrettoPoint,
         G_vec: &Vec<RistrettoPoint>,
@@ -192,7 +192,7 @@ mod tests {
     use super::*;
 
     fn test_helper_create(n: usize, expected_a: &[u8; 32], expected_b: &[u8; 32]) {
-        let mut verifier = RandomOracle::new(b"innerproducttest");
+        let mut verifier = ProofTranscript::new(b"innerproducttest");
         let G = &RistrettoPoint::hash_from_bytes::<Sha256>("hello".as_bytes());
         let H = &RistrettoPoint::hash_from_bytes::<Sha256>("there".as_bytes());
         let G_vec = make_generators(G, n);
@@ -219,7 +219,7 @@ mod tests {
             b_vec.clone(),
         );
 
-        let mut verifier = RandomOracle::new(b"innerproducttest");
+        let mut verifier = ProofTranscript::new(b"innerproducttest");
         assert!(proof.verify(&mut verifier, &P, &Q, &G_vec, &H_vec).is_ok());
 
         //assert_eq!(proof.a.as_bytes(), expected_a);
@@ -269,7 +269,7 @@ mod bench {
     use test::Bencher;
 
     fn bench_helper_create(n: usize, b: &mut Bencher) {
-        let mut verifier = RandomOracle::new(b"innerproducttest");
+        let mut verifier = ProofTranscript::new(b"innerproducttest");
         let G = &RistrettoPoint::hash_from_bytes::<Sha256>("hello".as_bytes());
         let H = &RistrettoPoint::hash_from_bytes::<Sha256>("there".as_bytes());
         let G_vec = make_generators(G, n);
@@ -293,7 +293,7 @@ mod bench {
     }
 
     fn bench_helper_verify(n: usize, b: &mut Bencher) {
-        let mut verifier = RandomOracle::new(b"innerproducttest");
+        let mut verifier = ProofTranscript::new(b"innerproducttest");
         let G = &RistrettoPoint::hash_from_bytes::<Sha256>("hello".as_bytes());
         let H = &RistrettoPoint::hash_from_bytes::<Sha256>("there".as_bytes());
         let G_vec = make_generators(G, n);
@@ -320,7 +320,7 @@ mod bench {
             b_vec.clone(),
         );
 
-        let mut verifier = RandomOracle::new(b"innerproducttest");
+        let mut verifier = ProofTranscript::new(b"innerproducttest");
         b.iter(|| proof.verify(&mut verifier, &P, &Q, &G_vec, &H_vec));
     }
 
