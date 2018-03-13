@@ -1,54 +1,57 @@
 #![allow(non_snake_case)]
+//#![deny(missing_docs)]
 
 use std::iter;
-use sha2::Sha256;
+use rand::Rng;
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::ristretto;
 use curve25519_dalek::traits::Identity;
 use curve25519_dalek::scalar::Scalar;
-use rand::OsRng;
 use std::clone::Clone;
-use range_proof::{make_generators, inner_product, add_vec};
 use proof_transcript::ProofTranscript;
+use self::generators::Generators;
 
-struct PolyDeg3(Scalar, Scalar, Scalar);
+/// Party is an entry-point API for setting up a party.
+pub struct Party {}
 
-struct VecPoly2(Vec<Scalar>, Vec<Scalar>);
+/// Dealer is an entry-point API for setting up a dealer
+pub struct Dealer {}
 
-pub struct GeneratorPoints {
-    n: usize,
-    m: usize,
-    B: RistrettoPoint,
-    B_blinding: RistrettoPoint,
+/// Each party has their own set of generators based on their position (`j`).
+pub struct PartyGenerators {
+    B: RistrettoPoint, // main base of the pedersen commitment
+    B_blinding: RistrettoPoint, // base for the blinding factor in the pedersen commitment
     G: Vec<RistrettoPoint>,
-    H: Vec<RistrettoPoint>,   
+    H: Vec<RistrettoPoint>,
 }
 
+/// As party awaits its position, they only know their value and desired bit-size of the proof.
 pub struct PartyAwaitingPosition {
-    gen: GeneratorPoints,
-    rng: OsRng,
+    n: usize,
     v: u64,
     v_blinding: Scalar
 }
 
+/// When party knows its position (`j`), it can produce commitments
+/// to all bits of the value and necessary blinding factors.
 pub struct PartyAwaitingValueChallenge {
-    gen: GeneratorPoints,
-    rng: OsRng,
-    val_comm: ValueCommitment,
+    n: usize, // bitsize of the range
+    v: u64,
+    v_blinding: Scalar,
 
     j: usize, // index of the party, 1..m as in original paper
-    v_blinding: Scalar,
+    generators: PartyGenerators,
+    val_comm: ValueCommitment,
     a_blinding: Scalar,
     s_blinding: Scalar,
     s_l: Vec<Scalar>,
     s_r: Vec<Scalar>,
-    v: u64,
 }
 
-// formerly: Statement
 pub struct PartyAwaitingPolyChallenge {
-    gen: GeneratorPoints,
-    val_comm: ValueCommitment,
+    generators: PartyGenerators,
+
+    val_comm:  ValueCommitment,
     poly_comm: PolyCommitment,
 
     y: Scalar,
@@ -64,18 +67,22 @@ pub struct PartyAwaitingPolyChallenge {
     t_2_blinding: Scalar,
 }
 
+/// When dealer is initialized, it only knows the size of the set.
 pub struct DealerAwaitingValues {
     pt: ProofTranscript,
+    n: usize,
     m: usize,
 }
 
 pub struct DealerAwaitingPoly {
     pt: ProofTranscript,
+    n: usize,
     m: usize,
 }
 
 pub struct DealerAwaitingShares {
     pt: ProofTranscript,
+    n: usize,
     m: usize,
 }
 
@@ -91,7 +98,7 @@ pub struct PolyCommitment {
 }
 
 pub struct ProofShare {
-    gen: GeneratorPoints,
+    generators: PartyGenerators,
     val_comm: ValueCommitment,
     poly_comm: PolyCommitment,
 
@@ -105,7 +112,8 @@ pub struct ProofShare {
 }
 
 pub struct AggregatedProof {
-    gen: GeneratorPoints,
+    generators: PartyGenerators,
+
     inp_comm: ValueCommitment,
     st_comm: PolyCommitment,
 
@@ -118,90 +126,143 @@ pub struct AggregatedProof {
     r: Vec<Scalar>,
 }
 
+/// Aggregator is a high-level API for creating proofs in one go.
 pub struct Aggregator {
     n: usize,
     m: usize,
 }
 
-impl GeneratorPoints {
-    pub fn new(n: usize, m: usize) -> Self {
-        unimplemented!()
+
+impl Party {
+    pub fn new<R:Rng>(value: u64, n: usize, rng: &mut R) -> PartyAwaitingPosition {
+        PartyAwaitingPosition {
+            n: n,
+            v: value,
+            v_blinding: Scalar::random(&mut rng),
+        }
+    }
+}
+
+impl Dealer {
+    /// Creates a new dealer with the given parties and a number of bits
+    pub fn new(n: usize, parties: Vec<PartyAwaitingPosition>) -> Result<DealerAwaitingValues, &'static str> {
+        if let Some(_) = parties.iter().find(|&x| x.n != n) {
+            return Err("Inconsistent n among parties!")
+        }
+        let mut pt = ProofTranscript::new(b"MultiRangeProof");
+        let m = parties.len();
+        pt.commit_u64(n as u64);
+        pt.commit_u64(m as u64);
+        Ok(DealerAwaitingValues { pt, n, m })
+    }
+}
+
+impl PartyGenerators {
+    /// Creates new set of generators for j-th party and n-bit proofs.
+    pub fn new(n: usize, j: usize) -> Self {
+        let mut gen = Generators::new();
+        let B = gen.next_point();
+        let B_blinding = gen.next_point();
+        for _ in 0..(2*n*j) {
+            let _ = gen.next_point();
+        }
+        let G  = gen.next_points(n);
+        let H  = gen.next_points(n);
+
+        PartyGenerators {
+            B,
+            B_blinding,
+            G,
+            H,
+        }
     }
 }
 
 impl PartyAwaitingPosition {
-    pub fn new(gen: GeneratorPoints, v: u64, rng: OsRng) -> Self {
-        PartyAwaitingPosition {
-            gen: gen,
-            rng: rng,
-            v: v,
-            v_blinding: Scalar::random(&mut rng),
-        }
-    }
-
-    pub fn new_with_blinding(gen: GeneratorPoints, v: u64, v_blinding: Scalar) -> Self {
-        PartyAwaitingPosition {
-            gen: gen,
-            rng: OsRng::new().unwrap(),
-            v: v,
-            v_blinding: v_blinding,
-        }
-    }
-
-    pub fn get_position(&self, j: usize) -> (PartyAwaitingValueChallenge, ValueCommitment) {
-        let n = self.gen.n;
+    /// Assigns the position to a party, 
+    /// at which point the party knows its generators.
+    pub fn assign_position<R: Rng>(&self, j: usize, rng: &mut R) -> (PartyAwaitingValueChallenge, ValueCommitment) {
+        let n = self.n;
+        let gen = PartyGenerators::new(n, j);
 
         // Compute V
-        let V = self.gen.B_blinding * self.v_blinding + self.gen.B * Scalar::from_u64(self.v);
+        let V = gen.B_blinding * self.v_blinding + gen.B * Scalar::from_u64(self.v);
 
         // Compute A
-        let a_blinding = Scalar::random(&mut self.rng);
-        let mut A = self.gen.B_blinding * a_blinding;
+        let a_blinding = Scalar::random(&mut rng);
+        let mut A = gen.B_blinding * a_blinding;
         for i in 0..n {
             let bit = (self.v >> i) & 1;
             if bit == 1 {
                 // a_L = bit, bit = 1, so a_L=1, a_R=0
-                A += self.gen.G[j * n + i];
+                A += gen.G[i];
             } else {
                 // a_R = bit - 1, bit = 0, so a_L=0, a_R=-1
-                A -= self.gen.H[j * n + i];
+                A -= gen.H[i];
             }
         }
 
         // Compute S
-        let s_blinding = Scalar::random(&mut self.rng);
-        let s_l:Vec<Scalar> = (0..n).map(|_| Scalar::random(&mut self.rng)).collect();
-        let s_r:Vec<Scalar> = (0..n).map(|_| Scalar::random(&mut self.rng)).collect();
+        let s_blinding = Scalar::random(&mut rng);
+        let s_l:Vec<Scalar> = (0..n).map(|_| Scalar::random(&mut rng)).collect();
+        let s_r:Vec<Scalar> = (0..n).map(|_| Scalar::random(&mut rng)).collect();
         let S = ristretto::multiscalar_mult(
             iter::once(&s_blinding).chain(s_l.iter()).chain(s_r.iter()),
-            iter::once(&self.gen.B_blinding).chain(self.gen.G[j*n..(j+1)*n].iter()).chain(self.gen.H[j*n..(j+1)*n].iter()));
+            iter::once(&gen.B_blinding).chain(gen.G.iter()).chain(gen.H.iter()));
 
-        let val_comm = ValueCommitment {
-            V,
-            A,
-            S,
-        };
-
-        let pavc = PartyAwaitingValueChallenge {
-            gen: self.gen,
-            rng: self.rng,
+        // Return next state and all commitments
+        let val_comm = ValueCommitment { V, A, S };
+        let next_state = PartyAwaitingValueChallenge {
+            n: self.n,
             v: self.v,
             v_blinding: self.v_blinding,
+
+            j,
+            generators: gen,
             val_comm,
-            j: j,
             a_blinding,
             s_blinding,
             s_l,
             s_r, 
         };
-
-        (pavc, val_comm)
+        (next_state, val_comm)
     }
 }
 
+impl DealerAwaitingValues {
+    /// Combines commitments and computes challenge variables.
+    pub fn present_values(mut self, vc: Vec<ValueCommitment>) -> (DealerAwaitingPoly, Scalar, Scalar) {
+        // Commit each V individually
+        for commitment in vc.iter() {
+            self.pt.commit(commitment.V.compress().as_bytes());
+        }
+        
+        // Commit sums of As and Ss.
+        let mut A = RistrettoPoint::identity();
+        let mut S = RistrettoPoint::identity();
+        for commitment in vc.iter() {
+            A += commitment.A;
+            S += commitment.S;
+        }
+
+        self.pt.commit(A.compress().as_bytes());
+        self.pt.commit(S.compress().as_bytes());
+
+        let y = self.pt.challenge_scalar();
+        let z = self.pt.challenge_scalar();
+
+        (DealerAwaitingPoly {
+            pt: self.pt,
+            n: self.n,
+            m: self.m
+        }, y,z)
+    }
+}
+
+
 impl PartyAwaitingValueChallenge {
-    pub fn get_value_challenge(&self, y: Scalar, z: Scalar) -> (PartyAwaitingPolyChallenge, PolyCommitment) {
-        let n = self.gen.n;
+    pub fn apply_challenge(&self, y: Scalar, z: Scalar) -> (PartyAwaitingPolyChallenge, PolyCommitment) {
+        let n = self.n;
 
         // needed for multi-range-proof only: generate y, z offsets
         let mut offset_y = Scalar::one(); // offset_y = y^((j-1)*n);
@@ -295,12 +356,6 @@ impl PartyAwaitingPolyChallenge {
     }
 }
 
-impl DealerAwaitingValues {
-    pub fn get_values(&self, vc: Vec<ValueCommitment>) -> (DealerAwaitingPoly, Scalar, Scalar) {
-        unimplemented!()
-    }
-}
-
 impl DealerAwaitingPoly {
     pub fn get_poly(&self, pc: Vec<PolyCommitment>) -> (DealerAwaitingShares, Scalar) {
         unimplemented!()
@@ -314,32 +369,22 @@ impl DealerAwaitingShares {
 }
 
 impl Aggregator {
-    pub fn create_one(v: u64, n: usize) -> AggregatedProof {
-        Self::create_multi(vec![v], n)
+    pub fn create_one<R: Rng>(v: u64, n: usize, rng: &mut R) -> AggregatedProof {
+        Self::create_multi(vec![v], n, rng)
     }
 
-    pub fn create_multi(values: Vec<u64>, n: usize) -> AggregatedProof {
-        let mut ro = RandomOracle::new(b"MultiRangeProof");
-        let m = values.len();
-        let gen = Generators::new(n, m);
-        let mut A = RistrettoPoint::identity();
-        let mut S = RistrettoPoint::identity();
-        let mut inputs = Vec::new();
-        for j in 0..m {
-            let input = gen.make_input(j, values[j]);
-            A += input.inp_comm.A;
-            S += input.inp_comm.S;
-            inputs.push(input);
+    pub fn create_multi<R: Rng>(values: Vec<u64>, n: usize, rng: &mut R) -> AggregatedProof {
+        let parties: Vec<_> = values.iter().map(|&v| Party::new(v, n, rng) ).collect();
+        let mut dealer = Dealer::new(n, parties);
+        let parties_commits: Vec<_> = parties.iter().zip(0..values.len()).map(|(&p,j)| p.assign_position(j,rng) ).collect();
+        let parties: Vec<_> = parties_commits.iter().map(|&(p,c)| p ).collect();
+        let commits: Vec<_> = parties_commits.iter().map(|&(p,c)| c ).collect();
+
+        for party in parties {
+
         }
-        ro.commit_integer(n as u64);
-        ro.commit_integer(m as u64);
-        for j in 0..m {
-            ro.commit_point(&inputs[j].inp_comm.V[0].compress());
-        }
-        ro.commit_point(&A.compress());
-        ro.commit_point(&S.compress());
-        let y = ro.challenge_scalar();
-        let z = ro.challenge_scalar();
+
+        /// TBD:
 
         let mut T_1 = RistrettoPoint::identity();
         let mut T_2 = RistrettoPoint::identity();
@@ -351,8 +396,8 @@ impl Aggregator {
             statements.push(statement);
         }
 
-        ro.commit_point(&T_1.compress());
-        ro.commit_point(&T_2.compress());
+        ro.commit(&T_1.compress().as_bytes());
+        ro.commit(&T_2.compress().as_bytes());
         let x = ro.challenge_scalar();
 
         let mut proofs = Vec::new();
@@ -410,18 +455,18 @@ impl Aggregator {
         let B = &self.gen.B;
         let B_blinding = &self.gen.B_blinding;
 
-        let mut ro = RandomOracle::new(b"MultiRangeProof");
-        ro.commit_integer(n as u64);
-        ro.commit_integer(m as u64);
+        let mut ro = ProofTranscript::new(b"MultiRangeProof");
+        ro.commit_u64(n as u64);
+        ro.commit_u64(m as u64);
         for j in 0..m {
-            ro.commit_point(&V[j].compress());
+            ro.commit(V[j].compress().as_bytes());
         }
-        ro.commit_point(&A.compress());
-        ro.commit_point(&S.compress());
+        ro.commit(&A.compress().as_bytes());
+        ro.commit(&S.compress().as_bytes());
         let y = ro.challenge_scalar();
         let z = ro.challenge_scalar();
-        ro.commit_point(&T_1.compress());
-        ro.commit_point(&T_2.compress());
+        ro.commit(&T_1.compress().as_bytes());
+        ro.commit(&T_2.compress().as_bytes());
         let x = ro.challenge_scalar();
 
         let G = make_generators(B, n * m);
@@ -515,6 +560,33 @@ impl Aggregator {
     }
 }
 
+pub fn inner_product(a: &[Scalar], b: &[Scalar]) -> Scalar {
+    let mut out = Scalar::zero();
+    if a.len() != b.len() {
+        // throw some error
+        println!("lengths of vectors don't match for inner product multiplication");
+    }
+    for i in 0..a.len() {
+        out += a[i] * b[i];
+    }
+    out
+}
+
+pub fn add_vec(a: &[Scalar], b: &[Scalar]) -> Vec<Scalar> {
+    let mut out = Vec::new();
+    if a.len() != b.len() {
+        // throw some error
+        println!("lengths of vectors don't match for vector addition");
+    }
+    for i in 0..a.len() {
+        out.push(a[i] + b[i]);
+    }
+    out
+}
+
+struct PolyDeg3(Scalar, Scalar, Scalar);
+struct VecPoly2(Vec<Scalar>, Vec<Scalar>);
+
 impl PolyDeg3 {
     pub fn new() -> PolyDeg3 {
         PolyDeg3(Scalar::zero(), Scalar::zero(), Scalar::zero())
@@ -535,10 +607,64 @@ impl VecPoly2 {
     }
 }
 
+
+///////////////////////////////////////////////////////
+//            Copy-paste from a PR #15               //
+///////////////////////////////////////////////////////
+mod generators {
+    use curve25519_dalek::ristretto::RistrettoPoint;
+    use curve25519_dalek::constants::RISTRETTO_BASEPOINT_POINT;
+    use sha2::Sha256;
+
+    /// The `Generators` represents an unbounded sequence
+    /// of orthogonal points.
+    pub struct Generators {
+        next_point: RistrettoPoint
+    }
+
+    impl Generators {
+
+        /// Instantiates a sequence starting with a standard Ristretto base point
+        /// (inclusive).
+        pub fn new() -> Self {
+            Generators::at(&RISTRETTO_BASEPOINT_POINT)
+        }
+
+        /// Instantiates a sequence starting with a given generator.
+        pub fn at(point: &RistrettoPoint) -> Self {
+            Generators {
+                next_point: point.clone()
+            }
+        }
+
+        /// Emits the next generator and advances the internal state.
+        pub fn next_point(&mut self) -> RistrettoPoint {
+            let p2 = RistrettoPoint::hash_from_bytes::<Sha256>(self.next_point.compress().as_bytes());
+            let result = self.next_point.clone();
+            self.next_point = p2;
+            result
+        }
+
+        /// Emits the next `n` generators and advances the internal state.
+        pub fn next_points(&mut self, n: usize) -> Vec<RistrettoPoint> {
+            let mut points = Vec::<RistrettoPoint>::with_capacity(n);
+            for _ in 0..n {
+                points.push(self.next_point())
+            }
+            points
+        }
+    }
+}
+///////////////////////////////////////////////////////
+//           End copy-paste from a PR #15            //
+///////////////////////////////////////////////////////
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use rand::Rng;
+    use rand::OsRng;
 
     #[test]
     fn one_party_small() {
