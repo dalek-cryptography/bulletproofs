@@ -15,8 +15,8 @@ struct PolyDeg3(Scalar, Scalar, Scalar);
 
 struct VecPoly2(Vec<Scalar>, Vec<Scalar>);
 
-#[derive(Clone)]
-pub struct Generators {
+// formerly: Generators
+pub struct PartyAwaitingPosition {
     B: RistrettoPoint,
     B_blinding: RistrettoPoint,
     G: Vec<RistrettoPoint>,
@@ -25,14 +25,8 @@ pub struct Generators {
     m: usize,
 }
 
-#[derive(Clone)]
-pub struct InputCommitment {
-    V: Vec<RistrettoPoint>,
-    A: RistrettoPoint,
-    S: RistrettoPoint,
-}
-
-pub struct Input {
+// formerly: Input
+pub struct PartyAwaitingValueChallenge {
     gen: Generators,
     pub inp_comm: InputCommitment,
 
@@ -45,13 +39,8 @@ pub struct Input {
     v: u64,
 }
 
-#[derive(Clone)]
-pub struct StatementCommitment {
-    T_1: RistrettoPoint,
-    T_2: RistrettoPoint,
-}
-
-pub struct Statement {
+// formerly: Statement
+pub struct PartyAwaitingPolyChallenge {
     gen: Generators,
     inp_comm: InputCommitment,
     pub st_comm: StatementCommitment,
@@ -70,8 +59,50 @@ pub struct Statement {
     t_2_blinding: Scalar,
 }
 
+pub struct DealerAwaitingValues {
+    pt: ProofTranscript
+    m: usize,
+}
+
+pub struct DealerAwaitingPoly {
+    pt: ProofTranscript,
+    m: usize,
+}
+
+pub struct DealerAwaitingShares {
+    pt: ProofTranscript,
+    m: usize,
+}
+
 #[derive(Clone)]
-pub struct Proof {
+pub struct ValueCommitment {
+    V: Vec<RistrettoPoint>,
+    A: RistrettoPoint,
+    S: RistrettoPoint,
+}
+
+#[derive(Clone)]
+pub struct PolyCommitment {
+    T_1: RistrettoPoint,
+    T_2: RistrettoPoint,
+}
+
+pub struct ProofShare {
+    gen: Generators,
+    inp_comm: InputCommitment,
+    st_comm: StatementCommitment,
+
+    t_x_blinding: Scalar,
+    e_blinding: Scalar,
+    t: Scalar,
+
+    // don't need if doing inner product proof
+    l: Vec<Scalar>,
+    r: Vec<Scalar>, 
+}
+
+#[derive(Clone)]
+pub struct AggregatedProof {
     gen: Generators,
     inp_comm: InputCommitment,
     st_comm: StatementCommitment,
