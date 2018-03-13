@@ -35,7 +35,6 @@ impl Proof {
     /// protocols).
     pub fn create<I>(
         verifier: &mut ProofTranscript,
-        P: &RistrettoPoint,
         Q: &RistrettoPoint,
         Hprime_factors: I,
         mut G_vec: Vec<RistrettoPoint>,
@@ -252,7 +251,6 @@ mod tests {
         let mut verifier = ProofTranscript::new(b"innerproducttest");
         let proof = Proof::create(
             &mut verifier,
-            &P,
             &Q,
             &H_adjustments,
             G_vec.clone(),
@@ -329,7 +327,6 @@ mod bench {
         b.iter(|| {
             Proof::create(
                 &mut verifier,
-                &P,
                 &Q,
                 &ones,
                 G_vec.clone(),
@@ -362,7 +359,6 @@ mod bench {
 
         let proof = Proof::create(
             &mut verifier,
-            &P,
             &Q,
             &ones,
             G_vec.clone(),
