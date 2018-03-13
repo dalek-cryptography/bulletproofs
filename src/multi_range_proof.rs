@@ -265,11 +265,11 @@ impl PartyAwaitingValueChallenge {
         let n = self.n;
 
         // needed for multi-range-proof only: generate y, z offsets
-        let mut offset_y = Scalar::one(); // offset_y = y^((j-1)*n);
+        let mut offset_y = Scalar::one(); // offset_y = y^(j*n);
         for _ in 0..self.j*n {
             offset_y = offset_y * y;
         }
-        let mut offset_z = Scalar::one(); // offset_z = z^(j-1);
+        let mut offset_z = Scalar::one(); // offset_z = z^j;
         for _ in 0..self.j {
             offset_z = offset_z * z;
         }
