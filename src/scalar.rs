@@ -68,7 +68,7 @@ pub fn scalar_pow_vartime_slow(x: &Scalar, n: u64) -> Scalar {
 
 /// Raises `x` to the power `n` in (1 to 2)*lg(n) scalar multiplications.
 /// TODO: a consttime version of this would be awfully similar to a Montgomery ladder.
-pub fn scalar_pow_vartime_fast(x: &Scalar, mut n: u64) -> Scalar {
+pub fn scalar_pow_vartime(x: &Scalar, mut n: u64) -> Scalar {
     let mut result = Scalar::one();
     let mut aux = *x; // x, x^2, x^4, x^8, ...
     while n > 0 {
@@ -82,6 +82,35 @@ pub fn scalar_pow_vartime_fast(x: &Scalar, mut n: u64) -> Scalar {
     result
 }
 
+pub fn inner_product(a: &Vec<Scalar>, b: &Vec<Scalar>) -> Scalar {
+    a.iter().zip(b.iter()).map(|(&l,&r)| l*r).fold(Scalar::zero(), |t, x| t+x)
+    // let mut out = Scalar::zero();
+    // if a.len() != b.len() {
+    //     // throw some error
+    //     println!("lengths of vectors don't match for inner product multiplication");
+    // }
+    // for i in 0..a.len() {
+    //     out += a[i] * b[i];
+    // }
+    // out
+}
+
+pub fn add_vectors(a: &Vec<Scalar>, b: &Vec<Scalar>) -> Vec<Scalar> {
+    a.iter().zip(b.iter()).map(|(&l,&r)| l + r).collect()
+}
+// pub fn add_vec(a: &[Scalar], b: &[Scalar]) -> Vec<Scalar> {
+//     let mut out = Vec::new();
+//     if a.len() != b.len() {
+//         // throw some error
+//         println!("lengths of vectors don't match for vector addition");
+//     }
+//     for i in 0..a.len() {
+//         out.push(a[i] + b[i]);
+//     }
+//     out
+// }
+
+
 
 #[cfg(test)]
 mod test {
@@ -92,10 +121,14 @@ mod test {
         let x = Scalar::from_bits(
             *b"\x84\xfc\xbcOx\x12\xa0\x06\xd7\x91\xd9z:'\xdd\x1e!CE\xf7\xb1\xb9Vz\x810sD\x96\x85\xb5\x07",
         );
-        assert_eq!(scalar_pow_vartime_slow(&x, 0),   scalar_pow_vartime_fast(&x, 0));
-        assert_eq!(scalar_pow_vartime_slow(&x, 0b1), scalar_pow_vartime_fast(&x, 0b1));
-        assert_eq!(scalar_pow_vartime_slow(&x, 64),  scalar_pow_vartime_fast(&x, 64));
-        assert_eq!(scalar_pow_vartime_slow(&x, 0b11001010), scalar_pow_vartime_fast(&x, 0b11001010));
+        assert_eq!(scalar_pow_vartime(&x, 0),   Scalar::one());
+        assert_eq!(scalar_pow_vartime(&x, 1),   x);
+        assert_eq!(scalar_pow_vartime(&x, 2),   x*x);
+        assert_eq!(scalar_pow_vartime(&x, 3),   x*x*x);
+        assert_eq!(scalar_pow_vartime(&x, 4),   x*x*x*x);
+        assert_eq!(scalar_pow_vartime(&x, 5),   x*x*x*x*x);
+        assert_eq!(scalar_pow_vartime(&x, 64),  scalar_pow_vartime_slow(&x, 64));
+        assert_eq!(scalar_pow_vartime(&x, 0b11001010), scalar_pow_vartime_slow(&x, 0b11001010));
     }
 
     #[test]
