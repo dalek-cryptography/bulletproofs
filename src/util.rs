@@ -24,13 +24,13 @@ impl Iterator for ScalarExp {
 /// Return an iterator of the powers of `x`.
 pub fn exp_iter(x: Scalar) -> ScalarExp {
     let next_exp_x = Scalar::one();
-    ScalarExp{ x, next_exp_x }
+    ScalarExp { x, next_exp_x }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn exp_2_is_powers_of_2() {
         let exp_2: Vec<_> = exp_iter(Scalar::from_u64(2)).take(4).collect();

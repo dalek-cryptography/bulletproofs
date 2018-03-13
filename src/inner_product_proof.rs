@@ -19,6 +19,7 @@ use range_proof::make_generators;
 
 use sha2::Sha256;
 
+#[derive(Clone, Debug)]
 pub struct Proof {
     L_vec: Vec<RistrettoPoint>,
     R_vec: Vec<RistrettoPoint>,
@@ -124,7 +125,7 @@ impl Proof {
         };
     }
 
-    fn verify<I>(
+    pub fn verify<I>(
         &self,
         verifier: &mut ProofTranscript,
         Hprime_factors: I,
