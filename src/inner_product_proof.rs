@@ -165,6 +165,7 @@ impl Proof {
         let mut s = Vec::with_capacity(n);
         for i in 0..n {
             let mut s_i = allinv;
+            // XXX remove this loop via the bit twiddling mentioned in the paper
             for j in 0..lg_n {
                 if bit(i, j) == 1 {
                     // The challenges are stored in "creation order" as [x_k,...,x_1]
@@ -175,39 +176,32 @@ impl Proof {
         }
         let s = s;
 
-        // so many allocs :(
-        // these were supposed to be iterators but the dalek trait doesn't accept values
+        let a_times_s = s.iter().map(|s_i| self.a * s_i);
 
-        let ab = self.a * self.b;
+        // 1/s[i] is s[!i], and !i runs from n-1 to 0 as i runs from 0 to n-1
+        let inv_s = s.iter().rev();
 
-        let a_times_s: Vec<_> = s.iter().map(|s_i| self.a * s_i).collect();
+        let h_times_b_div_s = Hprime_factors
+            .into_iter()
+            .zip(inv_s)
+            .map(|(h_i, s_i_inv)| (self.b * s_i_inv) * h_i.borrow());
 
-        let b_div_s_times_h: Vec<_> = s.iter()
-            .rev()
-            .zip(Hprime_factors.into_iter())
-            .map(|(s_i_inv, h_i)| (self.b * s_i_inv) * h_i.borrow())
-            .collect();
+        let neg_x_sq = challenges_sq.iter().map(|x| -x);
 
-        let neg_x_sq: Vec<_> = challenges_sq.iter().map(|x| -x).collect();
+        let neg_x_inv_sq = inv_challenges.iter().map(|x_inv| -(x_inv * x_inv));
 
-        let neg_x_inv_sq: Vec<_> = inv_challenges
-            .iter()
-            .map(|x_inv| -(x_inv * x_inv))
-            .collect();
-
-        let scalar_iter = iter::once(&ab)
-            .chain(a_times_s.iter())
-            .chain(b_div_s_times_h.iter())
-            .chain(neg_x_sq.iter())
-            .chain(neg_x_inv_sq.iter());
-
-        let points_iter = iter::once(Q)
-            .chain(G_vec.iter())
-            .chain(H_vec.iter())
-            .chain(self.L_vec.iter())
-            .chain(self.R_vec.iter());
-
-        let expect_P = ristretto::vartime::multiscalar_mult(scalar_iter, points_iter);
+        let expect_P = ristretto::vartime::multiscalar_mult(
+            iter::once(self.a * self.b)
+                .chain(a_times_s)
+                .chain(h_times_b_div_s)
+                .chain(neg_x_sq)
+                .chain(neg_x_inv_sq),
+            iter::once(Q)
+                .chain(G_vec.iter())
+                .chain(H_vec.iter())
+                .chain(self.L_vec.iter())
+                .chain(self.R_vec.iter()),
+        );
 
         if expect_P == *P {
             Ok(())
