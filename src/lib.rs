@@ -16,10 +16,11 @@ extern crate test;
 pub mod proof_transcript;
 pub mod generators;
 mod range_proof;
-mod multi_range_proof;
+pub mod multi_range_proof;
 mod inner_product_proof;
 
 pub mod scalar;
 
 pub use range_proof::*;
 pub use generators::*;
+pub use multi_range_proof::*;

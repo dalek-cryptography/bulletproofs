@@ -84,31 +84,11 @@ pub fn scalar_pow_vartime(x: &Scalar, mut n: u64) -> Scalar {
 
 pub fn inner_product(a: &Vec<Scalar>, b: &Vec<Scalar>) -> Scalar {
     a.iter().zip(b.iter()).map(|(&l,&r)| l*r).fold(Scalar::zero(), |t, x| t+x)
-    // let mut out = Scalar::zero();
-    // if a.len() != b.len() {
-    //     // throw some error
-    //     println!("lengths of vectors don't match for inner product multiplication");
-    // }
-    // for i in 0..a.len() {
-    //     out += a[i] * b[i];
-    // }
-    // out
 }
 
 pub fn add_vectors(a: &Vec<Scalar>, b: &Vec<Scalar>) -> Vec<Scalar> {
     a.iter().zip(b.iter()).map(|(&l,&r)| l + r).collect()
 }
-// pub fn add_vec(a: &[Scalar], b: &[Scalar]) -> Vec<Scalar> {
-//     let mut out = Vec::new();
-//     if a.len() != b.len() {
-//         // throw some error
-//         println!("lengths of vectors don't match for vector addition");
-//     }
-//     for i in 0..a.len() {
-//         out.push(a[i] + b[i]);
-//     }
-//     out
-// }
 
 
 
