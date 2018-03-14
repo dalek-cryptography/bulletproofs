@@ -3,15 +3,14 @@
 
 use std::iter;
 use rand::Rng;
-use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::ristretto;
+use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::traits::Identity;
 use curve25519_dalek::scalar::Scalar;
 use std::clone::Clone;
 use scalar::{scalar_pow_vartime,inner_product,add_vectors};
 use proof_transcript::ProofTranscript;
-use self::generators::Generators;
-use self::rangeproof_generators::RangeproofGenerators;
+use generators::{Generators,GeneratorsView};
 
 /// Party is an entry-point API for setting up a party.
 pub struct Party {}
@@ -29,13 +28,13 @@ pub struct PartyAwaitingPosition {
 
 /// When party knows its position (`j`), it can produce commitments
 /// to all bits of the value and necessary blinding factors.
-pub struct PartyAwaitingValueChallenge {
+pub struct PartyAwaitingValueChallenge<'a> {
     n: usize, // bitsize of the range
     v: u64,
     v_blinding: Scalar,
 
     j: usize, // index of the party, 1..m as in original paper
-    generators: RangeproofGenerators,
+    generators: GeneratorsView<'a>,
     value_commitment: ValueCommitment,
     a_blinding: Scalar,
     s_blinding: Scalar,
@@ -43,8 +42,8 @@ pub struct PartyAwaitingValueChallenge {
     s_r: Vec<Scalar>,
 }
 
-pub struct PartyAwaitingPolyChallenge {
-    generators: RangeproofGenerators,
+pub struct PartyAwaitingPolyChallenge<'a> {
+    generators: GeneratorsView<'a>,
 
     value_commitment:  ValueCommitment,
     poly_commitment: PolyCommitment,
@@ -96,7 +95,6 @@ pub struct PolyCommitment {
 
 #[derive(Clone)]
 pub struct ProofShare {
-    pub generators: RangeproofGenerators,
     pub value_commitment: ValueCommitment,
     pub poly_commitment: PolyCommitment,
 
@@ -128,8 +126,8 @@ pub struct Proof {
 
 impl Party {
     pub fn new<R:Rng>(value: u64, n: usize, mut rng: &mut R) -> PartyAwaitingPosition {
-        let gen = RangeproofGenerators::new(0);
-        let (V,v_blinding) = gen.pedersen_commitment(&Scalar::from_u64(value), &mut rng);
+        let gen = Generators::new(n, 0);
+        let (V,v_blinding) = pedersen_commitment(&Scalar::from_u64(value), &gen.all(), &mut rng);
         PartyAwaitingPosition { n, v: value, v_blinding, V }
     }
 }
@@ -151,18 +149,9 @@ impl Dealer {
 impl PartyAwaitingPosition {
     /// Assigns the position to a party, 
     /// at which point the party knows its generators.
-    pub fn assign_position<R: Rng>(&self, j: usize, mut rng: &mut R) -> (PartyAwaitingValueChallenge, ValueCommitment) {
-        let n = self.n;
-        let gen = RangeproofGenerators::share(n, j);
-
-        let one = Scalar::one();
-        let bits: Vec<_> = (0..n).map(|i| Scalar::from_u64((self.v >> i) & 1)).collect(); // a_L
-        let bits_minus_one: Vec<_> = bits.iter().map(|bit| bit - one).collect();  // a_R
-        let s_l:Vec<Scalar> = (0..n).map(|_| Scalar::random(&mut rng)).collect();
-        let s_r:Vec<Scalar> = (0..n).map(|_| Scalar::random(&mut rng)).collect();
-        
-        let (A, a_blinding) = gen.vector_pedersen_commitment(bits.iter().chain(bits_minus_one.iter()), &mut rng);
-        let (S, s_blinding) = gen.vector_pedersen_commitment(s_l.iter().chain(s_r.iter()), &mut rng);
+    pub fn assign_position<'a, R: Rng>(&self, j: usize, generators: GeneratorsView<'a>, mut rng: &mut R) -> (PartyAwaitingValueChallenge<'a>, ValueCommitment) {
+        let (A, a_blinding) = self.commit_A(&generators, &mut rng);
+        let (S, s_blinding, s_l, s_r) = self.commit_S(&generators, &mut rng);
 
         // Return next state and all commitments
         let value_commitment = ValueCommitment { V: self.V, A, S };
@@ -172,7 +161,7 @@ impl PartyAwaitingPosition {
             v_blinding: self.v_blinding,
 
             j,
-            generators: gen,
+            generators,
             value_commitment: value_commitment.clone(),
             a_blinding,
             s_blinding,
@@ -180,6 +169,34 @@ impl PartyAwaitingPosition {
             s_r, 
         };
         (next_state, value_commitment)
+    }
+
+    fn commit_A<R: Rng>(&self, generators: &GeneratorsView, mut rng: &mut R) -> (RistrettoPoint, Scalar) {
+        let a_blinding = Scalar::random(&mut rng);
+        let mut A = generators.B_blinding * a_blinding;
+        for i in 0..self.n {
+            let v_i = (self.v >> i) & 1;
+            // XXX make sure this is const time
+            if v_i == 1 {
+                A += generators.G[i]; // + bit*G_i
+            } else {
+                A -= generators.H[i]; // + (bit-1)*H_i
+            }
+        }
+        (A, a_blinding)
+    }
+
+    fn commit_S<R: Rng>(&self, generators: &GeneratorsView, mut rng: &mut R) -> (RistrettoPoint, Scalar, Vec<Scalar>, Vec<Scalar>) {
+        let s_l:Vec<Scalar> = (0..self.n).map(|_| Scalar::random(&mut rng)).collect();
+        let s_r:Vec<Scalar> = (0..self.n).map(|_| Scalar::random(&mut rng)).collect();
+
+        let s_blinding = Scalar::random(&mut rng);
+        let S = ristretto::multiscalar_mult(
+            iter::once(&s_blinding).chain(s_l.iter()).chain(s_r.iter()),
+            iter::once(generators.B_blinding).chain(generators.G.iter()).chain(generators.H.iter())
+        );
+
+        (S, s_blinding, s_l, s_r)
     }
 }
 
@@ -212,7 +229,7 @@ impl DealerAwaitingValues {
     }
 }
 
-impl PartyAwaitingValueChallenge {
+impl<'a> PartyAwaitingValueChallenge<'a> {
     pub fn apply_challenge<R: Rng>(&self, y: &Scalar, z: &Scalar, mut rng: &mut R) -> (PartyAwaitingPolyChallenge, PolyCommitment) {
         let n = self.n;
         let offset_y = scalar_pow_vartime(&y, (self.j*n) as u64);
@@ -248,8 +265,8 @@ impl PartyAwaitingValueChallenge {
         t.1 = l_r_mul - t.0 - t.2;
 
         // Generate x by committing to T_1, T_2 (line 49-54)
-        let (T1, t1_blinding) = self.generators.pedersen_commitment(&t.1, &mut rng);
-        let (T2, t2_blinding) = self.generators.pedersen_commitment(&t.2, &mut rng);
+        let (T1, t1_blinding) = pedersen_commitment(&t.1, &self.generators, &mut rng);
+        let (T2, t2_blinding) = pedersen_commitment(&t.2, &self.generators, &mut rng);
 
         let poly_commitment = PolyCommitment { T1, T2 };
 
@@ -274,7 +291,7 @@ impl PartyAwaitingValueChallenge {
     }
 }
 
-impl PartyAwaitingPolyChallenge {
+impl<'a> PartyAwaitingPolyChallenge<'a> {
     pub fn apply_challenge(&self, x: &Scalar) -> ProofShare {
         // Generate final values for proof (line 55-60)
         let t_x_blinding = 
@@ -289,7 +306,6 @@ impl PartyAwaitingPolyChallenge {
         let r_total = self.r.eval(x);
 
         ProofShare {
-            generators: self.generators.clone(),
             value_commitment: self.value_commitment.clone(),
             poly_commitment: self.poly_commitment.clone(),
             t_x_blinding: t_x_blinding,
@@ -350,12 +366,15 @@ impl Proof {
     }
 
     pub fn create_multi<R: Rng>(values: Vec<u64>, n: usize, rng: &mut R) -> Proof {
+        let m = values.len();
+        let generators = Generators::new(n,m);
+
         let parties: Vec<_> = values.iter().map(|&v| Party::new(v, n, rng) ).collect();
-        
+
         let dealer = Dealer::new(n, &parties).unwrap();
 
         let (parties, value_commitments): (Vec<_>,Vec<_>) =
-            parties.iter().enumerate().map(|(j, p)| p.assign_position(j,rng) ).unzip();
+            parties.iter().enumerate().map(|(j, p)| p.assign_position(j,generators.share(j),rng) ).unzip();
         
         let (dealer, y, z) = dealer.present_value_commitments(&value_commitments);
 
@@ -373,7 +392,7 @@ impl Proof {
         let n = self.n;
         let m = self.value_commitments.len();
 
-        let gen = RangeproofGenerators::new(n*m);
+        let gen = Generators::new(n, m);
 
         let mut transcript = ProofTranscript::new(b"MultiRangeProof");
         transcript.commit_u64(n as u64);
@@ -515,144 +534,40 @@ impl VecPoly2 {
 }
 
 
-///////////////////////////////////////////////////////
-//            Copy-paste from a PR #15               //
-///////////////////////////////////////////////////////
-mod generators {
-    use curve25519_dalek::ristretto::RistrettoPoint;
-    use curve25519_dalek::constants::RISTRETTO_BASEPOINT_POINT;
-    use sha2::Sha256;
-
-    /// The `Generators` represents an unbounded sequence
-    /// of orthogonal points.
-    pub struct Generators {
-        next_point: RistrettoPoint
-    }
-
-    impl Generators {
-
-        /// Instantiates a sequence starting with a standard Ristretto base point
-        /// (inclusive).
-        pub fn new() -> Self {
-            Generators::at(&RISTRETTO_BASEPOINT_POINT)
-        }
-
-        /// Instantiates a sequence starting with a given generator.
-        pub fn at(point: &RistrettoPoint) -> Self {
-            Generators {
-                next_point: point.clone()
-            }
-        }
-
-        /// Emits the next generator and advances the internal state.
-        pub fn next_point(&mut self) -> RistrettoPoint {
-            let p2 = RistrettoPoint::hash_from_bytes::<Sha256>(self.next_point.compress().as_bytes());
-            let result = self.next_point.clone();
-            self.next_point = p2;
-            result
-        }
-
-        /// Emits the next `n` generators and advances the internal state.
-        pub fn next_points(&mut self, n: usize) -> Vec<RistrettoPoint> {
-            let mut points = Vec::<RistrettoPoint>::with_capacity(n);
-            for _ in 0..n {
-                points.push(self.next_point())
-            }
-            points
-        }
-    }
-    impl Iterator for Generators {
-        type Item = RistrettoPoint;
-        fn next(&mut self) -> Option<Self::Item> {
-            Some(self.next_point())
-        }
-    }
+/// Creates a new pedersen commitment
+fn pedersen_commitment<R: Rng>(scalar: &Scalar, generators: &GeneratorsView, mut rng: &mut R) -> (RistrettoPoint, Scalar) {
+    let blinding = Scalar::random(&mut rng);
+    // XXX change into multiscalar mult
+    ((generators.B * scalar + generators.B_blinding * blinding), blinding)
 }
 
-mod rangeproof_generators {
-    use rand::Rng;
-    use std::iter;
-    use curve25519_dalek::ristretto;
-    use curve25519_dalek::ristretto::RistrettoPoint;
-    use curve25519_dalek::scalar::Scalar;
+/// Creates a new vector pedersen commitment
+pub fn vector_pedersen_commitment<'a, I, R>(scalars: I, generators: &GeneratorsView, mut rng: &mut R) -> (RistrettoPoint, Scalar)
+    where I: IntoIterator<Item = &'a Scalar>,
+          R: Rng
+{
+    let blinding = Scalar::random(&mut rng);
+    // FIXME: we do this because of lifetime mismatch of scalars and &blinding.
+    let scalars: Vec<_> = scalars.into_iter().collect();
+    let C = ristretto::multiscalar_mult(
+        iter::once(&blinding).chain(scalars.into_iter()),
+        iter::once(generators.B_blinding).chain(generators.G.iter()).chain(generators.H.iter())
+    );
 
-    /// Each party has their own set of generators based on their position (`j`).
-    #[derive(Clone)]
-    pub struct RangeproofGenerators {
-        /// Main base of the pedersen commitment
-        pub B: RistrettoPoint,
-        /// Base for the blinding factor in the pedersen commitment
-        pub B_b: RistrettoPoint,
-        /// Aux base for IPP
-        pub Q: RistrettoPoint,
-        /// Per-bit generators for the bit values
-        pub G: Vec<RistrettoPoint>,
-        /// Per-bit generators for the bit blinding factors
-        pub H: Vec<RistrettoPoint>,
-    }
-
-    impl RangeproofGenerators {
-        /// Creates a set of generators for an n-bit range proof.
-        /// This can be used for an aggregated rangeproof from `m` parties using `new(n*m)`.
-        pub fn new(n: usize) -> Self {
-            let mut gen = super::generators::Generators::new();
-            let B = gen.next_point();
-            let B_b = gen.next_point();
-            let Q = gen.next_point();
-
-            // remaining points are: G0, H0, ..., G_(n-1), H_(n-1)
-            let (G, H): (Vec<_>, Vec<_>) = gen.take(2 * n).enumerate().partition(|&(i, _)| i % 2 == 0);
-            let G: Vec<_> = G.iter().map(|&(_, p)| p).collect();
-            let H: Vec<_> = H.iter().map(|&(_, p)| p).collect();
-
-            RangeproofGenerators { B, B_b, Q, G, H }
-        }
-
-        /// Creates a set of generators for an n-bit proof j-th party and n-bit proofs.
-        pub fn share(n: usize, j: usize) -> Self {
-            let mut gen = super::generators::Generators::new();
-            let B = gen.next_point();
-            let B_b = gen.next_point();
-            let Q = gen.next_point();
-
-            // remaining points are: G0, H0, ..., G_(n-1), H_(n-1)
-            let (G, H): (Vec<_>, Vec<_>) = gen.skip(2 * n * j).take(2 * n).enumerate().partition(
-                |&(i, _)| {
-                    i % 2 == 0
-                },
-            );
-            let G: Vec<_> = G.iter().map(|&(_, p)| p).collect();
-            let H: Vec<_> = H.iter().map(|&(_, p)| p).collect();
-
-            RangeproofGenerators { B, B_b, Q, G, H }
-        }
-
-        /// Creates a new pedersen commitment
-        pub fn pedersen_commitment<R: Rng>(&self, scalar: &Scalar, mut rng: &mut R) -> (RistrettoPoint, Scalar) {
-            let blinding = Scalar::random(&mut rng);
-            ((self.B * scalar + self.B_b * blinding), blinding)
-        }
-
-        /// Creates a new vector pedersen commitment
-        pub fn vector_pedersen_commitment<'a, I, R>(&self, scalars: I, mut rng: &mut R) -> (RistrettoPoint, Scalar)
-            where I: IntoIterator<Item = &'a Scalar>,
-                  R: Rng
-        {
-            let blinding = Scalar::random(&mut rng);
-            // FIXME: we do this because of lifetime mismatch of scalars and &blinding.
-            let scalars: Vec<_> = scalars.into_iter().collect();
-            let C = ristretto::multiscalar_mult(
-                iter::once(&blinding).chain(scalars.into_iter()),
-                iter::once(&self.B_b).chain(self.G.iter()).chain(self.H.iter())
-            );
-
-            (C, blinding)
-        }
-    }
+    (C, blinding)
 }
-///////////////////////////////////////////////////////
-//           End copy-paste from a PR #15            //
-///////////////////////////////////////////////////////
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 #[cfg(test)]

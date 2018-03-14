@@ -78,6 +78,7 @@ pub struct Generators {
 }
 
 /// Represents a view into `Generators` relevant to a specific range proof.
+#[derive(Clone)]
 pub struct GeneratorsView<'a> {
     /// Main base of a Pedersen commitment
     pub B: &'a RistrettoPoint,
