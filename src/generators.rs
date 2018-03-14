@@ -173,4 +173,41 @@ mod tests {
             [gens.share(2).G[..].to_vec(), gens.share(2).H[..].to_vec()]
         );
     }
+
+    #[test]
+    fn generator_orthogonality() {
+        let n = 2;
+        let m = 1;
+        let gens = Generators::new(n, m);
+        let view = gens.all();
+
+        assert_eq!(
+            hex::encode(RISTRETTO_BASEPOINT_POINT.compress().as_bytes()),
+            "e2f2ae0a6abc4e71a884a961c500515f58e30b6aa582dd8db6a65945e08d2d76"
+        );
+        assert_eq!(
+            hex::encode(view.B.compress().as_bytes()),
+            "6abd9de445ed16637be32da51bbd3fa114f984c52081258a1f476c8493f09731"
+        );
+        assert_eq!(
+            hex::encode(view.B_blinding.compress().as_bytes()),
+            "5c97d2b3cd6994ae1a4d6bd7371b40800b6a28afb1db14b81b4b5107ed9c5478"
+        );
+        assert_eq!(
+            hex::encode(view.G[0].compress().as_bytes()),
+            "688bac289f5e4ed902648278b4e81a2b8a028365b0a7753fd0242e499bd6200e"
+        );
+        assert_eq!(
+            hex::encode(view.G[1].compress().as_bytes()),
+            "7e49425c91464e4b3aa4c4676e7deba7e91d1cfd1a19a0a39dfd73b0cecdb55c"
+        );
+        assert_eq!(
+            hex::encode(view.H[0].compress().as_bytes()),
+            "50140daade760912586d04be961dab5d723d1aba05b536b13b99f69225ea4002"
+        );
+        assert_eq!(
+            hex::encode(view.H[1].compress().as_bytes()),
+            "ac23f3c0964e8bb1b9c61869edbb39c4417a96d518715d2e3e60a03cd722d13d"
+        );
+    }
 }
