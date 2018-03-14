@@ -14,8 +14,9 @@ use proof_transcript::ProofTranscript;
 
 use util;
 
+use generators::Generators;
+
 use range_proof::inner_product;
-use range_proof::make_generators;
 
 use sha2::Sha256;
 
@@ -131,8 +132,8 @@ impl Proof {
         Hprime_factors: I,
         P: &RistrettoPoint,
         Q: &RistrettoPoint,
-        G_vec: &Vec<RistrettoPoint>,
-        H_vec: &Vec<RistrettoPoint>,
+        G: &[RistrettoPoint],
+        H: &[RistrettoPoint],
     ) -> Result<(), ()>
     where
         I: IntoIterator,
@@ -198,8 +199,8 @@ impl Proof {
                 .chain(neg_x_sq)
                 .chain(neg_x_inv_sq),
             iter::once(Q)
-                .chain(G_vec.iter())
-                .chain(H_vec.iter())
+                .chain(G.iter())
+                .chain(H.iter())
                 .chain(self.L_vec.iter())
                 .chain(self.R_vec.iter()),
         );
@@ -221,11 +222,9 @@ mod tests {
     fn test_helper_create(n: usize) {
         let mut rng = OsRng::new().unwrap();
 
-        // XXX fix up generators
-        let B = &RistrettoPoint::hash_from_bytes::<Sha256>("hello".as_bytes());
-        let B_blinding = &RistrettoPoint::hash_from_bytes::<Sha256>("there".as_bytes());
-        let G = make_generators(B, n);
-        let H = make_generators(B_blinding, n);
+        let gens = Generators::new(n, 1);
+        let G = gens.share(0).G.to_vec();
+        let H = gens.share(0).H.to_vec();
 
         // Q would be determined upstream in the protocol, so we pick a random one.
         let Q = RistrettoPoint::hash_from_bytes::<Sha256>(b"test point");
@@ -303,63 +302,66 @@ mod bench {
     use super::*;
     use test::Bencher;
 
-    fn bench_helper_create(n: usize, b: &mut Bencher) {
-        let mut verifier = ProofTranscript::new(b"innerproducttest");
-        let G = &RistrettoPoint::hash_from_bytes::<Sha256>("hello".as_bytes());
-        let H = &RistrettoPoint::hash_from_bytes::<Sha256>("there".as_bytes());
-        let G_vec = make_generators(G, n);
-        let H_vec = make_generators(H, n);
-        let Q = RistrettoPoint::hash_from_bytes::<Sha256>("more".as_bytes());
-        let P = RistrettoPoint::hash_from_bytes::<Sha256>("points".as_bytes());
-        let a_vec = vec![Scalar::from_u64(1); n];
-        let b_vec = vec![Scalar::from_u64(2); n];
+    fn bench_helper_create(n: usize, bench: &mut Bencher) {
+        let gens = Generators::new(n, 1);
+        let G = gens.share(0).G.to_vec();
+        let H = gens.share(0).H.to_vec();
+
+        // Q would be determined upstream in the protocol, so we pick a random one.
+        let Q = RistrettoPoint::hash_from_bytes::<Sha256>(b"test point");
+
+        let a = vec![Scalar::from_u64(1); n];
+        let b = vec![Scalar::from_u64(2); n];
         let ones = vec![Scalar::from_u64(1); n];
 
-        b.iter(|| {
+        let mut verifier = ProofTranscript::new(b"innerproducttest");
+
+        bench.iter(|| {
             Proof::create(
                 &mut verifier,
                 &Q,
                 &ones,
-                G_vec.clone(),
-                H_vec.clone(),
-                a_vec.clone(),
-                b_vec.clone(),
+                G.clone(),
+                H.clone(),
+                a.clone(),
+                b.clone(),
             )
         });
     }
 
-    fn bench_helper_verify(n: usize, b: &mut Bencher) {
-        let mut verifier = ProofTranscript::new(b"innerproducttest");
-        let G = &RistrettoPoint::hash_from_bytes::<Sha256>("hello".as_bytes());
-        let H = &RistrettoPoint::hash_from_bytes::<Sha256>("there".as_bytes());
-        let G_vec = make_generators(G, n);
-        let H_vec = make_generators(H, n);
+    fn bench_helper_verify(n: usize, bench: &mut Bencher) {
+        let gens = Generators::new(n, 1);
+        let G = gens.share(0).G.to_vec();
+        let H = gens.share(0).H.to_vec();
 
-        let a_vec = vec![Scalar::from_u64(1); n];
-        let b_vec = vec![Scalar::from_u64(2); n];
-
+        // Q would be determined upstream in the protocol, so we pick a random one.
         let Q = RistrettoPoint::hash_from_bytes::<Sha256>(b"test point");
-        let c = inner_product(&a_vec, &b_vec);
 
-        let P = ristretto::vartime::multiscalar_mult(
-            a_vec.iter().chain(b_vec.iter()).chain(iter::once(&c)),
-            G_vec.iter().chain(H_vec.iter()).chain(iter::once(&Q)),
-        );
-
+        let a = vec![Scalar::from_u64(1); n];
+        let b = vec![Scalar::from_u64(2); n];
         let ones = vec![Scalar::from_u64(1); n];
+
+        let mut verifier = ProofTranscript::new(b"innerproducttest");
 
         let proof = Proof::create(
             &mut verifier,
             &Q,
             &ones,
-            G_vec.clone(),
-            H_vec.clone(),
-            a_vec.clone(),
-            b_vec.clone(),
+            G.clone(),
+            H.clone(),
+            a.clone(),
+            b.clone(),
+        );
+
+        let c = inner_product(&a, &b);
+
+        let P = ristretto::vartime::multiscalar_mult(
+            a.iter().chain(b.iter()).chain(iter::once(&c)),
+            G.iter().chain(H.iter()).chain(iter::once(&Q)),
         );
 
         let mut verifier = ProofTranscript::new(b"innerproducttest");
-        b.iter(|| proof.verify(&mut verifier, &ones, &P, &Q, &G_vec, &H_vec));
+        bench.iter(|| proof.verify(&mut verifier, &ones, &P, &Q, &G, &H));
     }
 
     #[bench]

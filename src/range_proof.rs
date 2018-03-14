@@ -19,6 +19,8 @@ use proof_transcript::ProofTranscript;
 
 use util;
 
+use generators::{Generators, GeneratorsView};
+
 struct PolyDeg3(Scalar, Scalar, Scalar);
 
 struct VecPoly2(Vec<Scalar>, Vec<Scalar>);
@@ -51,20 +53,23 @@ pub struct RangeProof {
 impl RangeProof {
     /// Create a rangeproof.
     pub fn generate_proof<R: Rng>(
+        generators: GeneratorsView,
         transcript: &mut ProofTranscript,
         rng: &mut R,
         n: usize,
         v: u64,
         v_blinding: &Scalar,
     ) -> RangeProof {
-        // XXX move this out to a common generators module
-        let B = RistrettoPoint::hash_from_bytes::<Sha256>("hello".as_bytes());
-        let B_blinding = RistrettoPoint::hash_from_bytes::<Sha256>("there".as_bytes());
+        let B = generators.B;
+        let B_blinding = generators.B_blinding;
 
-        let G = make_generators(&B, n);
-        let H = make_generators(&B_blinding, n);
+        // Create copies of G, H, so we can pass them to the
+        // (consuming) IPP API later.
+        let G = generators.G.to_vec();
+        let H = generators.H.to_vec();
 
-        let V = ristretto::multiscalar_mult(&[Scalar::from_u64(v), *v_blinding], &[B, B_blinding]);
+        let V =
+            ristretto::multiscalar_mult(&[Scalar::from_u64(v), *v_blinding], &[*B, *B_blinding]);
 
         let a_blinding = Scalar::random(rng);
 
@@ -87,7 +92,7 @@ impl RangeProof {
         // Compute S = <s_L, G> + <s_R, H> + s_blinding * B_blinding.
         let S = ristretto::multiscalar_mult(
             iter::once(&s_blinding).chain(s_L.iter()).chain(s_R.iter()),
-            iter::once(&B_blinding).chain(G.iter()).chain(H.iter()),
+            iter::once(B_blinding).chain(G.iter()).chain(H.iter()),
         );
 
         // Commit to V, A, S and get challenges y, z
@@ -123,8 +128,8 @@ impl RangeProof {
         // Form commitments T_1, T_2 to t.1, t.2
         let t_1_blinding = Scalar::random(rng);
         let t_2_blinding = Scalar::random(rng);
-        let T_1 = ristretto::multiscalar_mult(&[t_poly.1, t_1_blinding], &[B, B_blinding]);
-        let T_2 = ristretto::multiscalar_mult(&[t_poly.2, t_2_blinding], &[B, B_blinding]);
+        let T_1 = ristretto::multiscalar_mult(&[t_poly.1, t_1_blinding], &[*B, *B_blinding]);
+        let T_2 = ristretto::multiscalar_mult(&[t_poly.2, t_2_blinding], &[*B, *B_blinding]);
 
         // Commit to T_1, T_2 to get the challenge point x
         transcript.commit(T_1.compress().as_bytes());
@@ -170,18 +175,13 @@ impl RangeProof {
 
     pub fn verify<R: Rng>(
         &self,
+        gens: GeneratorsView,
         transcript: &mut ProofTranscript,
         rng: &mut R,
         n: usize,
     ) -> Result<(), ()> {
-        // XXX move this out to a common generators module
-        let B = RistrettoPoint::hash_from_bytes::<Sha256>("hello".as_bytes());
-        let B_blinding = RistrettoPoint::hash_from_bytes::<Sha256>("there".as_bytes());
-
-        let G = make_generators(&B, n);
-        let H = make_generators(&B_blinding, n);
-
-        // Replay the "interactive" protocol using the proof data to recompute all challenges.
+        // First, replay the "interactive" protocol using the proof
+        // data to recompute all challenges.
 
         transcript.commit(self.V.compress().as_bytes());
         transcript.commit(self.A.compress().as_bytes());
@@ -210,7 +210,7 @@ impl RangeProof {
                 (delta(n, &y, &z) - self.t_x),
                 -self.t_x_blinding,
             ],
-            &[self.V, self.T_1, self.T_2, B, B_blinding],
+            &[self.V, self.T_1, self.T_2, *gens.B, *gens.B_blinding],
         );
 
         if !poly_check.is_identity() {
@@ -219,7 +219,9 @@ impl RangeProof {
 
         // Recompute P + t(x)Q = P + t(x)w B_blinding
 
-        let G_sum = G.iter()
+        // XXX later we will need to fold this into the IPP api
+        let G_sum = gens.G
+            .iter()
             .fold(RistrettoPoint::identity(), |acc, G_i| acc + G_i);
 
         let y_inv = y.invert();
@@ -236,11 +238,13 @@ impl RangeProof {
                     .iter()
                     .cloned()
                     .chain(H_scalars),
-                [B_blinding, self.S, G_sum].iter().chain(H.iter()),
+                [*gens.B_blinding, self.S, G_sum]
+                    .iter()
+                    .chain(gens.H.iter()),
             );
 
         // XXX eliminate this when merging into a single multiscalar mult
-        let Q = w * B_blinding;
+        let Q = w * gens.B_blinding;
 
         // Return the result of IPP verification using the recomputed P + t(x) Q
         self.ipp_proof.verify(
@@ -248,8 +252,8 @@ impl RangeProof {
             util::exp_iter(y_inv).take(n),
             &P_plus_tx_Q,
             &Q,
-            &G,
-            &H,
+            gens.G,
+            gens.H,
         )
     }
 }
@@ -304,17 +308,6 @@ impl VecPoly2 {
         }
         out
     }
-}
-
-pub fn make_generators(point: &RistrettoPoint, n: usize) -> Vec<RistrettoPoint> {
-    let mut generators = vec![RistrettoPoint::identity(); n];
-
-    generators[0] = RistrettoPoint::hash_from_bytes::<Sha256>(point.compress().as_bytes());
-    for i in 1..n {
-        let prev = generators[i - 1].compress();
-        generators[i] = RistrettoPoint::hash_from_bytes::<Sha256>(prev.as_bytes());
-    }
-    generators
 }
 
 pub fn inner_product(a: &[Scalar], b: &[Scalar]) -> Scalar {
@@ -390,17 +383,29 @@ mod tests {
     }
 
     fn create_and_verify_helper(n: usize) {
+        let generators = Generators::new(n, 1);
         let mut transcript = ProofTranscript::new(b"RangeproofTest");
         let mut rng = OsRng::new().unwrap();
 
         let v: u64 = rng.gen_range(0, (1 << (n - 1)) - 1);
         let v_blinding = Scalar::random(&mut rng);
 
-        let rp = RangeProof::generate_proof(&mut transcript, &mut rng, n, v, &v_blinding);
+        let range_proof = RangeProof::generate_proof(
+            generators.share(0),
+            &mut transcript,
+            &mut rng,
+            n,
+            v,
+            &v_blinding,
+        );
 
         let mut transcript = ProofTranscript::new(b"RangeproofTest");
 
-        assert!(rp.verify(&mut transcript, &mut rng, n).is_ok());
+        assert!(
+            range_proof
+                .verify(generators.share(0), &mut transcript, &mut rng, n)
+                .is_ok()
+        );
     }
 
     #[test]
@@ -431,27 +436,45 @@ mod bench {
     use test::Bencher;
 
     fn bench_create_helper(n: usize, b: &mut Bencher) {
+        let generators = Generators::new(n, 1);
         let mut transcript = ProofTranscript::new(b"RangeproofTest");
         let mut rng = OsRng::new().unwrap();
 
         let v: u64 = rng.gen_range(0, (1 << (n - 1)) - 1);
         let v_blinding = Scalar::random(&mut rng);
 
-        b.iter(|| RangeProof::generate_proof(&mut transcript, &mut rng, n, v, &v_blinding));
+        b.iter(|| {
+            RangeProof::generate_proof(
+                generators.share(0),
+                &mut transcript,
+                &mut rng,
+                n,
+                v,
+                &v_blinding,
+            )
+        });
     }
 
     fn bench_verify_helper(n: usize, b: &mut Bencher) {
+        let generators = Generators::new(n, 1);
         let mut transcript = ProofTranscript::new(b"RangeproofTest");
         let mut rng = OsRng::new().unwrap();
 
         let v: u64 = rng.gen_range(0, (1 << (n - 1)) - 1);
         let v_blinding = Scalar::random(&mut rng);
 
-        let rp = RangeProof::generate_proof(&mut transcript, &mut rng, n, v, &v_blinding);
+        let rp = RangeProof::generate_proof(
+            generators.share(0),
+            &mut transcript,
+            &mut rng,
+            n,
+            v,
+            &v_blinding,
+        );
 
         let mut transcript = ProofTranscript::new(b"RangeproofTest");
 
-        b.iter(|| rp.verify(&mut transcript, &mut rng, n));
+        b.iter(|| rp.verify(generators.share(0), &mut transcript, &mut rng, n));
     }
 
     #[bench]
