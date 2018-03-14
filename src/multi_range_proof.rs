@@ -385,14 +385,15 @@ impl Proof {
         transcript.commit(self.A.compress().as_bytes());
         transcript.commit(self.S.compress().as_bytes());
 
+        let y = transcript.challenge_scalar();
+        let z = transcript.challenge_scalar();
+
+        transcript.commit(self.T1.compress().as_bytes());
+        transcript.commit(self.T2.compress().as_bytes());
+
+        let x = transcript.challenge_scalar();
+
         unimplemented!();
-        // ro.commit(&A.compress().as_bytes());
-        // ro.commit(&S.compress().as_bytes());
-        // let y = ro.challenge_scalar();
-        // let z = ro.challenge_scalar();
-        // ro.commit(&T_1.compress().as_bytes());
-        // ro.commit(&T_2.compress().as_bytes());
-        // let x = ro.challenge_scalar();
 
         // let G = make_generators(B, n * m);
         // let mut hprime_vec = make_generators(B_blinding, n * m);
