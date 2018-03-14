@@ -6,7 +6,10 @@
 
 use curve25519_dalek::scalar::Scalar;
 
-// XXX fix up deps (see comment below re: "api somewhat unclear")
+// XXX This uses experiment fork of tiny_keccak with half-duplex
+// support that we require in this implementation.
+// Review this after this PR is merged or updated:
+// https://github.com/debris/tiny-keccak/pull/24
 use tiny_keccak::Keccak;
 
 use byteorder::{ByteOrder, LittleEndian};
@@ -61,12 +64,10 @@ pub struct ProofTranscript {
 }
 
 impl ProofTranscript {
-    /// Begin an new, empty proof transcript, using the given `label`
+    /// Begin a new, empty proof transcript, using the given `label`
     /// for domain separation.
     pub fn new(label: &[u8]) -> Self {
-        let mut ro = ProofTranscript {
-            hash: Keccak::new_shake128(),
-        };
+        let mut ro = ProofTranscript { hash: Keccak::new_shake128() };
         ro.commit(label);
         // makes sure the label is disambiguated from the rest of the messages.
         ro.pad();
@@ -88,6 +89,10 @@ impl ProofTranscript {
         let mut len_prefix = [0u8; 2];
         LittleEndian::write_u16(&mut len_prefix, len as u16);
 
+        // XXX we rely on tiny_keccak experimental support for half-duplex mode and
+        // correct switching from absorbing to squeezing and back.
+        // Review this after this PR is merged or updated:
+        // https://github.com/debris/tiny-keccak/pull/24
         self.hash.absorb(&len_prefix);
         self.hash.absorb(message);
     }
@@ -105,6 +110,11 @@ impl ProofTranscript {
 
     /// Extracts an arbitrary-sized challenge byte slice.
     pub fn challenge_bytes(&mut self, mut output: &mut [u8]) {
+
+        // XXX we rely on tiny_keccak experimental support for half-duplex mode and
+        // correct switching from absorbing to squeezing and back.
+        // Review this after this PR is merged or updated:
+        // https://github.com/debris/tiny-keccak/pull/24
         self.hash.squeeze(&mut output);
     }
 
@@ -140,11 +150,20 @@ mod tests {
             {
                 let mut ch = [0u8; 32];
                 ro.challenge_bytes(&mut ch);
-                assert_eq!(hex::encode(ch), "9ba30a0e71e8632b55fbae92495440b6afb5d2646ba6b1bb419933d97e06b810");
+                assert_eq!(
+                    hex::encode(ch),
+                    "9ba30a0e71e8632b55fbae92495440b6afb5d2646ba6b1bb419933d97e06b810"
+                );
                 ro.challenge_bytes(&mut ch);
-                assert_eq!(hex::encode(ch), "add523844517c2320fc23ca72423b0ee072c6d076b05a6a7b6f46d8d2e322f94");
+                assert_eq!(
+                    hex::encode(ch),
+                    "add523844517c2320fc23ca72423b0ee072c6d076b05a6a7b6f46d8d2e322f94"
+                );
                 ro.challenge_bytes(&mut ch);
-                assert_eq!(hex::encode(ch), "ac279a11cac0b1271d210592c552d719d82d67c82d7f86772ed7bc6618b0927c");
+                assert_eq!(
+                    hex::encode(ch),
+                    "ac279a11cac0b1271d210592c552d719d82d67c82d7f86772ed7bc6618b0927c"
+                );
             }
 
             let mut ro = ProofTranscript::new(b"TestProtocol");
