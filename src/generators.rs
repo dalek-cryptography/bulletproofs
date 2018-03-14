@@ -33,7 +33,9 @@ struct GeneratorsChain {
 /// The sequence can be deterministically produced starting with an arbitrary point.
 impl GeneratorsChain {
     pub fn at(point: &RistrettoPoint) -> Self {
-        GeneratorsChain { next_point: point.clone() }
+        GeneratorsChain {
+            next_point: point.clone(),
+        }
     }
 }
 
@@ -90,9 +92,9 @@ impl Generators {
         let B_b = gen.next().unwrap();
 
         // remaining points are: G0, H0, ..., G_(n*m-1), H_(n*m-1)
-        let (G, H): (Vec<_>, Vec<_>) = gen.take(2 * n * m).enumerate().partition(
-            |&(i, _)| i % 2 == 0,
-        );
+        let (G, H): (Vec<_>, Vec<_>) = gen.take(2 * n * m)
+            .enumerate()
+            .partition(|&(i, _)| i % 2 == 0);
         let G: Vec<_> = G.iter().map(|&(_, p)| p).collect();
         let H: Vec<_> = H.iter().map(|&(_, p)| p).collect();
 
