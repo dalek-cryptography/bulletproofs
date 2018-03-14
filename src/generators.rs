@@ -29,6 +29,8 @@ struct GeneratorsChain {
     next_point: RistrettoPoint,
 }
 
+/// The `GeneratorsChain` creates an arbitrary-long sequence of orthogonal generators.
+/// The sequence can be deterministically produced starting with an arbitrary point.
 impl GeneratorsChain {
     pub fn new() -> Self {
         GeneratorsChain::at(&RISTRETTO_BASEPOINT_POINT)
@@ -48,7 +50,7 @@ impl Iterator for GeneratorsChain {
     }
 }
 
-/// `RangeproofGenerators` contains all the generators for `n`-bit proofs and `m` values (parties).
+/// `Generators` contains all the generators for `n`-bit proofs and `m` values (parties).
 #[derive(Clone)]
 pub struct Generators {
     /// Number of bits in a rangeproof
@@ -85,7 +87,9 @@ impl Generators {
         let B_b = gen.next().unwrap();
 
         // remaining points are: G0, H0, ..., G_(n*m-1), H_(n*m-1)
-        let (G, H): (Vec<_>, Vec<_>) = gen.take(2 * n * m).enumerate().partition(|&(i, _)| i % 2 == 0);
+        let (G, H): (Vec<_>, Vec<_>) = gen.take(2 * n * m).enumerate().partition(
+            |&(i, _)| i % 2 == 0,
+        );
         let G: Vec<_> = G.iter().map(|&(_, p)| p).collect();
         let H: Vec<_> = H.iter().map(|&(_, p)| p).collect();
 
@@ -98,25 +102,25 @@ impl Generators {
             B: &self.B,
             B_b: &self.B_b,
             G: &self.G[..],
-            H: &self.H[..]
+            H: &self.H[..],
         }
     }
 
     /// Returns j-th share of generators,
     /// with an appropriate slice of vectors G and H.
     pub fn share(&self, j: usize) -> GeneratorsView {
-        let range = j*self.n..(j+1)*self.n;
+        let range = j * self.n..(j + 1) * self.n;
         GeneratorsView {
             B: &self.B,
             B_b: &self.B_b,
             G: &self.G[range.clone()],
-            H: &self.H[range]
+            H: &self.H[range],
         }
     }
 }
 
 #[cfg(test)]
-mod tests {    
+mod tests {
     extern crate hex;
     use super::*;
 
@@ -125,18 +129,24 @@ mod tests {
         let n = 2;
         let m = 3;
         let gens = Generators::new(n, m);
-        
+
         // The concatenation of shares must be the full generator set
         assert_eq!(
             [gens.all().G[..n].to_vec(), gens.all().H[..n].to_vec()],
             [gens.share(0).G[..].to_vec(), gens.share(0).H[..].to_vec()]
         );
         assert_eq!(
-            [gens.all().G[n..][..n].to_vec(), gens.all().H[n..][..n].to_vec()],
+            [
+                gens.all().G[n..][..n].to_vec(),
+                gens.all().H[n..][..n].to_vec(),
+            ],
             [gens.share(1).G[..].to_vec(), gens.share(1).H[..].to_vec()]
         );
         assert_eq!(
-            [gens.all().G[2*n..][..n].to_vec(), gens.all().H[2*n..][..n].to_vec()],
+            [
+                gens.all().G[2 * n..][..n].to_vec(),
+                gens.all().H[2 * n..][..n].to_vec(),
+            ],
             [gens.share(2).G[..].to_vec(), gens.share(2).H[..].to_vec()]
         );
     }
