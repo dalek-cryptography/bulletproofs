@@ -93,12 +93,8 @@ impl Generators {
         let B = gen.next().unwrap();
         let B_blinding = gen.next().unwrap();
 
-        // remaining points are: G0, H0, ..., G_(n*m-1), H_(n*m-1)
-        let (G, H): (Vec<_>, Vec<_>) = gen.take(2 * n * m)
-            .enumerate()
-            .partition(|&(i, _)| i % 2 == 0);
-        let G: Vec<_> = G.iter().map(|&(_, p)| p).collect();
-        let H: Vec<_> = H.iter().map(|&(_, p)| p).collect();
+        let G = GeneratorsChain::start_after(&B).take(n*m).collect();
+        let H = GeneratorsChain::start_after(&B_blinding).take(n*m).collect();
 
         Generators { n, m, B, B_blinding, G, H }
     }
