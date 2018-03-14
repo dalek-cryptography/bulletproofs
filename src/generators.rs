@@ -32,11 +32,14 @@ struct GeneratorsChain {
 /// The `GeneratorsChain` creates an arbitrary-long sequence of orthogonal generators.
 /// The sequence can be deterministically produced starting with an arbitrary point.
 impl GeneratorsChain {
-    pub fn new() -> Self {
-        GeneratorsChain::at(&RISTRETTO_BASEPOINT_POINT)
-    }
     pub fn at(point: &RistrettoPoint) -> Self {
         GeneratorsChain { next_point: point.clone() }
+    }
+}
+
+impl Default for GeneratorsChain {
+    fn default() -> Self {
+        GeneratorsChain::at(&RISTRETTO_BASEPOINT_POINT)
     }
 }
 
@@ -82,7 +85,7 @@ pub struct GeneratorsView<'a> {
 impl Generators {
     /// Creates a set of generators for an `n`-bit range proof and `m` values (parties).
     pub fn new(n: usize, m: usize) -> Self {
-        let mut gen = GeneratorsChain::new();
+        let mut gen = GeneratorsChain::default();
         let B = gen.next().unwrap();
         let B_b = gen.next().unwrap();
 
@@ -153,12 +156,12 @@ mod tests {
 
     #[test]
     fn mutable_api() {
-        let mut gens = GeneratorsChain::new();
+        let mut gens = GeneratorsChain::default();
         let G = gens.next().unwrap();
         let H = gens.next().unwrap();
         let J = gens.next().unwrap();
 
-        let GHJ: Vec<_> = GeneratorsChain::new().take(3).collect();
+        let GHJ: Vec<_> = GeneratorsChain::default().take(3).collect();
         let HJ: Vec<_> = GeneratorsChain::at(&H).take(2).collect();
         let J_vec: Vec<_> = GeneratorsChain::at(&J).take(1).collect();
 
@@ -169,12 +172,12 @@ mod tests {
 
     #[test]
     fn iterator_api() {
-        let mut gens = GeneratorsChain::new();
+        let mut gens = GeneratorsChain::default();
         let G = gens.next().unwrap();
         let H = gens.next().unwrap();
         let J = gens.next().unwrap();
 
-        let GHJ: Vec<_> = GeneratorsChain::new().take(3).collect();
+        let GHJ: Vec<_> = GeneratorsChain::default().take(3).collect();
         let HJ: Vec<_> = GeneratorsChain::at(&H).take(2).collect();
         let J_vec: Vec<_> = GeneratorsChain::at(&J).take(1).collect();
 
