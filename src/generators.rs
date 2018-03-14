@@ -20,40 +20,44 @@
 #![allow(non_snake_case)]
 #![deny(missing_docs)]
 
+// XXX we should use Sha3 everywhere
+
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::constants::RISTRETTO_BASEPOINT_POINT;
-use sha2::Sha256;
+use sha2::{Digest, Sha256};
 
 /// The `GeneratorsChain` creates an arbitrary-long sequence of orthogonal generators.
 /// The sequence can be deterministically produced starting with an arbitrary point.
 struct GeneratorsChain {
-    current_point: RistrettoPoint,
+    next_point: RistrettoPoint,
 }
 
 impl GeneratorsChain {
-    /// Creates a chain of generators starting with a given point.
-    /// Use `GeneratorsChain::default()` to start after the
-    /// standard Ristretto base point.
-    fn start_after(point: &RistrettoPoint) -> Self {
-        GeneratorsChain {
-            current_point: point.clone(),
-        }
+    /// Creates a chain of generators, determined by the hash of `label`.
+    fn new(label: &[u8]) -> Self {
+        let mut hash = Sha256::default();
+        hash.input(b"GeneratorsChainInit");
+        hash.input(label);
+        let next_point = RistrettoPoint::from_hash(hash);
+        GeneratorsChain { next_point }
     }
 }
 
 impl Default for GeneratorsChain {
     fn default() -> Self {
-        GeneratorsChain::start_after(&RISTRETTO_BASEPOINT_POINT)
+        Self::new(&[])
     }
 }
 
 impl Iterator for GeneratorsChain {
     type Item = RistrettoPoint;
     fn next(&mut self) -> Option<Self::Item> {
-        self.current_point = RistrettoPoint::hash_from_bytes::<Sha256>(
-            self.current_point.compress().as_bytes()
-        );
-        Some(self.current_point.clone())
+        let current_point = self.next_point;
+        let mut hash = Sha256::default();
+        hash.input(b"GeneratorsChainNext");
+        hash.input(current_point.compress().as_bytes());
+        self.next_point = RistrettoPoint::from_hash(hash);
+        Some(current_point)
     }
 }
 
@@ -89,14 +93,28 @@ pub struct GeneratorsView<'a> {
 impl Generators {
     /// Creates generators for `m` range proofs of `n` bits each.
     pub fn new(n: usize, m: usize) -> Self {
-        let mut gen = GeneratorsChain::default();
-        let B = gen.next().unwrap();
-        let B_blinding = gen.next().unwrap();
+        let B = GeneratorsChain::new(b"Bulletproofs.Generators.B")
+            .next()
+            .unwrap();
+        let B_blinding = GeneratorsChain::new(b"Bulletproofs.Generators.B_blinding")
+            .next()
+            .unwrap();
 
-        let G = GeneratorsChain::start_after(&B).take(n*m).collect();
-        let H = GeneratorsChain::start_after(&B_blinding).take(n*m).collect();
+        let G = GeneratorsChain::new(b"Bulletproofs.Generators.G")
+            .take(n * m)
+            .collect();
+        let H = GeneratorsChain::new(b"Bulletproofs.Generators.H")
+            .take(n * m)
+            .collect();
 
-        Generators { n, m, B, B_blinding, G, H }
+        Generators {
+            n,
+            m,
+            B,
+            B_blinding,
+            G,
+            H,
+        }
     }
 
     /// Returns a view into the entirety of the generators.
@@ -112,12 +130,13 @@ impl Generators {
     /// Returns j-th share of generators, with an appropriate
     /// slice of vectors G and H for the j-th range proof.
     pub fn share(&self, j: usize) -> GeneratorsView {
-        let range = j * self.n..(j + 1) * self.n;
+        let lower = self.n * j;
+        let upper = self.n * (j + 1);
         GeneratorsView {
             B: &self.B,
             B_blinding: &self.B_blinding,
-            G: &self.G[range.clone()],
-            H: &self.H[range],
+            G: &self.G[lower..upper],
+            H: &self.H[lower..upper],
         }
     }
 }
@@ -152,21 +171,5 @@ mod tests {
             ],
             [gens.share(2).G[..].to_vec(), gens.share(2).H[..].to_vec()]
         );
-    }
-
-    #[test]
-    fn generator_chain() {
-        let mut gens = GeneratorsChain::default();
-        let G = gens.next().unwrap();
-        let H = gens.next().unwrap();
-        let J = gens.next().unwrap();
-
-        let GHJ: Vec<_> = GeneratorsChain::default().take(3).collect();
-        let HJ: Vec<_> = GeneratorsChain::start_after(&G).take(2).collect();
-        let J_vec: Vec<_> = GeneratorsChain::start_after(&H).take(1).collect();
-
-        assert_eq!(vec![G, H, J], GHJ);
-        assert_eq!(vec![H, J], HJ);
-        assert_eq!(vec![J], J_vec);
     }
 }
