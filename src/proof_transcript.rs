@@ -11,14 +11,6 @@ use tiny_keccak::Keccak;
 
 use byteorder::{ByteOrder, LittleEndian};
 
-/// The `SpongeState` enum describes the state of the internal sponge
-/// used by a `ProofTranscript`.
-#[derive(Copy, Clone, Eq, PartialEq, Debug)]
-enum SpongeState {
-    Absorbing,
-    Squeezing,
-}
-
 /// The `ProofTranscript` struct represents a transcript of messages
 /// between a prover and verifier engaged in a public-coin argument.
 ///
@@ -66,7 +58,6 @@ enum SpongeState {
 #[derive(Clone)]
 pub struct ProofTranscript {
     hash: Keccak,
-    state: SpongeState,
 }
 
 impl ProofTranscript {
@@ -75,7 +66,6 @@ impl ProofTranscript {
     pub fn new(label: &[u8]) -> Self {
         let mut ro = ProofTranscript {
             hash: Keccak::new_shake128(),
-            state: SpongeState::Absorbing,
         };
         ro.commit(label);
         // makes sure the label is disambiguated from the rest of the messages.
@@ -89,7 +79,6 @@ impl ProofTranscript {
     ///
     /// Each message must be shorter than 64Kb (65536 bytes).
     pub fn commit(&mut self, message: &[u8]) {
-        self.set_state(SpongeState::Absorbing);
 
         let len = message.len();
         if len > (u16::max_value() as usize) {
@@ -116,7 +105,6 @@ impl ProofTranscript {
 
     /// Extracts an arbitrary-sized challenge byte slice.
     pub fn challenge_bytes(&mut self, mut output: &mut [u8]) {
-        self.set_state(SpongeState::Squeezing);
         self.hash.squeeze(&mut output);
     }
 
@@ -130,44 +118,12 @@ impl ProofTranscript {
         Scalar::from_bytes_mod_order_wide(&buf)
     }
 
-    /// Set the sponge state to `new_state`.
-    ///
-    /// Does necessary padding+permutation if needed to transition
-    /// from one state to another.
-    fn set_state(&mut self, new_state: SpongeState) {
-        if self.state != new_state {
-            self.pad();
-            self.state = new_state;
-        }
-    }
-
-    /// Pad separates the prior operations by a full permutation.
+    /// Pad separates the prior operations by padding
+    /// the rest of the block with zeroes and applying a permutation.
     /// Each incoming message is length-prefixed anyway, but padding
     /// enables pre-computing and re-using the oracle state.
     fn pad(&mut self) {
-        // tiny_keccak's API is not very clear,
-        // so we'd probably need to fork and either document it, or tweak to make it more sensible.
-        // 1. pad() only adds keccak padding, but does not advance internal offset and
-        //    does not perform a permutation round.
-        // 2. fill_block() does not pad, but resets the internal offset
-        //    and does a permutation round.
-        //
-        // XXX(hdevalence) before this is "production-ready", we
-        // should sort out what tiny_keccak is actually doing and
-        // decide on something sensible. Maybe this overlaps with
-        // Noise NXOF work?
-        match self.state {
-            SpongeState::Absorbing => {
-                self.hash.pad();
-                self.hash.fill_block();
-            }
-            SpongeState::Squeezing => {
-                // in the squeezing state we are not feeding messages,
-                // only reading portions of a state, so padding does not make sense.
-                // what we need is to perform computation and reset the internal offset to zero.
-                self.hash.fill_block();
-            }
-        }
+        self.hash.fill_block();
     }
 }
 
@@ -184,11 +140,11 @@ mod tests {
             {
                 let mut ch = [0u8; 32];
                 ro.challenge_bytes(&mut ch);
-                assert_eq!(hex::encode(ch), "275a858e4912cc3cde90c57443acb498e42dbbc4aace9596c8cdadd8d63d86ad");
+                assert_eq!(hex::encode(ch), "9ba30a0e71e8632b55fbae92495440b6afb5d2646ba6b1bb419933d97e06b810");
                 ro.challenge_bytes(&mut ch);
-                assert_eq!(hex::encode(ch), "27d30ff7c2f34c0fa664d090cd08d7821e1de16848377d9684ef7d24981bffff");
+                assert_eq!(hex::encode(ch), "add523844517c2320fc23ca72423b0ee072c6d076b05a6a7b6f46d8d2e322f94");
                 ro.challenge_bytes(&mut ch);
-                assert_eq!(hex::encode(ch), "6046be4c641beb2915eb3b3c5e5664c9382173881232456e3edcb598b990cf9b");
+                assert_eq!(hex::encode(ch), "ac279a11cac0b1271d210592c552d719d82d67c82d7f86772ed7bc6618b0927c");
             }
 
             let mut ro = ProofTranscript::new(b"TestProtocol");
@@ -196,11 +152,24 @@ mod tests {
             {
                 let mut ch = [0u8; 16];
                 ro.challenge_bytes(&mut ch);
-                assert_eq!(hex::encode(ch), "275a858e4912cc3cde90c57443acb498");
+                assert_eq!(hex::encode(ch), "9ba30a0e71e8632b55fbae92495440b6");
                 ro.challenge_bytes(&mut ch);
-                assert_eq!(hex::encode(ch), "e42dbbc4aace9596c8cdadd8d63d86ad");
+                assert_eq!(hex::encode(ch), "afb5d2646ba6b1bb419933d97e06b810");
                 ro.challenge_bytes(&mut ch);
-                assert_eq!(hex::encode(ch), "27d30ff7c2f34c0fa664d090cd08d782");
+                assert_eq!(hex::encode(ch), "add523844517c2320fc23ca72423b0ee");
+            }
+
+            let mut ro = ProofTranscript::new(b"TestProtocol");
+            ro.commit(b"test");
+            {
+                let mut ch = [0u8; 16];
+                ro.challenge_bytes(&mut ch);
+                assert_eq!(hex::encode(ch), "9ba30a0e71e8632b55fbae92495440b6");
+                ro.commit(b"extra commitment");
+                ro.challenge_bytes(&mut ch);
+                assert_eq!(hex::encode(ch), "11536e09cedbb6b302d8c7cd96471be5");
+                ro.challenge_bytes(&mut ch);
+                assert_eq!(hex::encode(ch), "058c383da5f2e193a381aaa420b505b2");
             }
         }
     }
@@ -213,7 +182,7 @@ mod tests {
             {
                 let mut ch = [0u8; 8];
                 ro.challenge_bytes(&mut ch);
-                assert_eq!(hex::encode(ch), "039f39a21e3cce4a");
+                assert_eq!(hex::encode(ch), "1ad843ea2bf7f8b6");
             }
         }
         {
@@ -223,7 +192,7 @@ mod tests {
             {
                 let mut ch = [0u8; 8];
                 ro.challenge_bytes(&mut ch);
-                assert_eq!(hex::encode(ch), "b4c47055cfcec1d2");
+                assert_eq!(hex::encode(ch), "79abbe29d8c33bb0");
             }
         }
         {
@@ -233,7 +202,7 @@ mod tests {
             {
                 let mut ch = [0u8; 8];
                 ro.challenge_bytes(&mut ch);
-                assert_eq!(hex::encode(ch), "325247ab6948b7a1");
+                assert_eq!(hex::encode(ch), "f88d0f790cde50d5");
             }
         }
         {
@@ -244,7 +213,7 @@ mod tests {
             {
                 let mut ch = [0u8; 8];
                 ro.challenge_bytes(&mut ch);
-                assert_eq!(hex::encode(ch), "04068112e4fa0f44");
+                assert_eq!(hex::encode(ch), "90ca22b443fb78a1");
             }
         }
     }

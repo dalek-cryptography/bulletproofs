@@ -18,4 +18,4 @@ std = ["curve25519-dalek/std"]
 
 [dependencies.tiny-keccak]
 git = 'https://github.com/chain/tiny-keccak.git'
-rev = 'acbbc4e69f510c1dd879c24d5c87073626837ca5'
+rev = '5925f81b3c351440283c3328e2345d982aac0f6e'
