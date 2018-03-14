@@ -93,6 +93,7 @@ pub struct GeneratorsView<'a> {
 impl Generators {
     /// Creates generators for `m` range proofs of `n` bits each.
     pub fn new(n: usize, m: usize) -> Self {
+        // Using unwrap is safe here, because the iterator is unbounded.
         let B = GeneratorsChain::new(b"Bulletproofs.Generators.B")
             .next()
             .unwrap();
