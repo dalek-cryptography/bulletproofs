@@ -111,19 +111,19 @@ pub struct ProofShare {
 
 
 pub struct Proof {
-    n: usize,
-    value_commitments: Vec<RistrettoPoint>,
-    A: RistrettoPoint,
-    S: RistrettoPoint,
-    T1: RistrettoPoint,
-    T2: RistrettoPoint,
-    t_x_blinding: Scalar,
-    e_blinding: Scalar,
-    t: Scalar,
+    pub n: usize,
+    pub value_commitments: Vec<RistrettoPoint>,
+    pub A: RistrettoPoint,
+    pub S: RistrettoPoint,
+    pub T1: RistrettoPoint,
+    pub T2: RistrettoPoint,
+    pub t_x_blinding: Scalar,
+    pub e_blinding: Scalar,
+    pub t: Scalar,
 
     // FIXME: don't need if doing inner product proof
-    l: Vec<Scalar>,
-    r: Vec<Scalar>,
+    pub l: Vec<Scalar>,
+    pub r: Vec<Scalar>,
 }
 
 impl Party {
@@ -369,120 +369,120 @@ impl Proof {
         dealer.present_shares(&proof_shares)
     }
 
+    pub fn verify(&self) -> bool {
+        let n = self.n;
+        let m = self.value_commitments.len();
 
-//     pub fn verify(&self, m: usize) -> bool {
-//         let V = &self.inp_comm.V;
-//         let A = &self.inp_comm.A;
-//         let S = &self.inp_comm.S;
-//         let T_1 = &self.st_comm.T_1;
-//         let T_2 = &self.st_comm.T_2;
-//         let n = self.gen.n;
-//         let B = &self.gen.B;
-//         let B_blinding = &self.gen.B_blinding;
+        let gen = RangeproofGenerators::new(n*m);
 
-//         let mut ro = ProofTranscript::new(b"MultiRangeProof");
-//         ro.commit_u64(n as u64);
-//         ro.commit_u64(m as u64);
-//         for j in 0..m {
-//             ro.commit(V[j].compress().as_bytes());
-//         }
-//         ro.commit(&A.compress().as_bytes());
-//         ro.commit(&S.compress().as_bytes());
-//         let y = ro.challenge_scalar();
-//         let z = ro.challenge_scalar();
-//         ro.commit(&T_1.compress().as_bytes());
-//         ro.commit(&T_2.compress().as_bytes());
-//         let x = ro.challenge_scalar();
+        let mut transcript = ProofTranscript::new(b"MultiRangeProof");
+        transcript.commit_u64(n as u64);
+        transcript.commit_u64(m as u64);
 
-//         let G = make_generators(B, n * m);
-//         let mut hprime_vec = make_generators(B_blinding, n * m);
+        for V in self.value_commitments.iter() {
+            transcript.commit(V.compress().as_bytes());
+        }
+        transcript.commit(self.A.compress().as_bytes());
+        transcript.commit(self.S.compress().as_bytes());
 
-//         // line 63: check that t = t0 + t1 * x + t2 * x * x
-//         let z2 = z * z;
-//         let z3 = z2 * z;
-//         let mut power_g = Scalar::zero(); // delta(y,z)
+        unimplemented!();
+        // ro.commit(&A.compress().as_bytes());
+        // ro.commit(&S.compress().as_bytes());
+        // let y = ro.challenge_scalar();
+        // let z = ro.challenge_scalar();
+        // ro.commit(&T_1.compress().as_bytes());
+        // ro.commit(&T_2.compress().as_bytes());
+        // let x = ro.challenge_scalar();
 
-//         // calculate power_g += (z - z^2) * <1^(n*m), y^(n*m)>
-//         let mut exp_y = Scalar::one(); // start at y^0 = 1
-//         let mut exp_2 = Scalar::one(); // start at 2^0 = 1
-//         for _ in 0..n * m {
-//             power_g += (z - z2) * exp_y;
+        // let G = make_generators(B, n * m);
+        // let mut hprime_vec = make_generators(B_blinding, n * m);
 
-//             exp_y = exp_y * y; // y^i -> y^(i+1)
-//             exp_2 = exp_2 + exp_2; // 2^i -> 2^(i+1)
-//         }
-//         // calculate power_g += sum_(j=1)^(m)(z^(j+2) * (2^n - 1))
-//         let mut exp_z = z3;
-//         for _ in 1..(m + 1) {
-//             power_g -= exp_z * Scalar::from_u64(((1u128 << n) - 1) as u64);
-//             exp_z = exp_z * z;
-//         }
+        // // line 63: check that t = t0 + t1 * x + t2 * x * x
+        // let z2 = z * z;
+        // let z3 = z2 * z;
+        // let mut power_g = Scalar::zero(); // delta(y,z)
 
-//         let mut t_check = B * power_g + T_1 * x + T_2 * x * x;
-//         let mut exp_z = Scalar::one();
-//         for j in 0..m {
-//             t_check += V[j] * z2 * exp_z;
-//             exp_z = exp_z * z;
-//         }
-//         let t_commit = B * self.t + B_blinding * self.t_x_blinding;
-//         if t_commit != t_check {
-//             println!("fails check on line 63");
-//             return false;
-//         }
+        // // calculate power_g += (z - z^2) * <1^(n*m), y^(n*m)>
+        // let mut exp_y = Scalar::one(); // start at y^0 = 1
+        // let mut exp_2 = Scalar::one(); // start at 2^0 = 1
+        // for _ in 0..n * m {
+        //     power_g += (z - z2) * exp_y;
 
-//         // line 64: compute commitment to l, r
-//         // calculate P: add A + S*x - G*z
-//         let mut sum_G = RistrettoPoint::identity();
-//         for i in 0..n * m {
-//             sum_G += G[i];
-//         }
-//         let mut P = A + S * x;
-//         P -= sum_G * z;
+        //     exp_y = exp_y * y; // y^i -> y^(i+1)
+        //     exp_2 = exp_2 + exp_2; // 2^i -> 2^(i+1)
+        // }
+        // // calculate power_g += sum_(j=1)^(m)(z^(j+2) * (2^n - 1))
+        // let mut exp_z = z3;
+        // for _ in 1..(m + 1) {
+        //     power_g -= exp_z * Scalar::from_u64(((1u128 << n) - 1) as u64);
+        //     exp_z = exp_z * z;
+        // }
 
-//         // line 62: calculate hprime
-//         // calculate P: add < vec(h'), z * vec(y)^n*m >
-//         let mut exp_y = Scalar::one(); // start at y^0 = 1
-//         let inverse_y = Scalar::invert(&y); // inverse_y = 1/y
-//         let mut inv_exp_y = Scalar::one(); // start at y^-0 = 1
-//         for i in 0..n * m {
-//             hprime_vec[i] = hprime_vec[i] * inv_exp_y;
-//             P += hprime_vec[i] * z * exp_y;
+        // let mut t_check = B * power_g + T_1 * x + T_2 * x * x;
+        // let mut exp_z = Scalar::one();
+        // for j in 0..m {
+        //     t_check += V[j] * z2 * exp_z;
+        //     exp_z = exp_z * z;
+        // }
+        // let t_commit = B * self.t + B_blinding * self.t_x_blinding;
+        // if t_commit != t_check {
+        //     println!("fails check on line 63");
+        //     return false;
+        // }
 
-//             exp_y = exp_y * y; // y^i -> y^(i+1)
-//             exp_2 = exp_2 + exp_2; // 2^i -> 2^(i+1)
-//             inv_exp_y = inv_exp_y * inverse_y; // y^(-i) * y^(-1) -> y^(-(i+1))
-//         }
+        // // line 64: compute commitment to l, r
+        // // calculate P: add A + S*x - G*z
+        // let mut sum_G = RistrettoPoint::identity();
+        // for i in 0..n * m {
+        //     sum_G += G[i];
+        // }
+        // let mut P = A + S * x;
+        // P -= sum_G * z;
 
-//         // calculate P: add sum(j_1^m)(<H[(j-1)*n:j*n-1], z^(j+1)*vec(2)^n>)
-//         let mut exp_z = z * z;
-//         for j in 1..(m + 1) {
-//             exp_2 = Scalar::one();
-//             for index in 0..n {
-//                 // index into hprime, from [(j-1)*n : j*n-1]
-//                 P += hprime_vec[(j - 1) * n + index] * exp_z * exp_2;
-//                 exp_2 = exp_2 + exp_2;
-//             }
-//             exp_z = exp_z * z;
-//         }
+        // // line 62: calculate hprime
+        // // calculate P: add < vec(h'), z * vec(y)^n*m >
+        // let mut exp_y = Scalar::one(); // start at y^0 = 1
+        // let inverse_y = Scalar::invert(&y); // inverse_y = 1/y
+        // let mut inv_exp_y = Scalar::one(); // start at y^-0 = 1
+        // for i in 0..n * m {
+        //     hprime_vec[i] = hprime_vec[i] * inv_exp_y;
+        //     P += hprime_vec[i] * z * exp_y;
 
-//         // line 65: check that l, r are correct
-//         let mut P_check = B_blinding * self.e_blinding;
-//         let points_iter = G.iter().chain(hprime_vec.iter());
-//         let scalars_iter = self.l.iter().chain(self.r.iter());
-//         P_check += ristretto::multiscalar_mult(scalars_iter, points_iter);
-//         if P != P_check {
-//             println!("fails check on line 65: P != g * l + hprime * r");
-//             return false;
-//         }
+        //     exp_y = exp_y * y; // y^i -> y^(i+1)
+        //     exp_2 = exp_2 + exp_2; // 2^i -> 2^(i+1)
+        //     inv_exp_y = inv_exp_y * inverse_y; // y^(-i) * y^(-1) -> y^(-(i+1))
+        // }
 
-//         // line 66: check that t is correct
-//         if self.t != inner_product(&self.l, &self.r) {
-//             println!("fails check on line 66: t != l * r");
-//             return false;
-//         }
+        // // calculate P: add sum(j_1^m)(<H[(j-1)*n:j*n-1], z^(j+1)*vec(2)^n>)
+        // let mut exp_z = z * z;
+        // for j in 1..(m + 1) {
+        //     exp_2 = Scalar::one();
+        //     for index in 0..n {
+        //         // index into hprime, from [(j-1)*n : j*n-1]
+        //         P += hprime_vec[(j - 1) * n + index] * exp_z * exp_2;
+        //         exp_2 = exp_2 + exp_2;
+        //     }
+        //     exp_z = exp_z * z;
+        // }
 
-//         return true;
-//     }
+        // // line 65: check that l, r are correct
+        // let mut P_check = B_blinding * self.e_blinding;
+        // let points_iter = G.iter().chain(hprime_vec.iter());
+        // let scalars_iter = self.l.iter().chain(self.r.iter());
+        // P_check += ristretto::multiscalar_mult(scalars_iter, points_iter);
+        // if P != P_check {
+        //     println!("fails check on line 65: P != g * l + hprime * r");
+        //     return false;
+        // }
+
+        // // line 66: check that t is correct
+        // if self.t != inner_product(&self.l, &self.r) {
+        //     println!("fails check on line 66: t != l * r");
+        //     return false;
+        // }
+
+        // return true;
+    }
 }
 
 
