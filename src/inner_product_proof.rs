@@ -183,7 +183,11 @@ impl Proof {
 
         let expect_P = ristretto::vartime::multiscalar_mult(scalar_iter, points_iter);
 
-        if expect_P == *P { Ok(()) } else { Err(()) }
+        if expect_P == *P {
+            Ok(())
+        } else {
+            Err(())
+        }
     }
 }
 
