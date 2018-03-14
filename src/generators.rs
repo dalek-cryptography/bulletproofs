@@ -58,16 +58,16 @@ impl Iterator for GeneratorsChain {
     }
 }
 
-/// `Generators` contains all the generators for `n`-bit proofs and `m` values (parties).
+/// `Generators` contains all the generators needed for aggregating `m` range proofs of `n` bits each.
 #[derive(Clone)]
 pub struct Generators {
     /// Number of bits in a rangeproof
     pub n: usize,
     /// Number of values or parties
     pub m: usize,
-    /// Main base of the pedersen commitment
+    /// Main base of a Pedersen commitment
     B: RistrettoPoint,
-    /// Base for the blinding factor in the pedersen commitment
+    /// Base for the blinding factor in a Pedersen commitment
     B_b: RistrettoPoint,
     /// Per-bit generators for the bit values
     G: Vec<RistrettoPoint>,
@@ -75,11 +75,11 @@ pub struct Generators {
     H: Vec<RistrettoPoint>,
 }
 
-/// Represents a view into generators relevant to a specific actor.
+/// Represents a view into `Generators` relevant to a specific range proof.
 pub struct GeneratorsView<'a> {
-    /// Main base of the pedersen commitment
+    /// Main base of a Pedersen commitment
     pub B: &'a RistrettoPoint,
-    /// Base for the blinding factor in the pedersen commitment
+    /// Base for the blinding factor in a Pedersen commitment
     pub B_b: &'a RistrettoPoint,
     /// Per-bit generators for the bit values
     pub G: &'a [RistrettoPoint],
@@ -88,7 +88,7 @@ pub struct GeneratorsView<'a> {
 }
 
 impl Generators {
-    /// Creates a set of generators for an `n`-bit range proof and `m` values (parties).
+    /// Creates generators for `m` range proofs of `n` bits each.
     pub fn new(n: usize, m: usize) -> Self {
         let mut gen = GeneratorsChain::default();
         let B = gen.next().unwrap();
@@ -104,7 +104,7 @@ impl Generators {
         Generators { n, m, B, B_b, G, H }
     }
 
-    /// Returns a view on the entirety of the generators.
+    /// Returns a view into the entirety of the generators.
     pub fn all(&self) -> GeneratorsView {
         GeneratorsView {
             B: &self.B,
@@ -114,8 +114,8 @@ impl Generators {
         }
     }
 
-    /// Returns j-th share of generators,
-    /// with an appropriate slice of vectors G and H.
+    /// Returns j-th share of generators, with an appropriate
+    /// slice of vectors G and H for the j-th range proof.
     pub fn share(&self, j: usize) -> GeneratorsView {
         let range = j * self.n..(j + 1) * self.n;
         GeneratorsView {
