@@ -27,34 +27,33 @@ use sha2::Sha256;
 /// The `GeneratorsChain` creates an arbitrary-long sequence of orthogonal generators.
 /// The sequence can be deterministically produced starting with an arbitrary point.
 struct GeneratorsChain {
-    next_point: RistrettoPoint,
+    current_point: RistrettoPoint,
 }
 
 impl GeneratorsChain {
     /// Creates a chain of generators starting with a given point.
-    /// Use `GeneratorsChain::default()` to start from the
+    /// Use `GeneratorsChain::default()` to start after the
     /// standard Ristretto base point.
-    fn start_from(point: &RistrettoPoint) -> Self {
+    fn start_after(point: &RistrettoPoint) -> Self {
         GeneratorsChain {
-            next_point: point.clone(),
+            current_point: point.clone(),
         }
     }
 }
 
 impl Default for GeneratorsChain {
     fn default() -> Self {
-        GeneratorsChain::start_from(&RISTRETTO_BASEPOINT_POINT)
+        GeneratorsChain::start_after(&RISTRETTO_BASEPOINT_POINT)
     }
 }
 
 impl Iterator for GeneratorsChain {
     type Item = RistrettoPoint;
     fn next(&mut self) -> Option<Self::Item> {
-        let result = self.next_point;
-        self.next_point = RistrettoPoint::hash_from_bytes::<Sha256>(
-            self.next_point.compress().as_bytes()
+        self.current_point = RistrettoPoint::hash_from_bytes::<Sha256>(
+            self.current_point.compress().as_bytes()
         );
-        Some(result)
+        Some(self.current_point.clone())
     }
 }
 
@@ -160,31 +159,15 @@ mod tests {
     }
 
     #[test]
-    fn mutable_api() {
+    fn generator_chain() {
         let mut gens = GeneratorsChain::default();
         let G = gens.next().unwrap();
         let H = gens.next().unwrap();
         let J = gens.next().unwrap();
 
         let GHJ: Vec<_> = GeneratorsChain::default().take(3).collect();
-        let HJ: Vec<_> = GeneratorsChain::start_from(&H).take(2).collect();
-        let J_vec: Vec<_> = GeneratorsChain::start_from(&J).take(1).collect();
-
-        assert_eq!(vec![G, H, J], GHJ);
-        assert_eq!(vec![H, J], HJ);
-        assert_eq!(vec![J], J_vec);
-    }
-
-    #[test]
-    fn iterator_api() {
-        let mut gens = GeneratorsChain::default();
-        let G = gens.next().unwrap();
-        let H = gens.next().unwrap();
-        let J = gens.next().unwrap();
-
-        let GHJ: Vec<_> = GeneratorsChain::default().take(3).collect();
-        let HJ: Vec<_> = GeneratorsChain::start_from(&H).take(2).collect();
-        let J_vec: Vec<_> = GeneratorsChain::start_from(&J).take(1).collect();
+        let HJ: Vec<_> = GeneratorsChain::start_after(&G).take(2).collect();
+        let J_vec: Vec<_> = GeneratorsChain::start_after(&H).take(1).collect();
 
         assert_eq!(vec![G, H, J], GHJ);
         assert_eq!(vec![H, J], HJ);
