@@ -23,7 +23,6 @@
 // XXX we should use Sha3 everywhere
 
 use curve25519_dalek::ristretto::RistrettoPoint;
-use curve25519_dalek::constants::RISTRETTO_BASEPOINT_POINT;
 use sha2::{Digest, Sha256};
 
 /// The `GeneratorsChain` creates an arbitrary-long sequence of orthogonal generators.
@@ -146,6 +145,7 @@ impl Generators {
 mod tests {
     extern crate hex;
     use super::*;
+    use curve25519_dalek::constants::RISTRETTO_BASEPOINT_POINT;
 
     #[test]
     fn rangeproof_generators() {
