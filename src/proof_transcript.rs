@@ -177,6 +177,35 @@ mod tests {
     use super::*;
 
     #[test]
+    fn challenges_must_be_random() {
+        {
+            let mut ro = ProofTranscript::new(b"TestProtocol");
+            ro.commit(b"test");
+            {
+                let mut ch = [0u8; 32];
+                ro.challenge_bytes(&mut ch);
+                assert_eq!(hex::encode(ch), "275a858e4912cc3cde90c57443acb498e42dbbc4aace9596c8cdadd8d63d86ad");
+                ro.challenge_bytes(&mut ch);
+                assert_eq!(hex::encode(ch), "27d30ff7c2f34c0fa664d090cd08d7821e1de16848377d9684ef7d24981bffff");
+                ro.challenge_bytes(&mut ch);
+                assert_eq!(hex::encode(ch), "6046be4c641beb2915eb3b3c5e5664c9382173881232456e3edcb598b990cf9b");
+            }
+
+            let mut ro = ProofTranscript::new(b"TestProtocol");
+            ro.commit(b"test");
+            {
+                let mut ch = [0u8; 16];
+                ro.challenge_bytes(&mut ch);
+                assert_eq!(hex::encode(ch), "275a858e4912cc3cde90c57443acb498");
+                ro.challenge_bytes(&mut ch);
+                assert_eq!(hex::encode(ch), "e42dbbc4aace9596c8cdadd8d63d86ad");
+                ro.challenge_bytes(&mut ch);
+                assert_eq!(hex::encode(ch), "27d30ff7c2f34c0fa664d090cd08d782");
+            }
+        }
+    }
+
+    #[test]
     fn messages_are_disambiguated_by_length_prefix() {
         {
             let mut ro = ProofTranscript::new(b"TestProtocol");
