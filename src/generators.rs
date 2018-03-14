@@ -68,7 +68,7 @@ pub struct Generators {
     /// Main base of a Pedersen commitment
     B: RistrettoPoint,
     /// Base for the blinding factor in a Pedersen commitment
-    B_b: RistrettoPoint,
+    B_blinding: RistrettoPoint,
     /// Per-bit generators for the bit values
     G: Vec<RistrettoPoint>,
     /// Per-bit generators for the bit blinding factors
@@ -80,7 +80,7 @@ pub struct GeneratorsView<'a> {
     /// Main base of a Pedersen commitment
     pub B: &'a RistrettoPoint,
     /// Base for the blinding factor in a Pedersen commitment
-    pub B_b: &'a RistrettoPoint,
+    pub B_blinding: &'a RistrettoPoint,
     /// Per-bit generators for the bit values
     pub G: &'a [RistrettoPoint],
     /// Per-bit generators for the bit blinding factors
@@ -92,7 +92,7 @@ impl Generators {
     pub fn new(n: usize, m: usize) -> Self {
         let mut gen = GeneratorsChain::default();
         let B = gen.next().unwrap();
-        let B_b = gen.next().unwrap();
+        let B_blinding = gen.next().unwrap();
 
         // remaining points are: G0, H0, ..., G_(n*m-1), H_(n*m-1)
         let (G, H): (Vec<_>, Vec<_>) = gen.take(2 * n * m)
@@ -101,14 +101,14 @@ impl Generators {
         let G: Vec<_> = G.iter().map(|&(_, p)| p).collect();
         let H: Vec<_> = H.iter().map(|&(_, p)| p).collect();
 
-        Generators { n, m, B, B_b, G, H }
+        Generators { n, m, B, B_blinding, G, H }
     }
 
     /// Returns a view into the entirety of the generators.
     pub fn all(&self) -> GeneratorsView {
         GeneratorsView {
             B: &self.B,
-            B_b: &self.B_b,
+            B_blinding: &self.B_blinding,
             G: &self.G[..],
             H: &self.H[..],
         }
@@ -120,7 +120,7 @@ impl Generators {
         let range = j * self.n..(j + 1) * self.n;
         GeneratorsView {
             B: &self.B,
-            B_b: &self.B_b,
+            B_blinding: &self.B_blinding,
             G: &self.G[range.clone()],
             H: &self.H[range],
         }
