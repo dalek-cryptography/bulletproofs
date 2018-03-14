@@ -24,15 +24,17 @@ use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::constants::RISTRETTO_BASEPOINT_POINT;
 use sha2::Sha256;
 
-/// Implements an infinite iterator of generators
+/// The `GeneratorsChain` creates an arbitrary-long sequence of orthogonal generators.
+/// The sequence can be deterministically produced starting with an arbitrary point.
 struct GeneratorsChain {
     next_point: RistrettoPoint,
 }
 
-/// The `GeneratorsChain` creates an arbitrary-long sequence of orthogonal generators.
-/// The sequence can be deterministically produced starting with an arbitrary point.
 impl GeneratorsChain {
-    pub fn at(point: &RistrettoPoint) -> Self {
+    /// Creates a chain of generators starting with a given point.
+    /// Use `GeneratorsChain::default()` to start from the
+    /// standard Ristretto base point.
+    fn start_from(point: &RistrettoPoint) -> Self {
         GeneratorsChain {
             next_point: point.clone(),
         }
@@ -41,16 +43,17 @@ impl GeneratorsChain {
 
 impl Default for GeneratorsChain {
     fn default() -> Self {
-        GeneratorsChain::at(&RISTRETTO_BASEPOINT_POINT)
+        GeneratorsChain::start_from(&RISTRETTO_BASEPOINT_POINT)
     }
 }
 
 impl Iterator for GeneratorsChain {
     type Item = RistrettoPoint;
     fn next(&mut self) -> Option<Self::Item> {
-        let p2 = RistrettoPoint::hash_from_bytes::<Sha256>(self.next_point.compress().as_bytes());
-        let result = self.next_point.clone();
-        self.next_point = p2;
+        let result = self.next_point;
+        self.next_point = RistrettoPoint::hash_from_bytes::<Sha256>(
+            self.next_point.compress().as_bytes()
+        );
         Some(result)
     }
 }
@@ -164,8 +167,8 @@ mod tests {
         let J = gens.next().unwrap();
 
         let GHJ: Vec<_> = GeneratorsChain::default().take(3).collect();
-        let HJ: Vec<_> = GeneratorsChain::at(&H).take(2).collect();
-        let J_vec: Vec<_> = GeneratorsChain::at(&J).take(1).collect();
+        let HJ: Vec<_> = GeneratorsChain::start_from(&H).take(2).collect();
+        let J_vec: Vec<_> = GeneratorsChain::start_from(&J).take(1).collect();
 
         assert_eq!(vec![G, H, J], GHJ);
         assert_eq!(vec![H, J], HJ);
@@ -180,8 +183,8 @@ mod tests {
         let J = gens.next().unwrap();
 
         let GHJ: Vec<_> = GeneratorsChain::default().take(3).collect();
-        let HJ: Vec<_> = GeneratorsChain::at(&H).take(2).collect();
-        let J_vec: Vec<_> = GeneratorsChain::at(&J).take(1).collect();
+        let HJ: Vec<_> = GeneratorsChain::start_from(&H).take(2).collect();
+        let J_vec: Vec<_> = GeneratorsChain::start_from(&J).take(1).collect();
 
         assert_eq!(vec![G, H, J], GHJ);
         assert_eq!(vec![H, J], HJ);
