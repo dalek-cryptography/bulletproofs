@@ -63,20 +63,20 @@ mod test {
 
     #[test]
     fn batch_invert_matches_nonbatched() {
-        let W = Scalar::from_bits(
+        let w = Scalar::from_bits(
             *b"\x84\xfc\xbcOx\x12\xa0\x06\xd7\x91\xd9z:'\xdd\x1e!CE\xf7\xb1\xb9Vz\x810sD\x96\x85\xb5\x07",
         );
-        let X = Scalar::from_bits(
+        let x = Scalar::from_bits(
             *b"NZ\xb44]G\x08\x84Y\x13\xb4d\x1b\xc2}RR\xa5\x85\x10\x1b\xccBD\xd4I\xf4\xa8y\xd9\xf2\x04",
         );
-        let Y = Scalar::from_bits(
+        let y = Scalar::from_bits(
             *b"\x90v3\xfe\x1cKf\xa4\xa2\x8d-\xd7g\x83\x86\xc3S\xd0\xdeTU\xd4\xfc\x9d\xe8\xefz\xc3\x1f5\xbb\x05",
         );
-        let Z = Scalar::from_bits(
+        let z = Scalar::from_bits(
             *b"\x05\x9d>\x0b\t&P=\xa3\x84\xa1<\x92z\xc2\x06A\x98\xcf4:$\xd5\xb7\xeb3j-\xfc\x11!\x0b",
         );
 
-        let list = vec![W, X, Y, Z, W * Y, X * Z, Y * Y, W * Z];
+        let list = vec![w, x, y, z, w * y, x * z, y * y, w * z];
         let mut inv_list = list.clone();
         batch_invert(&mut inv_list[..]);
         for i in 0..8 {
