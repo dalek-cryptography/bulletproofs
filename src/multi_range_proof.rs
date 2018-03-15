@@ -238,6 +238,8 @@ impl<'a> PartyAwaitingValueChallenge<'a> {
         // Calculate t by calculating vectors l0, l1, r0, r1 and multiplying
         let mut l = VecPoly2::new(n);
         let mut r = VecPoly2::new(n);
+
+
         let z2 = z * z;
         let mut exp_y = Scalar::one(); // start at y^0 = 1
         let mut exp_2 = Scalar::one(); // start at 2^0 = 1
@@ -254,6 +256,7 @@ impl<'a> PartyAwaitingValueChallenge<'a> {
             exp_y = exp_y * y; // y^i -> y^(i+1)
             exp_2 = exp_2 + exp_2; // 2^i -> 2^(i+1)
         }
+
         let t = inner_product_poly2(&l, &r);
         
         // Generate x by committing to T_1, T_2 (line 49-54)
@@ -397,6 +400,7 @@ impl Proof {
         let m = self.value_commitments.len();
 
         let gen = Generators::new(n, m);
+        let generators = gen.all();
 
         let mut transcript = ProofTranscript::new(b"MultiRangeProof");
         transcript.commit_u64(n as u64);
@@ -416,95 +420,96 @@ impl Proof {
 
         let x = transcript.challenge_scalar();
 
-        unimplemented!();
+        let mut hprime_vec = generators.H.to_vec();
 
-        // let mut hprime_vec = make_generators(B_blinding, n * m);
+        // line 63: check that t = t0 + t1 * x + t2 * x * x
+        let z2 = z * z;
+        let z3 = z2 * z;
+        let mut delta = Scalar::zero(); // delta(y,z)
 
-        // // line 63: check that t = t0 + t1 * x + t2 * x * x
-        // let z2 = z * z;
-        // let z3 = z2 * z;
-        // let mut power_g = Scalar::zero(); // delta(y,z)
+        // // calculate delta += (z - z^2) * <1^(n*m), y^(n*m)>
+        let mut exp_y = Scalar::one(); // start at y^0 = 1
+        let mut exp_2 = Scalar::one(); // start at 2^0 = 1
+        for _ in 0..n * m {
+            delta += (z - z2) * exp_y;
 
-        // // calculate power_g += (z - z^2) * <1^(n*m), y^(n*m)>
-        // let mut exp_y = Scalar::one(); // start at y^0 = 1
-        // let mut exp_2 = Scalar::one(); // start at 2^0 = 1
-        // for _ in 0..n * m {
-        //     power_g += (z - z2) * exp_y;
+            exp_y = exp_y * y; // y^i -> y^(i+1)
+            exp_2 = exp_2 + exp_2; // 2^i -> 2^(i+1)
+        }
 
-        //     exp_y = exp_y * y; // y^i -> y^(i+1)
-        //     exp_2 = exp_2 + exp_2; // 2^i -> 2^(i+1)
-        // }
-        // // calculate power_g += sum_(j=1)^(m)(z^(j+2) * (2^n - 1))
-        // let mut exp_z = z3;
-        // for _ in 1..(m + 1) {
-        //     power_g -= exp_z * Scalar::from_u64(((1u128 << n) - 1) as u64);
-        //     exp_z = exp_z * z;
-        // }
+        // calculate delta += sum_(j=1)^(m)(z^(j+2) * (2^n - 1))
+        let mut exp_z = z3;
+        for _ in 1..(m + 1) {
+            delta -= exp_z * Scalar::from_u64(((1u128 << n) - 1) as u64);
+            exp_z = exp_z * z;
+        }
 
-        // let mut t_check = B * power_g + T_1 * x + T_2 * x * x;
-        // let mut exp_z = Scalar::one();
-        // for j in 0..m {
-        //     t_check += V[j] * z2 * exp_z;
-        //     exp_z = exp_z * z;
-        // }
-        // let t_commit = B * self.t + B_blinding * self.t_x_blinding;
-        // if t_commit != t_check {
-        //     println!("fails check on line 63");
-        //     return false;
-        // }
+        // TBD: put in a multiscalar mult
+        let mut t_check = generators.B * delta + self.T1 * x + self.T2 * x * x;
 
-        // // line 64: compute commitment to l, r
-        // // calculate P: add A + S*x - G*z
-        // let mut sum_G = RistrettoPoint::identity();
-        // for i in 0..n * m {
-        //     sum_G += G[i];
-        // }
-        // let mut P = A + S * x;
-        // P -= sum_G * z;
+        let mut exp_z = Scalar::one();
+        for j in 0..m {
+            t_check += self.value_commitments[j] * z2 * exp_z;
+            exp_z = exp_z * z;
+        }
+        let t_commit = generators.B * self.t + generators.B_blinding * self.t_x_blinding;
+        if t_commit != t_check {
+            println!("fails check on line 63");
+            return false;
+        }
 
-        // // line 62: calculate hprime
-        // // calculate P: add < vec(h'), z * vec(y)^n*m >
-        // let mut exp_y = Scalar::one(); // start at y^0 = 1
-        // let inverse_y = Scalar::invert(&y); // inverse_y = 1/y
-        // let mut inv_exp_y = Scalar::one(); // start at y^-0 = 1
-        // for i in 0..n * m {
-        //     hprime_vec[i] = hprime_vec[i] * inv_exp_y;
-        //     P += hprime_vec[i] * z * exp_y;
+        // line 64: compute commitment to l, r
+        // calculate P: add A + S*x - G*z
+        let mut sum_G = RistrettoPoint::identity();
+        for i in 0..n * m {
+            sum_G += generators.G[i];
+        }
+        let mut P = self.A + self.S * x;
+        P -= sum_G * z;
 
-        //     exp_y = exp_y * y; // y^i -> y^(i+1)
-        //     exp_2 = exp_2 + exp_2; // 2^i -> 2^(i+1)
-        //     inv_exp_y = inv_exp_y * inverse_y; // y^(-i) * y^(-1) -> y^(-(i+1))
-        // }
+        // line 62: calculate hprime
+        // calculate P: add < vec(h'), z * vec(y)^n*m >
+        let mut exp_y = Scalar::one(); // start at y^0 = 1
+        let inverse_y = Scalar::invert(&y); // inverse_y = 1/y
+        let mut inv_exp_y = Scalar::one(); // start at y^-0 = 1
+        for i in 0..n * m {
+            hprime_vec[i] = hprime_vec[i] * inv_exp_y;
+            P += hprime_vec[i] * z * exp_y;
 
-        // // calculate P: add sum(j_1^m)(<H[(j-1)*n:j*n-1], z^(j+1)*vec(2)^n>)
-        // let mut exp_z = z * z;
-        // for j in 1..(m + 1) {
-        //     exp_2 = Scalar::one();
-        //     for index in 0..n {
-        //         // index into hprime, from [(j-1)*n : j*n-1]
-        //         P += hprime_vec[(j - 1) * n + index] * exp_z * exp_2;
-        //         exp_2 = exp_2 + exp_2;
-        //     }
-        //     exp_z = exp_z * z;
-        // }
+            exp_y = exp_y * y; // y^i -> y^(i+1)
+            exp_2 = exp_2 + exp_2; // 2^i -> 2^(i+1)
+            inv_exp_y = inv_exp_y * inverse_y; // y^(-i) * y^(-1) -> y^(-(i+1))
+        }
 
-        // // line 65: check that l, r are correct
-        // let mut P_check = B_blinding * self.e_blinding;
-        // let points_iter = G.iter().chain(hprime_vec.iter());
-        // let scalars_iter = self.l.iter().chain(self.r.iter());
-        // P_check += ristretto::multiscalar_mult(scalars_iter, points_iter);
-        // if P != P_check {
-        //     println!("fails check on line 65: P != g * l + hprime * r");
-        //     return false;
-        // }
+        // calculate P: add sum(j_1^m)(<H[(j-1)*n:j*n-1], z^(j+1)*vec(2)^n>)
+        let mut exp_z = z * z;
+        for j in 1..(m + 1) {
+            exp_2 = Scalar::one();
+            for index in 0..n {
+                // index into hprime, from [(j-1)*n : j*n-1]
+                P += hprime_vec[(j - 1) * n + index] * exp_z * exp_2;
+                exp_2 = exp_2 + exp_2;
+            }
+            exp_z = exp_z * z;
+        }
 
-        // // line 66: check that t is correct
-        // if self.t != inner_product(&self.l, &self.r) {
-        //     println!("fails check on line 66: t != l * r");
-        //     return false;
-        // }
+        // line 65: check that l, r are correct
+        let mut P_check = generators.B_blinding * self.e_blinding;
+        let points_iter = generators.G.iter().chain(hprime_vec.iter());
+        let scalars_iter = self.l.iter().chain(self.r.iter());
+        P_check += ristretto::multiscalar_mult(scalars_iter, points_iter);
+        if P != P_check {
+            println!("fails check on line 65: P != g * l + hprime * r");
+            return false;
+        }
 
-        // return true;
+        // line 66: check that t is correct
+        if self.t != inner_product(&self.l, &self.r) {
+            println!("fails check on line 66: t != l * r");
+            return false;
+        }
+
+        return true;
     }
 }
 
@@ -573,143 +578,121 @@ pub fn vector_pedersen_commitment<'a, I, R>(scalars: I, generators: &GeneratorsV
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rand::Rng;
     use rand::OsRng;
 
     #[test]
-    fn one_party_small() {
-        // for n in vec![1, 16, 32] {
-        //     let rp = Proof::create_one(0, n);
-        //     assert_eq!(rp.verify(1), true);
-        //     let rp = Proof::create_one(2u64.pow(n as u32) - 1, n);
-        //     assert_eq!(rp.verify(1), true);
-        //     let rp = Proof::create_one(2u64.pow(n as u32), n);
-        //     assert_eq!(rp.verify(1), false);
-        //     let rp = Proof::create_one(2u64.pow(n as u32) + 1, n);
-        //     assert_eq!(rp.verify(1), false);
-        //     let rp = Proof::create_one(u64::max_value(), n);
-        //     assert_eq!(rp.verify(1), false);
-        // }
+    fn one_rangeproof() {
+        let mut rng = OsRng::new().unwrap();
+        let rp = Proof::create_one(0, 16, &mut rng);
+        assert_eq!(rp.verify(), true);
+        let rp = Proof::create_one(12341, 16, &mut rng);
+        assert_eq!(rp.verify(), true);        
     }
+
     #[test]
-    fn one_party_u64() {
-        // let n = 64;
-        // let rp = Proof::create_one(0, n);
-        // assert_eq!(rp.verify(1), true);
-        // let rp = Proof::create_one(1, n);
-        // assert_eq!(rp.verify(1), true);
-        // let rp = Proof::create_one(u64::max_value(), n);
-        // assert_eq!(rp.verify(1), true);
+    fn two_rangeproofs() {
+        let mut rng = OsRng::new().unwrap();
+        let rp = Proof::create_multi(vec![0,1], 16, &mut rng);
+        assert_eq!(rp.verify(), true);
+        let rp = Proof::create_multi(vec![123,4567], 16, &mut rng);
+        assert_eq!(rp.verify(), true);        
     }
+
     #[test]
-    fn two_party_small() {
-        // for n in vec![1, 16, 32] {
-        //     let rp = Proof::create_multi(vec![1, 1], n);
-        //     assert_eq!(rp.verify(2), true);
-        //     let rp = Proof::create_multi(vec![0, 1], n);
-        //     assert_eq!(rp.verify(2), true);
-        //     let rp = Proof::create_multi(vec![1, 0], n);
-        //     assert_eq!(rp.verify(2), true);
-        //     let rp = Proof::create_multi(vec![0, 0], n);
-        //     assert_eq!(rp.verify(2), true);
-        //     let rp = Proof::create_multi(vec![2u64.pow(n as u32) - 1, 1], n);
-        //     assert_eq!(rp.verify(2), true);
-        //     let rp = Proof::create_multi(vec![2u64.pow(n as u32) + 1, 0], n);
-        //     assert_eq!(rp.verify(2), false);
-        //     let rp = Proof::create_multi(vec![0, u64::max_value()], n);
-        //     assert_eq!(rp.verify(2), false);
-        // }
+    fn three_rangeproofs() {
+        let mut rng = OsRng::new().unwrap();
+        let rp = Proof::create_multi(vec![0,1,3], 16, &mut rng);
+        assert_eq!(rp.verify(), true);
+        let rp = Proof::create_multi(vec![123,4567,563], 16, &mut rng);
+        assert_eq!(rp.verify(), true);        
     }
-    #[test]
-    fn two_party_u64() {
-        // let n = 64;
-        // let rp = Proof::create_multi(vec![u64::max_value(), 1], n);
-        // assert_eq!(rp.verify(2), true);
-        // let rp = Proof::create_multi(vec![0, u64::max_value() - 1], n);
-        // assert_eq!(rp.verify(2), true);
-    }
-    #[test]
-    fn ten_party_small() {
-        // let m = 10;
-        // for n in vec![1, 16, 32] {
-        //     let rp = Proof::create_multi(vec![1, 1, 0, 0, 1, 1, 0, 0, 1, 1], n);
-        //     assert_eq!(rp.verify(m), true);
-        //     let rp = Proof::create_multi(
-        //         vec![
-        //             2u64.pow(n as u32) - 1,
-        //             2u64.pow(n as u32) - 1,
-        //             0,
-        //             0,
-        //             0,
-        //             0,
-        //             0,
-        //             0,
-        //             1,
-        //             1,
-        //         ],
-        //         n,
-        //     );
-        //     assert_eq!(rp.verify(m), true);
-        //     let rp =
-        //         Proof::create_multi(vec![2u64.pow(n as u32) + 1, 0, 0, 0, 0, 0, 0, 0, 1, 1], n);
-        //     assert_eq!(rp.verify(m), false);
-        //     let rp = Proof::create_multi(vec![0, u64::max_value(), 0, 0, 0, 0, 0, 0, 1, 1], n);
-        //     assert_eq!(rp.verify(m), false);
-        // }
-    }
-    #[test]
-    fn ten_party_u64() {
-        // let m = 10;
-        // let n = 64;
-        // let rp = Proof::create_multi(
-        //     vec![u64::max_value(), u64::max_value(), 0, 0, 1, 1, 0, 0, 1, 1],
-        //     n,
-        // );
-        // assert_eq!(rp.verify(m), true);
-        // let rp = Proof::create_multi(
-        //     vec![
-        //         u64::max_value() - 1,
-        //         1,
-        //         0,
-        //         0,
-        //         0,
-        //         0,
-        //         0,
-        //         0,
-        //         1,
-        //         u64::max_value() / 2,
-        //     ],
-        //     n,
-        // );
-        // assert_eq!(rp.verify(m), true);
-    }
-    #[test]
-    fn rand_small() {
-        // for _ in 0..10 {
-        //     let mut rng: OsRng = OsRng::new().unwrap();
-        //     let v: u32 = rng.next_u32();
-        //     let rp = Proof::create_one(v as u64, 32);
-        //     assert_eq!(rp.verify(1), true);
-        // }
-    }
-    #[test]
-    fn rand_u32() {
-        // for _ in 0..10 {
-        //     let mut rng: OsRng = OsRng::new().unwrap();
-        //     let v = rng.next_u32() as u64;
-        //     let rp = Proof::create_one(v, 32);
-        //     assert_eq!(rp.verify(1), true);
-        // }
-    }
-    #[test]
-    fn rand_u64() {
-        // for _ in 0..10 {
-        //     let mut rng: OsRng = OsRng::new().unwrap();
-        //     let v = rng.next_u64();
-        //     let rp = Proof::create_one(v, 64);
-        //     assert_eq!(rp.verify(1), true);
-        // }
-    }
+
+    // #[test]
+    // fn two_party_small() {
+    //     for n in vec![1, 16, 32] {
+    //         let rp = Proof::create_multi(vec![1, 1], n);
+    //         assert_eq!(rp.verify(2), true);
+    //         let rp = Proof::create_multi(vec![0, 1], n);
+    //         assert_eq!(rp.verify(2), true);
+    //         let rp = Proof::create_multi(vec![1, 0], n);
+    //         assert_eq!(rp.verify(2), true);
+    //         let rp = Proof::create_multi(vec![0, 0], n);
+    //         assert_eq!(rp.verify(2), true);
+    //         let rp = Proof::create_multi(vec![2u64.pow(n as u32) - 1, 1], n);
+    //         assert_eq!(rp.verify(2), true);
+    //         let rp = Proof::create_multi(vec![2u64.pow(n as u32) + 1, 0], n);
+    //         assert_eq!(rp.verify(2), false);
+    //         let rp = Proof::create_multi(vec![0, u64::max_value()], n);
+    //         assert_eq!(rp.verify(2), false);
+    //     }
+    // }
+
+    // #[test]
+    // fn two_party_u64() {
+    //     let n = 64;
+    //     let rp = Proof::create_multi(vec![u64::max_value(), 1], n);
+    //     assert_eq!(rp.verify(2), true);
+    //     let rp = Proof::create_multi(vec![0, u64::max_value() - 1], n);
+    //     assert_eq!(rp.verify(2), true);
+    // }
+
+    // #[test]
+    // fn ten_party_small() {
+    //     let m = 10;
+    //     for n in vec![1, 16, 32] {
+    //         let rp = Proof::create_multi(vec![1, 1, 0, 0, 1, 1, 0, 0, 1, 1], n);
+    //         assert_eq!(rp.verify(m), true);
+    //         let rp = Proof::create_multi(
+    //             vec![
+    //                 2u64.pow(n as u32) - 1,
+    //                 2u64.pow(n as u32) - 1,
+    //                 0,
+    //                 0,
+    //                 0,
+    //                 0,
+    //                 0,
+    //                 0,
+    //                 1,
+    //                 1,
+    //             ],
+    //             n,
+    //         );
+    //         assert_eq!(rp.verify(m), true);
+    //         let rp =
+    //             Proof::create_multi(vec![2u64.pow(n as u32) + 1, 0, 0, 0, 0, 0, 0, 0, 1, 1], n);
+    //         assert_eq!(rp.verify(m), false);
+    //         let rp = Proof::create_multi(vec![0, u64::max_value(), 0, 0, 0, 0, 0, 0, 1, 1], n);
+    //         assert_eq!(rp.verify(m), false);
+    //     }
+    // }
+
+    // #[test]
+    // fn ten_party_u64() {
+    //     let m = 10;
+    //     let n = 64;
+    //     let rp = Proof::create_multi(
+    //         vec![u64::max_value(), u64::max_value(), 0, 0, 1, 1, 0, 0, 1, 1],
+    //         n,
+    //     );
+    //     assert_eq!(rp.verify(m), true);
+    //     let rp = Proof::create_multi(
+    //         vec![
+    //             u64::max_value() - 1,
+    //             1,
+    //             0,
+    //             0,
+    //             0,
+    //             0,
+    //             0,
+    //             0,
+    //             1,
+    //             u64::max_value() / 2,
+    //         ],
+    //         n,
+    //     );
+    //     assert_eq!(rp.verify(m), true);
+    // }
+
 }
 
 // #[cfg(test)]
