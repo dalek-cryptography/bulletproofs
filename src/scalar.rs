@@ -86,6 +86,7 @@ pub fn inner_product(a: &Vec<Scalar>, b: &Vec<Scalar>) -> Scalar {
     a.iter().zip(b.iter()).map(|(&l,&r)| l*r).fold(Scalar::zero(), |t, x| t+x)
 }
 
+
 pub fn add_vectors(a: &Vec<Scalar>, b: &Vec<Scalar>) -> Vec<Scalar> {
     a.iter().zip(b.iter()).map(|(&l,&r)| l + r).collect()
 }

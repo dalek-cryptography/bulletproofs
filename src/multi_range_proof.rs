@@ -239,7 +239,6 @@ impl<'a> PartyAwaitingValueChallenge<'a> {
         let mut l = VecPoly2::new(n);
         let mut r = VecPoly2::new(n);
         let z2 = z * z;
-        let mut t = Poly3::new();
         let mut exp_y = Scalar::one(); // start at y^0 = 1
         let mut exp_2 = Scalar::one(); // start at 2^0 = 1
         for i in 0..n {
@@ -255,15 +254,8 @@ impl<'a> PartyAwaitingValueChallenge<'a> {
             exp_y = exp_y * y; // y^i -> y^(i+1)
             exp_2 = exp_2 + exp_2; // 2^i -> 2^(i+1)
         }
-        t.0 = inner_product(&l.0, &r.0);
-        t.2 = inner_product(&l.1, &r.1);
-
-        // use Karatsuba algorithm to find t.1 = l.0*r.1 + l.1*r.0
-        let l_add = add_vectors(&l.0, &l.1);
-        let r_add = add_vectors(&r.0, &r.1);
-        let l_r_mul = inner_product(&l_add, &r_add);
-        t.1 = l_r_mul - t.0 - t.2;
-
+        let t = inner_product_poly2(&l, &r);
+        
         // Generate x by committing to T_1, T_2 (line 49-54)
         let (T1, t1_blinding) = pedersen_commitment(&t.1, &self.generators, &mut rng);
         let (T2, t2_blinding) = pedersen_commitment(&t.2, &self.generators, &mut rng);
@@ -291,17 +283,30 @@ impl<'a> PartyAwaitingValueChallenge<'a> {
     }
 }
 
+fn inner_product_poly2(l: &VecPoly2, r: &VecPoly2) -> Poly3 {
+    let t0 = inner_product(&l.0, &r.0);
+    let t2 = inner_product(&l.1, &r.1);
+
+    // use Karatsuba algorithm to find t.1 = l.0*r.1 + l.1*r.0
+    let l_add = add_vectors(&l.0, &l.1);
+    let r_add = add_vectors(&r.0, &r.1);
+    let l_r_mul = inner_product(&l_add, &r_add);
+    let t1 = l_r_mul - t0 - t2;
+
+    Poly3(t0,t1,t2)
+}
+
+
 impl<'a> PartyAwaitingPolyChallenge<'a> {
     pub fn apply_challenge(&self, x: &Scalar) -> ProofShare {
         // Generate final values for proof (line 55-60)
         let t_x_blinding = 
-            self.t1_blinding * x + 
-            self.t2_blinding * x * x +
+            (self.t1_blinding + 
+             self.t2_blinding * x) * x +
             self.z * self.z * self.offset_z * self.v_blinding;
 
         let e_blinding = self.a_blinding + self.s_blinding * x;
-        let t_hat = self.t.0 + self.t.1 * x + self.t.2 * x * x;
-
+        let t_hat = self.t.eval(x);
         let l_total = self.l.eval(x);
         let r_total = self.r.eval(x);
 
@@ -326,7 +331,6 @@ impl DealerAwaitingPoly {
             T1 += commitment.T1;
             T2 += commitment.T2;
         }
-
         self.transcript.commit(T1.compress().as_bytes());
         self.transcript.commit(T2.compress().as_bytes());
 
@@ -414,7 +418,6 @@ impl Proof {
 
         unimplemented!();
 
-        // let G = make_generators(B, n * m);
         // let mut hprime_vec = make_generators(B_blinding, n * m);
 
         // // line 63: check that t = t0 + t1 * x + t2 * x * x
@@ -513,6 +516,9 @@ impl Poly3 {
     pub fn new() -> Poly3 {
         Poly3(Scalar::zero(), Scalar::zero(), Scalar::zero())
     }
+    pub fn eval(&self, x: &Scalar) -> Scalar {
+        self.0 + x * (self.1 + x * self.2)
+    }
 }
 
 impl VecPoly2 {
@@ -524,12 +530,6 @@ impl VecPoly2 {
             zip(self.1.iter()).
             map(|(a,b)| a + x*b ).
             collect()
-        // let n = self.0.len();
-        // let mut out = vec![Scalar::zero(); n];
-        // for i in 0..n {
-        //     out[i] += self.0[i] + self.1[i] * x;
-        // }
-        // out
     }
 }
 
