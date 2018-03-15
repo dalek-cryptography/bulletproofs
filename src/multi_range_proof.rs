@@ -42,13 +42,10 @@ pub struct PartyAwaitingValueChallenge<'a> {
     s_r: Vec<Scalar>,
 }
 
-pub struct PartyAwaitingPolyChallenge<'a> {
-    generators: GeneratorsView<'a>,
-
+pub struct PartyAwaitingPolyChallenge {
     value_commitment:  ValueCommitment,
     poly_commitment: PolyCommitment,
 
-    y: Scalar,
     z: Scalar,
     offset_z: Scalar,
     l: VecPoly2,
@@ -65,19 +62,15 @@ pub struct PartyAwaitingPolyChallenge<'a> {
 pub struct DealerAwaitingValues {
     transcript: ProofTranscript,
     n: usize,
-    m: usize,
 }
 
 pub struct DealerAwaitingPoly {
     transcript: ProofTranscript,
     n: usize,
-    m: usize,
 }
 
 pub struct DealerAwaitingShares {
-    transcript: ProofTranscript,
     n: usize,
-    m: usize,
 }
 
 #[derive(Clone)]
@@ -142,7 +135,7 @@ impl Dealer {
         let m = parties.len();
         transcript.commit_u64(n as u64);
         transcript.commit_u64(m as u64);
-        Ok(DealerAwaitingValues { transcript, n, m })
+        Ok(DealerAwaitingValues { transcript, n })
     }
 }
 
@@ -224,7 +217,6 @@ impl DealerAwaitingValues {
         (DealerAwaitingPoly {
             transcript: self.transcript,
             n: self.n,
-            m: self.m
         }, y,z)
     }
 }
@@ -266,10 +258,8 @@ impl<'a> PartyAwaitingValueChallenge<'a> {
         let poly_commitment = PolyCommitment { T1, T2 };
 
         let papc = PartyAwaitingPolyChallenge {
-            generators: self.generators.clone(),
             value_commitment: self.value_commitment.clone(),
             poly_commitment: poly_commitment.clone(),
-            y: *y,
             z: *z,
             offset_z,
             l,
@@ -300,7 +290,7 @@ fn inner_product_poly2(l: &VecPoly2, r: &VecPoly2) -> Poly3 {
 }
 
 
-impl<'a> PartyAwaitingPolyChallenge<'a> {
+impl PartyAwaitingPolyChallenge {
     pub fn apply_challenge(&self, x: &Scalar) -> ProofShare {
         // Generate final values for proof (line 55-60)
         let t_x_blinding = 
@@ -340,9 +330,7 @@ impl DealerAwaitingPoly {
         let x = self.transcript.challenge_scalar();
 
         (DealerAwaitingShares {
-            transcript: self.transcript,
             n: self.n,
-            m: self.m
         }, x)
     }
 }
@@ -352,12 +340,12 @@ impl DealerAwaitingShares {
         Proof {
             n: self.n,
             value_commitments: proof_shares.iter().map(|ps| ps.value_commitment.V.clone()).collect(),
-            A: proof_shares.iter().fold(RistrettoPoint::identity(), |A, ps| A + ps.value_commitment.A),
-            S: proof_shares.iter().fold(RistrettoPoint::identity(), |S, ps| S + ps.value_commitment.S),
-            T1: proof_shares.iter().fold(RistrettoPoint::identity(), |T1, ps| T1 + ps.poly_commitment.T1),
-            T2: proof_shares.iter().fold(RistrettoPoint::identity(), |T2, ps| T2 + ps.poly_commitment.T2),
-            t_x_blinding: proof_shares.iter().fold(Scalar::zero(), |acc, ps| acc + ps.t_x_blinding),
-            e_blinding: proof_shares.iter().fold(Scalar::zero(), |acc, ps| acc + ps.e_blinding),
+            A: proof_shares.iter().fold(RistrettoPoint::identity(),  |A, ps|   A + ps.value_commitment.A),
+            S: proof_shares.iter().fold(RistrettoPoint::identity(),  |S, ps|   S + ps.value_commitment.S),
+            T1: proof_shares.iter().fold(RistrettoPoint::identity(), |T1, ps|  T1 + ps.poly_commitment.T1),
+            T2: proof_shares.iter().fold(RistrettoPoint::identity(), |T2, ps|  T2 + ps.poly_commitment.T2),
+            t_x_blinding: proof_shares.iter().fold(Scalar::zero(),   |acc, ps| acc + ps.t_x_blinding),
+            e_blinding: proof_shares.iter().fold(Scalar::zero(),     |acc, ps| acc + ps.e_blinding),
             t: proof_shares.iter().fold(Scalar::zero(), |acc, ps| acc + ps.t),
 
             // FIXME: don't need if doing inner product proof
@@ -518,9 +506,6 @@ struct Poly3(Scalar, Scalar, Scalar);
 struct VecPoly2(Vec<Scalar>, Vec<Scalar>);
 
 impl Poly3 {
-    pub fn new() -> Poly3 {
-        Poly3(Scalar::zero(), Scalar::zero(), Scalar::zero())
-    }
     pub fn eval(&self, x: &Scalar) -> Scalar {
         self.0 + x * (self.1 + x * self.2)
     }
