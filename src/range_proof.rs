@@ -494,12 +494,12 @@ mod bench {
 
     #[bench]
     fn create_rp_16(b: &mut Bencher) {
-        bench_create_helper(32, b);
+        bench_create_helper(16, b);
     }
 
     #[bench]
     fn create_rp_8(b: &mut Bencher) {
-        bench_create_helper(32, b);
+        bench_create_helper(8, b);
     }
 
     #[bench]
@@ -514,11 +514,11 @@ mod bench {
 
     #[bench]
     fn verify_rp_16(b: &mut Bencher) {
-        bench_verify_helper(32, b);
+        bench_verify_helper(16, b);
     }
 
     #[bench]
     fn verify_rp_8(b: &mut Bencher) {
-        bench_verify_helper(32, b);
+        bench_verify_helper(8, b);
     }
 }
