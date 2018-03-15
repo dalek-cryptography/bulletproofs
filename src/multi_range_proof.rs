@@ -1,223 +1,238 @@
 #![allow(non_snake_case)]
+//#![deny(missing_docs)]
 
 use std::iter;
-use sha2::Sha256;
-use curve25519_dalek::ristretto::RistrettoPoint;
+use rand::Rng;
 use curve25519_dalek::ristretto;
+use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::traits::Identity;
 use curve25519_dalek::scalar::Scalar;
-use rand::OsRng;
 use std::clone::Clone;
-use range_proof::{make_generators, inner_product, add_vec};
+use scalar::{scalar_pow_vartime,inner_product,add_vectors};
 use proof_transcript::ProofTranscript;
+use generators::{Generators,GeneratorsView};
 
-struct PolyDeg3(Scalar, Scalar, Scalar);
+/// Party is an entry-point API for setting up a party.
+pub struct Party {}
 
-struct VecPoly2(Vec<Scalar>, Vec<Scalar>);
+/// Dealer is an entry-point API for setting up a dealer
+pub struct Dealer {}
 
-pub struct GeneratorPoints {
-    n: usize,
-    m: usize,
-    B: RistrettoPoint,
-    B_blinding: RistrettoPoint,
-    G: Vec<RistrettoPoint>,
-    H: Vec<RistrettoPoint>,   
-}
-
+/// As party awaits its position, they only know their value and desired bit-size of the proof.
 pub struct PartyAwaitingPosition {
-    gen: GeneratorPoints,
-    rng: OsRng,
+    n: usize,
     v: u64,
-    v_blinding: Scalar
+    v_blinding: Scalar,
+    V: RistrettoPoint,
 }
 
-pub struct PartyAwaitingValueChallenge {
-    gen: GeneratorPoints,
-    rng: OsRng,
-    val_comm: ValueCommitment,
+/// When party knows its position (`j`), it can produce commitments
+/// to all bits of the value and necessary blinding factors.
+pub struct PartyAwaitingValueChallenge<'a> {
+    n: usize, // bitsize of the range
+    v: u64,
+    v_blinding: Scalar,
 
     j: usize, // index of the party, 1..m as in original paper
-    v_blinding: Scalar,
+    generators: GeneratorsView<'a>,
+    value_commitment: ValueCommitment,
     a_blinding: Scalar,
     s_blinding: Scalar,
     s_l: Vec<Scalar>,
     s_r: Vec<Scalar>,
-    v: u64,
 }
 
-// formerly: Statement
 pub struct PartyAwaitingPolyChallenge {
-    gen: GeneratorPoints,
-    val_comm: ValueCommitment,
-    poly_comm: PolyCommitment,
+    value_commitment:  ValueCommitment,
+    poly_commitment: PolyCommitment,
 
-    y: Scalar,
     z: Scalar,
     offset_z: Scalar,
     l: VecPoly2,
     r: VecPoly2,
-    t: PolyDeg3,
+    t: Poly3,
     v_blinding: Scalar,
     a_blinding: Scalar,
     s_blinding: Scalar,
-    t_1_blinding: Scalar,
-    t_2_blinding: Scalar,
+    t1_blinding: Scalar,
+    t2_blinding: Scalar,
 }
 
+/// When the dealer is initialized, it only knows the size of the set.
 pub struct DealerAwaitingValues {
-    pt: ProofTranscript,
-    m: usize,
+    transcript: ProofTranscript,
+    n: usize,
 }
 
 pub struct DealerAwaitingPoly {
-    pt: ProofTranscript,
-    m: usize,
+    transcript: ProofTranscript,
+    n: usize,
 }
 
 pub struct DealerAwaitingShares {
-    pt: ProofTranscript,
-    m: usize,
-}
-
-pub struct ValueCommitment {
-    V: RistrettoPoint,
-    A: RistrettoPoint,
-    S: RistrettoPoint,
-}
-
-pub struct PolyCommitment {
-    T_1: RistrettoPoint,
-    T_2: RistrettoPoint,
-}
-
-pub struct ProofShare {
-    gen: GeneratorPoints,
-    val_comm: ValueCommitment,
-    poly_comm: PolyCommitment,
-
-    t_x_blinding: Scalar,
-    e_blinding: Scalar,
-    t: Scalar,
-
-    // don't need if doing inner product proof
-    l: Vec<Scalar>,
-    r: Vec<Scalar>, 
-}
-
-pub struct AggregatedProof {
-    gen: GeneratorPoints,
-    inp_comm: ValueCommitment,
-    st_comm: PolyCommitment,
-
-    t_x_blinding: Scalar,
-    e_blinding: Scalar,
-    t: Scalar,
-
-    // don't need if doing inner product proof
-    l: Vec<Scalar>,
-    r: Vec<Scalar>,
-}
-
-pub struct Aggregator {
     n: usize,
-    m: usize,
 }
 
-impl GeneratorPoints {
-    pub fn new(n: usize, m: usize) -> Self {
-        unimplemented!()
+#[derive(Clone)]
+pub struct ValueCommitment {
+    pub V: RistrettoPoint,
+    pub A: RistrettoPoint,
+    pub S: RistrettoPoint,
+}
+
+#[derive(Clone)]
+pub struct PolyCommitment {
+    pub T1: RistrettoPoint,
+    pub T2: RistrettoPoint,
+}
+
+#[derive(Clone)]
+pub struct ProofShare {
+    pub value_commitment: ValueCommitment,
+    pub poly_commitment: PolyCommitment,
+
+    pub t_x_blinding: Scalar,
+    pub e_blinding: Scalar,
+    pub t: Scalar,
+
+    // don't need if doing inner product proof
+    pub l: Vec<Scalar>,
+    pub r: Vec<Scalar>, 
+}
+
+
+pub struct Proof {
+    pub n: usize,
+    pub value_commitments: Vec<RistrettoPoint>,
+    pub A: RistrettoPoint,
+    pub S: RistrettoPoint,
+    pub T1: RistrettoPoint,
+    pub T2: RistrettoPoint,
+    pub t_x_blinding: Scalar,
+    pub e_blinding: Scalar,
+    pub t: Scalar,
+
+    // FIXME: don't need if doing inner product proof
+    pub l: Vec<Scalar>,
+    pub r: Vec<Scalar>,
+}
+
+impl Party {
+    pub fn new<R:Rng>(value: u64, n: usize, mut rng: &mut R) -> PartyAwaitingPosition {
+        let gen = Generators::new(n, 0);
+        let (V,v_blinding) = pedersen_commitment(&Scalar::from_u64(value), &gen.all(), &mut rng);
+        PartyAwaitingPosition { n, v: value, v_blinding, V }
+    }
+}
+
+impl Dealer {
+    /// Creates a new dealer with the given parties and a number of bits
+    pub fn new(n: usize, parties: &Vec<PartyAwaitingPosition>) -> Result<DealerAwaitingValues, &'static str> {
+        if let Some(_) = parties.iter().find(|&x| x.n != n) {
+            return Err("Inconsistent n among parties!")
+        }
+        let mut transcript = ProofTranscript::new(b"MultiRangeProof");
+        let m = parties.len();
+        transcript.commit_u64(n as u64);
+        transcript.commit_u64(m as u64);
+        Ok(DealerAwaitingValues { transcript, n })
     }
 }
 
 impl PartyAwaitingPosition {
-    pub fn new(gen: GeneratorPoints, v: u64, rng: OsRng) -> Self {
-        PartyAwaitingPosition {
-            gen: gen,
-            rng: rng,
-            v: v,
-            v_blinding: Scalar::random(&mut rng),
-        }
-    }
+    /// Assigns the position to a party, 
+    /// at which point the party knows its generators.
+    pub fn assign_position<'a, R: Rng>(&self, j: usize, generators: GeneratorsView<'a>, mut rng: &mut R) -> (PartyAwaitingValueChallenge<'a>, ValueCommitment) {
+        let (A, a_blinding) = self.commit_A(&generators, &mut rng);
+        let (S, s_blinding, s_l, s_r) = self.commit_S(&generators, &mut rng);
 
-    pub fn new_with_blinding(gen: GeneratorPoints, v: u64, v_blinding: Scalar) -> Self {
-        PartyAwaitingPosition {
-            gen: gen,
-            rng: OsRng::new().unwrap(),
-            v: v,
-            v_blinding: v_blinding,
-        }
-    }
-
-    pub fn get_position(&self, j: usize) -> (PartyAwaitingValueChallenge, ValueCommitment) {
-        let n = self.gen.n;
-
-        // Compute V
-        let V = self.gen.B_blinding * self.v_blinding + self.gen.B * Scalar::from_u64(self.v);
-
-        // Compute A
-        let a_blinding = Scalar::random(&mut self.rng);
-        let mut A = self.gen.B_blinding * a_blinding;
-        for i in 0..n {
-            let bit = (self.v >> i) & 1;
-            if bit == 1 {
-                // a_L = bit, bit = 1, so a_L=1, a_R=0
-                A += self.gen.G[j * n + i];
-            } else {
-                // a_R = bit - 1, bit = 0, so a_L=0, a_R=-1
-                A -= self.gen.H[j * n + i];
-            }
-        }
-
-        // Compute S
-        let s_blinding = Scalar::random(&mut self.rng);
-        let s_l:Vec<Scalar> = (0..n).map(|_| Scalar::random(&mut self.rng)).collect();
-        let s_r:Vec<Scalar> = (0..n).map(|_| Scalar::random(&mut self.rng)).collect();
-        let S = ristretto::multiscalar_mult(
-            iter::once(&s_blinding).chain(s_l.iter()).chain(s_r.iter()),
-            iter::once(&self.gen.B_blinding).chain(self.gen.G[j*n..(j+1)*n].iter()).chain(self.gen.H[j*n..(j+1)*n].iter()));
-
-        let val_comm = ValueCommitment {
-            V,
-            A,
-            S,
-        };
-
-        let pavc = PartyAwaitingValueChallenge {
-            gen: self.gen,
-            rng: self.rng,
+        // Return next state and all commitments
+        let value_commitment = ValueCommitment { V: self.V, A, S };
+        let next_state = PartyAwaitingValueChallenge {
+            n: self.n,
             v: self.v,
             v_blinding: self.v_blinding,
-            val_comm,
-            j: j,
+
+            j,
+            generators,
+            value_commitment: value_commitment.clone(),
             a_blinding,
             s_blinding,
             s_l,
             s_r, 
         };
+        (next_state, value_commitment)
+    }
 
-        (pavc, val_comm)
+    fn commit_A<R: Rng>(&self, generators: &GeneratorsView, mut rng: &mut R) -> (RistrettoPoint, Scalar) {
+        let a_blinding = Scalar::random(&mut rng);
+        let mut A = generators.B_blinding * a_blinding;
+        for i in 0..self.n {
+            let v_i = (self.v >> i) & 1;
+            // XXX make sure this is const time
+            if v_i == 1 {
+                A += generators.G[i]; // + bit*G_i
+            } else {
+                A -= generators.H[i]; // + (bit-1)*H_i
+            }
+        }
+        (A, a_blinding)
+    }
+
+    fn commit_S<R: Rng>(&self, generators: &GeneratorsView, mut rng: &mut R) -> (RistrettoPoint, Scalar, Vec<Scalar>, Vec<Scalar>) {
+        let s_l:Vec<Scalar> = (0..self.n).map(|_| Scalar::random(&mut rng)).collect();
+        let s_r:Vec<Scalar> = (0..self.n).map(|_| Scalar::random(&mut rng)).collect();
+
+        let s_blinding = Scalar::random(&mut rng);
+        let S = ristretto::multiscalar_mult(
+            iter::once(&s_blinding).chain(s_l.iter()).chain(s_r.iter()),
+            iter::once(generators.B_blinding).chain(generators.G.iter()).chain(generators.H.iter())
+        );
+
+        (S, s_blinding, s_l, s_r)
     }
 }
 
-impl PartyAwaitingValueChallenge {
-    pub fn get_value_challenge(&self, y: Scalar, z: Scalar) -> (PartyAwaitingPolyChallenge, PolyCommitment) {
-        let n = self.gen.n;
+impl DealerAwaitingValues {
+    /// Combines commitments and computes challenge variables.
+    pub fn present_value_commitments(mut self, vc: &Vec<ValueCommitment>) -> (DealerAwaitingPoly, Scalar, Scalar) {
+        let mut A = RistrettoPoint::identity();
+        let mut S = RistrettoPoint::identity();
 
-        // needed for multi-range-proof only: generate y, z offsets
-        let mut offset_y = Scalar::one(); // offset_y = y^((j-1)*n);
-        for _ in 0..self.j*n {
-            offset_y = offset_y * y;
+        for commitment in vc.iter() {
+            // Commit each V individually
+            self.transcript.commit(commitment.V.compress().as_bytes());
+
+            // Commit sums of As and Ss.
+            A += commitment.A;
+            S += commitment.S;
         }
-        let mut offset_z = Scalar::one(); // offset_z = z^(j-1);
-        for _ in 0..self.j {
-            offset_z = offset_z * z;
-        }
+
+        self.transcript.commit(A.compress().as_bytes());
+        self.transcript.commit(S.compress().as_bytes());
+
+        let y = self.transcript.challenge_scalar();
+        let z = self.transcript.challenge_scalar();
+
+        (DealerAwaitingPoly {
+            transcript: self.transcript,
+            n: self.n,
+        }, y,z)
+    }
+}
+
+impl<'a> PartyAwaitingValueChallenge<'a> {
+    pub fn apply_challenge<R: Rng>(&self, y: &Scalar, z: &Scalar, mut rng: &mut R) -> (PartyAwaitingPolyChallenge, PolyCommitment) {
+        let n = self.n;
+        let offset_y = scalar_pow_vartime(&y, (self.j*n) as u64);
+        let offset_z = scalar_pow_vartime(&z, self.j as u64);
 
         // Calculate t by calculating vectors l0, l1, r0, r1 and multiplying
         let mut l = VecPoly2::new(n);
         let mut r = VecPoly2::new(n);
+
+
         let z2 = z * z;
-        let mut t = PolyDeg3::new();
         let mut exp_y = Scalar::one(); // start at y^0 = 1
         let mut exp_2 = Scalar::one(); // start at 2^0 = 1
         for i in 0..n {
@@ -233,27 +248,19 @@ impl PartyAwaitingValueChallenge {
             exp_y = exp_y * y; // y^i -> y^(i+1)
             exp_2 = exp_2 + exp_2; // 2^i -> 2^(i+1)
         }
-        t.0 = inner_product(&l.0, &r.0);
-        t.2 = inner_product(&l.1, &r.1);
-        // use Karatsuba algorithm to find t.1 = l.0*r.1 + l.1*r.0
-        let l_add = add_vec(&l.0, &l.1);
-        let r_add = add_vec(&r.0, &r.1);
-        let l_r_mul = inner_product(&l_add, &r_add);
-        t.1 = l_r_mul - t.0 - t.2;
 
+        let t = inner_product_poly2(&l, &r);
+        
         // Generate x by committing to T_1, T_2 (line 49-54)
-        let t_1_blinding = Scalar::random(&mut self.rng);
-        let t_2_blinding = Scalar::random(&mut self.rng);
-        let T_1 = self.gen.B * t.1 + self.gen.B_blinding * t_1_blinding;
-        let T_2 = self.gen.B * t.2 + self.gen.B_blinding * t_2_blinding;
-        let poly_comm = PolyCommitment { T_1: T_1, T_2: T_2 };
+        let (T1, t1_blinding) = pedersen_commitment(&t.1, &self.generators, &mut rng);
+        let (T2, t2_blinding) = pedersen_commitment(&t.2, &self.generators, &mut rng);
+
+        let poly_commitment = PolyCommitment { T1, T2 };
 
         let papc = PartyAwaitingPolyChallenge {
-            gen: self.gen,
-            val_comm: self.val_comm,
-            poly_comm,
-            y,
-            z,
+            value_commitment: self.value_commitment.clone(),
+            poly_commitment: poly_commitment.clone(),
+            z: *z,
             offset_z,
             l,
             r,
@@ -261,31 +268,44 @@ impl PartyAwaitingValueChallenge {
             v_blinding: self.v_blinding,
             a_blinding: self.a_blinding,
             s_blinding: self.s_blinding,
-            t_1_blinding,
-            t_2_blinding,
+            t1_blinding,
+            t2_blinding,
         };
 
-        (papc, poly_comm)
+        (papc, poly_commitment)
     }
 }
 
-impl PartyAwaitingPolyChallenge {
-    pub fn get_poly_challenge(&self, x: Scalar) -> ProofShare {
-        // Generate final values for proof (line 55-60)
-        let t_x_blinding = self.t_1_blinding * x + self.t_2_blinding * x * x +
-            self.z * self.z * self.offset_z * self.v_blinding;
-        let e_blinding = self.a_blinding + self.s_blinding * x;
-        let t_hat = self.t.0 + self.t.1 * x + self.t.2 * x * x;
+fn inner_product_poly2(l: &VecPoly2, r: &VecPoly2) -> Poly3 {
+    let t0 = inner_product(&l.0, &r.0);
+    let t2 = inner_product(&l.1, &r.1);
 
-        // Calculate l, r - which is only necessary if not doing IPP (line 55-57)
-        // Adding this in a seperate loop so we can remove it easily later
+    // use Karatsuba algorithm to find t.1 = l.0*r.1 + l.1*r.0
+    let l_add = add_vectors(&l.0, &l.1);
+    let r_add = add_vectors(&r.0, &r.1);
+    let l_r_mul = inner_product(&l_add, &r_add);
+    let t1 = l_r_mul - t0 - t2;
+
+    Poly3(t0,t1,t2)
+}
+
+
+impl PartyAwaitingPolyChallenge {
+    pub fn apply_challenge(&self, x: &Scalar) -> ProofShare {
+        // Generate final values for proof (line 55-60)
+        let t_x_blinding = 
+            (self.t1_blinding + 
+             self.t2_blinding * x) * x +
+            self.z * self.z * self.offset_z * self.v_blinding;
+
+        let e_blinding = self.a_blinding + self.s_blinding * x;
+        let t_hat = self.t.eval(x);
         let l_total = self.l.eval(x);
         let r_total = self.r.eval(x);
 
         ProofShare {
-            gen: self.gen,
-            val_comm: self.val_comm,
-            poly_comm: self.poly_comm,
+            value_commitment: self.value_commitment.clone(),
+            poly_commitment: self.poly_commitment.clone(),
             t_x_blinding: t_x_blinding,
             e_blinding: e_blinding,
             t: t_hat,
@@ -295,166 +315,132 @@ impl PartyAwaitingPolyChallenge {
     }
 }
 
-impl DealerAwaitingValues {
-    pub fn get_values(&self, vc: Vec<ValueCommitment>) -> (DealerAwaitingPoly, Scalar, Scalar) {
-        unimplemented!()
-    }
-}
-
 impl DealerAwaitingPoly {
-    pub fn get_poly(&self, pc: Vec<PolyCommitment>) -> (DealerAwaitingShares, Scalar) {
-        unimplemented!()
+    pub fn present_poly_commitments(mut self, poly_commitments: &Vec<PolyCommitment>) -> (DealerAwaitingShares, Scalar) {
+        // Commit sums of T1s and T2s.
+        let mut T1 = RistrettoPoint::identity();
+        let mut T2 = RistrettoPoint::identity();
+        for commitment in poly_commitments.iter() {
+            T1 += commitment.T1;
+            T2 += commitment.T2;
+        }
+        self.transcript.commit(T1.compress().as_bytes());
+        self.transcript.commit(T2.compress().as_bytes());
+
+        let x = self.transcript.challenge_scalar();
+
+        (DealerAwaitingShares {
+            n: self.n,
+        }, x)
     }
 }
 
 impl DealerAwaitingShares {
-    pub fn get_shares(&self, ps: Vec<ProofShare>) -> AggregatedProof {
-        unimplemented!()
+    pub fn present_shares(&self, proof_shares: &Vec<ProofShare>) -> Proof {
+        Proof {
+            n: self.n,
+            value_commitments: proof_shares.iter().map(|ps| ps.value_commitment.V.clone()).collect(),
+            A: proof_shares.iter().fold(RistrettoPoint::identity(),  |A, ps|   A + ps.value_commitment.A),
+            S: proof_shares.iter().fold(RistrettoPoint::identity(),  |S, ps|   S + ps.value_commitment.S),
+            T1: proof_shares.iter().fold(RistrettoPoint::identity(), |T1, ps|  T1 + ps.poly_commitment.T1),
+            T2: proof_shares.iter().fold(RistrettoPoint::identity(), |T2, ps|  T2 + ps.poly_commitment.T2),
+            t_x_blinding: proof_shares.iter().fold(Scalar::zero(),   |acc, ps| acc + ps.t_x_blinding),
+            e_blinding: proof_shares.iter().fold(Scalar::zero(),     |acc, ps| acc + ps.e_blinding),
+            t: proof_shares.iter().fold(Scalar::zero(), |acc, ps| acc + ps.t),
+
+            // FIXME: don't need if doing inner product proof
+            l: proof_shares.iter().flat_map(|ps| ps.l.clone().into_iter()).collect(),
+            r: proof_shares.iter().flat_map(|ps| ps.r.clone().into_iter()).collect(),
+        }
     }
 }
 
-impl Aggregator {
-    pub fn create_one(v: u64, n: usize) -> AggregatedProof {
-        Self::create_multi(vec![v], n)
+impl Proof {
+    pub fn create_one<R: Rng>(v: u64, n: usize, rng: &mut R) -> Proof {
+        Self::create_multi(vec![v], n, rng)
     }
 
-    pub fn create_multi(values: Vec<u64>, n: usize) -> AggregatedProof {
-        let mut ro = RandomOracle::new(b"MultiRangeProof");
+    pub fn create_multi<R: Rng>(values: Vec<u64>, n: usize, rng: &mut R) -> Proof {
         let m = values.len();
+        let generators = Generators::new(n,m);
+
+        let parties: Vec<_> = values.iter().map(|&v| Party::new(v, n, rng) ).collect();
+
+        let dealer = Dealer::new(n, &parties).unwrap();
+
+        let (parties, value_commitments): (Vec<_>,Vec<_>) =
+            parties.iter().enumerate().map(|(j, p)| p.assign_position(j,generators.share(j),rng) ).unzip();
+        
+        let (dealer, y, z) = dealer.present_value_commitments(&value_commitments);
+
+        let (parties, poly_commitments): (Vec<_>,Vec<_>) =
+            parties.iter().map(|p| p.apply_challenge( &y, &z, rng) ).unzip();
+
+        let (dealer, x) = dealer.present_poly_commitments(&poly_commitments);
+
+        let proof_shares: Vec<ProofShare> = parties.iter().map(|p| p.apply_challenge(&x) ).collect();
+
+        dealer.present_shares(&proof_shares)
+    }
+
+    pub fn verify(&self) -> bool {
+        let n = self.n;
+        let m = self.value_commitments.len();
+
         let gen = Generators::new(n, m);
-        let mut A = RistrettoPoint::identity();
-        let mut S = RistrettoPoint::identity();
-        let mut inputs = Vec::new();
-        for j in 0..m {
-            let input = gen.make_input(j, values[j]);
-            A += input.inp_comm.A;
-            S += input.inp_comm.S;
-            inputs.push(input);
+        let generators = gen.all();
+
+        let mut transcript = ProofTranscript::new(b"MultiRangeProof");
+        transcript.commit_u64(n as u64);
+        transcript.commit_u64(m as u64);
+
+        for V in self.value_commitments.iter() {
+            transcript.commit(V.compress().as_bytes());
         }
-        ro.commit_integer(n as u64);
-        ro.commit_integer(m as u64);
-        for j in 0..m {
-            ro.commit_point(&inputs[j].inp_comm.V[0].compress());
-        }
-        ro.commit_point(&A.compress());
-        ro.commit_point(&S.compress());
-        let y = ro.challenge_scalar();
-        let z = ro.challenge_scalar();
+        transcript.commit(self.A.compress().as_bytes());
+        transcript.commit(self.S.compress().as_bytes());
 
-        let mut T_1 = RistrettoPoint::identity();
-        let mut T_2 = RistrettoPoint::identity();
-        let mut statements = Vec::new();
-        for j in 0..m {
-            let statement = inputs[j].make_statement(y, z);
-            T_1 += statement.st_comm.T_1;
-            T_2 += statement.st_comm.T_2;
-            statements.push(statement);
-        }
+        let y = transcript.challenge_scalar();
+        let z = transcript.challenge_scalar();
 
-        ro.commit_point(&T_1.compress());
-        ro.commit_point(&T_2.compress());
-        let x = ro.challenge_scalar();
+        transcript.commit(self.T1.compress().as_bytes());
+        transcript.commit(self.T2.compress().as_bytes());
 
-        let mut proofs = Vec::new();
-        for j in 0..m {
-            let proof = statements[j].make_proof(x);
-            proofs.push(proof);
-        }
-        Proof::combine(proofs)
-    }
+        let x = transcript.challenge_scalar();
 
-    pub fn combine(proofs: Vec<Proof>) -> Proof {
-        let mut V = Vec::new();
-        let mut A = RistrettoPoint::identity();
-        let mut S = RistrettoPoint::identity();
-        let mut T_1 = RistrettoPoint::identity();
-        let mut T_2 = RistrettoPoint::identity();
-        let mut t_x_blinding = Scalar::zero();
-        let mut e_blinding = Scalar::zero();
-        let mut t = Scalar::zero();
-        let mut l: Vec<Scalar> = Vec::new();
-        let mut r: Vec<Scalar> = Vec::new();
-
-        for proof in &proofs {
-            V.push(proof.inp_comm.V[0]);
-            A += proof.inp_comm.A;
-            S += proof.inp_comm.S;
-            T_1 += proof.st_comm.T_1;
-            T_2 += proof.st_comm.T_2;
-            t_x_blinding += proof.t_x_blinding;
-            e_blinding += proof.e_blinding;
-            t += proof.t;
-            l.extend(&proof.l);
-            r.extend(&proof.r);
-        }
-
-        Proof {
-            gen: proofs[0].gen.clone(),
-            inp_comm: InputCommitment { V: V, A: A, S: S },
-            st_comm: StatementCommitment { T_1: T_1, T_2: T_2 },
-            t_x_blinding: t_x_blinding,
-            e_blinding,
-            t: t,
-            l: l,
-            r: r,
-        }
-    }
-
-    pub fn verify(&self, m: usize) -> bool {
-        let V = &self.inp_comm.V;
-        let A = &self.inp_comm.A;
-        let S = &self.inp_comm.S;
-        let T_1 = &self.st_comm.T_1;
-        let T_2 = &self.st_comm.T_2;
-        let n = self.gen.n;
-        let B = &self.gen.B;
-        let B_blinding = &self.gen.B_blinding;
-
-        let mut ro = RandomOracle::new(b"MultiRangeProof");
-        ro.commit_integer(n as u64);
-        ro.commit_integer(m as u64);
-        for j in 0..m {
-            ro.commit_point(&V[j].compress());
-        }
-        ro.commit_point(&A.compress());
-        ro.commit_point(&S.compress());
-        let y = ro.challenge_scalar();
-        let z = ro.challenge_scalar();
-        ro.commit_point(&T_1.compress());
-        ro.commit_point(&T_2.compress());
-        let x = ro.challenge_scalar();
-
-        let G = make_generators(B, n * m);
-        let mut hprime_vec = make_generators(B_blinding, n * m);
+        let mut hprime_vec = generators.H.to_vec();
 
         // line 63: check that t = t0 + t1 * x + t2 * x * x
         let z2 = z * z;
         let z3 = z2 * z;
-        let mut power_g = Scalar::zero(); // delta(y,z)
+        let mut delta = Scalar::zero(); // delta(y,z)
 
-        // calculate power_g += (z - z^2) * <1^(n*m), y^(n*m)>
+        // // calculate delta += (z - z^2) * <1^(n*m), y^(n*m)>
         let mut exp_y = Scalar::one(); // start at y^0 = 1
         let mut exp_2 = Scalar::one(); // start at 2^0 = 1
         for _ in 0..n * m {
-            power_g += (z - z2) * exp_y;
+            delta += (z - z2) * exp_y;
 
             exp_y = exp_y * y; // y^i -> y^(i+1)
             exp_2 = exp_2 + exp_2; // 2^i -> 2^(i+1)
         }
-        // calculate power_g += sum_(j=1)^(m)(z^(j+2) * (2^n - 1))
+
+        // calculate delta += sum_(j=1)^(m)(z^(j+2) * (2^n - 1))
         let mut exp_z = z3;
         for _ in 1..(m + 1) {
-            power_g -= exp_z * Scalar::from_u64(((1u128 << n) - 1) as u64);
+            delta -= exp_z * Scalar::from_u64(((1u128 << n) - 1) as u64);
             exp_z = exp_z * z;
         }
 
-        let mut t_check = B * power_g + T_1 * x + T_2 * x * x;
+        // TBD: put in a multiscalar mult
+        let mut t_check = generators.B * delta + self.T1 * x + self.T2 * x * x;
+
         let mut exp_z = Scalar::one();
         for j in 0..m {
-            t_check += V[j] * z2 * exp_z;
+            t_check += self.value_commitments[j] * z2 * exp_z;
             exp_z = exp_z * z;
         }
-        let t_commit = B * self.t + B_blinding * self.t_x_blinding;
+        let t_commit = generators.B * self.t + generators.B_blinding * self.t_x_blinding;
         if t_commit != t_check {
             println!("fails check on line 63");
             return false;
@@ -464,9 +450,9 @@ impl Aggregator {
         // calculate P: add A + S*x - G*z
         let mut sum_G = RistrettoPoint::identity();
         for i in 0..n * m {
-            sum_G += G[i];
+            sum_G += generators.G[i];
         }
-        let mut P = A + S * x;
+        let mut P = self.A + self.S * x;
         P -= sum_G * z;
 
         // line 62: calculate hprime
@@ -496,8 +482,8 @@ impl Aggregator {
         }
 
         // line 65: check that l, r are correct
-        let mut P_check = B_blinding * self.e_blinding;
-        let points_iter = G.iter().chain(hprime_vec.iter());
+        let mut P_check = generators.B_blinding * self.e_blinding;
+        let points_iter = generators.G.iter().chain(hprime_vec.iter());
         let scalars_iter = self.l.iter().chain(self.r.iter());
         P_check += ristretto::multiscalar_mult(scalars_iter, points_iter);
         if P != P_check {
@@ -515,9 +501,13 @@ impl Aggregator {
     }
 }
 
-impl PolyDeg3 {
-    pub fn new() -> PolyDeg3 {
-        PolyDeg3(Scalar::zero(), Scalar::zero(), Scalar::zero())
+
+struct Poly3(Scalar, Scalar, Scalar);
+struct VecPoly2(Vec<Scalar>, Vec<Scalar>);
+
+impl Poly3 {
+    pub fn eval(&self, x: &Scalar) -> Scalar {
+        self.0 + x * (self.1 + x * self.2)
     }
 }
 
@@ -525,183 +515,197 @@ impl VecPoly2 {
     pub fn new(n: usize) -> VecPoly2 {
         VecPoly2(vec![Scalar::zero(); n], vec![Scalar::zero(); n])
     }
-    pub fn eval(&self, x: Scalar) -> Vec<Scalar> {
-        let n = self.0.len();
-        let mut out = vec![Scalar::zero(); n];
-        for i in 0..n {
-            out[i] += self.0[i] + self.1[i] * x;
-        }
-        out
+    pub fn eval(&self, x: &Scalar) -> Vec<Scalar> {
+        self.0.iter().
+            zip(self.1.iter()).
+            map(|(a,b)| a + x*b ).
+            collect()
     }
 }
+
+
+/// Creates a new pedersen commitment
+fn pedersen_commitment<R: Rng>(scalar: &Scalar, generators: &GeneratorsView, mut rng: &mut R) -> (RistrettoPoint, Scalar) {
+    let blinding = Scalar::random(&mut rng);
+    // XXX change into multiscalar mult
+    ((generators.B * scalar + generators.B_blinding * blinding), blinding)
+}
+
+/// Creates a new vector pedersen commitment
+pub fn vector_pedersen_commitment<'a, I, R>(scalars: I, generators: &GeneratorsView, mut rng: &mut R) -> (RistrettoPoint, Scalar)
+    where I: IntoIterator<Item = &'a Scalar>,
+          R: Rng
+{
+    let blinding = Scalar::random(&mut rng);
+    // FIXME: we do this because of lifetime mismatch of scalars and &blinding.
+    let scalars: Vec<_> = scalars.into_iter().collect();
+    let C = ristretto::multiscalar_mult(
+        iter::once(&blinding).chain(scalars.into_iter()),
+        iter::once(generators.B_blinding).chain(generators.G.iter()).chain(generators.H.iter())
+    );
+
+    (C, blinding)
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rand::Rng;
+    use rand::OsRng;
 
     #[test]
-    fn one_party_small() {
-        for n in vec![1, 16, 32] {
-            let rp = Proof::create_one(0, n);
-            assert_eq!(rp.verify(1), true);
-            let rp = Proof::create_one(2u64.pow(n as u32) - 1, n);
-            assert_eq!(rp.verify(1), true);
-            let rp = Proof::create_one(2u64.pow(n as u32), n);
-            assert_eq!(rp.verify(1), false);
-            let rp = Proof::create_one(2u64.pow(n as u32) + 1, n);
-            assert_eq!(rp.verify(1), false);
-            let rp = Proof::create_one(u64::max_value(), n);
-            assert_eq!(rp.verify(1), false);
-        }
+    fn one_rangeproof() {
+        let mut rng = OsRng::new().unwrap();
+        let rp = Proof::create_one(0, 16, &mut rng);
+        assert_eq!(rp.verify(), true);
+        let rp = Proof::create_one(12341, 16, &mut rng);
+        assert_eq!(rp.verify(), true);        
     }
+
     #[test]
-    fn one_party_u64() {
-        let n = 64;
-        let rp = Proof::create_one(0, n);
-        assert_eq!(rp.verify(1), true);
-        let rp = Proof::create_one(1, n);
-        assert_eq!(rp.verify(1), true);
-        let rp = Proof::create_one(u64::max_value(), n);
-        assert_eq!(rp.verify(1), true);
+    fn two_rangeproofs() {
+        let mut rng = OsRng::new().unwrap();
+        let rp = Proof::create_multi(vec![0,1], 16, &mut rng);
+        assert_eq!(rp.verify(), true);
+        let rp = Proof::create_multi(vec![123,4567], 16, &mut rng);
+        assert_eq!(rp.verify(), true);        
     }
+
     #[test]
-    fn two_party_small() {
-        for n in vec![1, 16, 32] {
-            let rp = Proof::create_multi(vec![1, 1], n);
-            assert_eq!(rp.verify(2), true);
-            let rp = Proof::create_multi(vec![0, 1], n);
-            assert_eq!(rp.verify(2), true);
-            let rp = Proof::create_multi(vec![1, 0], n);
-            assert_eq!(rp.verify(2), true);
-            let rp = Proof::create_multi(vec![0, 0], n);
-            assert_eq!(rp.verify(2), true);
-            let rp = Proof::create_multi(vec![2u64.pow(n as u32) - 1, 1], n);
-            assert_eq!(rp.verify(2), true);
-            let rp = Proof::create_multi(vec![2u64.pow(n as u32) + 1, 0], n);
-            assert_eq!(rp.verify(2), false);
-            let rp = Proof::create_multi(vec![0, u64::max_value()], n);
-            assert_eq!(rp.verify(2), false);
-        }
+    fn three_rangeproofs() {
+        let mut rng = OsRng::new().unwrap();
+        let rp = Proof::create_multi(vec![0,1,3], 16, &mut rng);
+        assert_eq!(rp.verify(), true);
+        let rp = Proof::create_multi(vec![123,4567,563], 16, &mut rng);
+        assert_eq!(rp.verify(), true);        
     }
-    #[test]
-    fn two_party_u64() {
-        let n = 64;
-        let rp = Proof::create_multi(vec![u64::max_value(), 1], n);
-        assert_eq!(rp.verify(2), true);
-        let rp = Proof::create_multi(vec![0, u64::max_value() - 1], n);
-        assert_eq!(rp.verify(2), true);
-    }
-    #[test]
-    fn ten_party_small() {
-        let m = 10;
-        for n in vec![1, 16, 32] {
-            let rp = Proof::create_multi(vec![1, 1, 0, 0, 1, 1, 0, 0, 1, 1], n);
-            assert_eq!(rp.verify(m), true);
-            let rp = Proof::create_multi(
-                vec![
-                    2u64.pow(n as u32) - 1,
-                    2u64.pow(n as u32) - 1,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    1,
-                    1,
-                ],
-                n,
-            );
-            assert_eq!(rp.verify(m), true);
-            let rp =
-                Proof::create_multi(vec![2u64.pow(n as u32) + 1, 0, 0, 0, 0, 0, 0, 0, 1, 1], n);
-            assert_eq!(rp.verify(m), false);
-            let rp = Proof::create_multi(vec![0, u64::max_value(), 0, 0, 0, 0, 0, 0, 1, 1], n);
-            assert_eq!(rp.verify(m), false);
-        }
-    }
-    #[test]
-    fn ten_party_u64() {
-        let m = 10;
-        let n = 64;
-        let rp = Proof::create_multi(
-            vec![u64::max_value(), u64::max_value(), 0, 0, 1, 1, 0, 0, 1, 1],
-            n,
-        );
-        assert_eq!(rp.verify(m), true);
-        let rp = Proof::create_multi(
-            vec![
-                u64::max_value() - 1,
-                1,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                1,
-                u64::max_value() / 2,
-            ],
-            n,
-        );
-        assert_eq!(rp.verify(m), true);
-    }
-    #[test]
-    fn rand_small() {
-        for _ in 0..10 {
-            let mut rng: OsRng = OsRng::new().unwrap();
-            let v: u32 = rng.next_u32();
-            let rp = Proof::create_one(v as u64, 32);
-            assert_eq!(rp.verify(1), true);
-        }
-    }
-    #[test]
-    fn rand_u32() {
-        for _ in 0..10 {
-            let mut rng: OsRng = OsRng::new().unwrap();
-            let v = rng.next_u32() as u64;
-            let rp = Proof::create_one(v, 32);
-            assert_eq!(rp.verify(1), true);
-        }
-    }
-    #[test]
-    fn rand_u64() {
-        for _ in 0..10 {
-            let mut rng: OsRng = OsRng::new().unwrap();
-            let v = rng.next_u64();
-            let rp = Proof::create_one(v, 64);
-            assert_eq!(rp.verify(1), true);
-        }
-    }
+
+    // #[test]
+    // fn two_party_small() {
+    //     for n in vec![1, 16, 32] {
+    //         let rp = Proof::create_multi(vec![1, 1], n);
+    //         assert_eq!(rp.verify(2), true);
+    //         let rp = Proof::create_multi(vec![0, 1], n);
+    //         assert_eq!(rp.verify(2), true);
+    //         let rp = Proof::create_multi(vec![1, 0], n);
+    //         assert_eq!(rp.verify(2), true);
+    //         let rp = Proof::create_multi(vec![0, 0], n);
+    //         assert_eq!(rp.verify(2), true);
+    //         let rp = Proof::create_multi(vec![2u64.pow(n as u32) - 1, 1], n);
+    //         assert_eq!(rp.verify(2), true);
+    //         let rp = Proof::create_multi(vec![2u64.pow(n as u32) + 1, 0], n);
+    //         assert_eq!(rp.verify(2), false);
+    //         let rp = Proof::create_multi(vec![0, u64::max_value()], n);
+    //         assert_eq!(rp.verify(2), false);
+    //     }
+    // }
+
+    // #[test]
+    // fn two_party_u64() {
+    //     let n = 64;
+    //     let rp = Proof::create_multi(vec![u64::max_value(), 1], n);
+    //     assert_eq!(rp.verify(2), true);
+    //     let rp = Proof::create_multi(vec![0, u64::max_value() - 1], n);
+    //     assert_eq!(rp.verify(2), true);
+    // }
+
+    // #[test]
+    // fn ten_party_small() {
+    //     let m = 10;
+    //     for n in vec![1, 16, 32] {
+    //         let rp = Proof::create_multi(vec![1, 1, 0, 0, 1, 1, 0, 0, 1, 1], n);
+    //         assert_eq!(rp.verify(m), true);
+    //         let rp = Proof::create_multi(
+    //             vec![
+    //                 2u64.pow(n as u32) - 1,
+    //                 2u64.pow(n as u32) - 1,
+    //                 0,
+    //                 0,
+    //                 0,
+    //                 0,
+    //                 0,
+    //                 0,
+    //                 1,
+    //                 1,
+    //             ],
+    //             n,
+    //         );
+    //         assert_eq!(rp.verify(m), true);
+    //         let rp =
+    //             Proof::create_multi(vec![2u64.pow(n as u32) + 1, 0, 0, 0, 0, 0, 0, 0, 1, 1], n);
+    //         assert_eq!(rp.verify(m), false);
+    //         let rp = Proof::create_multi(vec![0, u64::max_value(), 0, 0, 0, 0, 0, 0, 1, 1], n);
+    //         assert_eq!(rp.verify(m), false);
+    //     }
+    // }
+
+    // #[test]
+    // fn ten_party_u64() {
+    //     let m = 10;
+    //     let n = 64;
+    //     let rp = Proof::create_multi(
+    //         vec![u64::max_value(), u64::max_value(), 0, 0, 1, 1, 0, 0, 1, 1],
+    //         n,
+    //     );
+    //     assert_eq!(rp.verify(m), true);
+    //     let rp = Proof::create_multi(
+    //         vec![
+    //             u64::max_value() - 1,
+    //             1,
+    //             0,
+    //             0,
+    //             0,
+    //             0,
+    //             0,
+    //             0,
+    //             1,
+    //             u64::max_value() / 2,
+    //         ],
+    //         n,
+    //     );
+    //     assert_eq!(rp.verify(m), true);
+    // }
+
 }
 
-#[cfg(test)]
-mod bench {
-    use super::*;
-    use rand::Rng;
-    use test::Bencher;
+// #[cfg(test)]
+// mod bench {
+//     use super::*;
+//     use rand::Rng;
+//     use test::Bencher;
 
-    #[bench]
-    fn make_u64(b: &mut Bencher) {
-        let mut rng: OsRng = OsRng::new().unwrap();
-        b.iter(|| Proof::create_one(rng.next_u64(), 64));
-    }
-    #[bench]
-    fn make_u32(b: &mut Bencher) {
-        let mut rng: OsRng = OsRng::new().unwrap();
-        b.iter(|| Proof::create_one(rng.next_u32() as u64, 32));
-    }
-    #[bench]
-    fn verify_u64(b: &mut Bencher) {
-        let mut rng: OsRng = OsRng::new().unwrap();
-        let rp = Proof::create_one(rng.next_u64(), 64);
-        b.iter(|| rp.verify(1));
-    }
-    #[bench]
-    fn verify_u32(b: &mut Bencher) {
-        let mut rng: OsRng = OsRng::new().unwrap();
-        let rp = Proof::create_one(rng.next_u32() as u64, 32);
-        b.iter(|| rp.verify(1));
-    }
-}
+//     #[bench]
+//     fn make_u64(b: &mut Bencher) {
+//         let mut rng: OsRng = OsRng::new().unwrap();
+//         b.iter(|| Proof::create_one(rng.next_u64(), 64));
+//     }
+//     #[bench]
+//     fn make_u32(b: &mut Bencher) {
+//         let mut rng: OsRng = OsRng::new().unwrap();
+//         b.iter(|| Proof::create_one(rng.next_u32() as u64, 32));
+//     }
+//     #[bench]
+//     fn verify_u64(b: &mut Bencher) {
+//         let mut rng: OsRng = OsRng::new().unwrap();
+//         let rp = Proof::create_one(rng.next_u64(), 64);
+//         b.iter(|| rp.verify(1));
+//     }
+//     #[bench]
+//     fn verify_u32(b: &mut Bencher) {
+//         let mut rng: OsRng = OsRng::new().unwrap();
+//         let rp = Proof::create_one(rng.next_u32() as u64, 32);
+//         b.iter(|| rp.verify(1));
+//     }
+// }
