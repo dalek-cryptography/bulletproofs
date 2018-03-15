@@ -437,13 +437,15 @@ mod bench {
 
     fn bench_create_helper(n: usize, b: &mut Bencher) {
         let generators = Generators::new(n, 1);
-        let mut transcript = ProofTranscript::new(b"RangeproofTest");
         let mut rng = OsRng::new().unwrap();
 
         let v: u64 = rng.gen_range(0, (1 << (n - 1)) - 1);
         let v_blinding = Scalar::random(&mut rng);
 
         b.iter(|| {
+            // Each proof creation requires a clean transcript.
+            let mut transcript = ProofTranscript::new(b"RangeproofTest");
+
             RangeProof::generate_proof(
                 generators.share(0),
                 &mut transcript,
@@ -457,9 +459,9 @@ mod bench {
 
     fn bench_verify_helper(n: usize, b: &mut Bencher) {
         let generators = Generators::new(n, 1);
-        let mut transcript = ProofTranscript::new(b"RangeproofTest");
         let mut rng = OsRng::new().unwrap();
 
+        let mut transcript = ProofTranscript::new(b"RangeproofTest");
         let v: u64 = rng.gen_range(0, (1 << (n - 1)) - 1);
         let v_blinding = Scalar::random(&mut rng);
 
@@ -472,9 +474,12 @@ mod bench {
             &v_blinding,
         );
 
-        let mut transcript = ProofTranscript::new(b"RangeproofTest");
+        b.iter(|| {
+            // Each verification requires a clean transcript.
+            let mut transcript = ProofTranscript::new(b"RangeproofTest");
 
-        b.iter(|| rp.verify(generators.share(0), &mut transcript, &mut rng, n));
+            rp.verify(generators.share(0), &mut transcript, &mut rng, n)
+        });
     }
 
     #[bench]
