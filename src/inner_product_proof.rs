@@ -161,20 +161,15 @@ impl Proof {
         }
         let challenges_sq = challenges;
 
-        // j-th bit of i
-        let bit = |i, j| 1 & (i >> j);
-
         let mut s = Vec::with_capacity(n);
-        for i in 0..n {
-            let mut s_i = allinv;
-            // XXX remove this loop via the bit twiddling mentioned in the paper
-            for j in 0..lg_n {
-                if bit(i, j) == 1 {
-                    // The challenges are stored in "creation order" as [x_k,...,x_1]
-                    s_i *= challenges_sq[(lg_n - 1) - j];
-                }
-            }
-            s.push(s_i);
+        s.push(allinv);
+        for i in 1..n {
+            let lg_i = (32 - 1 - (i as u32).leading_zeros()) as usize;
+            let k = 1 << lg_i;
+            // The challenges are stored in "creation order" as [x_k,...,x_1],
+            // so x_{lg(i)+1} = is indexed by (lg_n-1) - lg_i
+            let x_lg_i_sq = challenges_sq[(lg_n-1) - lg_i];
+            s.push( s[i-k] * x_lg_i_sq );
         }
         let s = s;
 
