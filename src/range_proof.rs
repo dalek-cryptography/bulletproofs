@@ -101,13 +101,13 @@ impl RangeProof {
         transcript.commit(S.compress().as_bytes());
         let y = transcript.challenge_scalar();
         let z = transcript.challenge_scalar();
+        let zz = z * z;
 
         // Compute l, r
         let mut l_poly = VecPoly2::zero(n);
         let mut r_poly = VecPoly2::zero(n);
         let mut exp_y = Scalar::one(); // start at y^0 = 1
         let mut exp_2 = Scalar::one(); // start at 2^0 = 1
-        let zz = z * z;
 
         for i in 0..n {
             let a_L_i = Scalar::from_u64((v >> i) & 1);
@@ -138,7 +138,7 @@ impl RangeProof {
 
         // Evaluate t at x and run the IPP
         let t_x = t_poly.0 + x * (t_poly.1 + x * t_poly.2);
-        let t_x_blinding = z * z * v_blinding + x * (t_1_blinding + x * t_2_blinding);
+        let t_x_blinding = zz * v_blinding + x * (t_1_blinding + x * t_2_blinding);
         let e_blinding = a_blinding + x * s_blinding;
 
         transcript.commit(t_x.as_bytes());
@@ -221,7 +221,7 @@ impl RangeProof {
         let mega_check = ristretto::vartime::multiscalar_mult(
             iter::once(Scalar::one())
                 .chain(iter::once(x))
-                .chain(iter::once(c * z * z))
+                .chain(iter::once(c * zz))
                 .chain(iter::once(c * x))
                 .chain(iter::once(c * x * x))
                 .chain(iter::once(-self.e_blinding - c * self.t_x_blinding))
