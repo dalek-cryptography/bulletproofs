@@ -22,10 +22,10 @@ use sha2::Sha256;
 
 #[derive(Clone, Debug)]
 pub struct Proof {
-    L_vec: Vec<RistrettoPoint>,
-    R_vec: Vec<RistrettoPoint>,
-    a: Scalar,
-    b: Scalar,
+    pub(crate) L_vec: Vec<RistrettoPoint>,
+    pub(crate) R_vec: Vec<RistrettoPoint>,
+    pub(crate) a: Scalar,
+    pub(crate) b: Scalar,
 }
 
 impl Proof {
