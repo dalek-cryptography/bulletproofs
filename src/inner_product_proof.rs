@@ -126,9 +126,58 @@ impl Proof {
         };
     }
 
+    pub(crate) fn verification_scalars(
+        &self,
+        transcript: &mut ProofTranscript,
+    ) -> (Vec<Scalar>, Vec<Scalar>, Vec<Scalar>) {
+        let lg_n = self.L_vec.len();
+        let n = 1 << lg_n;
+
+        // 1. Recompute x_k,...,x_1 based on the proof transcript
+
+        let mut challenges = Vec::with_capacity(lg_n);
+        for (L, R) in self.L_vec.iter().zip(self.R_vec.iter()) {
+            // XXX maybe avoid this compression when proof ser/de is sorted out
+            transcript.commit(L.compress().as_bytes());
+            transcript.commit(R.compress().as_bytes());
+
+            challenges.push(transcript.challenge_scalar());
+        }
+
+        // 2. Compute 1/(x_k...x_1) and 1/x_k, ..., 1/x_1
+
+        let mut challenges_inv = challenges.clone();
+        let allinv = scalar::batch_invert(&mut challenges_inv);
+
+        // 3. Compute x_i^2 and (1/x_i)^2
+
+        for i in 0..lg_n {
+            // XXX missing square fn upstream
+            challenges[i] = challenges[i] * challenges[i];
+            challenges_inv[i] = challenges_inv[i] * challenges_inv[i];
+        }
+        let challenges_sq = challenges;
+        let challenges_inv_sq = challenges_inv;
+
+        // 4. Compute s values inductively.
+
+        let mut s = Vec::with_capacity(n);
+        s.push(allinv);
+        for i in 1..n {
+            let lg_i = (32 - 1 - (i as u32).leading_zeros()) as usize;
+            let k = 1 << lg_i;
+            // The challenges are stored in "creation order" as [x_k,...,x_1],
+            // so x_{lg(i)+1} = is indexed by (lg_n-1) - lg_i
+            let x_lg_i_sq = challenges_sq[(lg_n - 1) - lg_i];
+            s.push(s[i - k] * x_lg_i_sq);
+        }
+
+        (challenges_sq, challenges_inv_sq, s)
+    }
+
     pub fn verify<I>(
         &self,
-        verifier: &mut ProofTranscript,
+        transcript: &mut ProofTranscript,
         Hprime_factors: I,
         P: &RistrettoPoint,
         Q: &RistrettoPoint,
@@ -139,39 +188,7 @@ impl Proof {
         I: IntoIterator,
         I::Item: Borrow<Scalar>,
     {
-        // XXX prover should commit to n
-        let lg_n = self.L_vec.len();
-        let n = 1 << lg_n;
-
-        // XXX figure out how ser/deser works for Proofs
-        // maybe avoid this compression
-        let mut challenges = Vec::with_capacity(lg_n);
-        for (L, R) in self.L_vec.iter().zip(self.R_vec.iter()) {
-            verifier.commit(L.compress().as_bytes());
-            verifier.commit(R.compress().as_bytes());
-
-            challenges.push(verifier.challenge_scalar());
-        }
-
-        let mut inv_challenges = challenges.clone();
-        let allinv = scalar::batch_invert(&mut inv_challenges);
-
-        for x in challenges.iter_mut() {
-            *x = &*x * &*x; // wtf
-        }
-        let challenges_sq = challenges;
-
-        let mut s = Vec::with_capacity(n);
-        s.push(allinv);
-        for i in 1..n {
-            let lg_i = (32 - 1 - (i as u32).leading_zeros()) as usize;
-            let k = 1 << lg_i;
-            // The challenges are stored in "creation order" as [x_k,...,x_1],
-            // so x_{lg(i)+1} = is indexed by (lg_n-1) - lg_i
-            let x_lg_i_sq = challenges_sq[(lg_n-1) - lg_i];
-            s.push( s[i-k] * x_lg_i_sq );
-        }
-        let s = s;
+        let (x_sq, x_inv_sq, s) = self.verification_scalars(transcript);
 
         let a_times_s = s.iter().map(|s_i| self.a * s_i);
 
@@ -183,9 +200,8 @@ impl Proof {
             .zip(inv_s)
             .map(|(h_i, s_i_inv)| (self.b * s_i_inv) * h_i.borrow());
 
-        let neg_x_sq = challenges_sq.iter().map(|x| -x);
-
-        let neg_x_inv_sq = inv_challenges.iter().map(|x_inv| -(x_inv * x_inv));
+        let neg_x_sq = x_sq.iter().map(|xi| -xi);
+        let neg_x_inv_sq = x_inv_sq.iter().map(|xi| -xi);
 
         let expect_P = ristretto::vartime::multiscalar_mult(
             iter::once(self.a * self.b)
