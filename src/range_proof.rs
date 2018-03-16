@@ -147,7 +147,7 @@ impl RangeProof {
 
         // Get a challenge value to combine statements for the IPP
         let w = transcript.challenge_scalar();
-        let Q = w * B_blinding;
+        let Q = w * B;
 
         // Generate the IPP proof
         let ipp_proof = inner_product_proof::Proof::create(
@@ -189,6 +189,8 @@ impl RangeProof {
 
         let y = transcript.challenge_scalar();
         let z = transcript.challenge_scalar();
+        let zz = z * z;
+        let minus_z = -z;
 
         transcript.commit(self.T_1.compress().as_bytes());
         transcript.commit(self.T_2.compress().as_bytes());
@@ -201,60 +203,53 @@ impl RangeProof {
 
         let w = transcript.challenge_scalar();
 
-        // Check that t(x) is consistent with commitments V, T_1, T_2
-        let poly_check = ristretto::vartime::multiscalar_mult(
-            &[
-                z * z,
-                x,
-                x * x,
-                (delta(n, &y, &z) - self.t_x),
-                -self.t_x_blinding,
-            ],
-            &[self.V, self.T_1, self.T_2, *gens.B, *gens.B_blinding],
+        // Challenge value for batching statements to be verified
+        let c = Scalar::random(rng);
+
+        let (x_sq, x_inv_sq, s) = self.ipp_proof.verification_scalars(transcript);
+        let s_inv = s.iter().rev();
+
+        let a = self.ipp_proof.a;
+        let b = self.ipp_proof.b;
+
+        let g = s.iter().map(|s_i| minus_z - a * s_i);
+        let h = s_inv
+            .zip(util::exp_iter(Scalar::from_u64(2)))
+            .zip(util::exp_iter(y.invert()))
+            .map(|((s_i_inv, exp_2), exp_y_inv)| z + exp_y_inv * (zz * exp_2 - b * s_i_inv));
+
+        let mega_check = ristretto::vartime::multiscalar_mult(
+            iter::once(Scalar::one())
+                .chain(iter::once(x))
+                .chain(iter::once(c * z * z))
+                .chain(iter::once(c * x))
+                .chain(iter::once(c * x * x))
+                .chain(iter::once(-self.e_blinding - c * self.t_x_blinding))
+                .chain(iter::once(
+                    w * (self.t_x - a * b) + c * (delta(n, &y, &z) - self.t_x),
+                ))
+                .chain(g)
+                .chain(h)
+                .chain(x_sq.iter().cloned())
+                .chain(x_inv_sq.iter().cloned()),
+            iter::once(&self.A)
+                .chain(iter::once(&self.S))
+                .chain(iter::once(&self.V))
+                .chain(iter::once(&self.T_1))
+                .chain(iter::once(&self.T_2))
+                .chain(iter::once(gens.B_blinding))
+                .chain(iter::once(gens.B))
+                .chain(gens.G.iter())
+                .chain(gens.H.iter())
+                .chain(self.ipp_proof.L_vec.iter())
+                .chain(self.ipp_proof.R_vec.iter()),
         );
 
-        if !poly_check.is_identity() {
-            return Err(());
+        if mega_check.is_identity() {
+            Ok(())
+        } else {
+            Err(())
         }
-
-        // Recompute P + t(x)Q = P + t(x)w B_blinding
-
-        // XXX later we will need to fold this into the IPP api
-        let G_sum = gens.G
-            .iter()
-            .fold(RistrettoPoint::identity(), |acc, G_i| acc + G_i);
-
-        let y_inv = y.invert();
-        let two_over_y = Scalar::from_u64(2) * y_inv;
-        let zz = z * z;
-
-        let H_scalars = util::exp_iter(two_over_y)
-            .take(n)
-            .map(|exp_two_over_y| z + zz * exp_two_over_y);
-
-        let P_plus_tx_Q = &self.A
-            + &ristretto::vartime::multiscalar_mult(
-                [w * self.t_x - self.e_blinding, x, -z]
-                    .iter()
-                    .cloned()
-                    .chain(H_scalars),
-                [*gens.B_blinding, self.S, G_sum]
-                    .iter()
-                    .chain(gens.H.iter()),
-            );
-
-        // XXX eliminate this when merging into a single multiscalar mult
-        let Q = w * gens.B_blinding;
-
-        // Return the result of IPP verification using the recomputed P + t(x) Q
-        self.ipp_proof.verify(
-            transcript,
-            util::exp_iter(y_inv).take(n),
-            &P_plus_tx_Q,
-            &Q,
-            gens.G,
-            gens.H,
-        )
     }
 }
 
