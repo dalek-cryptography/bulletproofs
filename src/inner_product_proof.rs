@@ -1,6 +1,8 @@
 #![allow(non_snake_case)]
 
 use std::iter;
+use std::borrow::Borrow;
+
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::ristretto;
 use curve25519_dalek::scalar::Scalar;
@@ -10,33 +12,44 @@ use scalar;
 
 use proof_transcript::ProofTranscript;
 
+use util;
+
+use generators::Generators;
+
 use range_proof::inner_product;
-use range_proof::make_generators;
 
 use sha2::Sha256;
 
+#[derive(Clone, Debug)]
 pub struct Proof {
-    L_vec: Vec<RistrettoPoint>,
-    R_vec: Vec<RistrettoPoint>,
-    a: Scalar,
-    b: Scalar,
+    pub(crate) L_vec: Vec<RistrettoPoint>,
+    pub(crate) R_vec: Vec<RistrettoPoint>,
+    pub(crate) a: Scalar,
+    pub(crate) b: Scalar,
 }
 
 impl Proof {
     /// Create an inner-product proof.
     ///
+    /// The proof is created with respect to the bases G, Hprime,
+    /// where Hprime[i] = H[i] * Hprime_factors[i].
+    ///
     /// The `verifier` is passed in as a parameter so that the
     /// challenges depend on the *entire* transcript (including parent
     /// protocols).
-    pub fn create(
+    pub fn create<I>(
         verifier: &mut ProofTranscript,
-        P: &RistrettoPoint,
         Q: &RistrettoPoint,
+        Hprime_factors: I,
         mut G_vec: Vec<RistrettoPoint>,
         mut H_vec: Vec<RistrettoPoint>,
         mut a_vec: Vec<Scalar>,
         mut b_vec: Vec<Scalar>,
-    ) -> Proof {
+    ) -> Proof
+    where
+        I: IntoIterator,
+        I::Item: Borrow<Scalar>,
+    {
         // Create slices G, H, a, b backed by their respective
         // vectors.  This lets us reslice as we compress the lengths
         // of the vectors in the main loop below.
@@ -52,6 +65,12 @@ impl Proof {
         assert_eq!(H.len(), n);
         assert_eq!(a.len(), n);
         assert_eq!(b.len(), n);
+
+        // XXX save these scalar mults by unrolling them into the
+        // first iteration of the loop below
+        for (H_i, h_i) in H.iter_mut().zip(Hprime_factors.into_iter()) {
+            *H_i = (&*H_i) * h_i.borrow();
+        }
 
         let lg_n = n.next_power_of_two().trailing_zeros() as usize;
         let mut L_vec = Vec::with_capacity(lg_n);
@@ -107,81 +126,95 @@ impl Proof {
         };
     }
 
-    fn verify(
+    pub(crate) fn verification_scalars(
         &self,
-        verifier: &mut ProofTranscript,
-        P: &RistrettoPoint,
-        Q: &RistrettoPoint,
-        G_vec: &Vec<RistrettoPoint>,
-        H_vec: &Vec<RistrettoPoint>,
-    ) -> Result<(), ()> {
-        // XXX prover should commit to n
+        transcript: &mut ProofTranscript,
+    ) -> (Vec<Scalar>, Vec<Scalar>, Vec<Scalar>) {
         let lg_n = self.L_vec.len();
         let n = 1 << lg_n;
 
-        // XXX figure out how ser/deser works for Proofs
-        // maybe avoid this compression
+        // 1. Recompute x_k,...,x_1 based on the proof transcript
+
         let mut challenges = Vec::with_capacity(lg_n);
         for (L, R) in self.L_vec.iter().zip(self.R_vec.iter()) {
-            verifier.commit(L.compress().as_bytes());
-            verifier.commit(R.compress().as_bytes());
+            // XXX maybe avoid this compression when proof ser/de is sorted out
+            transcript.commit(L.compress().as_bytes());
+            transcript.commit(R.compress().as_bytes());
 
-            challenges.push(verifier.challenge_scalar());
+            challenges.push(transcript.challenge_scalar());
         }
 
-        let mut inv_challenges = challenges.clone();
-        let allinv = scalar::batch_invert(&mut inv_challenges);
+        // 2. Compute 1/(x_k...x_1) and 1/x_k, ..., 1/x_1
 
-        for x in challenges.iter_mut() {
-            *x = &*x * &*x; // wtf
+        let mut challenges_inv = challenges.clone();
+        let allinv = scalar::batch_invert(&mut challenges_inv);
+
+        // 3. Compute x_i^2 and (1/x_i)^2
+
+        for i in 0..lg_n {
+            // XXX missing square fn upstream
+            challenges[i] = challenges[i] * challenges[i];
+            challenges_inv[i] = challenges_inv[i] * challenges_inv[i];
         }
         let challenges_sq = challenges;
+        let challenges_inv_sq = challenges_inv;
 
-        // j-th bit of i
-        let bit = |i, j| 1 & (i >> j);
+        // 4. Compute s values inductively.
 
         let mut s = Vec::with_capacity(n);
-        for i in 0..n {
-            let mut s_i = allinv;
-            for j in 0..lg_n {
-                if bit(i, j) == 1 {
-                    // The challenges are stored in "creation order" as [x_k,...,x_1]
-                    s_i *= challenges_sq[(lg_n - 1) - j];
-                }
-            }
-            s.push(s_i);
+        s.push(allinv);
+        for i in 1..n {
+            let lg_i = (32 - 1 - (i as u32).leading_zeros()) as usize;
+            let k = 1 << lg_i;
+            // The challenges are stored in "creation order" as [x_k,...,x_1],
+            // so x_{lg(i)+1} = is indexed by (lg_n-1) - lg_i
+            let x_lg_i_sq = challenges_sq[(lg_n - 1) - lg_i];
+            s.push(s[i - k] * x_lg_i_sq);
         }
-        let s = s;
 
-        // so many allocs :(
-        // these were supposed to be iterators but the dalek trait doesn't accept values
+        (challenges_sq, challenges_inv_sq, s)
+    }
 
-        let ab = self.a * self.b;
+    pub fn verify<I>(
+        &self,
+        transcript: &mut ProofTranscript,
+        Hprime_factors: I,
+        P: &RistrettoPoint,
+        Q: &RistrettoPoint,
+        G: &[RistrettoPoint],
+        H: &[RistrettoPoint],
+    ) -> Result<(), ()>
+    where
+        I: IntoIterator,
+        I::Item: Borrow<Scalar>,
+    {
+        let (x_sq, x_inv_sq, s) = self.verification_scalars(transcript);
 
-        let a_times_s: Vec<_> = s.iter().map(|s_i| self.a * s_i).collect();
+        let a_times_s = s.iter().map(|s_i| self.a * s_i);
 
-        let b_div_s: Vec<_> = s.iter().rev().map(|s_i_inv| self.b * s_i_inv).collect();
+        // 1/s[i] is s[!i], and !i runs from n-1 to 0 as i runs from 0 to n-1
+        let inv_s = s.iter().rev();
 
-        let neg_x_sq: Vec<_> = challenges_sq.iter().map(|x| -x).collect();
+        let h_times_b_div_s = Hprime_factors
+            .into_iter()
+            .zip(inv_s)
+            .map(|(h_i, s_i_inv)| (self.b * s_i_inv) * h_i.borrow());
 
-        let neg_x_inv_sq: Vec<_> = inv_challenges
-            .iter()
-            .map(|x_inv| -(x_inv * x_inv))
-            .collect();
+        let neg_x_sq = x_sq.iter().map(|xi| -xi);
+        let neg_x_inv_sq = x_inv_sq.iter().map(|xi| -xi);
 
-        let scalar_iter = iter::once(&ab)
-            .chain(a_times_s.iter())
-            .chain(b_div_s.iter())
-            .chain(neg_x_sq.iter())
-            .chain(neg_x_inv_sq.iter());
-
-        let points_iter = iter::once(Q)
-            .chain(G_vec.iter())
-            .chain(H_vec.iter())
-            .chain(self.L_vec.iter())
-            .chain(self.R_vec.iter());
-
-        let expect_P = ristretto::vartime::multiscalar_mult(scalar_iter, points_iter);
+        let expect_P = ristretto::vartime::multiscalar_mult(
+            iter::once(self.a * self.b)
+                .chain(a_times_s)
+                .chain(h_times_b_div_s)
+                .chain(neg_x_sq)
+                .chain(neg_x_inv_sq),
+            iter::once(Q)
+                .chain(G.iter())
+                .chain(H.iter())
+                .chain(self.L_vec.iter())
+                .chain(self.R_vec.iter()),
+        );
 
         if expect_P == *P {
             Ok(())
@@ -195,74 +228,82 @@ impl Proof {
 mod tests {
     use super::*;
 
-    fn test_helper_create(n: usize, expected_a: &[u8; 32], expected_b: &[u8; 32]) {
-        let mut verifier = ProofTranscript::new(b"innerproducttest");
-        let G = &RistrettoPoint::hash_from_bytes::<Sha256>("hello".as_bytes());
-        let H = &RistrettoPoint::hash_from_bytes::<Sha256>("there".as_bytes());
-        let G_vec = make_generators(G, n);
-        let H_vec = make_generators(H, n);
+    use rand::OsRng;
 
-        let a_vec = vec![Scalar::from_u64(1); n];
-        let b_vec = vec![Scalar::from_u64(2); n];
+    fn test_helper_create(n: usize) {
+        let mut rng = OsRng::new().unwrap();
 
+        let gens = Generators::new(n, 1);
+        let G = gens.share(0).G.to_vec();
+        let H = gens.share(0).H.to_vec();
+
+        // Q would be determined upstream in the protocol, so we pick a random one.
         let Q = RistrettoPoint::hash_from_bytes::<Sha256>(b"test point");
-        let c = inner_product(&a_vec, &b_vec);
+
+        // a and b are the vectors for which we want to prove c = <a,b>
+        let a: Vec<_> = (0..n).map(|_| Scalar::random(&mut rng)).collect();
+        let b: Vec<_> = (0..n).map(|_| Scalar::random(&mut rng)).collect();
+        let c = inner_product(&a, &b);
+
+        // y_inv is (the inverse of) a random challenge
+        let y_inv = Scalar::random(&mut rng);
+
+        // P would be determined upstream, but we need a correct P to check the proof.
+        //
+        // To generate P = <a,G> + <b,H'> + <a,b> Q, compute
+        //             P = <a,G> + <b',H> + <a,b> Q,
+        // where b' = b \circ y^(-n)
+        let b_prime = b.iter().zip(util::exp_iter(y_inv)).map(|(bi, yi)| bi * yi);
+        // a.iter() has Item=&Scalar, need Item=Scalar to chain with b_prime
+        let a_prime = a.iter().cloned();
 
         let P = ristretto::vartime::multiscalar_mult(
-            a_vec.iter().chain(b_vec.iter()).chain(iter::once(&c)),
-            G_vec.iter().chain(H_vec.iter()).chain(iter::once(&Q)),
-        );
-
-        let proof = Proof::create(
-            &mut verifier,
-            &P,
-            &Q,
-            G_vec.clone(),
-            H_vec.clone(),
-            a_vec.clone(),
-            b_vec.clone(),
+            a_prime.chain(b_prime).chain(iter::once(c)),
+            G.iter().chain(H.iter()).chain(iter::once(&Q)),
         );
 
         let mut verifier = ProofTranscript::new(b"innerproducttest");
-        assert!(proof.verify(&mut verifier, &P, &Q, &G_vec, &H_vec).is_ok());
+        let proof = Proof::create(
+            &mut verifier,
+            &Q,
+            util::exp_iter(y_inv),
+            G.clone(),
+            H.clone(),
+            a.clone(),
+            b.clone(),
+        );
 
-        //assert_eq!(proof.a.as_bytes(), expected_a);
-        //assert_eq!(proof.b.as_bytes(), expected_b);
+        let mut verifier = ProofTranscript::new(b"innerproducttest");
+        assert!(
+            proof
+                .verify(&mut verifier, util::exp_iter(y_inv), &P, &Q, &G, &H)
+                .is_ok()
+        );
     }
 
     #[test]
     fn make_ipp_1() {
-        test_helper_create(1, &[0; 32], &[0; 32]);
+        test_helper_create(1);
     }
 
     #[test]
     fn make_ipp_2() {
-        test_helper_create(2, &[0; 32], &[0; 32]);
+        test_helper_create(2);
     }
 
     #[test]
     fn make_ipp_4() {
-        test_helper_create(4, &[0; 32], &[0; 32]);
-    }
-
-    #[test]
-    fn make_ipp_64() {
-        // These test vectors don't have a ground truth, they're just to catch accidental changes to the computation.
-        test_helper_create(
-            64,
-            b"=\xa2\xed\xd2i\x1a\xb3'oF\xba:S\x12.\xbd)\xe1F\xbeI\xb4+\x11V&\xa6\xae\x1fGd\x04",
-            b"zD\xdb\xa5\xd34fO\xde\x8ctu\xa6$\\zS\xc2\x8d|\x93hW\"\xacLL]?\x8e\xc8\x08",
-        );
+        test_helper_create(4);
     }
 
     #[test]
     fn make_ipp_32() {
-        // These test vectors don't have a ground truth, they're just to catch accidental changes to the computation.
-        test_helper_create(
-            32,
-            b"l\xa3\xa8\xda\xca\xf9\xdbec|i\xb32i\xc0'\xc3H\xde+\xa0P\x0e;.\xf5\x9cf'?\xa6\n",
-            b"\xebr[X{\x90\xa5s\xf0[\xdb\xc3\x86\xd8\xa1:\x86\x91\xbcW@\xa1\x1cv\\\xea9\xcdN~L\x05",
-        );
+        test_helper_create(32);
+    }
+
+    #[test]
+    fn make_ipp_64() {
+        test_helper_create(64);
     }
 }
 
@@ -272,60 +313,66 @@ mod bench {
     use super::*;
     use test::Bencher;
 
-    fn bench_helper_create(n: usize, b: &mut Bencher) {
-        let mut verifier = ProofTranscript::new(b"innerproducttest");
-        let G = &RistrettoPoint::hash_from_bytes::<Sha256>("hello".as_bytes());
-        let H = &RistrettoPoint::hash_from_bytes::<Sha256>("there".as_bytes());
-        let G_vec = make_generators(G, n);
-        let H_vec = make_generators(H, n);
-        let Q = RistrettoPoint::hash_from_bytes::<Sha256>("more".as_bytes());
-        let P = RistrettoPoint::hash_from_bytes::<Sha256>("points".as_bytes());
-        let a_vec = vec![Scalar::from_u64(1); n];
-        let b_vec = vec![Scalar::from_u64(2); n];
+    fn bench_helper_create(n: usize, bench: &mut Bencher) {
+        let gens = Generators::new(n, 1);
+        let G = gens.share(0).G.to_vec();
+        let H = gens.share(0).H.to_vec();
 
-        b.iter(|| {
+        // Q would be determined upstream in the protocol, so we pick a random one.
+        let Q = RistrettoPoint::hash_from_bytes::<Sha256>(b"test point");
+
+        let a = vec![Scalar::from_u64(1); n];
+        let b = vec![Scalar::from_u64(2); n];
+        let ones = vec![Scalar::from_u64(1); n];
+
+        let mut verifier = ProofTranscript::new(b"innerproducttest");
+
+        bench.iter(|| {
             Proof::create(
                 &mut verifier,
-                &P,
                 &Q,
-                G_vec.clone(),
-                H_vec.clone(),
-                a_vec.clone(),
-                b_vec.clone(),
+                &ones,
+                G.clone(),
+                H.clone(),
+                a.clone(),
+                b.clone(),
             )
         });
     }
 
-    fn bench_helper_verify(n: usize, b: &mut Bencher) {
-        let mut verifier = ProofTranscript::new(b"innerproducttest");
-        let G = &RistrettoPoint::hash_from_bytes::<Sha256>("hello".as_bytes());
-        let H = &RistrettoPoint::hash_from_bytes::<Sha256>("there".as_bytes());
-        let G_vec = make_generators(G, n);
-        let H_vec = make_generators(H, n);
+    fn bench_helper_verify(n: usize, bench: &mut Bencher) {
+        let gens = Generators::new(n, 1);
+        let G = gens.share(0).G.to_vec();
+        let H = gens.share(0).H.to_vec();
 
-        let a_vec = vec![Scalar::from_u64(1); n];
-        let b_vec = vec![Scalar::from_u64(2); n];
-
+        // Q would be determined upstream in the protocol, so we pick a random one.
         let Q = RistrettoPoint::hash_from_bytes::<Sha256>(b"test point");
-        let c = inner_product(&a_vec, &b_vec);
 
-        let P = ristretto::vartime::multiscalar_mult(
-            a_vec.iter().chain(b_vec.iter()).chain(iter::once(&c)),
-            G_vec.iter().chain(H_vec.iter()).chain(iter::once(&Q)),
-        );
+        let a = vec![Scalar::from_u64(1); n];
+        let b = vec![Scalar::from_u64(2); n];
+        let ones = vec![Scalar::from_u64(1); n];
+
+        let mut verifier = ProofTranscript::new(b"innerproducttest");
 
         let proof = Proof::create(
             &mut verifier,
-            &P,
             &Q,
-            G_vec.clone(),
-            H_vec.clone(),
-            a_vec.clone(),
-            b_vec.clone(),
+            &ones,
+            G.clone(),
+            H.clone(),
+            a.clone(),
+            b.clone(),
+        );
+
+        let c = inner_product(&a, &b);
+
+        let P = ristretto::vartime::multiscalar_mult(
+            a.iter().chain(b.iter()).chain(iter::once(&c)),
+            G.iter().chain(H.iter()).chain(iter::once(&Q)),
         );
 
         let mut verifier = ProofTranscript::new(b"innerproducttest");
-        b.iter(|| proof.verify(&mut verifier, &P, &Q, &G_vec, &H_vec));
+        bench.iter(|| proof.verify(&mut verifier, &ones, &P, &Q, &G, &H));
     }
 
     #[bench]
