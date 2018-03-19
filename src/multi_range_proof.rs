@@ -39,8 +39,8 @@ pub struct PartyAwaitingValueChallenge<'a> {
     value_commitment: ValueCommitment,
     a_blinding: Scalar,
     s_blinding: Scalar,
-    s_l: Vec<Scalar>,
-    s_r: Vec<Scalar>,
+    s_L: Vec<Scalar>,
+    s_R: Vec<Scalar>,
 }
 
 pub struct PartyAwaitingPolyChallenge {
@@ -163,8 +163,30 @@ impl<'a> PartyAwaitingPosition<'a> {
     ) -> (PartyAwaitingValueChallenge<'a>, ValueCommitment) {
         let gen_share = self.generators.share(j);
 
-        let (A, a_blinding) = self.commit_A(&gen_share, &mut rng);
-        let (S, s_blinding, s_l, s_r) = self.commit_S(&gen_share, &mut rng);
+        let a_blinding = Scalar::random(&mut rng);
+        // Compute A = <a_L, G> + <a_R, H> + a_blinding * B_blinding
+        let mut A = gen_share.B_blinding * a_blinding;
+        for i in 0..self.n {
+            let v_i = (self.v >> i) & 1;
+            // XXX replace this with a conditional move
+            if v_i == 1 {
+                A += gen_share.G[i]; // + bit*G_i
+            } else {
+                A -= gen_share.H[i]; // + (bit-1)*H_i
+            }
+        }
+
+        let s_blinding = Scalar::random(&mut rng);
+        let s_L: Vec<Scalar> = (0..self.n).map(|_| Scalar::random(&mut rng)).collect();
+        let s_R: Vec<Scalar> = (0..self.n).map(|_| Scalar::random(&mut rng)).collect();
+
+        // Compute S = <s_L, G> + <s_R, H> + s_blinding * B_blinding
+        let S = ristretto::multiscalar_mult(
+            iter::once(&s_blinding).chain(s_L.iter()).chain(s_R.iter()),
+            iter::once(gen_share.B_blinding)
+                .chain(gen_share.G.iter())
+                .chain(gen_share.H.iter()),
+        );
 
         // Return next state and all commitments
         let value_commitment = ValueCommitment { V: self.V, A, S };
@@ -178,48 +200,10 @@ impl<'a> PartyAwaitingPosition<'a> {
             value_commitment: value_commitment.clone(),
             a_blinding,
             s_blinding,
-            s_l,
-            s_r,
+            s_L,
+            s_R,
         };
         (next_state, value_commitment)
-    }
-
-    fn commit_A<R: Rng>(
-        &self,
-        generators: &GeneratorsView,
-        mut rng: &mut R,
-    ) -> (RistrettoPoint, Scalar) {
-        let a_blinding = Scalar::random(&mut rng);
-        let mut A = generators.B_blinding * a_blinding;
-        for i in 0..self.n {
-            let v_i = (self.v >> i) & 1;
-            // XXX make sure this is const time
-            if v_i == 1 {
-                A += generators.G[i]; // + bit*G_i
-            } else {
-                A -= generators.H[i]; // + (bit-1)*H_i
-            }
-        }
-        (A, a_blinding)
-    }
-
-    fn commit_S<R: Rng>(
-        &self,
-        generators: &GeneratorsView,
-        mut rng: &mut R,
-    ) -> (RistrettoPoint, Scalar, Vec<Scalar>, Vec<Scalar>) {
-        let s_l: Vec<Scalar> = (0..self.n).map(|_| Scalar::random(&mut rng)).collect();
-        let s_r: Vec<Scalar> = (0..self.n).map(|_| Scalar::random(&mut rng)).collect();
-
-        let s_blinding = Scalar::random(&mut rng);
-        let S = ristretto::multiscalar_mult(
-            iter::once(&s_blinding).chain(s_l.iter()).chain(s_r.iter()),
-            iter::once(generators.B_blinding)
-                .chain(generators.G.iter())
-                .chain(generators.H.iter()),
-        );
-
-        (S, s_blinding, s_l, s_r)
     }
 }
 
@@ -270,28 +254,26 @@ impl<'a> PartyAwaitingValueChallenge<'a> {
         let offset_z = scalar_pow_vartime(&z, self.j as u64);
 
         // Calculate t by calculating vectors l0, l1, r0, r1 and multiplying
-        let mut l = VecPoly2::new(n);
-        let mut r = VecPoly2::new(n);
+        let mut l_poly = VecPoly2::new(n);
+        let mut r_poly = VecPoly2::new(n);
 
-
-        let z2 = z * z;
+        let zz = z * z;
         let mut exp_y = Scalar::one(); // start at y^0 = 1
         let mut exp_2 = Scalar::one(); // start at 2^0 = 1
         for i in 0..n {
-            let a_l = Scalar::from_u64((self.v >> i) & 1);
-            let a_r = a_l - Scalar::one();
+            let a_L_i = Scalar::from_u64((self.v >> i) & 1);
+            let a_R_i = a_L_i - Scalar::one();
 
-            l.0[i] = a_l - z;
-            l.1[i] = self.s_l[i];
-
-            r.0[i] = exp_y * offset_y * (a_r + z) + z2 * offset_z * exp_2;
-            r.1[i] = exp_y * offset_y * self.s_r[i];
+            l_poly.0[i] = a_L_i - z;
+            l_poly.1[i] = self.s_L[i];
+            r_poly.0[i] = exp_y * offset_y * (a_R_i + z) + zz * offset_z * exp_2;
+            r_poly.1[i] = exp_y * offset_y * self.s_R[i];
 
             exp_y = exp_y * y; // y^i -> y^(i+1)
             exp_2 = exp_2 + exp_2; // 2^i -> 2^(i+1)
         }
 
-        let t = inner_product_poly2(&l, &r);
+        let t = inner_product_poly2(&l_poly, &r_poly);
 
         // Generate x by committing to T_1, T_2 (line 49-54)
         let (T1, t1_blinding) = pedersen_commitment(&t.1, &self.generators.share(self.j), rng);
@@ -304,8 +286,8 @@ impl<'a> PartyAwaitingValueChallenge<'a> {
             poly_commitment: poly_commitment.clone(),
             z: *z,
             offset_z,
-            l,
-            r,
+            l: l_poly,
+            r: r_poly,
             t,
             v_blinding: self.v_blinding,
             a_blinding: self.a_blinding,
