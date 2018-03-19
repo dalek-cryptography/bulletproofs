@@ -67,7 +67,9 @@ impl ProofTranscript {
     /// Begin a new, empty proof transcript, using the given `label`
     /// for domain separation.
     pub fn new(label: &[u8]) -> Self {
-        let mut ro = ProofTranscript { hash: Keccak::new_shake128() };
+        let mut ro = ProofTranscript {
+            hash: Keccak::new_shake128(),
+        };
         ro.commit(label);
         // makes sure the label is disambiguated from the rest of the messages.
         ro.pad();
@@ -80,7 +82,6 @@ impl ProofTranscript {
     ///
     /// Each message must be shorter than 64Kb (65536 bytes).
     pub fn commit(&mut self, message: &[u8]) {
-
         let len = message.len();
         if len > (u16::max_value() as usize) {
             panic!("Committed message must be less than 64Kb!");
@@ -110,7 +111,6 @@ impl ProofTranscript {
 
     /// Extracts an arbitrary-sized challenge byte slice.
     pub fn challenge_bytes(&mut self, mut output: &mut [u8]) {
-
         // XXX we rely on tiny_keccak experimental support for half-duplex mode and
         // correct switching from absorbing to squeezing and back.
         // Review this after this PR is merged or updated:
