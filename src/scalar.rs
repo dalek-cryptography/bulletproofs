@@ -83,12 +83,15 @@ pub fn scalar_pow_vartime(x: &Scalar, mut n: u64) -> Scalar {
 }
 
 pub fn inner_product(a: &Vec<Scalar>, b: &Vec<Scalar>) -> Scalar {
-    a.iter().zip(b.iter()).map(|(&l,&r)| l*r).fold(Scalar::zero(), |t, x| t+x)
+    a.iter().zip(b.iter()).map(|(&l, &r)| l * r).fold(
+        Scalar::zero(),
+        |t, x| t + x,
+    )
 }
 
 
 pub fn add_vectors(a: &Vec<Scalar>, b: &Vec<Scalar>) -> Vec<Scalar> {
-    a.iter().zip(b.iter()).map(|(&l,&r)| l + r).collect()
+    a.iter().zip(b.iter()).map(|(&l, &r)| l + r).collect()
 }
 
 
@@ -102,14 +105,17 @@ mod test {
         let x = Scalar::from_bits(
             *b"\x84\xfc\xbcOx\x12\xa0\x06\xd7\x91\xd9z:'\xdd\x1e!CE\xf7\xb1\xb9Vz\x810sD\x96\x85\xb5\x07",
         );
-        assert_eq!(scalar_pow_vartime(&x, 0),   Scalar::one());
-        assert_eq!(scalar_pow_vartime(&x, 1),   x);
-        assert_eq!(scalar_pow_vartime(&x, 2),   x*x);
-        assert_eq!(scalar_pow_vartime(&x, 3),   x*x*x);
-        assert_eq!(scalar_pow_vartime(&x, 4),   x*x*x*x);
-        assert_eq!(scalar_pow_vartime(&x, 5),   x*x*x*x*x);
-        assert_eq!(scalar_pow_vartime(&x, 64),  scalar_pow_vartime_slow(&x, 64));
-        assert_eq!(scalar_pow_vartime(&x, 0b11001010), scalar_pow_vartime_slow(&x, 0b11001010));
+        assert_eq!(scalar_pow_vartime(&x, 0), Scalar::one());
+        assert_eq!(scalar_pow_vartime(&x, 1), x);
+        assert_eq!(scalar_pow_vartime(&x, 2), x * x);
+        assert_eq!(scalar_pow_vartime(&x, 3), x * x * x);
+        assert_eq!(scalar_pow_vartime(&x, 4), x * x * x * x);
+        assert_eq!(scalar_pow_vartime(&x, 5), x * x * x * x * x);
+        assert_eq!(scalar_pow_vartime(&x, 64), scalar_pow_vartime_slow(&x, 64));
+        assert_eq!(
+            scalar_pow_vartime(&x, 0b11001010),
+            scalar_pow_vartime_slow(&x, 0b11001010)
+        );
     }
 
     #[test]
