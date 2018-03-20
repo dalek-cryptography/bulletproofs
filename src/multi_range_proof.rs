@@ -11,81 +11,7 @@ use std::clone::Clone;
 use scalar::{scalar_pow_vartime, inner_product, add_vectors};
 use proof_transcript::ProofTranscript;
 use generators::{Generators, GeneratorsView};
-
-/// Party is an entry-point API for setting up a party.
-pub struct Party {}
-
-/// Dealer is an entry-point API for setting up a dealer
-pub struct Dealer {}
-
-/// As party awaits its position, they only know their value and desired bit-size of the proof.
-pub struct PartyAwaitingPosition<'a> {
-    generators: &'a Generators,
-    n: usize,
-    v: u64,
-    v_blinding: Scalar,
-    V: RistrettoPoint,
-}
-
-/// When party knows its position (`j`), it can produce commitments
-/// to all bits of the value and necessary blinding factors.
-pub struct PartyAwaitingValueChallenge<'a> {
-    n: usize, // bitsize of the range
-    v: u64,
-    v_blinding: Scalar,
-
-    j: usize, // index of the party, 1..m as in original paper
-    generators: &'a Generators,
-    value_commitment: ValueCommitment,
-    a_blinding: Scalar,
-    s_blinding: Scalar,
-    s_L: Vec<Scalar>,
-    s_R: Vec<Scalar>,
-}
-
-pub struct PartyAwaitingPolyChallenge {
-    value_commitment: ValueCommitment,
-    poly_commitment: PolyCommitment,
-
-    z: Scalar,
-    offset_z: Scalar,
-    l: VecPoly2,
-    r: VecPoly2,
-    t: Poly3,
-    v_blinding: Scalar,
-    a_blinding: Scalar,
-    s_blinding: Scalar,
-    t1_blinding: Scalar,
-    t2_blinding: Scalar,
-}
-
-/// When the dealer is initialized, it only knows the size of the set.
-pub struct DealerAwaitingValues {
-    transcript: ProofTranscript,
-    n: usize,
-}
-
-pub struct DealerAwaitingPoly {
-    transcript: ProofTranscript,
-    n: usize,
-}
-
-pub struct DealerAwaitingShares {
-    n: usize,
-}
-
-#[derive(Clone)]
-pub struct ValueCommitment {
-    pub V: RistrettoPoint,
-    pub A: RistrettoPoint,
-    pub S: RistrettoPoint,
-}
-
-#[derive(Clone)]
-pub struct PolyCommitment {
-    pub T1: RistrettoPoint,
-    pub T2: RistrettoPoint,
-}
+use util::{PolyDeg3, VecPoly2};
 
 #[derive(Clone)]
 pub struct ProofShare {
@@ -100,7 +26,6 @@ pub struct ProofShare {
     pub l: Vec<Scalar>,
     pub r: Vec<Scalar>,
 }
-
 
 pub struct Proof {
     pub n: usize,
@@ -117,6 +42,9 @@ pub struct Proof {
     pub l: Vec<Scalar>,
     pub r: Vec<Scalar>,
 }
+
+/// Party is an entry-point API for setting up a party.
+pub struct Party {}
 
 impl Party {
     pub fn new<'a, 'b, R: Rng>(
@@ -136,6 +64,9 @@ impl Party {
     }
 }
 
+/// Dealer is an entry-point API for setting up a dealer
+pub struct Dealer {}
+
 impl Dealer {
     /// Creates a new dealer with the given parties and a number of bits
     pub fn new(
@@ -151,6 +82,15 @@ impl Dealer {
         transcript.commit_u64(m as u64);
         Ok(DealerAwaitingValues { transcript, n })
     }
+}
+
+/// As party awaits its position, they only know their value and desired bit-size of the proof.
+pub struct PartyAwaitingPosition<'a> {
+    generators: &'a Generators,
+    n: usize,
+    v: u64,
+    v_blinding: Scalar,
+    V: RistrettoPoint,
 }
 
 impl<'a> PartyAwaitingPosition<'a> {
@@ -207,6 +147,12 @@ impl<'a> PartyAwaitingPosition<'a> {
     }
 }
 
+/// When the dealer is initialized, it only knows the size of the set.
+pub struct DealerAwaitingValues {
+    transcript: ProofTranscript,
+    n: usize,
+}
+
 impl DealerAwaitingValues {
     /// Combines commitments and computes challenge variables.
     pub fn present_value_commitments(
@@ -242,6 +188,29 @@ impl DealerAwaitingValues {
     }
 }
 
+#[derive(Clone)]
+pub struct ValueCommitment {
+    pub V: RistrettoPoint,
+    pub A: RistrettoPoint,
+    pub S: RistrettoPoint,
+}
+
+/// When party knows its position (`j`), it can produce commitments
+/// to all bits of the value and necessary blinding factors.
+pub struct PartyAwaitingValueChallenge<'a> {
+    n: usize, // bitsize of the range
+    v: u64,
+    v_blinding: Scalar,
+
+    j: usize, // index of the party, 1..m as in original paper
+    generators: &'a Generators,
+    value_commitment: ValueCommitment,
+    a_blinding: Scalar,
+    s_blinding: Scalar,
+    s_L: Vec<Scalar>,
+    s_R: Vec<Scalar>,
+}
+
 impl<'a> PartyAwaitingValueChallenge<'a> {
     pub fn apply_challenge<R: Rng>(
         &self,
@@ -254,11 +223,11 @@ impl<'a> PartyAwaitingValueChallenge<'a> {
         let offset_z = scalar_pow_vartime(&z, self.j as u64);
 
         // Calculate t by calculating vectors l0, l1, r0, r1 and multiplying
-        let mut l_poly = VecPoly2::new(n);
-        let mut r_poly = VecPoly2::new(n);
+        let mut l_poly = VecPoly2::zero(n);
+        let mut r_poly = VecPoly2::zero(n);
 
         let zz = z * z;
-        let mut exp_y = Scalar::one(); // start at y^0 = 1
+        let mut exp_y = offset_y; // start at y^j
         let mut exp_2 = Scalar::one(); // start at 2^0 = 1
         for i in 0..n {
             let a_L_i = Scalar::from_u64((self.v >> i) & 1);
@@ -266,14 +235,14 @@ impl<'a> PartyAwaitingValueChallenge<'a> {
 
             l_poly.0[i] = a_L_i - z;
             l_poly.1[i] = self.s_L[i];
-            r_poly.0[i] = exp_y * offset_y * (a_R_i + z) + zz * offset_z * exp_2;
-            r_poly.1[i] = exp_y * offset_y * self.s_R[i];
+            r_poly.0[i] = exp_y * (a_R_i + z) + zz * offset_z * exp_2;
+            r_poly.1[i] = exp_y * self.s_R[i];
 
             exp_y = exp_y * y; // y^i -> y^(i+1)
             exp_2 = exp_2 + exp_2; // 2^i -> 2^(i+1)
         }
 
-        let t = inner_product_poly2(&l_poly, &r_poly);
+        let t = l_poly.inner_product(&r_poly);
 
         // Generate x by committing to T_1, T_2 (line 49-54)
         let (T1, t1_blinding) = pedersen_commitment(&t.1, &self.generators.share(self.j), rng);
@@ -300,7 +269,7 @@ impl<'a> PartyAwaitingValueChallenge<'a> {
     }
 }
 
-fn inner_product_poly2(l: &VecPoly2, r: &VecPoly2) -> Poly3 {
+fn inner_product_poly2(l: &VecPoly2, r: &VecPoly2) -> PolyDeg3 {
     let t0 = inner_product(&l.0, &r.0);
     let t2 = inner_product(&l.1, &r.1);
 
@@ -310,9 +279,30 @@ fn inner_product_poly2(l: &VecPoly2, r: &VecPoly2) -> Poly3 {
     let l_r_mul = inner_product(&l_add, &r_add);
     let t1 = l_r_mul - t0 - t2;
 
-    Poly3(t0, t1, t2)
+    PolyDeg3(t0, t1, t2)
 }
 
+#[derive(Clone)]
+pub struct PolyCommitment {
+    pub T1: RistrettoPoint,
+    pub T2: RistrettoPoint,
+}
+
+pub struct PartyAwaitingPolyChallenge {
+    value_commitment: ValueCommitment,
+    poly_commitment: PolyCommitment,
+
+    z: Scalar,
+    offset_z: Scalar,
+    l: VecPoly2,
+    r: VecPoly2,
+    t: PolyDeg3,
+    v_blinding: Scalar,
+    a_blinding: Scalar,
+    s_blinding: Scalar,
+    t1_blinding: Scalar,
+    t2_blinding: Scalar,
+}
 
 impl PartyAwaitingPolyChallenge {
     pub fn apply_challenge(&self, x: &Scalar) -> ProofShare {
@@ -322,8 +312,8 @@ impl PartyAwaitingPolyChallenge {
 
         let e_blinding = self.a_blinding + self.s_blinding * x;
         let t_hat = self.t.eval(x);
-        let l_total = self.l.eval(x);
-        let r_total = self.r.eval(x);
+        let l_total = self.l.eval(*x);
+        let r_total = self.r.eval(*x);
 
         ProofShare {
             value_commitment: self.value_commitment.clone(),
@@ -335,6 +325,11 @@ impl PartyAwaitingPolyChallenge {
             r: r_total,
         }
     }
+}
+
+pub struct DealerAwaitingPoly {
+    transcript: ProofTranscript,
+    n: usize,
 }
 
 impl DealerAwaitingPoly {
@@ -356,6 +351,10 @@ impl DealerAwaitingPoly {
 
         (DealerAwaitingShares { n: self.n }, x)
     }
+}
+
+pub struct DealerAwaitingShares {
+    n: usize,
 }
 
 impl DealerAwaitingShares {
@@ -563,30 +562,6 @@ impl Proof {
     }
 }
 
-
-struct Poly3(Scalar, Scalar, Scalar);
-struct VecPoly2(Vec<Scalar>, Vec<Scalar>);
-
-impl Poly3 {
-    pub fn eval(&self, x: &Scalar) -> Scalar {
-        self.0 + x * (self.1 + x * self.2)
-    }
-}
-
-impl VecPoly2 {
-    pub fn new(n: usize) -> VecPoly2 {
-        VecPoly2(vec![Scalar::zero(); n], vec![Scalar::zero(); n])
-    }
-    pub fn eval(&self, x: &Scalar) -> Vec<Scalar> {
-        self.0
-            .iter()
-            .zip(self.1.iter())
-            .map(|(a, b)| a + x * b)
-            .collect()
-    }
-}
-
-
 /// Creates a new pedersen commitment
 fn pedersen_commitment<R: Rng>(
     scalar: &Scalar,
@@ -623,19 +598,6 @@ where
 
     (C, blinding)
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 #[cfg(test)]
 mod tests {
