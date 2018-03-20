@@ -12,11 +12,9 @@ use scalar;
 
 use proof_transcript::ProofTranscript;
 
-use util;
+use util::{self, inner_product};
 
 use generators::Generators;
-
-use range_proof::inner_product;
 
 use sha2::Sha256;
 
