@@ -8,7 +8,7 @@ use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::traits::Identity;
 use curve25519_dalek::scalar::Scalar;
 use std::clone::Clone;
-use scalar::{scalar_pow_vartime, inner_product, add_vectors};
+use scalar::{scalar_pow_vartime, inner_product};
 use proof_transcript::ProofTranscript;
 use generators::{Generators, GeneratorsView};
 use util::{PolyDeg3, VecPoly2};
@@ -18,9 +18,9 @@ pub struct ProofShare {
     pub value_commitment: ValueCommitment,
     pub poly_commitment: PolyCommitment,
 
+    pub t_x: Scalar,
     pub t_x_blinding: Scalar,
-    pub e_blinding: Scalar,
-    pub t: Scalar,
+    pub e_blinding: Scalar,  
 
     // don't need if doing inner product proof
     pub l: Vec<Scalar>,
@@ -34,9 +34,9 @@ pub struct Proof {
     pub S: RistrettoPoint,
     pub T1: RistrettoPoint,
     pub T2: RistrettoPoint,
+    pub t: Scalar,
     pub t_x_blinding: Scalar,
     pub e_blinding: Scalar,
-    pub t: Scalar,
 
     // FIXME: don't need if doing inner product proof
     pub l: Vec<Scalar>,
@@ -242,13 +242,13 @@ impl<'a> PartyAwaitingValueChallenge<'a> {
             exp_2 = exp_2 + exp_2; // 2^i -> 2^(i+1)
         }
 
-        let t = l_poly.inner_product(&r_poly);
+        let t_poly = l_poly.inner_product(&r_poly);
 
         // Generate x by committing to T_1, T_2 (line 49-54)
-        let (T1, t1_blinding) = pedersen_commitment(&t.1, &self.generators.share(self.j), rng);
-        let (T2, t2_blinding) = pedersen_commitment(&t.2, &self.generators.share(self.j), rng);
+        let (T_1, t_1_blinding) = pedersen_commitment(&t_poly.1, &self.generators.share(self.j), rng);
+        let (T_2, t_2_blinding) = pedersen_commitment(&t_poly.2, &self.generators.share(self.j), rng);
 
-        let poly_commitment = PolyCommitment { T1, T2 };
+        let poly_commitment = PolyCommitment { T_1, T_2 };
 
         let papc = PartyAwaitingPolyChallenge {
             value_commitment: self.value_commitment.clone(),
@@ -257,35 +257,22 @@ impl<'a> PartyAwaitingValueChallenge<'a> {
             offset_z,
             l: l_poly,
             r: r_poly,
-            t,
+            t: t_poly,
             v_blinding: self.v_blinding,
             a_blinding: self.a_blinding,
             s_blinding: self.s_blinding,
-            t1_blinding,
-            t2_blinding,
+            t_1_blinding,
+            t_2_blinding,
         };
 
         (papc, poly_commitment)
     }
 }
 
-fn inner_product_poly2(l: &VecPoly2, r: &VecPoly2) -> PolyDeg3 {
-    let t0 = inner_product(&l.0, &r.0);
-    let t2 = inner_product(&l.1, &r.1);
-
-    // use Karatsuba algorithm to find t.1 = l.0*r.1 + l.1*r.0
-    let l_add = add_vectors(&l.0, &l.1);
-    let r_add = add_vectors(&r.0, &r.1);
-    let l_r_mul = inner_product(&l_add, &r_add);
-    let t1 = l_r_mul - t0 - t2;
-
-    PolyDeg3(t0, t1, t2)
-}
-
 #[derive(Clone)]
 pub struct PolyCommitment {
-    pub T1: RistrettoPoint,
-    pub T2: RistrettoPoint,
+    pub T_1: RistrettoPoint,
+    pub T_2: RistrettoPoint,
 }
 
 pub struct PartyAwaitingPolyChallenge {
@@ -300,18 +287,22 @@ pub struct PartyAwaitingPolyChallenge {
     v_blinding: Scalar,
     a_blinding: Scalar,
     s_blinding: Scalar,
-    t1_blinding: Scalar,
-    t2_blinding: Scalar,
+    t_1_blinding: Scalar,
+    t_2_blinding: Scalar,
 }
 
 impl PartyAwaitingPolyChallenge {
     pub fn apply_challenge(&self, x: &Scalar) -> ProofShare {
         // Generate final values for proof (line 55-60)
-        let t_x_blinding = (self.t1_blinding + self.t2_blinding * x) * x +
-            self.z * self.z * self.offset_z * self.v_blinding;
+        let t_blinding_poly = PolyDeg3( 
+            self.z * self.z * self.offset_z * self.v_blinding,
+            self.t_1_blinding,
+            self.t_2_blinding,
+        );
 
+        let t_x = self.t.eval(x);
+        let t_x_blinding = t_blinding_poly.eval(x);
         let e_blinding = self.a_blinding + self.s_blinding * x;
-        let t_hat = self.t.eval(x);
         let l_total = self.l.eval(*x);
         let r_total = self.r.eval(*x);
 
@@ -319,8 +310,8 @@ impl PartyAwaitingPolyChallenge {
             value_commitment: self.value_commitment.clone(),
             poly_commitment: self.poly_commitment.clone(),
             t_x_blinding: t_x_blinding,
+            t_x: t_x,
             e_blinding: e_blinding,
-            t: t_hat,
             l: l_total,
             r: r_total,
         }
@@ -341,8 +332,8 @@ impl DealerAwaitingPoly {
         let mut T1 = RistrettoPoint::identity();
         let mut T2 = RistrettoPoint::identity();
         for commitment in poly_commitments.iter() {
-            T1 += commitment.T1;
-            T2 += commitment.T2;
+            T1 += commitment.T_1;
+            T2 += commitment.T_2;
         }
         self.transcript.commit(T1.compress().as_bytes());
         self.transcript.commit(T2.compress().as_bytes());
@@ -375,11 +366,11 @@ impl DealerAwaitingShares {
             ),
             T1: proof_shares.iter().fold(
                 RistrettoPoint::identity(),
-                |T1, ps| T1 + ps.poly_commitment.T1,
+                |T1, ps| T1 + ps.poly_commitment.T_1,
             ),
             T2: proof_shares.iter().fold(
                 RistrettoPoint::identity(),
-                |T2, ps| T2 + ps.poly_commitment.T2,
+                |T2, ps| T2 + ps.poly_commitment.T_2,
             ),
             t_x_blinding: proof_shares.iter().fold(Scalar::zero(), |acc, ps| {
                 acc + ps.t_x_blinding
@@ -389,7 +380,7 @@ impl DealerAwaitingShares {
             }),
             t: proof_shares.iter().fold(
                 Scalar::zero(),
-                |acc, ps| acc + ps.t,
+                |acc, ps| acc + ps.t_x,
             ),
 
             // FIXME: don't need if doing inner product proof
@@ -569,11 +560,12 @@ fn pedersen_commitment<R: Rng>(
     mut rng: &mut R,
 ) -> (RistrettoPoint, Scalar) {
     let blinding = Scalar::random(&mut rng);
-    // XXX change into multiscalar mult
-    (
-        (generators.B * scalar + generators.B_blinding * blinding),
-        blinding,
-    )
+
+    let commitment = ristretto::multiscalar_mult(
+        iter::once(scalar).chain(iter::once(&blinding)), 
+        iter::once(generators.B).chain(iter::once(generators.B_blinding))
+    );
+    (commitment, blinding)
 }
 
 /// Creates a new vector pedersen commitment
