@@ -193,10 +193,11 @@ impl Proof {
         // 1/s[i] is s[!i], and !i runs from n-1 to 0 as i runs from 0 to n-1
         let inv_s = s.iter().rev();
 
-        let h_times_b_div_s = Hprime_factors
-            .into_iter()
-            .zip(inv_s)
-            .map(|(h_i, s_i_inv)| (self.b * s_i_inv) * h_i.borrow());
+        let h_times_b_div_s = Hprime_factors.into_iter().zip(inv_s).map(
+            |(h_i, s_i_inv)| {
+                (self.b * s_i_inv) * h_i.borrow()
+            },
+        );
 
         let neg_x_sq = x_sq.iter().map(|xi| -xi);
         let neg_x_inv_sq = x_inv_sq.iter().map(|xi| -xi);

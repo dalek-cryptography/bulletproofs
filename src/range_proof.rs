@@ -213,7 +213,9 @@ impl RangeProof {
         let h = s_inv
             .zip(util::exp_iter(Scalar::from_u64(2)))
             .zip(util::exp_iter(y.invert()))
-            .map(|((s_i_inv, exp_2), exp_y_inv)| z + exp_y_inv * (zz * exp_2 - b * s_i_inv));
+            .map(|((s_i_inv, exp_2), exp_y_inv)| {
+                z + exp_y_inv * (zz * exp_2 - b * s_i_inv)
+            });
 
         let mega_check = ristretto::vartime::multiscalar_mult(
             iter::once(Scalar::one())
@@ -258,13 +260,15 @@ fn delta(n: usize, y: &Scalar, z: &Scalar) -> Scalar {
     let two = Scalar::from_u64(2);
 
     // XXX this could be more efficient, esp for powers of 2
-    let sum_of_powers_of_y = util::exp_iter(*y)
-        .take(n)
-        .fold(Scalar::zero(), |acc, x| acc + x);
+    let sum_of_powers_of_y = util::exp_iter(*y).take(n).fold(
+        Scalar::zero(),
+        |acc, x| acc + x,
+    );
 
-    let sum_of_powers_of_2 = util::exp_iter(two)
-        .take(n)
-        .fold(Scalar::zero(), |acc, x| acc + x);
+    let sum_of_powers_of_2 = util::exp_iter(two).take(n).fold(
+        Scalar::zero(),
+        |acc, x| acc + x,
+    );
 
     let zz = z * z;
 

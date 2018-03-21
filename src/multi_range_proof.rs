@@ -5,43 +5,14 @@ use std::iter;
 use rand::Rng;
 use curve25519_dalek::ristretto;
 use curve25519_dalek::ristretto::RistrettoPoint;
-use curve25519_dalek::traits::Identity;
+use curve25519_dalek::traits::{Identity, IsIdentity};
 use curve25519_dalek::scalar::Scalar;
 use std::clone::Clone;
-use scalar::{scalar_pow_vartime, inner_product};
+use scalar::scalar_pow_vartime;
 use proof_transcript::ProofTranscript;
 use generators::{Generators, GeneratorsView};
-use util::{PolyDeg3, VecPoly2};
-
-#[derive(Clone)]
-pub struct ProofShare {
-    pub value_commitment: ValueCommitment,
-    pub poly_commitment: PolyCommitment,
-
-    pub t_x: Scalar,
-    pub t_x_blinding: Scalar,
-    pub e_blinding: Scalar,  
-
-    // don't need if doing inner product proof
-    pub l: Vec<Scalar>,
-    pub r: Vec<Scalar>,
-}
-
-pub struct Proof {
-    pub n: usize,
-    pub value_commitments: Vec<RistrettoPoint>,
-    pub A: RistrettoPoint,
-    pub S: RistrettoPoint,
-    pub T1: RistrettoPoint,
-    pub T2: RistrettoPoint,
-    pub t: Scalar,
-    pub t_x_blinding: Scalar,
-    pub e_blinding: Scalar,
-
-    // FIXME: don't need if doing inner product proof
-    pub l: Vec<Scalar>,
-    pub r: Vec<Scalar>,
-}
+use util::{self, PolyDeg3, VecPoly2};
+use inner_product_proof;
 
 /// Party is an entry-point API for setting up a party.
 pub struct Party {}
@@ -245,8 +216,10 @@ impl<'a> PartyAwaitingValueChallenge<'a> {
         let t_poly = l_poly.inner_product(&r_poly);
 
         // Generate x by committing to T_1, T_2 (line 49-54)
-        let (T_1, t_1_blinding) = pedersen_commitment(&t_poly.1, &self.generators.share(self.j), rng);
-        let (T_2, t_2_blinding) = pedersen_commitment(&t_poly.2, &self.generators.share(self.j), rng);
+        let (T_1, t_1_blinding) =
+            pedersen_commitment(&t_poly.1, &self.generators.share(self.j), rng);
+        let (T_2, t_2_blinding) =
+            pedersen_commitment(&t_poly.2, &self.generators.share(self.j), rng);
 
         let poly_commitment = PolyCommitment { T_1, T_2 };
 
@@ -294,7 +267,7 @@ pub struct PartyAwaitingPolyChallenge {
 impl PartyAwaitingPolyChallenge {
     pub fn apply_challenge(&self, x: &Scalar) -> ProofShare {
         // Generate final values for proof (line 55-60)
-        let t_blinding_poly = PolyDeg3( 
+        let t_blinding_poly = PolyDeg3(
             self.z * self.z * self.offset_z * self.v_blinding,
             self.t_1_blinding,
             self.t_2_blinding,
@@ -316,6 +289,20 @@ impl PartyAwaitingPolyChallenge {
             r: r_total,
         }
     }
+}
+
+#[derive(Clone)]
+pub struct ProofShare {
+    pub value_commitment: ValueCommitment,
+    pub poly_commitment: PolyCommitment,
+
+    pub t_x: Scalar,
+    pub t_x_blinding: Scalar,
+    pub e_blinding: Scalar,
+
+    // don't need if doing inner product proof
+    pub l: Vec<Scalar>,
+    pub r: Vec<Scalar>,
 }
 
 pub struct DealerAwaitingPoly {
@@ -340,60 +327,128 @@ impl DealerAwaitingPoly {
 
         let x = self.transcript.challenge_scalar();
 
-        (DealerAwaitingShares { n: self.n }, x)
+        (
+            DealerAwaitingShares {
+                transcript: self.transcript,
+                n: self.n,
+            },
+            x,
+        )
     }
 }
 
 pub struct DealerAwaitingShares {
+    transcript: ProofTranscript,
     n: usize,
 }
 
 impl DealerAwaitingShares {
-    pub fn present_shares(&self, proof_shares: &Vec<ProofShare>) -> Proof {
+    pub fn present_shares(
+        mut self,
+        proof_shares: &Vec<ProofShare>,
+        gen: &GeneratorsView,
+        x: Scalar,
+        y: Scalar,
+    ) -> Proof {
+        let value_commitments = proof_shares
+            .iter()
+            .map(|ps| ps.value_commitment.V.clone())
+            .collect();
+        let A = proof_shares.iter().fold(
+            RistrettoPoint::identity(),
+            |A, ps| A + ps.value_commitment.A,
+        );
+        let S = proof_shares.iter().fold(
+            RistrettoPoint::identity(),
+            |S, ps| S + ps.value_commitment.S,
+        );
+        let T_1 = proof_shares.iter().fold(
+            RistrettoPoint::identity(),
+            |T_1, ps| T_1 + ps.poly_commitment.T_1,
+        );
+        let T_2 = proof_shares.iter().fold(
+            RistrettoPoint::identity(),
+            |T_2, ps| T_2 + ps.poly_commitment.T_2,
+        );
+        let t = proof_shares.iter().fold(
+            Scalar::zero(),
+            |acc, ps| acc + ps.t_x,
+        );
+        let t_x_blinding = proof_shares.iter().fold(Scalar::zero(), |acc, ps| {
+            acc + ps.t_x_blinding
+        });
+        let e_blinding = proof_shares.iter().fold(Scalar::zero(), |acc, ps| {
+            acc + ps.e_blinding
+        });
+        self.transcript.commit(t.as_bytes());
+        self.transcript.commit(t_x_blinding.as_bytes());
+        self.transcript.commit(e_blinding.as_bytes());
+
+        // Get a challenge value to combine statements for the IPP
+        let w = self.transcript.challenge_scalar();
+        let Q = w * gen.B;
+
+        let l:Vec<Scalar> = proof_shares.iter()
+            .flat_map(|ps| ps.l.clone().into_iter()).collect();
+        let r = proof_shares
+            .iter()
+            .flat_map(|ps| ps.r.clone().into_iter())
+            .collect();
+        let ipp_proof = inner_product_proof::Proof::create(
+            &mut self.transcript,
+            &Q,
+            util::exp_iter(y.invert()),
+            gen.G.to_vec(),
+            gen.H.to_vec(),
+            l,
+            r,
+        );
+
         Proof {
             n: self.n,
-            value_commitments: proof_shares
-                .iter()
-                .map(|ps| ps.value_commitment.V.clone())
-                .collect(),
-            A: proof_shares.iter().fold(
-                RistrettoPoint::identity(),
-                |A, ps| A + ps.value_commitment.A,
-            ),
-            S: proof_shares.iter().fold(
-                RistrettoPoint::identity(),
-                |S, ps| S + ps.value_commitment.S,
-            ),
-            T1: proof_shares.iter().fold(
-                RistrettoPoint::identity(),
-                |T1, ps| T1 + ps.poly_commitment.T_1,
-            ),
-            T2: proof_shares.iter().fold(
-                RistrettoPoint::identity(),
-                |T2, ps| T2 + ps.poly_commitment.T_2,
-            ),
-            t_x_blinding: proof_shares.iter().fold(Scalar::zero(), |acc, ps| {
-                acc + ps.t_x_blinding
-            }),
-            e_blinding: proof_shares.iter().fold(Scalar::zero(), |acc, ps| {
-                acc + ps.e_blinding
-            }),
-            t: proof_shares.iter().fold(
-                Scalar::zero(),
-                |acc, ps| acc + ps.t_x,
-            ),
+            value_commitments,
+            A,
+            S,
+            T_1,
+            T_2,
+            t_x: t,
+            t_x_blinding,
+            e_blinding,
+            ipp_proof,
 
             // FIXME: don't need if doing inner product proof
-            l: proof_shares
-                .iter()
-                .flat_map(|ps| ps.l.clone().into_iter())
-                .collect(),
-            r: proof_shares
-                .iter()
-                .flat_map(|ps| ps.r.clone().into_iter())
-                .collect(),
+            // l,
+            // r,
         }
     }
+}
+
+pub struct Proof {
+    pub n: usize,
+    /// Commitment to the value
+    // XXX this should not be included, so that we can prove about existing commitments
+    // included for now so that it's easier to test
+    pub value_commitments: Vec<RistrettoPoint>,
+    /// Commitment to the bits of the value
+    pub A: RistrettoPoint,
+    /// Commitment to the blinding factors
+    pub S: RistrettoPoint,
+    /// Commitment to the \\(t_1\\) coefficient of \\( t(x) \\)
+    pub T_1: RistrettoPoint,
+    /// Commitment to the \\(t_2\\) coefficient of \\( t(x) \\)
+    pub T_2: RistrettoPoint,
+    /// Evaluation of the polynomial \\(t(x)\\) at the challenge point \\(x\\)
+    pub t_x: Scalar,
+    /// Blinding factor for the synthetic commitment to \\(t(x)\\)
+    pub t_x_blinding: Scalar,
+    /// Blinding factor for the synthetic commitment to the inner-product arguments
+    pub e_blinding: Scalar,
+    /// Proof data for the inner-product argument.
+    pub ipp_proof: inner_product_proof::Proof,
+
+    // FIXME: don't need if doing inner product proof
+    // pub l: Vec<Scalar>,
+    // pub r: Vec<Scalar>,
 }
 
 impl Proof {
@@ -405,7 +460,10 @@ impl Proof {
         let m = values.len();
         let generators = Generators::new(n, m);
 
-        let parties: Vec<_> = values.iter().map(|&v| Party::new(v, n, &generators, rng)).collect();
+        let parties: Vec<_> = values
+            .iter()
+            .map(|&v| Party::new(v, n, &generators, rng))
+            .collect();
 
         let dealer = Dealer::new(n, &parties).unwrap();
 
@@ -426,15 +484,15 @@ impl Proof {
 
         let proof_shares: Vec<ProofShare> = parties.iter().map(|p| p.apply_challenge(&x)).collect();
 
-        dealer.present_shares(&proof_shares)
+        dealer.present_shares(&proof_shares, &generators.all(), x, y)
     }
 
-    pub fn verify(&self) -> bool {
+    pub fn verify<R: Rng>(&self, rng: &mut R) -> Result<(), ()> {
         let n = self.n;
         let m = self.value_commitments.len();
 
-        let gen = Generators::new(n, m);
-        let generators = gen.all();
+        let generators = Generators::new(n, m);
+        let gen = generators.all();
 
         let mut transcript = ProofTranscript::new(b"MultiRangeProof");
         transcript.commit_u64(n as u64);
@@ -449,108 +507,89 @@ impl Proof {
         let y = transcript.challenge_scalar();
         let z = transcript.challenge_scalar();
 
-        transcript.commit(self.T1.compress().as_bytes());
-        transcript.commit(self.T2.compress().as_bytes());
+        transcript.commit(self.T_1.compress().as_bytes());
+        transcript.commit(self.T_2.compress().as_bytes());
 
         let x = transcript.challenge_scalar();
 
-        // transcript.commit(self.t_x.as_bytes());
+        transcript.commit(self.t_x.as_bytes());
         transcript.commit(self.t_x_blinding.as_bytes());
         transcript.commit(self.e_blinding.as_bytes());
 
         let w = transcript.challenge_scalar();
+        let zz = z * z;
+        let minus_z = -z;
 
-        let mut hprime_vec = generators.H.to_vec();
+        // Challenge value for batching statements to be verified
+        let c = Scalar::random(rng);
 
-        // line 63: check that t = t0 + t1 * x + t2 * x * x
-        let z2 = z * z;
-        let z3 = z2 * z;
-        let mut delta = Scalar::zero(); // delta(y,z)
+        let (x_sq, x_inv_sq, s) = self.ipp_proof.verification_scalars(&mut transcript);
+        let s_inv = s.iter().rev();
 
-        // // calculate delta += (z - z^2) * <1^(n*m), y^(n*m)>
-        let mut exp_y = Scalar::one(); // start at y^0 = 1
-        let mut exp_2 = Scalar::one(); // start at 2^0 = 1
-        for _ in 0..n * m {
-            delta += (z - z2) * exp_y;
+        let a = self.ipp_proof.a;
+        let b = self.ipp_proof.b;
 
-            exp_y = exp_y * y; // y^i -> y^(i+1)
-            exp_2 = exp_2 + exp_2; // 2^i -> 2^(i+1)
+        let g = s.iter().map(|s_i| minus_z - a * s_i);
+        let h = s_inv
+            .zip(util::exp_iter(Scalar::from_u64(2)))
+            .zip(util::exp_iter(y.invert()))
+            .map(|((s_i_inv, exp_2), exp_y_inv)| {
+                z + exp_y_inv * (zz * exp_2 - b * s_i_inv)
+            });
+
+
+        let mega_check = ristretto::vartime::multiscalar_mult(
+            iter::once(Scalar::one())
+                .chain(iter::once(x))
+                .chain(iter::once(c * zz))
+                .chain(iter::once(c * x))
+                .chain(iter::once(c * x * x))
+                .chain(iter::once(-self.e_blinding - c * self.t_x_blinding))
+                .chain(iter::once(
+                    w * (self.t_x - a * b) + c * (delta(n, &y, &z) - self.t_x),
+                ))
+                .chain(g)
+                .chain(h)
+                .chain(x_sq.iter().cloned())
+                .chain(x_inv_sq.iter().cloned()),
+            iter::once(&self.A)
+                .chain(iter::once(&self.S))
+                .chain(iter::once(&self.value_commitments[0])) //TODO: fix for j>1
+                .chain(iter::once(&self.T_1))
+                .chain(iter::once(&self.T_2))
+                .chain(iter::once(gen.B_blinding))
+                .chain(iter::once(gen.B))
+                .chain(gen.G.iter())
+                .chain(gen.H.iter())
+                .chain(self.ipp_proof.L_vec.iter())
+                .chain(self.ipp_proof.R_vec.iter()),
+        );
+
+        if mega_check.is_identity() {
+            Ok(())
+        } else {
+            Err(())
         }
-
-        // calculate delta += sum_(j=1)^(m)(z^(j+2) * (2^n - 1))
-        let mut exp_z = z3;
-        for _ in 1..(m + 1) {
-            delta -= exp_z * Scalar::from_u64(((1u128 << n) - 1) as u64);
-            exp_z = exp_z * z;
-        }
-
-        // TBD: put in a multiscalar mult
-        let mut t_check = generators.B * delta + self.T1 * x + self.T2 * x * x;
-
-        let mut exp_z = Scalar::one();
-        for j in 0..m {
-            t_check += self.value_commitments[j] * z2 * exp_z;
-            exp_z = exp_z * z;
-        }
-        let t_commit = generators.B * self.t + generators.B_blinding * self.t_x_blinding;
-        if t_commit != t_check {
-            println!("fails check on line 63");
-            return false;
-        }
-
-        // line 64: compute commitment to l, r
-        // calculate P: add A + S*x - G*z
-        let mut sum_G = RistrettoPoint::identity();
-        for i in 0..n * m {
-            sum_G += generators.G[i];
-        }
-        let mut P = self.A + self.S * x;
-        P -= sum_G * z;
-
-        // line 62: calculate hprime
-        // calculate P: add < vec(h'), z * vec(y)^n*m >
-        let mut exp_y = Scalar::one(); // start at y^0 = 1
-        let inverse_y = Scalar::invert(&y); // inverse_y = 1/y
-        let mut inv_exp_y = Scalar::one(); // start at y^-0 = 1
-        for i in 0..n * m {
-            hprime_vec[i] = hprime_vec[i] * inv_exp_y;
-            P += hprime_vec[i] * z * exp_y;
-
-            exp_y = exp_y * y; // y^i -> y^(i+1)
-            exp_2 = exp_2 + exp_2; // 2^i -> 2^(i+1)
-            inv_exp_y = inv_exp_y * inverse_y; // y^(-i) * y^(-1) -> y^(-(i+1))
-        }
-
-        // calculate P: add sum(j_1^m)(<H[(j-1)*n:j*n-1], z^(j+1)*vec(2)^n>)
-        let mut exp_z = z * z;
-        for j in 1..(m + 1) {
-            exp_2 = Scalar::one();
-            for index in 0..n {
-                // index into hprime, from [(j-1)*n : j*n-1]
-                P += hprime_vec[(j - 1) * n + index] * exp_z * exp_2;
-                exp_2 = exp_2 + exp_2;
-            }
-            exp_z = exp_z * z;
-        }
-
-        // line 65: check that l, r are correct
-        let mut P_check = generators.B_blinding * self.e_blinding;
-        let points_iter = generators.G.iter().chain(hprime_vec.iter());
-        let scalars_iter = self.l.iter().chain(self.r.iter());
-        P_check += ristretto::multiscalar_mult(scalars_iter, points_iter);
-        if P != P_check {
-            println!("fails check on line 65: P != g * l + hprime * r");
-            return false;
-        }
-
-        // line 66: check that t is correct
-        if self.t != inner_product(&self.l, &self.r) {
-            println!("fails check on line 66: t != l * r");
-            return false;
-        }
-
-        return true;
     }
+}
+
+/// Compute
+/// $$ \\delta(y,z) = (z - z^2)<1, y^n> + z^3 <1, 2^n> $$
+fn delta(n: usize, y: &Scalar, z: &Scalar) -> Scalar {
+    let two = Scalar::from_u64(2);
+
+    // XXX this could be more efficient, esp for powers of 2
+    let sum_of_powers_of_y = util::exp_iter(*y)
+        .take(n)
+        .fold(Scalar::zero(), |acc, x| acc + x);
+
+    let sum_of_powers_of_2 = util::exp_iter(two)
+        .take(n)
+        .fold(Scalar::zero(), |acc, x| acc + x);
+
+    let zz = z * z;
+
+    (z - zz) * sum_of_powers_of_y - z * zz * sum_of_powers_of_2
 }
 
 /// Creates a new pedersen commitment
@@ -562,8 +601,8 @@ fn pedersen_commitment<R: Rng>(
     let blinding = Scalar::random(&mut rng);
 
     let commitment = ristretto::multiscalar_mult(
-        iter::once(scalar).chain(iter::once(&blinding)), 
-        iter::once(generators.B).chain(iter::once(generators.B_blinding))
+        iter::once(scalar).chain(iter::once(&blinding)),
+        iter::once(generators.B).chain(iter::once(generators.B_blinding)),
     );
     (commitment, blinding)
 }
@@ -600,27 +639,27 @@ mod tests {
     fn one_rangeproof() {
         let mut rng = OsRng::new().unwrap();
         let rp = Proof::create_one(0, 16, &mut rng);
-        assert_eq!(rp.verify(), true);
+        assert!(rp.verify(&mut rng).is_ok());
         let rp = Proof::create_one(12341, 16, &mut rng);
-        assert_eq!(rp.verify(), true);
+        assert!(rp.verify(&mut rng).is_ok());
     }
 
     #[test]
     fn two_rangeproofs() {
         let mut rng = OsRng::new().unwrap();
         let rp = Proof::create_multi(vec![0, 1], 16, &mut rng);
-        assert_eq!(rp.verify(), true);
+        assert!(rp.verify(&mut rng).is_ok());
         let rp = Proof::create_multi(vec![123, 4567], 16, &mut rng);
-        assert_eq!(rp.verify(), true);
+        assert!(rp.verify(&mut rng).is_ok());
     }
 
     #[test]
     fn three_rangeproofs() {
         let mut rng = OsRng::new().unwrap();
         let rp = Proof::create_multi(vec![0, 1, 3], 16, &mut rng);
-        assert_eq!(rp.verify(), true);
+        assert!(rp.verify(&mut rng).is_ok());
         let rp = Proof::create_multi(vec![123, 4567, 563], 16, &mut rng);
-        assert_eq!(rp.verify(), true);
+        assert!(rp.verify(&mut rng).is_ok());
     }
 
     // #[test]

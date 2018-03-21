@@ -67,9 +67,7 @@ impl ProofTranscript {
     /// Begin a new, empty proof transcript, using the given `label`
     /// for domain separation.
     pub fn new(label: &[u8]) -> Self {
-        let mut ro = ProofTranscript {
-            hash: Keccak::new_shake128(),
-        };
+        let mut ro = ProofTranscript { hash: Keccak::new_shake128() };
         ro.commit(label);
         // makes sure the label is disambiguated from the rest of the messages.
         ro.pad();
