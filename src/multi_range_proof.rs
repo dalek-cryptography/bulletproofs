@@ -228,9 +228,9 @@ impl<'a> PartyAwaitingValueChallenge<'a> {
             poly_commitment: poly_commitment.clone(),
             z: *z,
             offset_z,
-            l: l_poly,
-            r: r_poly,
-            t: t_poly,
+            l_poly,
+            r_poly,
+            t_poly,
             v_blinding: self.v_blinding,
             a_blinding: self.a_blinding,
             s_blinding: self.s_blinding,
@@ -254,9 +254,9 @@ pub struct PartyAwaitingPolyChallenge {
 
     z: Scalar,
     offset_z: Scalar,
-    l: VecPoly2,
-    r: VecPoly2,
-    t: PolyDeg3,
+    l_poly: VecPoly2,
+    r_poly: VecPoly2,
+    t_poly: PolyDeg3,
     v_blinding: Scalar,
     a_blinding: Scalar,
     s_blinding: Scalar,
@@ -273,20 +273,20 @@ impl PartyAwaitingPolyChallenge {
             self.t_2_blinding,
         );
 
-        let t_x = self.t.eval(x);
+        let t_x = self.t_poly.eval(x);
         let t_x_blinding = t_blinding_poly.eval(x);
         let e_blinding = self.a_blinding + self.s_blinding * x;
-        let l_total = self.l.eval(*x);
-        let r_total = self.r.eval(*x);
+        let l_vec = self.l_poly.eval(*x);
+        let r_vec = self.r_poly.eval(*x);
 
         ProofShare {
             value_commitment: self.value_commitment.clone(),
             poly_commitment: self.poly_commitment.clone(),
-            t_x_blinding: t_x_blinding,
-            t_x: t_x,
-            e_blinding: e_blinding,
-            l: l_total,
-            r: r_total,
+            t_x_blinding,
+            t_x,
+            e_blinding,
+            l_vec,
+            r_vec,
         }
     }
 }
@@ -300,9 +300,8 @@ pub struct ProofShare {
     pub t_x_blinding: Scalar,
     pub e_blinding: Scalar,
 
-    // don't need if doing inner product proof
-    pub l: Vec<Scalar>,
-    pub r: Vec<Scalar>,
+    pub l_vec: Vec<Scalar>,
+    pub r_vec: Vec<Scalar>,
 }
 
 pub struct DealerAwaitingPoly {
@@ -347,7 +346,6 @@ impl DealerAwaitingShares {
         mut self,
         proof_shares: &Vec<ProofShare>,
         gen: &GeneratorsView,
-        x: Scalar,
         y: Scalar,
     ) -> Proof {
         let value_commitments = proof_shares
@@ -388,11 +386,13 @@ impl DealerAwaitingShares {
         let w = self.transcript.challenge_scalar();
         let Q = w * gen.B;
 
-        let l:Vec<Scalar> = proof_shares.iter()
-            .flat_map(|ps| ps.l.clone().into_iter()).collect();
-        let r = proof_shares
+        let l_vec: Vec<Scalar> = proof_shares
             .iter()
-            .flat_map(|ps| ps.r.clone().into_iter())
+            .flat_map(|ps| ps.l_vec.clone().into_iter())
+            .collect();
+        let r_vec = proof_shares
+            .iter()
+            .flat_map(|ps| ps.r_vec.clone().into_iter())
             .collect();
         let ipp_proof = inner_product_proof::Proof::create(
             &mut self.transcript,
@@ -400,8 +400,8 @@ impl DealerAwaitingShares {
             util::exp_iter(y.invert()),
             gen.G.to_vec(),
             gen.H.to_vec(),
-            l,
-            r,
+            l_vec,
+            r_vec,
         );
 
         Proof {
@@ -415,10 +415,6 @@ impl DealerAwaitingShares {
             t_x_blinding,
             e_blinding,
             ipp_proof,
-
-            // FIXME: don't need if doing inner product proof
-            // l,
-            // r,
         }
     }
 }
@@ -445,10 +441,6 @@ pub struct Proof {
     pub e_blinding: Scalar,
     /// Proof data for the inner-product argument.
     pub ipp_proof: inner_product_proof::Proof,
-
-    // FIXME: don't need if doing inner product proof
-    // pub l: Vec<Scalar>,
-    // pub r: Vec<Scalar>,
 }
 
 impl Proof {
@@ -484,7 +476,7 @@ impl Proof {
 
         let proof_shares: Vec<ProofShare> = parties.iter().map(|p| p.apply_challenge(&x)).collect();
 
-        dealer.present_shares(&proof_shares, &generators.all(), x, y)
+        dealer.present_shares(&proof_shares, &generators.all(), y)
     }
 
     pub fn verify<R: Rng>(&self, rng: &mut R) -> Result<(), ()> {
@@ -574,18 +566,20 @@ impl Proof {
 }
 
 /// Compute
-/// $$ \\delta(y,z) = (z - z^2)<1, y^n> + z^3 <1, 2^n> $$
+/// delta(y,z) = (z - z^2)<1, y^n> + z^3 <1, 2^n>
 fn delta(n: usize, y: &Scalar, z: &Scalar) -> Scalar {
     let two = Scalar::from_u64(2);
 
     // XXX this could be more efficient, esp for powers of 2
-    let sum_of_powers_of_y = util::exp_iter(*y)
-        .take(n)
-        .fold(Scalar::zero(), |acc, x| acc + x);
+    let sum_of_powers_of_y = util::exp_iter(*y).take(n).fold(
+        Scalar::zero(),
+        |acc, x| acc + x,
+    );
 
-    let sum_of_powers_of_2 = util::exp_iter(two)
-        .take(n)
-        .fold(Scalar::zero(), |acc, x| acc + x);
+    let sum_of_powers_of_2 = util::exp_iter(two).take(n).fold(
+        Scalar::zero(),
+        |acc, x| acc + x,
+    );
 
     let zz = z * z;
 
