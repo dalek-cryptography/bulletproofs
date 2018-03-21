@@ -538,7 +538,7 @@ impl Proof {
                 .chain(iter::once(c * x * x))
                 .chain(iter::once(-self.e_blinding - c * self.t_x_blinding))
                 .chain(iter::once(
-                    w * (self.t_x - a * b) + c * (delta(n, &y, &z) - self.t_x),
+                    w * (self.t_x - a * b) + c * (delta(n, m, &y, &z) - self.t_x),
                 ))
                 .chain(g)
                 .chain(h)
@@ -566,17 +566,23 @@ impl Proof {
 }
 
 /// Compute
-/// delta(y,z) = (z - z^2)<1, y^n> + z^3 <1, 2^n>
-fn delta(n: usize, y: &Scalar, z: &Scalar) -> Scalar {
+/// delta(y,z) = (z - z^2)<1^n*m, y^n*m> + z^3 <1, 2^n*m> * \sum_j=0^(m-1) z^j
+fn delta(n: usize, m: usize, y: &Scalar, z: &Scalar) -> Scalar {
     let two = Scalar::from_u64(2);
 
     // XXX this could be more efficient, esp for powers of 2
-    let sum_of_powers_of_y = util::exp_iter(*y).take(n).fold(
+    let sum_of_powers_of_y = util::exp_iter(*y).take(n*m).fold(
         Scalar::zero(),
         |acc, x| acc + x,
     );
 
-    let sum_of_powers_of_2 = util::exp_iter(two).take(n).fold(
+    // XXX TODO: just calculate (2^n - 1) instead
+    let sum_of_powers_of_2 = util::exp_iter(two).take(n*m).fold(
+        Scalar::zero(),
+        |acc, x| acc + x,
+    );
+
+    let sum_of_powers_of_z = util::exp_iter(*z).take(m).fold(
         Scalar::zero(),
         |acc, x| acc + x,
     );
