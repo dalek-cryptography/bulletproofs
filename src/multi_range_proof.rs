@@ -712,7 +712,7 @@ fn delta(n: usize, m: usize, y: &Scalar, z: &Scalar) -> Scalar {
     );
 
     // XXX TODO: just calculate (2^n - 1) instead
-    let sum_of_powers_of_2 = util::exp_iter(two).take(n * m).fold(
+    let sum_of_powers_of_2 = util::exp_iter(two).take(n).fold(
         Scalar::zero(),
         |acc, x| acc + x,
     );
