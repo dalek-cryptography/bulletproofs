@@ -516,6 +516,7 @@ impl Proof {
 
         let w = transcript.challenge_scalar();
         let zz = z * z;
+
 /*
         // start copypasta
         let mut hprime_vec = gen.H.to_vec();
@@ -605,14 +606,38 @@ impl Proof {
 
         return Ok(());
     }
+
 */
-       
+        let c = Scalar::random(rng);
+        let t_check = ristretto::vartime::multiscalar_mult(
+            util::exp_iter(z).take(m).map(|z_exp| c * zz * z_exp)
+                .chain(iter::once(c * x))
+                .chain(iter::once(c * x * x))
+                .chain(iter::once(- c * self.t_x_blinding))
+                .chain(iter::once( c * (delta(n, m, &y, &z) - self.t_x))),
+            self.value_commitments.iter()
+                .chain(iter::once(&self.T_1))
+                .chain(iter::once(&self.T_2))
+                .chain(iter::once(gen.B_blinding))
+                .chain(iter::once(gen.B))
+            );
+
+        if t_check.is_identity() {
+            Ok(())
+        } else {
+            Err(())
+        }
+    }
+
+
+/*
         let minus_z = -z;
 
         // Challenge value for batching statements to be verified
         let c = Scalar::random(rng);
 
         let (x_sq, x_inv_sq, s) = self.ipp_proof.verification_scalars(&mut transcript);
+
         let s_inv = s.iter().rev();
 
         let a = self.ipp_proof.a;
@@ -633,6 +658,8 @@ impl Proof {
             .zip(util::exp_iter(y.invert()))
             .zip(z_2_over_y_concat)
             .map(|((s_i_inv, exp_y_inv), z_2_over_y)| {
+                println!("z_2_over_y_concat {:?}", z_2_over_y);
+
                 z - exp_y_inv * b * s_i_inv + zz * z_2_over_y
             });
 
@@ -670,6 +697,7 @@ impl Proof {
             Err(())
         }
     }
+*/
 }
 
 /// Compute
@@ -737,30 +765,28 @@ where
     (C, blinding)
 }
 
-pub fn construct_u32(m: usize) {
-    use rand::OsRng;
-    let mut rng = OsRng::new().unwrap();
-
-    let v: Vec<u64> = iter::repeat(())
-        .map(|()| rng.next_u32() as u64).take(m).collect();
-    let rp = Proof::create_multi(v, 32, &mut rng);
-    assert!(rp.verify(&mut rng).is_ok());
-}
-
-pub fn construct_u64(m: usize) {
-    use rand::OsRng;
-    let mut rng = OsRng::new().unwrap();
-
-    let v: Vec<u64> = iter::repeat(())
-        .map(|()| rng.next_u64()).take(m).collect();
-    let rp = Proof::create_multi(v, 64, &mut rng);
-    assert!(rp.verify(&mut rng).is_ok());
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use rand::OsRng;
+
+    fn construct_u32(m: usize) {
+        let mut rng = OsRng::new().unwrap();
+
+        let v: Vec<u64> = iter::repeat(())
+            .map(|()| rng.next_u32() as u64).take(m).collect();
+        let rp = Proof::create_multi(v, 32, &mut rng);
+        assert!(rp.verify(&mut rng).is_ok());
+    }
+
+    fn construct_u64(m: usize) {
+        let mut rng = OsRng::new().unwrap();
+
+        let v: Vec<u64> = iter::repeat(())
+            .map(|()| rng.next_u64()).take(m).collect();
+        let rp = Proof::create_multi(v, 64, &mut rng);
+        assert!(rp.verify(&mut rng).is_ok());
+    }
 
     #[test]
     fn one_rangeproof() {
