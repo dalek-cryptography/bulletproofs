@@ -606,8 +606,9 @@ impl Proof {
 
         return Ok(());
     }
-
 */
+
+// t_check passes for all j
         let c = Scalar::random(rng);
         let t_check = ristretto::vartime::multiscalar_mult(
             util::exp_iter(z).take(m).map(|z_exp| c * zz * z_exp)
@@ -622,13 +623,59 @@ impl Proof {
                 .chain(iter::once(gen.B))
             );
 
-        if t_check.is_identity() {
-            Ok(())
-        } else {
+        let minus_z = -z;
+        let (x_sq, x_inv_sq, s) = self.ipp_proof.verification_scalars(&mut transcript);
+
+        let s_inv = s.iter().rev();
+
+        let a = self.ipp_proof.a;
+        let b = self.ipp_proof.b;
+
+        let g = s.iter().map(|s_i| minus_z - a * s_i);
+
+        let powers_of_2:Vec<Scalar> = util::exp_iter(Scalar::from_u64(2)).take(n).collect();
+        let powers_of_z = util::exp_iter(z).take(m);
+        // product in updated P: z^0 * \vec(2)^n || z^1 * \vec(2)^n || ... z^(m-1) * \vec(2)^n
+        let concat_z_and_2 = powers_of_z.flat_map(|exp_z|
+            powers_of_2.iter().map(move |exp_2| exp_2 * exp_z)
+        );
+
+        let h = s_inv
+            .zip(util::exp_iter(y.invert()))
+            .zip(concat_z_and_2)
+            .map(|((s_i_inv, exp_y_inv), z_and_2)| {
+                z + exp_y_inv * (zz * z_and_2 - b * s_i_inv)
+            });
+
+        let p_check = ristretto::vartime::multiscalar_mult(
+            iter::once(Scalar::one())
+                .chain(iter::once(x))
+                .chain(iter::once(-self.e_blinding))
+                .chain(iter::once(w * (self.t_x - a * b)))
+                .chain(g)
+                .chain(h)
+                .chain(x_sq.iter().cloned())
+                .chain(x_inv_sq.iter().cloned()),
+            iter::once(&self.A)
+                .chain(iter::once(&self.S))
+                .chain(iter::once(gen.B_blinding))
+                .chain(iter::once(gen.B))
+                .chain(gen.G.iter())
+                .chain(gen.H.iter())
+                .chain(self.ipp_proof.L_vec.iter())
+                .chain(self.ipp_proof.R_vec.iter()),
+            );
+
+        if !p_check.is_identity(){
+            println!("p check failed");
             Err(())
+        } else if !t_check.is_identity() {
+            println!("t check failed");
+            Err(())
+        } else {
+            Ok(())
         }
     }
-
 
 /*
         let minus_z = -z;
@@ -772,7 +819,6 @@ mod tests {
 
     fn construct_u32(m: usize) {
         let mut rng = OsRng::new().unwrap();
-
         let v: Vec<u64> = iter::repeat(())
             .map(|()| rng.next_u32() as u64).take(m).collect();
         let rp = Proof::create_multi(v, 32, &mut rng);
@@ -781,7 +827,6 @@ mod tests {
 
     fn construct_u64(m: usize) {
         let mut rng = OsRng::new().unwrap();
-
         let v: Vec<u64> = iter::repeat(())
             .map(|()| rng.next_u64()).take(m).collect();
         let rp = Proof::create_multi(v, 64, &mut rng);
@@ -790,10 +835,14 @@ mod tests {
 
     #[test]
     fn one_rangeproof() {
+        construct_u32(1);
+        construct_u64(1);
+    }
+
+    #[test]
+    fn two_rangeproofs_tiny() {
         let mut rng = OsRng::new().unwrap();
-        let rp = Proof::create_one(0, 16, &mut rng);
-        assert!(rp.verify(&mut rng).is_ok());
-        let rp = Proof::create_one(12341, 16, &mut rng);
+        let rp = Proof::create_multi(vec![0, 1], 1, &mut rng);
         assert!(rp.verify(&mut rng).is_ok());
     }
 
