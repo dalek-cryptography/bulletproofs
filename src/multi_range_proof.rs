@@ -416,7 +416,7 @@ impl DealerAwaitingShares {
             e_blinding,
             ipp_proof,
             l: l_vec,
-            r: r_vec
+            r: r_vec,
         }
     }
 }
@@ -516,8 +516,8 @@ impl Proof {
 
         let w = transcript.challenge_scalar();
         let zz = z * z;
-
-// start copypasta
+/*
+        // start copypasta
         let mut hprime_vec = gen.H.to_vec();
         let mut delta = Scalar::zero(); // delta(y,z)
 
@@ -549,7 +549,7 @@ impl Proof {
         let t_commit = gen.B * self.t_x + gen.B_blinding * self.t_x_blinding;
         if t_commit != t_check {
             println!("fails check on line 63");
-            return Err(())
+            return Err(());
         }
 
         // line 64: compute commitment to l, r
@@ -605,9 +605,8 @@ impl Proof {
 
         return Ok(());
     }
-
-
-/*        
+*/
+       
         let minus_z = -z;
 
         // Challenge value for batching statements to be verified
@@ -671,7 +670,6 @@ impl Proof {
             Err(())
         }
     }
-*/
 }
 
 /// Compute
@@ -739,6 +737,26 @@ where
     (C, blinding)
 }
 
+pub fn construct_u32(m: usize) {
+    use rand::OsRng;
+    let mut rng = OsRng::new().unwrap();
+
+    let v: Vec<u64> = iter::repeat(())
+        .map(|()| rng.next_u32() as u64).take(m).collect();
+    let rp = Proof::create_multi(v, 32, &mut rng);
+    assert!(rp.verify(&mut rng).is_ok());
+}
+
+pub fn construct_u64(m: usize) {
+    use rand::OsRng;
+    let mut rng = OsRng::new().unwrap();
+
+    let v: Vec<u64> = iter::repeat(())
+        .map(|()| rng.next_u64()).take(m).collect();
+    let rp = Proof::create_multi(v, 64, &mut rng);
+    assert!(rp.verify(&mut rng).is_ok());
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -755,108 +773,21 @@ mod tests {
 
     #[test]
     fn two_rangeproofs() {
-        let mut rng = OsRng::new().unwrap();
-        let rp = Proof::create_multi(vec![0, 1], 16, &mut rng);
-        assert!(rp.verify(&mut rng).is_ok());
-        let rp = Proof::create_multi(vec![123, 4567], 16, &mut rng);
-        assert!(rp.verify(&mut rng).is_ok());
+        construct_u32(2);
+        construct_u64(2);
     }
 
     #[test]
-    fn three_rangeproofs() {
-        let mut rng = OsRng::new().unwrap();
-        let rp = Proof::create_multi(vec![0, 1, 3], 16, &mut rng);
-        assert!(rp.verify(&mut rng).is_ok());
-        let rp = Proof::create_multi(vec![123, 4567, 563], 16, &mut rng);
-        assert!(rp.verify(&mut rng).is_ok());
+    fn four_rangeproofs() {
+        construct_u32(4);
+        construct_u64(4);
     }
 
-    // #[test]
-    // fn two_party_small() {
-    //     for n in vec![1, 16, 32] {
-    //         let rp = Proof::create_multi(vec![1, 1], n);
-    //         assert_eq!(rp.verify(2), true);
-    //         let rp = Proof::create_multi(vec![0, 1], n);
-    //         assert_eq!(rp.verify(2), true);
-    //         let rp = Proof::create_multi(vec![1, 0], n);
-    //         assert_eq!(rp.verify(2), true);
-    //         let rp = Proof::create_multi(vec![0, 0], n);
-    //         assert_eq!(rp.verify(2), true);
-    //         let rp = Proof::create_multi(vec![2u64.pow(n as u32) - 1, 1], n);
-    //         assert_eq!(rp.verify(2), true);
-    //         let rp = Proof::create_multi(vec![2u64.pow(n as u32) + 1, 0], n);
-    //         assert_eq!(rp.verify(2), false);
-    //         let rp = Proof::create_multi(vec![0, u64::max_value()], n);
-    //         assert_eq!(rp.verify(2), false);
-    //     }
-    // }
-
-    // #[test]
-    // fn two_party_u64() {
-    //     let n = 64;
-    //     let rp = Proof::create_multi(vec![u64::max_value(), 1], n);
-    //     assert_eq!(rp.verify(2), true);
-    //     let rp = Proof::create_multi(vec![0, u64::max_value() - 1], n);
-    //     assert_eq!(rp.verify(2), true);
-    // }
-
-    // #[test]
-    // fn ten_party_small() {
-    //     let m = 10;
-    //     for n in vec![1, 16, 32] {
-    //         let rp = Proof::create_multi(vec![1, 1, 0, 0, 1, 1, 0, 0, 1, 1], n);
-    //         assert_eq!(rp.verify(m), true);
-    //         let rp = Proof::create_multi(
-    //             vec![
-    //                 2u64.pow(n as u32) - 1,
-    //                 2u64.pow(n as u32) - 1,
-    //                 0,
-    //                 0,
-    //                 0,
-    //                 0,
-    //                 0,
-    //                 0,
-    //                 1,
-    //                 1,
-    //             ],
-    //             n,
-    //         );
-    //         assert_eq!(rp.verify(m), true);
-    //         let rp =
-    //             Proof::create_multi(vec![2u64.pow(n as u32) + 1, 0, 0, 0, 0, 0, 0, 0, 1, 1], n);
-    //         assert_eq!(rp.verify(m), false);
-    //         let rp = Proof::create_multi(vec![0, u64::max_value(), 0, 0, 0, 0, 0, 0, 1, 1], n);
-    //         assert_eq!(rp.verify(m), false);
-    //     }
-    // }
-
-    // #[test]
-    // fn ten_party_u64() {
-    //     let m = 10;
-    //     let n = 64;
-    //     let rp = Proof::create_multi(
-    //         vec![u64::max_value(), u64::max_value(), 0, 0, 1, 1, 0, 0, 1, 1],
-    //         n,
-    //     );
-    //     assert_eq!(rp.verify(m), true);
-    //     let rp = Proof::create_multi(
-    //         vec![
-    //             u64::max_value() - 1,
-    //             1,
-    //             0,
-    //             0,
-    //             0,
-    //             0,
-    //             0,
-    //             0,
-    //             1,
-    //             u64::max_value() / 2,
-    //         ],
-    //         n,
-    //     );
-    //     assert_eq!(rp.verify(m), true);
-    // }
-
+    #[test]
+    fn eight_rangeproofs() {
+        construct_u32(8);
+        construct_u64(8);
+    }
 }
 
 // #[cfg(test)]
