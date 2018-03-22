@@ -516,168 +516,6 @@ impl Proof {
 
         let w = transcript.challenge_scalar();
         let zz = z * z;
-
-/*
-        // start copypasta
-        let mut hprime_vec = gen.H.to_vec();
-        let mut delta = Scalar::zero(); // delta(y,z)
-
-        // // calculate delta += (z - z^2) * <1^(n*m), y^(n*m)>
-        let mut exp_y = Scalar::one(); // start at y^0 = 1
-        let mut exp_2 = Scalar::one(); // start at 2^0 = 1
-        for _ in 0..n * m {
-            delta += (z - zz) * exp_y;
-
-            exp_y = exp_y * y; // y^i -> y^(i+1)
-            exp_2 = exp_2 + exp_2; // 2^i -> 2^(i+1)
-        }
-
-        // calculate delta += sum_(j=1)^(m)(z^(j+2) * (2^n - 1))
-        let mut exp_z = zz * z;
-        for _ in 1..(m + 1) {
-            delta -= exp_z * Scalar::from_u64(((1u128 << n) - 1) as u64);
-            exp_z = exp_z * z;
-        }
-
-        // TBD: put in a multiscalar mult
-        let mut t_check = gen.B * delta + self.T_1 * x + self.T_2 * x * x;
-
-        let mut exp_z = Scalar::one();
-        for j in 0..m {
-            t_check += self.value_commitments[j] * zz * exp_z;
-            exp_z = exp_z * z;
-        }
-        let t_commit = gen.B * self.t_x + gen.B_blinding * self.t_x_blinding;
-        if t_commit != t_check {
-            println!("fails check on line 63");
-            return Err(());
-        }
-
-        // line 64: compute commitment to l, r
-        // calculate P: add A + S*x - G*z
-        let mut sum_G = RistrettoPoint::identity();
-        for i in 0..n * m {
-            sum_G += gen.G[i];
-        }
-        let mut P = self.A + self.S * x;
-        P -= sum_G * z;
-
-        // line 62: calculate hprime
-        // calculate P: add < vec(h'), z * vec(y)^n*m >
-        let mut exp_y = Scalar::one(); // start at y^0 = 1
-        let inverse_y = Scalar::invert(&y); // inverse_y = 1/y
-        let mut inv_exp_y = Scalar::one(); // start at y^-0 = 1
-        for i in 0..n * m {
-            hprime_vec[i] = hprime_vec[i] * inv_exp_y;
-            P += hprime_vec[i] * z * exp_y;
-
-            exp_y = exp_y * y; // y^i -> y^(i+1)
-            exp_2 = exp_2 + exp_2; // 2^i -> 2^(i+1)
-            inv_exp_y = inv_exp_y * inverse_y; // y^(-i) * y^(-1) -> y^(-(i+1))
-        }
-
-        // calculate P: add sum(j_1^m)(<H[(j-1)*n:j*n-1], z^(j+1)*vec(2)^n>)
-        let mut exp_z = z * z;
-        for j in 1..(m + 1) {
-            exp_2 = Scalar::one();
-            for index in 0..n {
-                // index into hprime, from [(j-1)*n : j*n-1]
-                P += hprime_vec[(j - 1) * n + index] * exp_z * exp_2;
-                exp_2 = exp_2 + exp_2;
-            }
-            exp_z = exp_z * z;
-        }
-
-        // line 65: check that l, r are correct
-        let mut P_check = gen.B_blinding * self.e_blinding;
-        let points_iter = gen.G.iter().chain(hprime_vec.iter());
-        let scalars_iter = self.l.iter().chain(self.r.iter());
-        P_check += ristretto::multiscalar_mult(scalars_iter, points_iter);
-        if P != P_check {
-            println!("fails check on line 65: P != g * l + hprime * r");
-            return Err(());
-        }
-
-        // line 66: check that t is correct
-        if self.t_x != util::inner_product(&self.l, &self.r) {
-            println!("fails check on line 66: t != l * r");
-            return Err(());
-        }
-
-        return Ok(());
-    }
-*/
-
-// t_check passes for all j
-        let c = Scalar::random(rng);
-        let t_check = ristretto::vartime::multiscalar_mult(
-            util::exp_iter(z).take(m).map(|z_exp| c * zz * z_exp)
-                .chain(iter::once(c * x))
-                .chain(iter::once(c * x * x))
-                .chain(iter::once(- c * self.t_x_blinding))
-                .chain(iter::once( c * (delta(n, m, &y, &z) - self.t_x))),
-            self.value_commitments.iter()
-                .chain(iter::once(&self.T_1))
-                .chain(iter::once(&self.T_2))
-                .chain(iter::once(gen.B_blinding))
-                .chain(iter::once(gen.B))
-            );
-
-        let minus_z = -z;
-        let (x_sq, x_inv_sq, s) = self.ipp_proof.verification_scalars(&mut transcript);
-
-        let s_inv = s.iter().rev();
-
-        let a = self.ipp_proof.a;
-        let b = self.ipp_proof.b;
-
-        let g = s.iter().map(|s_i| minus_z - a * s_i);
-
-        let powers_of_2:Vec<Scalar> = util::exp_iter(Scalar::from_u64(2)).take(n).collect();
-        let powers_of_z = util::exp_iter(z).take(m);
-        // product in updated P: z^0 * \vec(2)^n || z^1 * \vec(2)^n || ... z^(m-1) * \vec(2)^n
-        let concat_z_and_2 = powers_of_z.flat_map(|exp_z|
-            powers_of_2.iter().map(move |exp_2| exp_2 * exp_z)
-        );
-
-        let h = s_inv
-            .zip(util::exp_iter(y.invert()))
-            .zip(concat_z_and_2)
-            .map(|((s_i_inv, exp_y_inv), z_and_2)| {
-                z + exp_y_inv * (zz * z_and_2 - b * s_i_inv)
-            });
-
-        let p_check = ristretto::vartime::multiscalar_mult(
-            iter::once(Scalar::one())
-                .chain(iter::once(x))
-                .chain(iter::once(-self.e_blinding))
-                .chain(iter::once(w * (self.t_x - a * b)))
-                .chain(g)
-                .chain(h)
-                .chain(x_sq.iter().cloned())
-                .chain(x_inv_sq.iter().cloned()),
-            iter::once(&self.A)
-                .chain(iter::once(&self.S))
-                .chain(iter::once(gen.B_blinding))
-                .chain(iter::once(gen.B))
-                .chain(gen.G.iter())
-                .chain(gen.H.iter())
-                .chain(self.ipp_proof.L_vec.iter())
-                .chain(self.ipp_proof.R_vec.iter()),
-            );
-
-        if !p_check.is_identity(){
-            println!("p check failed");
-            Err(())
-        } else if !t_check.is_identity() {
-            println!("t check failed");
-            Err(())
-        } else {
-            Ok(())
-        }
-    }
-
-/*
         let minus_z = -z;
 
         // Challenge value for batching statements to be verified
@@ -691,23 +529,19 @@ impl Proof {
         let b = self.ipp_proof.b;
 
         let g = s.iter().map(|s_i| minus_z - a * s_i);
-        // (\vec(2) / \vec(y))^n
-        let powers_of_2_over_y: Vec<Scalar> = util::exp_iter(Scalar::from_u64(2) * y.invert())
-            .take(n)
-            .collect();
+
+        // Compute product in updated P
+        // z^0 * \vec(2)^n || z^1 * \vec(2)^n || ... || z^(m-1) * \vec(2)^n
+        let powers_of_2: Vec<Scalar> = util::exp_iter(Scalar::from_u64(2)).take(n).collect();
         let powers_of_z = util::exp_iter(z).take(m);
-        // z^0 (\vec(2) / \vec(y))^n || z^1 * (\vec(2) / \vec(y))^n || ... || z^(m-1)(\vec(2) / \vec(y))^n
-        let z_2_over_y_concat = powers_of_z.flat_map(|exp_z| 
-            powers_of_2_over_y.iter().map(move |exp_2_over_y| exp_2_over_y * exp_z)
-            );
+        let concat_z_and_2 =
+            powers_of_z.flat_map(|exp_z| powers_of_2.iter().map(move |exp_2| exp_2 * exp_z));
 
         let h = s_inv
             .zip(util::exp_iter(y.invert()))
-            .zip(z_2_over_y_concat)
-            .map(|((s_i_inv, exp_y_inv), z_2_over_y)| {
-                println!("z_2_over_y_concat {:?}", z_2_over_y);
-
-                z - exp_y_inv * b * s_i_inv + zz * z_2_over_y
+            .zip(concat_z_and_2)
+            .map(|((s_i_inv, exp_y_inv), z_and_2)| {
+                z + exp_y_inv * (zz * z_and_2 - b * s_i_inv)
             });
 
         let mega_check = ristretto::vartime::multiscalar_mult(
@@ -744,11 +578,9 @@ impl Proof {
             Err(())
         }
     }
-*/
 }
 
-/// Compute
-/// delta(y,z) = (z - z^2)<1^n*m, y^n*m> + z^3 <1, 2^n*m> * \sum_j=0^(m-1) z^j
+/// Compute delta(y,z) = (z - z^2)<1^n*m, y^n*m> + z^3 <1, 2^n*m> * \sum_j=0^(m-1) z^j
 fn delta(n: usize, m: usize, y: &Scalar, z: &Scalar) -> Scalar {
     let two = Scalar::from_u64(2);
 
@@ -817,7 +649,7 @@ mod tests {
     use super::*;
     use rand::OsRng;
 
-    fn construct_u32(m: usize) {
+    fn test_u32(m: usize) {
         let mut rng = OsRng::new().unwrap();
         let v: Vec<u64> = iter::repeat(())
             .map(|()| rng.next_u32() as u64).take(m).collect();
@@ -825,7 +657,7 @@ mod tests {
         assert!(rp.verify(&mut rng).is_ok());
     }
 
-    fn construct_u64(m: usize) {
+    fn test_u64(m: usize) {
         let mut rng = OsRng::new().unwrap();
         let v: Vec<u64> = iter::repeat(())
             .map(|()| rng.next_u64()).take(m).collect();
@@ -834,63 +666,63 @@ mod tests {
     }
 
     #[test]
-    fn one_rangeproof() {
-        construct_u32(1);
-        construct_u64(1);
+    fn one_value() {
+        test_u32(1);
+        test_u64(1);
     }
 
     #[test]
-    fn two_rangeproofs_tiny() {
-        let mut rng = OsRng::new().unwrap();
-        let rp = Proof::create_multi(vec![0, 1], 1, &mut rng);
-        assert!(rp.verify(&mut rng).is_ok());
+    fn two_values() {
+        test_u32(2);
+        test_u64(2);
     }
 
     #[test]
-    fn two_rangeproofs() {
-        construct_u32(2);
-        construct_u64(2);
+    fn four_values() {
+        test_u32(4);
+        test_u64(4);
     }
 
     #[test]
-    fn four_rangeproofs() {
-        construct_u32(4);
-        construct_u64(4);
-    }
-
-    #[test]
-    fn eight_rangeproofs() {
-        construct_u32(8);
-        construct_u64(8);
+    fn eight_values() {
+        test_u32(8);
+        test_u64(8);
     }
 }
 
 // #[cfg(test)]
 // mod bench {
 //     use super::*;
-//     use rand::Rng;
+//     use rand::OsRng;
 //     use test::Bencher;
 
-//     #[bench]
-//     fn make_u64(b: &mut Bencher) {
-//         let mut rng: OsRng = OsRng::new().unwrap();
-//         b.iter(|| Proof::create_one(rng.next_u64(), 64));
+//     fn make_u32(m: usize, b: &mut Bencher) {
+//         let mut rng = OsRng::new().unwrap();
+//         let v: Vec<u64>  = iter::repeat(())
+//             .map(|()| rng.next_u32() as u64).take(m).collect();
+//         b.iter(|| Proof::create_multi(v, 32, &mut rng));
 //     }
-//     #[bench]
-//     fn make_u32(b: &mut Bencher) {
+
+//     fn make_u64(m: usize, b: &mut Bencher) {
 //         let mut rng: OsRng = OsRng::new().unwrap();
-//         b.iter(|| Proof::create_one(rng.next_u32() as u64, 32));
+//         let v: Vec<u64> = iter::repeat(())
+//             .map(|()| rng.next_u32() as u64).take(m).collect();
+//         b.iter(|| Proof::create_multi(v, 32, &mut rng));
 //     }
-//     #[bench]
-//     fn verify_u64(b: &mut Bencher) {
+
+//     fn verify_u32(m: usize, b: &mut Bencher) {
 //         let mut rng: OsRng = OsRng::new().unwrap();
-//         let rp = Proof::create_one(rng.next_u64(), 64);
-//         b.iter(|| rp.verify(1));
+//         let v: Vec<u64> = iter::repeat(())
+//             .map(|()| rng.next_u32() as u64).take(m).collect();
+//         let rp = Proof::create_multi(v, 32, &mut rng);
+//         b.iter(|| rp.verify(&mut rng));
 //     }
-//     #[bench]
-//     fn verify_u32(b: &mut Bencher) {
+
+//     fn verify_u64(m: usize, b: &mut Bencher) {
 //         let mut rng: OsRng = OsRng::new().unwrap();
-//         let rp = Proof::create_one(rng.next_u32() as u64, 32);
-//         b.iter(|| rp.verify(1));
+//         let v: Vec<u64> = iter::repeat(())
+//             .map(|()| rng.next_u64()).take(m).collect();
+//         let rp = Proof::create_multi(v, 64, &mut rng);
+//         b.iter(|| rp.verify(&mut rng));
 //     }
 // }
