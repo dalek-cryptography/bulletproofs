@@ -390,7 +390,7 @@ impl DealerAwaitingShares {
             .iter()
             .flat_map(|ps| ps.l_vec.clone().into_iter())
             .collect();
-        let r_vec = proof_shares
+        let r_vec: Vec<Scalar> = proof_shares
             .iter()
             .flat_map(|ps| ps.r_vec.clone().into_iter())
             .collect();
@@ -400,8 +400,8 @@ impl DealerAwaitingShares {
             util::exp_iter(y.invert()),
             gen.G.to_vec(),
             gen.H.to_vec(),
-            l_vec,
-            r_vec,
+            l_vec.clone(),
+            r_vec.clone(),
         );
 
         Proof {
@@ -415,6 +415,8 @@ impl DealerAwaitingShares {
             t_x_blinding,
             e_blinding,
             ipp_proof,
+            l: l_vec,
+            r: r_vec
         }
     }
 }
@@ -441,6 +443,10 @@ pub struct Proof {
     pub e_blinding: Scalar,
     /// Proof data for the inner-product argument.
     pub ipp_proof: inner_product_proof::Proof,
+
+    // FIXME: don't need if doing inner product proof
+    pub l: Vec<Scalar>,
+    pub r: Vec<Scalar>,
 }
 
 impl Proof {
@@ -510,6 +516,98 @@ impl Proof {
 
         let w = transcript.challenge_scalar();
         let zz = z * z;
+
+// start copypasta
+        let mut hprime_vec = gen.H.to_vec();
+        let mut delta = Scalar::zero(); // delta(y,z)
+
+        // // calculate delta += (z - z^2) * <1^(n*m), y^(n*m)>
+        let mut exp_y = Scalar::one(); // start at y^0 = 1
+        let mut exp_2 = Scalar::one(); // start at 2^0 = 1
+        for _ in 0..n * m {
+            delta += (z - zz) * exp_y;
+
+            exp_y = exp_y * y; // y^i -> y^(i+1)
+            exp_2 = exp_2 + exp_2; // 2^i -> 2^(i+1)
+        }
+
+        // calculate delta += sum_(j=1)^(m)(z^(j+2) * (2^n - 1))
+        let mut exp_z = zz * z;
+        for _ in 1..(m + 1) {
+            delta -= exp_z * Scalar::from_u64(((1u128 << n) - 1) as u64);
+            exp_z = exp_z * z;
+        }
+
+        // TBD: put in a multiscalar mult
+        let mut t_check = gen.B * delta + self.T_1 * x + self.T_2 * x * x;
+
+        let mut exp_z = Scalar::one();
+        for j in 0..m {
+            t_check += self.value_commitments[j] * zz * exp_z;
+            exp_z = exp_z * z;
+        }
+        let t_commit = gen.B * self.t_x + gen.B_blinding * self.t_x_blinding;
+        if t_commit != t_check {
+            println!("fails check on line 63");
+            return Err(())
+        }
+
+        // line 64: compute commitment to l, r
+        // calculate P: add A + S*x - G*z
+        let mut sum_G = RistrettoPoint::identity();
+        for i in 0..n * m {
+            sum_G += gen.G[i];
+        }
+        let mut P = self.A + self.S * x;
+        P -= sum_G * z;
+
+        // line 62: calculate hprime
+        // calculate P: add < vec(h'), z * vec(y)^n*m >
+        let mut exp_y = Scalar::one(); // start at y^0 = 1
+        let inverse_y = Scalar::invert(&y); // inverse_y = 1/y
+        let mut inv_exp_y = Scalar::one(); // start at y^-0 = 1
+        for i in 0..n * m {
+            hprime_vec[i] = hprime_vec[i] * inv_exp_y;
+            P += hprime_vec[i] * z * exp_y;
+
+            exp_y = exp_y * y; // y^i -> y^(i+1)
+            exp_2 = exp_2 + exp_2; // 2^i -> 2^(i+1)
+            inv_exp_y = inv_exp_y * inverse_y; // y^(-i) * y^(-1) -> y^(-(i+1))
+        }
+
+        // calculate P: add sum(j_1^m)(<H[(j-1)*n:j*n-1], z^(j+1)*vec(2)^n>)
+        let mut exp_z = z * z;
+        for j in 1..(m + 1) {
+            exp_2 = Scalar::one();
+            for index in 0..n {
+                // index into hprime, from [(j-1)*n : j*n-1]
+                P += hprime_vec[(j - 1) * n + index] * exp_z * exp_2;
+                exp_2 = exp_2 + exp_2;
+            }
+            exp_z = exp_z * z;
+        }
+
+        // line 65: check that l, r are correct
+        let mut P_check = gen.B_blinding * self.e_blinding;
+        let points_iter = gen.G.iter().chain(hprime_vec.iter());
+        let scalars_iter = self.l.iter().chain(self.r.iter());
+        P_check += ristretto::multiscalar_mult(scalars_iter, points_iter);
+        if P != P_check {
+            println!("fails check on line 65: P != g * l + hprime * r");
+            return Err(());
+        }
+
+        // line 66: check that t is correct
+        if self.t_x != util::inner_product(&self.l, &self.r) {
+            println!("fails check on line 66: t != l * r");
+            return Err(());
+        }
+
+        return Ok(());
+    }
+
+
+/*        
         let minus_z = -z;
 
         // Challenge value for batching statements to be verified
@@ -573,6 +671,7 @@ impl Proof {
             Err(())
         }
     }
+*/
 }
 
 /// Compute
