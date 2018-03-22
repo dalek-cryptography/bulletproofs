@@ -522,23 +522,33 @@ impl Proof {
         let b = self.ipp_proof.b;
 
         let g = s.iter().map(|s_i| minus_z - a * s_i);
-        let h = s_inv
-            .zip(util::exp_iter(Scalar::from_u64(2)))
-            .zip(util::exp_iter(y.invert()))
-            .map(|((s_i_inv, exp_2), exp_y_inv)| {
-                z + exp_y_inv * (zz * exp_2 - b * s_i_inv)
-            });
+        // (\vec(2) / \vec(y))^n
+        let powers_of_2_over_y: Vec<Scalar> = util::exp_iter(Scalar::from_u64(2) * y.invert())
+            .take(n)
+            .collect();
+        let powers_of_z = util::exp_iter(z).take(m);
+        // z^0 (\vec(2) / \vec(y))^n || z^1 * (\vec(2) / \vec(y))^n || ... || z^(m-1)(\vec(2) / \vec(y))^n
+        let z_2_over_y_concat = powers_of_z.flat_map(|exp_z| 
+            powers_of_2_over_y.iter().map(move |exp_2_over_y| exp_2_over_y * exp_z)
+            );
 
+        let h = s_inv
+            .zip(util::exp_iter(y.invert()))
+            .zip(z_2_over_y_concat)
+            .map(|((s_i_inv, exp_y_inv), z_2_over_y)| {
+                z - exp_y_inv * b * s_i_inv + zz * z_2_over_y
+            });
 
         let mega_check = ristretto::vartime::multiscalar_mult(
             iter::once(Scalar::one())
                 .chain(iter::once(x))
-                .chain(iter::once(c * zz))
+                .chain(util::exp_iter(z).take(m).map(|z_exp| c * zz * z_exp))
                 .chain(iter::once(c * x))
                 .chain(iter::once(c * x * x))
                 .chain(iter::once(-self.e_blinding - c * self.t_x_blinding))
                 .chain(iter::once(
-                    w * (self.t_x - a * b) + c * (delta(n, m, &y, &z) - self.t_x),
+                    w * (self.t_x - a * b) +
+                        c * (delta(n, m, &y, &z) - self.t_x),
                 ))
                 .chain(g)
                 .chain(h)
@@ -546,7 +556,7 @@ impl Proof {
                 .chain(x_inv_sq.iter().cloned()),
             iter::once(&self.A)
                 .chain(iter::once(&self.S))
-                .chain(iter::once(&self.value_commitments[0])) //TODO: fix for j>1
+                .chain(self.value_commitments.iter())
                 .chain(iter::once(&self.T_1))
                 .chain(iter::once(&self.T_2))
                 .chain(iter::once(gen.B_blinding))
@@ -571,13 +581,13 @@ fn delta(n: usize, m: usize, y: &Scalar, z: &Scalar) -> Scalar {
     let two = Scalar::from_u64(2);
 
     // XXX this could be more efficient, esp for powers of 2
-    let sum_of_powers_of_y = util::exp_iter(*y).take(n*m).fold(
+    let sum_of_powers_of_y = util::exp_iter(*y).take(n * m).fold(
         Scalar::zero(),
         |acc, x| acc + x,
     );
 
     // XXX TODO: just calculate (2^n - 1) instead
-    let sum_of_powers_of_2 = util::exp_iter(two).take(n*m).fold(
+    let sum_of_powers_of_2 = util::exp_iter(two).take(n * m).fold(
         Scalar::zero(),
         |acc, x| acc + x,
     );
@@ -589,7 +599,7 @@ fn delta(n: usize, m: usize, y: &Scalar, z: &Scalar) -> Scalar {
 
     let zz = z * z;
 
-    (z - zz) * sum_of_powers_of_y - z * zz * sum_of_powers_of_2
+    (z - zz) * sum_of_powers_of_y - z * zz * sum_of_powers_of_2 * sum_of_powers_of_z
 }
 
 /// Creates a new pedersen commitment
