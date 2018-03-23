@@ -18,7 +18,7 @@ use generators::Generators;
 
 use range_proof::inner_product;
 
-use sha2::Sha256;
+use sha2::Sha512;
 
 #[derive(Clone, Debug)]
 pub struct Proof {
@@ -86,12 +86,12 @@ impl Proof {
             let c_L = inner_product(&a_L, &b_R);
             let c_R = inner_product(&a_R, &b_L);
 
-            let L = ristretto::vartime::multiscalar_mult(
+            let L = ristretto::vartime::multiscalar_mul(
                 a_L.iter().chain(b_R.iter()).chain(iter::once(&c_L)),
                 G_R.iter().chain(H_L.iter()).chain(iter::once(Q)),
             );
 
-            let R = ristretto::vartime::multiscalar_mult(
+            let R = ristretto::vartime::multiscalar_mul(
                 a_R.iter().chain(b_L.iter()).chain(iter::once(&c_R)),
                 G_L.iter().chain(H_R.iter()).chain(iter::once(Q)),
             );
@@ -108,8 +108,8 @@ impl Proof {
             for i in 0..n {
                 a_L[i] = a_L[i] * x + x_inv * a_R[i];
                 b_L[i] = b_L[i] * x_inv + x * b_R[i];
-                G_L[i] = ristretto::vartime::multiscalar_mult(&[x_inv, x], &[G_L[i], G_R[i]]);
-                H_L[i] = ristretto::vartime::multiscalar_mult(&[x, x_inv], &[H_L[i], H_R[i]]);
+                G_L[i] = ristretto::vartime::multiscalar_mul(&[x_inv, x], &[G_L[i], G_R[i]]);
+                H_L[i] = ristretto::vartime::multiscalar_mul(&[x, x_inv], &[H_L[i], H_R[i]]);
             }
 
             a = a_L;
@@ -203,7 +203,7 @@ impl Proof {
         let neg_x_sq = x_sq.iter().map(|xi| -xi);
         let neg_x_inv_sq = x_inv_sq.iter().map(|xi| -xi);
 
-        let expect_P = ristretto::vartime::multiscalar_mult(
+        let expect_P = ristretto::vartime::multiscalar_mul(
             iter::once(self.a * self.b)
                 .chain(a_times_s)
                 .chain(h_times_b_div_s)
@@ -238,7 +238,7 @@ mod tests {
         let H = gens.share(0).H.to_vec();
 
         // Q would be determined upstream in the protocol, so we pick a random one.
-        let Q = RistrettoPoint::hash_from_bytes::<Sha256>(b"test point");
+        let Q = RistrettoPoint::hash_from_bytes::<Sha512>(b"test point");
 
         // a and b are the vectors for which we want to prove c = <a,b>
         let a: Vec<_> = (0..n).map(|_| Scalar::random(&mut rng)).collect();
@@ -257,7 +257,7 @@ mod tests {
         // a.iter() has Item=&Scalar, need Item=Scalar to chain with b_prime
         let a_prime = a.iter().cloned();
 
-        let P = ristretto::vartime::multiscalar_mult(
+        let P = ristretto::vartime::multiscalar_mul(
             a_prime.chain(b_prime).chain(iter::once(c)),
             G.iter().chain(H.iter()).chain(iter::once(&Q)),
         );
@@ -319,7 +319,7 @@ mod bench {
         let H = gens.share(0).H.to_vec();
 
         // Q would be determined upstream in the protocol, so we pick a random one.
-        let Q = RistrettoPoint::hash_from_bytes::<Sha256>(b"test point");
+        let Q = RistrettoPoint::hash_from_bytes::<Sha512>(b"test point");
 
         let a = vec![Scalar::from_u64(1); n];
         let b = vec![Scalar::from_u64(2); n];
@@ -346,7 +346,7 @@ mod bench {
         let H = gens.share(0).H.to_vec();
 
         // Q would be determined upstream in the protocol, so we pick a random one.
-        let Q = RistrettoPoint::hash_from_bytes::<Sha256>(b"test point");
+        let Q = RistrettoPoint::hash_from_bytes::<Sha512>(b"test point");
 
         let a = vec![Scalar::from_u64(1); n];
         let b = vec![Scalar::from_u64(2); n];
@@ -366,7 +366,7 @@ mod bench {
 
         let c = inner_product(&a, &b);
 
-        let P = ristretto::vartime::multiscalar_mult(
+        let P = ristretto::vartime::multiscalar_mul(
             a.iter().chain(b.iter()).chain(iter::once(&c)),
             G.iter().chain(H.iter()).chain(iter::once(&Q)),
         );

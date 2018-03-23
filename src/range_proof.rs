@@ -4,7 +4,7 @@ use rand::Rng;
 
 use std::iter;
 
-use sha2::{Digest, Sha256, Sha512};
+use sha2::{Digest, Sha512};
 
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::ristretto;
@@ -69,7 +69,7 @@ impl RangeProof {
         let H = generators.H.to_vec();
 
         let V =
-            ristretto::multiscalar_mult(&[Scalar::from_u64(v), *v_blinding], &[*B, *B_blinding]);
+            ristretto::multiscalar_mul(&[Scalar::from_u64(v), *v_blinding], &[*B, *B_blinding]);
 
         let a_blinding = Scalar::random(rng);
 
@@ -90,7 +90,7 @@ impl RangeProof {
         let s_R: Vec<_> = (0..n).map(|_| Scalar::random(rng)).collect();
 
         // Compute S = <s_L, G> + <s_R, H> + s_blinding * B_blinding.
-        let S = ristretto::multiscalar_mult(
+        let S = ristretto::multiscalar_mul(
             iter::once(&s_blinding).chain(s_L.iter()).chain(s_R.iter()),
             iter::once(B_blinding).chain(G.iter()).chain(H.iter()),
         );
@@ -128,8 +128,8 @@ impl RangeProof {
         // Form commitments T_1, T_2 to t.1, t.2
         let t_1_blinding = Scalar::random(rng);
         let t_2_blinding = Scalar::random(rng);
-        let T_1 = ristretto::multiscalar_mult(&[t_poly.1, t_1_blinding], &[*B, *B_blinding]);
-        let T_2 = ristretto::multiscalar_mult(&[t_poly.2, t_2_blinding], &[*B, *B_blinding]);
+        let T_1 = ristretto::multiscalar_mul(&[t_poly.1, t_1_blinding], &[*B, *B_blinding]);
+        let T_2 = ristretto::multiscalar_mul(&[t_poly.2, t_2_blinding], &[*B, *B_blinding]);
 
         // Commit to T_1, T_2 to get the challenge point x
         transcript.commit(T_1.compress().as_bytes());
@@ -218,7 +218,7 @@ impl RangeProof {
             .zip(util::exp_iter(y.invert()))
             .map(|((s_i_inv, exp_2), exp_y_inv)| z + exp_y_inv * (zz * exp_2 - b * s_i_inv));
 
-        let mega_check = ristretto::vartime::multiscalar_mult(
+        let mega_check = ristretto::vartime::multiscalar_mul(
             iter::once(Scalar::one())
                 .chain(iter::once(x))
                 .chain(iter::once(c * zz))
