@@ -4,7 +4,7 @@ version = "0.1.0"
 authors = ["Cathie <cathie@chain.com>"]
 
 [dependencies]
-curve25519-dalek = { version = "^0.15", features = ["nightly"] }
+curve25519-dalek = { version = "^0.16", features = ["nightly"] }
 sha2 = "^0.7"
 rand = "^0.4"
 byteorder = "1.2.1"
@@ -20,5 +20,3 @@ std = ["curve25519-dalek/std"]
 git = 'https://github.com/chain/tiny-keccak.git'
 rev = '5925f81b3c351440283c3328e2345d982aac0f6e'
 
-[patch.crates-io]
-curve25519-dalek = { git = 'https://github.com/dalek-cryptography/curve25519-dalek', branch = 'develop' }
