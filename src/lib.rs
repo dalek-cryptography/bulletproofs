@@ -1,6 +1,7 @@
 #![cfg_attr(feature = "bench", feature(test))]
 #![feature(nll)]
 #![feature(test)]
+#![feature(external_doc)]
 
 extern crate byteorder;
 extern crate curve25519_dalek;
@@ -12,6 +13,10 @@ extern crate tiny_keccak;
 extern crate test;
 
 mod util;
+
+#[doc(include = "../docs/notes.md")]
+mod notes {
+}
 
 pub mod proof_transcript;
 pub mod generators;
