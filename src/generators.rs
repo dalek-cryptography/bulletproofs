@@ -6,7 +6,7 @@
 //!
 //! ```
 //! # extern crate ristretto_bulletproofs;
-//! # use ristretto_bulletproofs::generators::Generators;
+//! # use ristretto_bulletproofs::Generators;
 //! # fn main() {
 //!
 //! let generators = Generators::new(64,1);

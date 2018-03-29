@@ -20,12 +20,13 @@ mod util;
 mod notes {
 }
 
-pub mod proof_transcript;
-pub mod generators;
+mod proof_transcript;
+mod generators;
 mod range_proof;
 mod inner_product_proof;
 
-pub mod scalar;
+mod scalar;
 
-pub use range_proof::*;
-pub use generators::*;
+pub use proof_transcript::ProofTranscript;
+pub use range_proof::RangeProof;
+pub use generators::Generators;
