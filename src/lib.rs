@@ -3,6 +3,8 @@
 #![feature(test)]
 #![feature(external_doc)]
 
+#![doc(include = "../README.md")]
+
 extern crate byteorder;
 extern crate curve25519_dalek;
 extern crate rand;
