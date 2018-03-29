@@ -27,6 +27,30 @@ pub fn exp_iter(x: Scalar) -> ScalarExp {
     ScalarExp { x, next_exp_x }
 }
 
+pub fn inner_product(a: &[Scalar], b: &[Scalar]) -> Scalar {
+    let mut out = Scalar::zero();
+    if a.len() != b.len() {
+        // throw some error
+        println!("lengths of vectors don't match for inner product multiplication");
+    }
+    for i in 0..a.len() {
+        out += a[i] * b[i];
+    }
+    out
+}
+
+pub fn add_vec(a: &[Scalar], b: &[Scalar]) -> Vec<Scalar> {
+    let mut out = Vec::new();
+    if a.len() != b.len() {
+        // throw some error
+        println!("lengths of vectors don't match for vector addition");
+    }
+    for i in 0..a.len() {
+        out.push(a[i] + b[i]);
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -39,5 +63,22 @@ mod tests {
         assert_eq!(exp_2[1], Scalar::from_u64(2));
         assert_eq!(exp_2[2], Scalar::from_u64(4));
         assert_eq!(exp_2[3], Scalar::from_u64(8));
+    }
+
+    #[test]
+    fn test_inner_product() {
+        let a = vec![
+            Scalar::from_u64(1),
+            Scalar::from_u64(2),
+            Scalar::from_u64(3),
+            Scalar::from_u64(4),
+        ];
+        let b = vec![
+            Scalar::from_u64(2),
+            Scalar::from_u64(3),
+            Scalar::from_u64(4),
+            Scalar::from_u64(5),
+        ];
+        assert_eq!(Scalar::from_u64(40), inner_product(&a, &b));
     }
 }
