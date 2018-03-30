@@ -501,12 +501,12 @@ let’s introduce an indeterminate variable \\(u\_k \in {\mathbb Z\_{p}^{\times}
 and compress the vectors by adding the left and the right halves
 separated by the variable \\(u\_k\\):
 \\[
-\begin{split}
+\begin{aligned}
   {\mathbf{a}}^{(k-1)} &= {\mathbf{a}}\_L \cdot u\_k        + u^{-1}\_k \cdot {\mathbf{a}}\_R \\\\
   {\mathbf{b}}^{(k-1)} &= {\mathbf{b}}\_L \cdot u^{-1}\_k   + u\_k \cdot {\mathbf{b}}\_R \\\\
   {\mathbf{G}}^{(k-1)} &= {\mathbf{G}}\_L \cdot u^{-1}\_k   + u\_k \cdot {\mathbf{G}}\_R \\\\
   {\mathbf{H}}^{(k-1)} &= {\mathbf{H}}\_L \cdot u\_k        + u^{-1}\_k \cdot {\mathbf{H}}\_R 
-\end{split}
+\end{aligned}
 \\]
 The powers of \\(u\_k\\) are chosen so they cancel out in the
 inner products of interest as will be shown below.
