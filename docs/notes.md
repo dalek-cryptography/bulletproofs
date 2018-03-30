@@ -11,10 +11,10 @@ documentation describes how it works.
 Notation
 ========
 
-We change notation from the original Bulletproofs paper. The primary
-motivation is that our implementation uses additive notation, and we
-would like our description of the protocol to use the same notation as
-the implementation.
+We change notation from the original [Bulletproofs paper][bulletproofs_paper].
+The primary motivation is that our implementation uses additive notation, and
+we would like our description of the protocol to use the same notation as the
+implementation.
 
 In general, we use lower-case letters
 \\(a, b, c\\)
@@ -572,3 +572,5 @@ The resulting protocol has \\(\lg n\\) steps of compression where the prover
 sends a pair \\((L\_j,R\_j)\\) of points at each step \\(j = k\dots1\\). An
 additional and final step involves sending a pair of scalars
 \\((a^{(0)}\_0,b^{(0)}\_0)\\) and checking the final relation directly.
+
+[bulletproofs_paper]: https://eprint.iacr.org/2017/1066.pdf
