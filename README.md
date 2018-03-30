@@ -13,6 +13,9 @@ make doc           # Builds external documentation
 make doc-internal  # Builds internal documentation
 ```
 
+Unfortunately `cargo doc --open` rebuilds the docs without the custom
+invocation, so it may be necessary to rerun `make`.
+
 The description of how Bulletproofs work is found in the (internal) `notes` module.
 
 ## WARNING
