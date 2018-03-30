@@ -1,5 +1,7 @@
 #![allow(non_snake_case)]
 
+#![doc(include = "../docs/inner-product-protocol.md")]
+
 use std::iter;
 use std::borrow::Borrow;
 
@@ -15,8 +17,6 @@ use proof_transcript::ProofTranscript;
 use util;
 
 use generators::Generators;
-
-use range_proof::inner_product;
 
 use sha2::Sha512;
 
@@ -83,8 +83,8 @@ impl Proof {
             let (G_L, G_R) = G.split_at_mut(n);
             let (H_L, H_R) = H.split_at_mut(n);
 
-            let c_L = inner_product(&a_L, &b_R);
-            let c_R = inner_product(&a_R, &b_L);
+            let c_L = util::inner_product(&a_L, &b_R);
+            let c_R = util::inner_product(&a_R, &b_L);
 
             let L = ristretto::vartime::multiscalar_mul(
                 a_L.iter().chain(b_R.iter()).chain(iter::once(&c_L)),
@@ -243,7 +243,7 @@ mod tests {
         // a and b are the vectors for which we want to prove c = <a,b>
         let a: Vec<_> = (0..n).map(|_| Scalar::random(&mut rng)).collect();
         let b: Vec<_> = (0..n).map(|_| Scalar::random(&mut rng)).collect();
-        let c = inner_product(&a, &b);
+        let c = util::inner_product(&a, &b);
 
         // y_inv is (the inverse of) a random challenge
         let y_inv = Scalar::random(&mut rng);
