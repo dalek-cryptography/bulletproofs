@@ -520,9 +520,9 @@ Expanding it in terms of the original \\({\mathbf{a}}\\), \\({\mathbf{b}}\\),
 \\({\mathbf{G}}\\) and \\({\mathbf{H}}\\) gives:
 \\[
 \begin{aligned}
-    P\_{k-1} &{}={}& &{\langle {\mathbf{a}}\_L \cdot u\_k      + u\_k^{-1} \cdot {\mathbf{a}}\_R, &&{\mathbf{G}}\_L \cdot u^{-1}\_k + u\_k \cdot {\mathbf{G}}\_R \rangle} + \\\\
-       &&      &{\langle {\mathbf{b}}\_L \cdot u^{-1}\_k + u\_k \cdot {\mathbf{b}}\_R, &&{\mathbf{H}}\_L \cdot u\_k      + u^{-1}\_k \cdot {\mathbf{H}}\_R \rangle} + \\\\
-       &&      &{\langle {\mathbf{a}}\_L \cdot u\_k + u^{-1}\_k \cdot {\mathbf{a}}\_R, &&{\mathbf{b}}\_L \cdot u^{-1}\_k + u\_k \cdot {\mathbf{b}}\_R \rangle} \cdot \hat{Q}
+    P\_{k-1} &{}={}& &{\langle {\mathbf{a}}\_L \cdot u\_k   + u\_k^{-1} \cdot {\mathbf{a}}\_R, {\mathbf{G}}\_L \cdot u^{-1}\_k + u\_k \cdot {\mathbf{G}}\_R      \rangle} + \\\\
+             &&  &{\langle {\mathbf{b}}\_L \cdot u^{-1}\_k  + u\_k \cdot {\mathbf{b}}\_R,      {\mathbf{H}}\_L \cdot u\_k      + u^{-1}\_k \cdot {\mathbf{H}}\_R \rangle} + \\\\
+             &&  &{\langle {\mathbf{a}}\_L \cdot u\_k       + u^{-1}\_k \cdot {\mathbf{a}}\_R,      {\mathbf{b}}\_L \cdot u^{-1}\_k + u\_k \cdot {\mathbf{b}}\_R      \rangle} \cdot \hat{Q}
 \end{aligned}
 \\]
 Breaking down in simpler products:
