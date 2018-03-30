@@ -76,18 +76,7 @@ vector of values \\({\mathbf{a}}\_{L} \Vert {\mathbf{a}}\_{R}\\) with the
 vector of bases \\({\mathbf{G}} \Vert {\mathbf{H}}\\), but defining the
 commitment on pairs of vectors is a more convenient notation.
 
-Decoder Ring
-------------
-
-Mapping from paper notation to this notation:
-\\[
-\begin{aligned}
-    g^a             &\xrightarrow{} a \cdot G\\\\
-    g \cdot h       &\xrightarrow{} G + H\\\\
-    g^a \cdot h^y   &\xrightarrow{} a \cdot G + y \cdot H\\\\
-    {\mathbf{g}}^{{\mathbf{a}}}  &\xrightarrow{} {\langle {\mathbf{a}}, {\mathbf{G}} \rangle} = {\textstyle\sum a\_i \cdot G\_i}\end{aligned}
-\\]
-Variables:
+The variable renaming is as follows:
 \\[
 \begin{aligned}
     g        &\xrightarrow{} B               & \gamma   &\xrightarrow{} \tilde{v}      \\\\
@@ -101,7 +90,7 @@ Variables:
 Range Proofs from Inner Products
 ================================
 
-The goal of a *range proof* is for a *prover* to convince a *verifier*
+The goal of a *range proof* is for a prover to convince a verifier
 that a particular value \\(v\\) lies within a valid range, without revealing
 any additional information about the value \\(v\\).
 
