@@ -518,8 +518,7 @@ separated by the variable \\(u\_k\\):
 The powers of \\(u\_k\\) are chosen so they cancel out in the
 inner products of interest as will be shown below.
 
-let’s now form the equation (\[eqn:ip\\_inner\\_eq\]) with these
-compressed vectors:
+Let’s now define \\(P\_{k-1}\\) using the same equation as for \\(P_k\\), but using the compressed vectors:
 \\[
     P\_{k-1} = {\langle {\mathbf{a}}^{(k-1)}, {\mathbf{G}}^{(k-1)} \rangle} + {\langle {\mathbf{b}}^{(k-1)}, {\mathbf{H}}^{(k-1)} \rangle} + {\langle {\mathbf{a}}^{(k-1)}, {\mathbf{b}}^{(k-1)} \rangle} \cdot \hat{Q} 
 \\]
@@ -542,7 +541,7 @@ Breaking down in simpler products:
 \\]
 We now see that the left two columns in the above equation is the
 definition of \\(P\_k\\), while various cross terms on the right are
-separated from \\(P\_k\\) by an indeterminate variable \\(u\_k\\). let’s group all
+separated from \\(P\_k\\) by an indeterminate variable \\(u\_k\\). Let’s group all
 terms with \\(u^2\_k\\) as \\(L\_k\\) and all terms with \\(u^{-2}\_k\\) as \\(R\_k\\):
 \\[
 \begin{aligned}
@@ -552,13 +551,12 @@ terms with \\(u^2\_k\\) as \\(L\_k\\) and all terms with \\(u^{-2}\_k\\) as \\(R
 \end{aligned}
 \\]
 If the prover commits to \\(L\_k\\) and \\(R\_k\\) before \\(u\_k\\) is randomly
-sampled, then if the (\[eqn:ip\\_inner\\_eq\\_compressed\]) is proven to be
-true, it will follow that (\[eqn:ip\\_inner\\_eq\]) is also true with an
-overwhelming probability.
+sampled, then if the statement about compressed vectors is proven to be
+true, it will follow that the original statement about uncompressed vectors
+is also true with an overwhelming probability.
 
-We can compress the resulting statement
-(\[eqn:ip\\_inner\\_eq\\_compressed\]) using one more indeterminate
-variable \\(u\_{k-1}\\) as specified in (\[eqn:ip\\_compression\]) and arrive
+We can compress the resulting statement about \\(P\_{k-1}\\) using one more indeterminate
+variable \\(u\_{k-1}\\) in the same way as we used \\(u\_k\\) and arrive
 to even shorter vectors. We will continue doing so until we end up with
 vectors
 \\({\mathbf{a}}^{(0)}, {\mathbf{b}}^{(0)}, {\mathbf{G}}^{(0)}, {\mathbf{H}}^{(0)}\\),
@@ -567,12 +565,10 @@ each containing one item:
     P\_0 = a^{(0)}\_0 \cdot G^{(0)}\_0 + b^{(0)}\_0 \cdot H^{(0)}\_0 + a^{(0)}\_0 \cdot b^{(0)}\_0 \cdot \hat{Q} 
 \\]
 At this point the prover can transmit two scalars \\(a^{(0)}\_0\\) and
-\\(b^{(0)}\_0\\) to the verifier, so they check
-(\[eqn:ip\\_inner\\_eq\\_final\]) directly by computing both sides of the
-equation.
+\\(b^{(0)}\_0\\) to the verifier, so they check the final statement directly
+by computing both sides of the equation.
 
 The resulting protocol has \\(\lg n\\) steps of compression where the prover
 sends a pair \\((L\_j,R\_j)\\) of points at each step \\(j = k\dots1\\). An
 additional and final step involves sending a pair of scalars
-\\((a^{(0)}\_0,b^{(0)}\_0)\\) and checking the relation
-(\[eqn:ip\\_inner\\_eq\\_final\]).
+\\((a^{(0)}\_0,b^{(0)}\_0)\\) and checking the final relation directly.
