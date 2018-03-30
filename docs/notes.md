@@ -240,7 +240,7 @@ z^2 v
 {\langle {\mathbf{a}}\_{L} - z{\mathbf{1}}, z^{2} {\mathbf{2}}^n + z {\mathbf{y}}^{n} + {\mathbf{a}}\_{R} \circ {\mathbf{y}}^{n} \rangle}
 \end{aligned}
 \\]
-Writing
+Combining all non-secret terms outside the inner product
 \\[
  \delta(y,z) = (z - z^{2}) {\langle {\mathbf{1}}, {\mathbf{y}}^{n} \rangle} - z^{3} {\langle {\mathbf{1}}, {\mathbf{2}}^{n} \rangle},
 \\]
@@ -448,12 +448,12 @@ cleaner, we will change the notation to one used specifically in the
 inner product argument which is not to be confused with the notation in
 the rangeproof protocol:
 \\[
-\begin{split}
+\begin{aligned}
 {\mathbf{a}}, {\mathbf{b}}  &\in {\mathbb Z\_{p}^{n}}\\\\
 {\mathbf{G}}, {\mathbf{H}}  &\in {\mathbb G^{n}}\\\\
 c  &= {\langle {\mathbf{a}}, {\mathbf{b}} \rangle}\\\\
 P  &= {\langle {\mathbf{a}}, {\mathbf{G}} \rangle} + {\langle {\mathbf{b}}, {\mathbf{H}} \rangle}
-\end{split}
+\end{aligned}
 \\]
 Within the above definitions we need a proof of knowledge
 for the following relation:
