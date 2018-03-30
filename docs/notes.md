@@ -271,13 +271,15 @@ and uses them to construct vector polynomials
   {\mathbf{r}}(x) &= {\mathbf{r}}\_{0} + {\mathbf{r}}\_{1} x = {\mathbf{y}}^{n} \circ \left( ({\mathbf{a}}\_{R} + {\mathbf{s}}\_{R} x\right)  + z {\mathbf{1}}) + z^{2} {\mathbf{2}}^{n} &\in {\mathbb Z\_p}[x]^{n} 
 \end{aligned}
 \\]
-These are the left and right sides of the inner product
-(\[eqn:single\\_inner\]), with \\({\mathbf{a}}\_{L}\\), \\({\mathbf{a}}\_{R}\\)
+These are the left and right sides of the combined inner product with \\({\mathbf{a}}\_{L}\\), \\({\mathbf{a}}\_{R}\\)
 replaced by blinded terms \\({\mathbf{a}}\_{L} + {\mathbf{s}}\_{L} x\\),
 \\({\mathbf{a}}\_{R} + {\mathbf{s}}\_{R} x\\). Notice that since only the
 blinding factors \\({\mathbf{s}}\_{L}\\), \\({\mathbf{s}}\_{R}\\) are multiplied
 by \\(x\\), the vectors \\({\mathbf{l}}\_{0}\\) and \\({\mathbf{r}}\_{0}\\) are
-exactly the left and right sides of the unblinded single inner-product.
+exactly the left and right sides of the unblinded single inner-product:
+\\[
+ {\langle {\mathbf{l}}\_{0}, {\mathbf{r}}\_{0} \rangle} = z^{2}v + \delta(y,z)
+\\]
 
 Setting
 \\[
@@ -486,18 +488,23 @@ The equation becomes:
 \\[
     P\_k = {\langle {\mathbf{a}}, {\mathbf{G}} \rangle} + {\langle {\mathbf{b}}, {\mathbf{H}} \rangle} + {\langle {\mathbf{a}}, {\mathbf{b}} \rangle} \cdot \hat{Q} 
 \\]
-If the prover can demonstrate that the above \\(P\_k\\) has such structure
-over generators \\({\mathbf{G}}\\), \\({\mathbf{H}}\\) and \\(\hat Q\\) for all
-\\(w \in {\mathbb Z\_{p}^{*}}\\), then the original \\(P\\) and \\(c\\) must satisfy
-the original relation (\[eqn:ip\\_cp\\_def\]).
-
-The equation (\[eqn:ip\\_inner\\_eq\]) is useful because it will allow us
+The combined equation is useful because it will allow us
 to compress each vector in half and arrive to the same form. By doing
 such compression \\(\lg n\\) times we will end up with an equation where
 both vectors are one-element long and we can simply transmit them to
 check the final equality directly.
 
-let’s introduce an indeterminate variable \\(u\_k \in {\mathbb Z\_{p}^{\times}}\\)
+If the prover can demonstrate that the above \\(P\_k\\) has such structure
+over generators \\({\mathbf{G}}\\), \\({\mathbf{H}}\\) and \\(\hat Q\\) for all
+\\(w \in {\mathbb Z\_{p}^{*}}\\), then the original \\(P\\) and \\(c\\) must satisfy
+the original relation
+\\[
+\begin{aligned}
+    P = {\langle {\mathbf{a}}, {\mathbf{G}} \rangle} + {\langle {\mathbf{b}}, {\mathbf{H}} \rangle} \wedge
+    c = {\langle {\mathbf{a}}, {\mathbf{b}} \rangle}
+\end{aligned}
+\\]
+Let’s introduce an indeterminate variable \\(u\_k \in {\mathbb Z\_{p}^{\times}}\\)
 and compress the vectors by adding the left and the right halves
 separated by the variable \\(u\_k\\):
 \\[
