@@ -23,7 +23,7 @@ The protocol consists of \\(k = \lg n\\) rounds, indexed by
 \end{aligned}
 \\]
 and sends \\(L\_{j}, R\_{j}\\) to the verifier. The verifier responds with a
-challenge value \\(x\_{j} {\xleftarrow{\$}}{\mathbb Z\_p}\\). The prover uses
+challenge value \\(x\_{j} {\xleftarrow{\\$}}{\mathbb{Z}\_p}\\). The prover uses
 \\(x\_{j}\\) to compute
 \\[
 \begin{aligned}
