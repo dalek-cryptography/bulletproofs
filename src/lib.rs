@@ -5,6 +5,7 @@
 
 #![doc(include = "../README.md")]
 
+extern crate core;
 extern crate byteorder;
 extern crate curve25519_dalek;
 extern crate rand;

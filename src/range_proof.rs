@@ -3,6 +3,7 @@
 use rand::Rng;
 
 use std::iter;
+use core::borrow::Borrow;
 
 use sha2::{Digest, Sha512};
 
@@ -224,25 +225,25 @@ impl RangeProof {
                 .chain(iter::once(c * zz))
                 .chain(iter::once(c * x))
                 .chain(iter::once(c * x * x))
+                .chain(x_sq.iter().cloned())
+                .chain(x_inv_sq.iter().cloned())
                 .chain(iter::once(-self.e_blinding - c * self.t_x_blinding))
                 .chain(iter::once(
                     w * (self.t_x - a * b) + c * (delta(n, &y, &z) - self.t_x),
                 ))
                 .chain(g)
-                .chain(h)
-                .chain(x_sq.iter().cloned())
-                .chain(x_inv_sq.iter().cloned()),
+                .chain(h),
             iter::once(&self.A)
                 .chain(iter::once(&self.S))
                 .chain(iter::once(&self.V))
                 .chain(iter::once(&self.T_1))
                 .chain(iter::once(&self.T_2))
+                .chain(self.ipp_proof.L_vec.iter())
+                .chain(self.ipp_proof.R_vec.iter())
                 .chain(iter::once(gens.B_blinding))
                 .chain(iter::once(gens.B))
                 .chain(gens.G.iter())
-                .chain(gens.H.iter())
-                .chain(self.ipp_proof.L_vec.iter())
-                .chain(self.ipp_proof.R_vec.iter()),
+                .chain(gens.H.iter()),
         );
 
         if mega_check.is_identity() {
@@ -251,7 +252,129 @@ impl RangeProof {
             Err(())
         }
     }
+
+    /// Produces a verifiable `RangeProofResult` object that
+    /// can be verified as a part of a batch
+    pub fn verify_batch<'a, 'b, 'c, R: Rng>(
+        proofs: &'a [RangeProof],
+        gens: GeneratorsView,
+        rng: &'c mut R,
+        n: usize,
+    ) -> Result<(), ()> {
+        // Challenge value for batching 2 statements per proof
+        let c = Scalar::random(rng);
+
+        // Challenge value for batching multiple proofs
+        let batch_challenge = Scalar::random(rng);
+
+        let m = proofs.len();
+        
+        let (
+            static_base_scalars,
+            dynamic_base_scalars,
+            dynamic_bases,
+            ) = proofs.iter().fold(
+            (
+                iter::empty::<Scalar>().chain((0..m).map(|_| Scalar::zero())),   // static base scalars    
+                iter::empty::<Scalar>(),          // dynamic base scalars
+                iter::empty::<RistrettoPoint>(),  // dynamic bases
+            ),
+            |(static_scalars, dyn_scalars, dyn_bases), proof| {
+
+                // XXX TODO: move all transcript creation into create/verify/verify_batch functions
+                //           and rename "RangeproofTest" to "RangeproofTranscript"
+                let mut transcript = ProofTranscript::new(b"RangeproofTest");
+
+                transcript.commit(proof.V.compress().as_bytes());
+                transcript.commit(proof.A.compress().as_bytes());
+                transcript.commit(proof.S.compress().as_bytes());
+
+                let y = transcript.challenge_scalar();
+                let z = transcript.challenge_scalar();
+                let zz = z * z;
+                let minus_z = -z;
+
+                transcript.commit(proof.T_1.compress().as_bytes());
+                transcript.commit(proof.T_2.compress().as_bytes());
+
+                let x = transcript.challenge_scalar();
+
+                transcript.commit(proof.t_x.as_bytes());
+                transcript.commit(proof.t_x_blinding.as_bytes());
+                transcript.commit(proof.e_blinding.as_bytes());
+
+                let w = transcript.challenge_scalar();
+
+                let (x_sq, x_inv_sq, s) = proof.ipp_proof.verification_scalars(&mut transcript);
+                let s_inv = s.iter().rev();
+
+                let a = proof.ipp_proof.a;
+                let b = proof.ipp_proof.b;
+
+                let g = s.iter().map(|s_i| minus_z - a * s_i);
+                let h = s_inv
+                    .zip(util::exp_iter(Scalar::from_u64(2)))
+                    .zip(util::exp_iter(y.invert()))
+                    .map(|((s_i_inv, exp_2), exp_y_inv)| z + exp_y_inv * (zz * exp_2 - b * s_i_inv));
+
+                // returning extended/modified iterators
+                (
+                    // static scalars
+                    static_scalars
+                        .zip(
+                            iter::once(
+                                w * (proof.t_x - a * b) + c * (delta(n, &y, &z) - proof.t_x),
+                            )
+                            .chain(iter::once(-proof.e_blinding - c * proof.t_x_blinding))
+                            .chain(g)
+                            .chain(h)
+                        )
+                        // Note: `c*a + b` yields growing powers of `c` on each statement as needed.
+                        //       if we do `a + c*b`, then all statements will have the same power of `c`
+                        //       and would be able to cancel each other out
+                        .map(|(a, b)| batch_challenge*a + b ),
+                    dyn_scalars
+                        .chain(iter::once(Scalar::one()))
+                        .chain(iter::once(x))
+                        .chain(iter::once(c * zz))
+                        .chain(iter::once(c * x))
+                        .chain(iter::once(c * x * x))
+                        .chain(x_sq.iter().cloned())
+                        .chain(x_inv_sq.iter().cloned()),
+                    dyn_bases
+                        .chain(iter::once(&proof.A))
+                        .chain(iter::once(&proof.S))
+                        .chain(iter::once(&proof.V))
+                        .chain(iter::once(&proof.T_1))
+                        .chain(iter::once(&proof.T_2))
+                        .chain(proof.ipp_proof.L_vec.iter())
+                        .chain(proof.ipp_proof.R_vec.iter())
+                )
+            }
+        );
+        let mega_check = ristretto::vartime::multiscalar_mul(
+                
+                static_base_scalars
+                .chain(dynamic_base_scalars),
+
+                iter::once(gens.B)
+                .chain(iter::once(gens.B_blinding))
+                .chain(gens.G.iter())
+                .chain(gens.H.iter())
+                .chain(dynamic_bases)
+        );
+
+        if mega_check.is_identity() {
+            Ok(())
+        } else {
+            Err(())
+        }    
+
+        
+    }
 }
+
+
 
 /// Compute
 /// $$
