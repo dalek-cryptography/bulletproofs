@@ -6,10 +6,10 @@
 //!
 //! ```
 //! # extern crate ristretto_bulletproofs;
-//! # use ristretto_bulletproofs::Generators;
+//! # use ristretto_bulletproofs::{CommitmentGenerators,Generators};
 //! # fn main() {
-//!
-//! let generators = Generators::new(64,1);
+//! let (B, B_blinding) = CommitmentGenerators::generators();
+//! let generators = Generators::new(B, B_blinding, 64,1);
 //! let view = generators.all();
 //! let G0 = view.G[0];
 //! let H0 = view.H[0];
@@ -89,21 +89,26 @@ pub struct GeneratorsView<'a> {
     pub H: &'a [RistrettoPoint],
 }
 
+/// Entry point for producing a pair of base points for Pedersen commitments.
+pub struct CommitmentGenerators {}
+
+impl CommitmentGenerators {
+    /// Produces a pair of generators for a Pedersen commitment.
+    pub fn generators() -> (RistrettoPoint, RistrettoPoint) {
+        (
+            GeneratorsChain::new(b"Bulletproofs.Generators.B").next().unwrap(),
+            GeneratorsChain::new(b"Bulletproofs.Generators.B_blinding").next().unwrap()
+        )
+    }
+}
+
 impl Generators {
     /// Creates generators for `m` range proofs of `n` bits each.
-    pub fn new(n: usize, m: usize) -> Self {
-        // Using unwrap is safe here, because the iterator is unbounded.
-        let B = GeneratorsChain::new(b"Bulletproofs.Generators.B")
-            .next()
-            .unwrap();
-        let B_blinding = GeneratorsChain::new(b"Bulletproofs.Generators.B_blinding")
-            .next()
-            .unwrap();
-
-        let G = GeneratorsChain::new(b"Bulletproofs.Generators.G")
+    pub fn new(B: RistrettoPoint, B_blinding: RistrettoPoint, n: usize, m: usize) -> Self {
+        let G = GeneratorsChain::new(B.compress().as_bytes())
             .take(n * m)
             .collect();
-        let H = GeneratorsChain::new(b"Bulletproofs.Generators.H")
+        let H = GeneratorsChain::new(B_blinding.compress().as_bytes())
             .take(n * m)
             .collect();
 
@@ -145,13 +150,13 @@ impl Generators {
 mod tests {
     extern crate hex;
     use super::*;
-    use curve25519_dalek::constants::RISTRETTO_BASEPOINT_POINT;
 
     #[test]
     fn rangeproof_generators() {
         let n = 2;
         let m = 3;
-        let gens = Generators::new(n, m);
+        let (B, B_blinding) = CommitmentGenerators::generators();
+        let gens = Generators::new(B, B_blinding, n, m);
 
         // The concatenation of shares must be the full generator set
         assert_eq!(
