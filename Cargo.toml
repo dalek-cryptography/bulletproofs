@@ -17,10 +17,6 @@ criterion = "0.2"
 yolocrypto = ["curve25519-dalek/yolocrypto"]
 std = ["curve25519-dalek/std"]
 
-[dependencies.tiny-keccak]
-git = 'https://github.com/chain/tiny-keccak.git'
-rev = '5925f81b3c351440283c3328e2345d982aac0f6e'
-
 [[bench]]
 name = "bulletproofs"
 harness = false
