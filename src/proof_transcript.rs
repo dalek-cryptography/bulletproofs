@@ -5,12 +5,7 @@
 //! interactive, using the Fiat-Shamir transform.
 
 use curve25519_dalek::scalar::Scalar;
-
-// XXX This uses experiment fork of tiny_keccak with half-duplex
-// support that we require in this implementation.
-// Review this after this PR is merged or updated:
-// https://github.com/debris/tiny-keccak/pull/24
-use tiny_keccak::Keccak;
+use sha2::{Sha512, Digest};
 
 use byteorder::{ByteOrder, LittleEndian};
 
@@ -31,12 +26,32 @@ use byteorder::{ByteOrder, LittleEndian};
 /// ensure that their challenge values are bound to the *entire* proof
 /// transcript, not just the sub-protocol.
 ///
-/// Internally, the `ProofTranscript` uses the Keccak sponge to
-/// absorb messages and squeeze challenges.
+/// Internally, the `ProofTranscript` uses a chain of SHA2-512 calls,
+/// one call per absorbing a message or squeezing a challenge:
+///
+/// ```ascii
+///
+///
+/// commit(message):      state0  message
+///                            ↓  ↓
+///                           sha512
+///                            ↓  ↓
+///                       state1  (ignore)
+///                            ↓
+/// challenge_scalar():       sha512
+///                            ↓  ↓
+///                       state2  L (left half)
+///                            ↓
+///                           sha512
+///                            ↓  ↓
+///                       state3  R (right half)  // scalar ← L||R mod l
+///
+/// ```
 ///
 /// # Example
 ///
 /// ```
+/// # #![allow(non_snake_case)]
 /// # extern crate curve25519_dalek;
 /// # extern crate ristretto_bulletproofs;
 /// # use ristretto_bulletproofs::ProofTranscript;
@@ -60,20 +75,16 @@ use byteorder::{ByteOrder, LittleEndian};
 /// ```
 #[derive(Clone)]
 pub struct ProofTranscript {
-    hash: Keccak,
+    state: [u8; 32],
 }
 
 impl ProofTranscript {
     /// Begin a new, empty proof transcript, using the given `label`
     /// for domain separation.
     pub fn new(label: &[u8]) -> Self {
-        let mut ro = ProofTranscript {
-            hash: Keccak::new_shake128(),
-        };
-        ro.commit(label);
-        // makes sure the label is disambiguated from the rest of the messages.
-        ro.pad();
-        ro
+        let mut pt = ProofTranscript { state: [0u8; 32] };
+        pt.commit(label);
+        pt
     }
 
     /// Commit a `message` to the proof transcript.
@@ -82,20 +93,11 @@ impl ProofTranscript {
     ///
     /// Each message must be shorter than 64Kb (65536 bytes).
     pub fn commit(&mut self, message: &[u8]) {
-        let len = message.len();
-        if len > (u16::max_value() as usize) {
-            panic!("Committed message must be less than 64Kb!");
-        }
-
-        let mut len_prefix = [0u8; 2];
-        LittleEndian::write_u16(&mut len_prefix, len as u16);
-
-        // XXX we rely on tiny_keccak experimental support for half-duplex mode and
-        // correct switching from absorbing to squeezing and back.
-        // Review this after this PR is merged or updated:
-        // https://github.com/debris/tiny-keccak/pull/24
-        self.hash.absorb(&len_prefix);
-        self.hash.absorb(message);
+        let mut hash = Sha512::default();
+        hash.input(&self.state);
+        hash.input(message);
+        let result = hash.result();
+        self.state.copy_from_slice(&result[..32]);
     }
 
     /// Commit a `u64` to the proof transcript.
@@ -111,11 +113,22 @@ impl ProofTranscript {
 
     /// Extracts an arbitrary-sized challenge byte slice.
     pub fn challenge_bytes(&mut self, mut output: &mut [u8]) {
-        // XXX we rely on tiny_keccak experimental support for half-duplex mode and
-        // correct switching from absorbing to squeezing and back.
-        // Review this after this PR is merged or updated:
-        // https://github.com/debris/tiny-keccak/pull/24
-        self.hash.squeeze(&mut output);
+        while output.len() > 0 {
+            let outlen = output.len();
+            let size: usize = if outlen <= 32 { outlen } else { 32 };
+
+            let mut hash = Sha512::default();
+            let mut prefix = [0u8; 8];
+            LittleEndian::write_u64(&mut prefix, outlen as u64);
+            // length prefix for the output is necessary
+            // to make sure requests of different lengths are unrelated
+            hash.input(&prefix);
+            hash.input(&self.state);
+            let result = hash.result();
+            self.state.copy_from_slice(&result[..32]);
+            output[..size].copy_from_slice(&result[32..(32 + size)]);
+            output = &mut output[size..];
+        }
     }
 
     /// Extracts a challenge scalar.
@@ -127,14 +140,6 @@ impl ProofTranscript {
         self.challenge_bytes(&mut buf);
         Scalar::from_bytes_mod_order_wide(&buf)
     }
-
-    /// Pad separates the prior operations by padding
-    /// the rest of the block with zeroes and applying a permutation.
-    /// Each incoming message is length-prefixed anyway, but padding
-    /// enables pre-computing and re-using the oracle state.
-    fn pad(&mut self) {
-        self.hash.fill_block();
-    }
 }
 
 #[cfg(test)]
@@ -145,50 +150,50 @@ mod tests {
     #[test]
     fn challenges_must_be_random() {
         {
-            let mut ro = ProofTranscript::new(b"TestProtocol");
-            ro.commit(b"test");
+            let mut pt = ProofTranscript::new(b"TestProtocol");
+            pt.commit(b"test");
             {
                 let mut ch = [0u8; 32];
-                ro.challenge_bytes(&mut ch);
+                pt.challenge_bytes(&mut ch);
                 assert_eq!(
                     hex::encode(ch),
-                    "9ba30a0e71e8632b55fbae92495440b6afb5d2646ba6b1bb419933d97e06b810"
+                    "250342b47f8992bd22e72707d9a0736f9b0a736786669020668c11d791359c14"
                 );
-                ro.challenge_bytes(&mut ch);
+                pt.challenge_bytes(&mut ch);
                 assert_eq!(
                     hex::encode(ch),
-                    "add523844517c2320fc23ca72423b0ee072c6d076b05a6a7b6f46d8d2e322f94"
+                    "8622e6b7c4f11c5752f784efd0a3c837c2aab46688ec5193a2c35293b1ebdf89"
                 );
-                ro.challenge_bytes(&mut ch);
+                pt.challenge_bytes(&mut ch);
                 assert_eq!(
                     hex::encode(ch),
-                    "ac279a11cac0b1271d210592c552d719d82d67c82d7f86772ed7bc6618b0927c"
+                    "20f419642415493816336132119293409da947a81e2f2a3a41586c579c252866"
                 );
             }
 
-            let mut ro = ProofTranscript::new(b"TestProtocol");
-            ro.commit(b"test");
+            let mut pt = ProofTranscript::new(b"TestProtocol");
+            pt.commit(b"test");
             {
                 let mut ch = [0u8; 16];
-                ro.challenge_bytes(&mut ch);
-                assert_eq!(hex::encode(ch), "9ba30a0e71e8632b55fbae92495440b6");
-                ro.challenge_bytes(&mut ch);
-                assert_eq!(hex::encode(ch), "afb5d2646ba6b1bb419933d97e06b810");
-                ro.challenge_bytes(&mut ch);
-                assert_eq!(hex::encode(ch), "add523844517c2320fc23ca72423b0ee");
+                pt.challenge_bytes(&mut ch);
+                assert_eq!(hex::encode(ch), "e485d35fb39cb3dcffdb85e69d9f6e41");
+                pt.challenge_bytes(&mut ch);
+                assert_eq!(hex::encode(ch), "6843787badc2c814a907b96724268276");
+                pt.challenge_bytes(&mut ch);
+                assert_eq!(hex::encode(ch), "efc93d2be979ca3978323d04ed23faa8");
             }
 
-            let mut ro = ProofTranscript::new(b"TestProtocol");
-            ro.commit(b"test");
+            let mut pt = ProofTranscript::new(b"TestProtocol");
+            pt.commit(b"test");
             {
                 let mut ch = [0u8; 16];
-                ro.challenge_bytes(&mut ch);
-                assert_eq!(hex::encode(ch), "9ba30a0e71e8632b55fbae92495440b6");
-                ro.commit(b"extra commitment");
-                ro.challenge_bytes(&mut ch);
-                assert_eq!(hex::encode(ch), "11536e09cedbb6b302d8c7cd96471be5");
-                ro.challenge_bytes(&mut ch);
-                assert_eq!(hex::encode(ch), "058c383da5f2e193a381aaa420b505b2");
+                pt.challenge_bytes(&mut ch);
+                assert_eq!(hex::encode(ch), "e485d35fb39cb3dcffdb85e69d9f6e41");
+                pt.commit(b"extra commitment");
+                pt.challenge_bytes(&mut ch);
+                assert_eq!(hex::encode(ch), "182d0f0483b101b87e8be8026a3f864b");
+                pt.challenge_bytes(&mut ch);
+                assert_eq!(hex::encode(ch), "20ad36c1adbf07c864650925af0316ce");
             }
         }
     }
@@ -196,43 +201,43 @@ mod tests {
     #[test]
     fn messages_are_disambiguated_by_length_prefix() {
         {
-            let mut ro = ProofTranscript::new(b"TestProtocol");
-            ro.commit(b"msg1msg2");
+            let mut pt = ProofTranscript::new(b"TestProtocol");
+            pt.commit(b"msg1msg2");
             {
                 let mut ch = [0u8; 8];
-                ro.challenge_bytes(&mut ch);
-                assert_eq!(hex::encode(ch), "1ad843ea2bf7f8b6");
+                pt.challenge_bytes(&mut ch);
+                assert_eq!(hex::encode(ch), "0b19216256fe74cb");
             }
         }
         {
-            let mut ro = ProofTranscript::new(b"TestProtocol");
-            ro.commit(b"msg1");
-            ro.commit(b"msg2");
+            let mut pt = ProofTranscript::new(b"TestProtocol");
+            pt.commit(b"msg1");
+            pt.commit(b"msg2");
             {
                 let mut ch = [0u8; 8];
-                ro.challenge_bytes(&mut ch);
-                assert_eq!(hex::encode(ch), "79abbe29d8c33bb0");
+                pt.challenge_bytes(&mut ch);
+                assert_eq!(hex::encode(ch), "172398c864df2231");
             }
         }
         {
-            let mut ro = ProofTranscript::new(b"TestProtocol");
-            ro.commit(b"msg");
-            ro.commit(b"1msg2");
+            let mut pt = ProofTranscript::new(b"TestProtocol");
+            pt.commit(b"msg");
+            pt.commit(b"1msg2");
             {
                 let mut ch = [0u8; 8];
-                ro.challenge_bytes(&mut ch);
-                assert_eq!(hex::encode(ch), "f88d0f790cde50d5");
+                pt.challenge_bytes(&mut ch);
+                assert_eq!(hex::encode(ch), "efb49fc1c7625d94");
             }
         }
         {
-            let mut ro = ProofTranscript::new(b"TestProtocol");
-            ro.commit(b"ms");
-            ro.commit(b"g1ms");
-            ro.commit(b"g2");
+            let mut pt = ProofTranscript::new(b"TestProtocol");
+            pt.commit(b"ms");
+            pt.commit(b"g1ms");
+            pt.commit(b"g2");
             {
                 let mut ch = [0u8; 8];
-                ro.challenge_bytes(&mut ch);
-                assert_eq!(hex::encode(ch), "90ca22b443fb78a1");
+                pt.challenge_bytes(&mut ch);
+                assert_eq!(hex::encode(ch), "9c6de7aecda7ee40");
             }
         }
     }

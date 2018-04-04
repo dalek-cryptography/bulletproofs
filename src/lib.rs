@@ -9,7 +9,6 @@ extern crate byteorder;
 extern crate curve25519_dalek;
 extern crate rand;
 extern crate sha2;
-extern crate tiny_keccak;
 
 #[cfg(test)]
 extern crate test;
