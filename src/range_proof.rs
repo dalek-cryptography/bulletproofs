@@ -349,11 +349,9 @@ mod tests {
         // Use bincode for serialization
         use bincode;
 
-        use generators::{CommitmentGenerators,Generators};
-
         // Both prover and verifier have access to the generators and the proof
-        let (B, B_blinding) = CommitmentGenerators::generators();
-        let generators = Generators::new(B, B_blinding, n, 1);
+        use generators::{CommitmentGenerators,Generators};
+        let generators = Generators::new(CommitmentGenerators::generators(), n, 1);
 
         // Serialized proof data
         let proof_bytes: Vec<u8>;

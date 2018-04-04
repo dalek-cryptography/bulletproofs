@@ -16,8 +16,7 @@ use ristretto_bulletproofs::RangeProof;
 
 fn bench_create_helper(n: usize, c: &mut Criterion) {
     c.bench_function(&format!("create_rangeproof_n_{}", n), move |b| {
-        let (B, B_blinding) = CommitmentGenerators::generators();
-        let generators = Generators::new(B, B_blinding, n, 1);
+        let generators = Generators::new(CommitmentGenerators::generators(), n, 1);
         let mut rng = OsRng::new().unwrap();
 
         let v: u64 = rng.gen_range(0, (1 << (n - 1)) - 1);
@@ -41,8 +40,7 @@ fn bench_create_helper(n: usize, c: &mut Criterion) {
 
 fn bench_verify_helper(n: usize, c: &mut Criterion) {
     c.bench_function(&format!("verify_rangeproof_n_{}", n), move |b| {
-        let (B, B_blinding) = CommitmentGenerators::generators();
-        let generators = Generators::new(B, B_blinding, n, 1);
+        let generators = Generators::new(CommitmentGenerators::generators(), n, 1);
         let mut rng = OsRng::new().unwrap();
 
         let mut transcript = ProofTranscript::new(b"RangeproofTest");

@@ -173,7 +173,6 @@ impl Proof {
     // XXX we want to keep this function for later use maybe, but
     // currently RP folds all verification in one giant multiplication,
     // so this is unused.
-    #[warn(dead_code)]
     pub fn verify<I>(
         &self,
         transcript: &mut ProofTranscript,
@@ -234,8 +233,7 @@ mod tests {
         let mut rng = OsRng::new().unwrap();
 
         use generators::{CommitmentGenerators,Generators};
-        let (B, B_blinding) = CommitmentGenerators::generators();
-        let gens = Generators::new(B, B_blinding, n, 1);
+        let gens = Generators::new(CommitmentGenerators::generators(), n, 1);
         let G = gens.share(0).G.to_vec();
         let H = gens.share(0).H.to_vec();
 
