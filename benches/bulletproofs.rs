@@ -9,8 +9,8 @@ extern crate curve25519_dalek;
 use curve25519_dalek::scalar::Scalar;
 
 extern crate ristretto_bulletproofs;
-use ristretto_bulletproofs::generators::{Generators, GeneratorsView};
-use ristretto_bulletproofs::proof_transcript::ProofTranscript;
+use ristretto_bulletproofs::{Generators};
+use ristretto_bulletproofs::ProofTranscript;
 use ristretto_bulletproofs::RangeProof;
 
 fn bench_create_helper(n: usize, c: &mut Criterion) {
@@ -60,6 +60,31 @@ fn bench_verify_helper(n: usize, c: &mut Criterion) {
             let mut transcript = ProofTranscript::new(b"RangeproofTest");
 
             rp.verify(generators.share(0), &mut transcript, &mut rng, n)
+        });
+    });
+
+    c.bench_function(&format!("verify_rangeproof_n_{}_via_batch", n), move |b| {
+        let generators = Generators::new(n, 1);
+        let mut rng = OsRng::new().unwrap();
+
+        let mut transcript = ProofTranscript::new(b"RangeproofTest");
+        let v: u64 = rng.gen_range(0, (1 << (n - 1)) - 1);
+        let v_blinding = Scalar::random(&mut rng);
+
+        let rp = RangeProof::generate_proof(
+            generators.share(0),
+            &mut transcript,
+            &mut rng,
+            n,
+            v,
+            &v_blinding,
+        );
+
+        b.iter(|| {
+            // Each verification requires a clean transcript.
+            let mut transcript = ProofTranscript::new(b"RangeproofTest");
+
+            rp.verify_via_batch(generators.share(0), &mut transcript, &mut rng, n)
         });
     });
 }

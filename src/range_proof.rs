@@ -51,7 +51,7 @@ pub struct RangeProof {
     ipp_proof: inner_product_proof::Proof,
 }
 
-pub struct Verification {
+struct Verification {
     /// Bit-size of the range, stored to make sure proofs are consistent
     n: usize,
     static_base_scalars: Vec<Scalar>,
@@ -182,7 +182,7 @@ impl RangeProof {
         }
     }
 
-    pub fn verify_verbose<R: Rng>(
+    pub fn verify<R: Rng>(
         &self,
         gens: GeneratorsView,
         transcript: &mut ProofTranscript,
@@ -261,7 +261,7 @@ impl RangeProof {
         }
     }
 
-    pub fn verify<R: Rng>(
+    pub fn verify_via_batch<R: Rng>(
         &self,
         gens: GeneratorsView,
         transcript: &mut ProofTranscript,
@@ -354,13 +354,23 @@ impl RangeProof {
         n: usize,
     ) -> Result<(), ()> {
         
-        let mut static_base_scalars: Vec<Scalar> = (0..(2 + 2*n)).map(|_| Scalar::zero()).collect();
-        let mut dynamic_base_scalars: Vec<Scalar> = Vec::new();
-        let mut dynamic_bases: Vec<RistrettoPoint> = Vec::new();
+        if proofs.len() == 0 {
+            return Ok(())
+        }
 
-        for proof in proofs {
-            let batch_challenge = Scalar::random(rng);
+        // let mut static_base_scalars: Vec<Scalar> = (0..(2 + 2*n)).map(|_| Scalar::zero()).collect();
+        // let mut dynamic_base_scalars: Vec<Scalar> = Vec::new();
+        // let mut dynamic_bases: Vec<RistrettoPoint> = Vec::new();
+
+        let verification = proofs[0].prepare_verification(&mut transcript.clone(), rng, n);
+        let mut static_base_scalars: Vec<Scalar> = verification.static_base_scalars;
+        let mut dynamic_base_scalars: Vec<Scalar> = verification.dynamic_base_scalars;
+        let mut dynamic_bases: Vec<RistrettoPoint> = verification.dynamic_bases;
+
+        // first statement is applied w/o a random factor
+        for proof in &proofs[1..] {
             let verification = proof.prepare_verification(&mut transcript.clone(), rng, n);
+            let batch_challenge = Scalar::random(rng);
             static_base_scalars = static_base_scalars.iter()
                     .zip(verification.static_base_scalars.iter())
                     .map(|(total, s)| total + batch_challenge*s )
