@@ -5,11 +5,9 @@ use rand::Rng;
 use std::iter;
 use core::borrow::Borrow;
 
-use sha2::{Digest, Sha512};
-
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::ristretto;
-use curve25519_dalek::traits::{Identity, IsIdentity};
+use curve25519_dalek::traits::IsIdentity;
 use curve25519_dalek::scalar::Scalar;
 
 // XXX rename this maybe ?? at least `inner_product_proof::Proof` is too long.
@@ -20,7 +18,7 @@ use proof_transcript::ProofTranscript;
 
 use util;
 
-use generators::{Generators, GeneratorsView};
+use generators::GeneratorsView;
 
 struct PolyDeg3(Scalar, Scalar, Scalar);
 
@@ -52,8 +50,6 @@ pub struct RangeProof {
 }
 
 struct Verification {
-    /// Bit-size of the range, stored to make sure proofs are consistent
-    n: usize,
     static_base_scalars: Vec<Scalar>,
     dynamic_base_scalars: Vec<Scalar>,
     dynamic_bases: Vec<RistrettoPoint>,
@@ -321,7 +317,6 @@ impl RangeProof {
             .map(|((s_i_inv, exp_2), exp_y_inv)| z + exp_y_inv * (zz * exp_2 - b * s_i_inv));
 
         Verification {
-            n: n,
             static_base_scalars: (iter::once(
                     w * (self.t_x - a * b) + c * (delta(n, &y, &z) - self.t_x),
                 ))
@@ -467,6 +462,7 @@ impl VecPoly2 {
 mod tests {
     use super::*;
     use rand::OsRng;
+    use generators::Generators;
 
     #[test]
     fn test_delta() {
