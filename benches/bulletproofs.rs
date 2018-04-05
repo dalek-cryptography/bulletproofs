@@ -156,10 +156,14 @@ fn batch_verify_rp_64_16(c: &mut Criterion) {
     bench_batch_verify_helper(64, 16, c);
 }
 
+fn batch_verify_rp_64_100(c: &mut Criterion) {
+    bench_batch_verify_helper(64, 100, c);
+}
+
 criterion_group!{
     name = batch_verify_rp;
     config = Criterion::default();
-    targets = batch_verify_rp_64_1, batch_verify_rp_64_2, batch_verify_rp_64_4, batch_verify_rp_64_8, batch_verify_rp_64_16
+    targets = batch_verify_rp_64_1, batch_verify_rp_64_2, batch_verify_rp_64_4, batch_verify_rp_64_8, batch_verify_rp_64_16, batch_verify_rp_64_100
 }
 
 criterion_main!(create_rp, verify_rp, batch_verify_rp);
