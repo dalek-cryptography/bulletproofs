@@ -259,9 +259,8 @@ impl RangeProof {
         }
     }
 
-    /// If we figure out how to make single RP verification via batch API
-    /// as fast as original all-in-one function, we'll keep this definition and
-    /// remove the redundant one above.
+    /// Seems like this is as fast as normal `verify`,
+    /// but I'd like to have a second opinion.
     pub fn verify_via_batch<R: Rng>(
         &self,
         gens: GeneratorsView,
