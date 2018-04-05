@@ -520,6 +520,37 @@ mod tests {
         );
     }
 
+    fn batch_verify_helper(n: usize, m: usize) {
+        let generators = Generators::new(n, 1);
+        let mut rng = OsRng::new().unwrap();
+
+        let rps: Vec<_> = (0..m).map(|_| {
+            let mut transcript = ProofTranscript::new(b"RangeproofTest");
+            let v: u64 = rng.gen_range(0, (1 << (n - 1)) - 1);
+            let v_blinding = Scalar::random(&mut rng);
+            RangeProof::generate_proof(
+                generators.share(0),
+                &mut transcript,
+                &mut rng,
+                n,
+                v,
+                &v_blinding,
+            )
+        }).collect();
+
+        let mut transcript = ProofTranscript::new(b"RangeproofTest");
+
+        assert!(
+            RangeProof::verify_batch(
+                rps.as_slice(), 
+                generators.share(0), 
+                &mut transcript, 
+                &mut rng, 
+                n
+            ).is_ok()
+        );
+    }
+
     #[test]
     fn create_and_verify_8() {
         create_and_verify_helper(8);
@@ -538,6 +569,31 @@ mod tests {
     #[test]
     fn create_and_verify_64() {
         create_and_verify_helper(64);
+    }
+
+    #[test]
+    fn batch_verify_64_0() {
+        batch_verify_helper(64, 0);
+    }
+
+    #[test]
+    fn batch_verify_64_1() {
+        batch_verify_helper(64, 1);
+    }
+
+    #[test]
+    fn batch_verify_64_2() {
+        batch_verify_helper(64, 2);
+    }
+
+    #[test]
+    fn batch_verify_64_4() {
+        batch_verify_helper(64, 4);
+    }
+
+    #[test]
+    fn batch_verify_64_7() {
+        batch_verify_helper(64, 7);
     }
 }
 
