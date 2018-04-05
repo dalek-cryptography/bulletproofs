@@ -261,6 +261,9 @@ impl RangeProof {
         }
     }
 
+    /// If we figure out how to make single RP verification via batch API
+    /// as fast as original all-in-one function, we'll keep this definition and
+    /// remove the redundant one above.
     pub fn verify_via_batch<R: Rng>(
         &self,
         gens: GeneratorsView,
@@ -346,8 +349,8 @@ impl RangeProof {
         }
     }
 
-    pub fn verify_batch<R: Rng>(
-        proofs: &[&RangeProof],
+    pub fn verify_batch<R: Rng, P: Borrow<RangeProof>>(
+        proofs: &[P],
         gens: GeneratorsView,
         transcript: &mut ProofTranscript,
         rng: &mut R,
@@ -362,14 +365,14 @@ impl RangeProof {
         // let mut dynamic_base_scalars: Vec<Scalar> = Vec::new();
         // let mut dynamic_bases: Vec<RistrettoPoint> = Vec::new();
 
-        let verification = proofs[0].prepare_verification(&mut transcript.clone(), rng, n);
+        let verification = proofs[0].borrow().prepare_verification(&mut transcript.clone(), rng, n);
         let mut static_base_scalars: Vec<Scalar> = verification.static_base_scalars;
         let mut dynamic_base_scalars: Vec<Scalar> = verification.dynamic_base_scalars;
         let mut dynamic_bases: Vec<RistrettoPoint> = verification.dynamic_bases;
 
         // first statement is applied w/o a random factor
         for proof in &proofs[1..] {
-            let verification = proof.prepare_verification(&mut transcript.clone(), rng, n);
+            let verification = proof.borrow().prepare_verification(&mut transcript.clone(), rng, n);
             let batch_challenge = Scalar::random(rng);
             static_base_scalars = static_base_scalars.iter()
                     .zip(verification.static_base_scalars.iter())

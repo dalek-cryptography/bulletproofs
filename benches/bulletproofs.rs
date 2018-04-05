@@ -62,29 +62,32 @@ fn bench_verify_helper(n: usize, c: &mut Criterion) {
             rp.verify(generators.share(0), &mut transcript, &mut rng, n)
         });
     });
+}
 
-    c.bench_function(&format!("verify_rangeproof_n_{}_via_batch", n), move |b| {
+fn bench_batch_verify_helper(n: usize, m: usize, c: &mut Criterion) {
+    c.bench_function(&format!("batch_verify_rangeproof_n_{}_m_{}", n, m), move |b| {
         let generators = Generators::new(n, 1);
         let mut rng = OsRng::new().unwrap();
 
-        let mut transcript = ProofTranscript::new(b"RangeproofTest");
-        let v: u64 = rng.gen_range(0, (1 << (n - 1)) - 1);
-        let v_blinding = Scalar::random(&mut rng);
-
-        let rp = RangeProof::generate_proof(
-            generators.share(0),
-            &mut transcript,
-            &mut rng,
-            n,
-            v,
-            &v_blinding,
-        );
+        let rps: Vec<_> = (0..m).map(|_| {
+            let mut transcript = ProofTranscript::new(b"RangeproofTest");
+            let v: u64 = rng.gen_range(0, (1 << (n - 1)) - 1);
+            let v_blinding = Scalar::random(&mut rng);
+            RangeProof::generate_proof(
+                generators.share(0),
+                &mut transcript,
+                &mut rng,
+                n,
+                v,
+                &v_blinding,
+            )
+        }).collect();
 
         b.iter(|| {
             // Each verification requires a clean transcript.
             let mut transcript = ProofTranscript::new(b"RangeproofTest");
 
-            rp.verify_via_batch(generators.share(0), &mut transcript, &mut rng, n)
+            RangeProof::verify_batch(rps.as_slice(), generators.share(0), &mut transcript, &mut rng, n)
         });
     });
 }
@@ -131,6 +134,32 @@ criterion_group!{
     name = verify_rp;
     config = Criterion::default();
     targets = verify_rp_8, verify_rp_16, verify_rp_32, verify_rp_64
+}
+
+fn batch_verify_rp_64_1(c: &mut Criterion) {
+    bench_batch_verify_helper(64, 1, c);
+}
+
+fn batch_verify_rp_64_2(c: &mut Criterion) {
+    bench_batch_verify_helper(64, 2, c);
+}
+
+fn batch_verify_rp_64_4(c: &mut Criterion) {
+    bench_batch_verify_helper(64, 4, c);
+}
+
+fn batch_verify_rp_64_8(c: &mut Criterion) {
+    bench_batch_verify_helper(64, 8, c);
+}
+
+fn batch_verify_rp_64_16(c: &mut Criterion) {
+    bench_batch_verify_helper(64, 16, c);
+}
+
+criterion_group!{
+    name = batch_verify_rp;
+    config = Criterion::default();
+    targets = batch_verify_rp_64_1, batch_verify_rp_64_2, batch_verify_rp_64_4, batch_verify_rp_64_8, batch_verify_rp_64_16
 }
 
 criterion_main!(create_rp, verify_rp);
