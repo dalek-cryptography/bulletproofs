@@ -59,7 +59,7 @@ fn bench_verify_helper(n: usize, c: &mut Criterion) {
             // Each verification requires a clean transcript.
             let mut transcript = ProofTranscript::new(b"RangeproofTest");
 
-            rp.verify(generators.share(0), &mut transcript, &mut rng, n)
+            rp.verify(generators.share(0), &mut transcript, &mut rng)
         });
     });
 }
@@ -87,7 +87,7 @@ fn bench_batch_verify_helper(n: usize, m: usize, c: &mut Criterion) {
             // Each verification requires a clean transcript.
             let mut transcript = ProofTranscript::new(b"RangeproofTest");
 
-            RangeProof::verify_batch(rps.as_slice(), generators.share(0), &mut transcript, &mut rng, n)
+            RangeProof::verify_batch(rps.as_slice(), generators.share(0), &mut transcript, &mut rng)
         });
     });
 }

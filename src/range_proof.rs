@@ -27,6 +27,8 @@ struct VecPoly2(Vec<Scalar>, Vec<Scalar>);
 /// The `RangeProof` struct represents a single range proof.
 #[derive(Clone, Debug)]
 pub struct RangeProof {
+    /// Number of bits in the proof
+    n: usize,
     /// Commitment to the value
     // XXX this should not be included, so that we can prove about existing commitments
     // included for now so that it's easier to test
@@ -166,6 +168,7 @@ impl RangeProof {
         );
 
         RangeProof {
+            n,
             V,
             A,
             S,
@@ -183,7 +186,6 @@ impl RangeProof {
         gens: GeneratorsView,
         transcript: &mut ProofTranscript,
         rng: &mut R,
-        n: usize,
     ) -> Result<(), ()> {
         // First, replay the "interactive" protocol using the proof
         // data to recompute all challenges.
@@ -232,7 +234,7 @@ impl RangeProof {
                 .chain(x_sq.iter().cloned())
                 .chain(x_inv_sq.iter().cloned())
                 .chain(iter::once(
-                    w * (self.t_x - a * b) + c * (delta(n, &y, &z) - self.t_x),
+                    w * (self.t_x - a * b) + c * (delta(self.n, &y, &z) - self.t_x),
                 ))
                 .chain(iter::once(-self.e_blinding - c * self.t_x_blinding))
                 .chain(g)
@@ -265,9 +267,8 @@ impl RangeProof {
         gens: GeneratorsView,
         transcript: &mut ProofTranscript,
         rng: &mut R,
-        n: usize,
     ) -> Result<(), ()> {
-        RangeProof::verify_batch(&[self][..], gens, transcript, rng, n)
+        RangeProof::verify_batch(&[self][..], gens, transcript, rng)
     }
 
     /// Produces a verifiable `RangeProofResult` object that
@@ -349,16 +350,18 @@ impl RangeProof {
         gens: GeneratorsView,
         transcript: &mut ProofTranscript,
         rng: &mut R,
-        n: usize,
     ) -> Result<(), ()> {
         
         if proofs.len() == 0 {
             return Ok(())
         }
 
-        // let mut static_base_scalars: Vec<Scalar> = (0..(2 + 2*n)).map(|_| Scalar::zero()).collect();
-        // let mut dynamic_base_scalars: Vec<Scalar> = Vec::new();
-        // let mut dynamic_bases: Vec<RistrettoPoint> = Vec::new();
+        let n = proofs[0].borrow().n;
+
+        // Make sure all proofs use the same range
+        if proofs.iter().any(|p| p.borrow().n != n) {
+            return Err(())
+        }
 
         let verification = proofs[0].borrow().prepare_verification(&mut transcript.clone(), rng, n);
         let mut static_base_scalars: Vec<Scalar> = verification.static_base_scalars;
@@ -490,7 +493,7 @@ mod tests {
         assert_eq!(power_g, delta(n, &y, &z),);
     }
 
-    fn create_and_verify_helper(n: usize) {
+    fn create_rp_helper(n: usize) -> RangeProof {
         let generators = Generators::new(n, 1);
         let mut transcript = ProofTranscript::new(b"RangeproofTest");
         let mut rng = OsRng::new().unwrap();
@@ -498,42 +501,35 @@ mod tests {
         let v: u64 = rng.gen_range(0, (1 << (n - 1)) - 1);
         let v_blinding = Scalar::random(&mut rng);
 
-        let range_proof = RangeProof::generate_proof(
+        RangeProof::generate_proof(
             generators.share(0),
             &mut transcript,
             &mut rng,
             n,
             v,
             &v_blinding,
-        );
+        )
+    }
 
+    fn create_and_verify_helper(n: usize) {
+        let range_proof = create_rp_helper(n);
+        let generators = Generators::new(n, 1);
         let mut transcript = ProofTranscript::new(b"RangeproofTest");
-
+        let mut rng = OsRng::new().unwrap();
         assert!(
             range_proof
-                .verify(generators.share(0), &mut transcript, &mut rng, n)
+                .verify(generators.share(0), &mut transcript, &mut rng)
                 .is_ok()
         );
     }
 
     fn batch_verify_helper(n: usize, m: usize) {
-        let generators = Generators::new(n, 1);
-        let mut rng = OsRng::new().unwrap();
-
         let rps: Vec<_> = (0..m).map(|_| {
-            let mut transcript = ProofTranscript::new(b"RangeproofTest");
-            let v: u64 = rng.gen_range(0, (1 << (n - 1)) - 1);
-            let v_blinding = Scalar::random(&mut rng);
-            RangeProof::generate_proof(
-                generators.share(0),
-                &mut transcript,
-                &mut rng,
-                n,
-                v,
-                &v_blinding,
-            )
+            create_rp_helper(n)
         }).collect();
 
+        let generators = Generators::new(n, 1);
+        let mut rng = OsRng::new().unwrap();
         let mut transcript = ProofTranscript::new(b"RangeproofTest");
 
         assert!(
@@ -541,8 +537,7 @@ mod tests {
                 rps.as_slice(), 
                 generators.share(0), 
                 &mut transcript, 
-                &mut rng, 
-                n
+                &mut rng
             ).is_ok()
         );
     }
@@ -590,6 +585,49 @@ mod tests {
     #[test]
     fn batch_verify_64_7() {
         batch_verify_helper(64, 7);
+    }
+
+    #[test]
+    fn batch_over_differently_sized_proofs_is_not_supported() {
+        let rp8_1 = create_rp_helper(8);
+        let rp8_2 = create_rp_helper(8);
+        let rp64_1 = create_rp_helper(64);
+        let rp64_2 = create_rp_helper(64);
+
+        let mut rng = OsRng::new().unwrap();
+        let mut transcript = ProofTranscript::new(b"RangeproofTest");
+
+        // 8,8 -> good
+        assert!(RangeProof::verify_batch(
+            &[&rp8_1, &rp8_2][..],
+            Generators::new(8, 1).share(0),
+            &mut transcript,
+            &mut rng
+        ).is_ok());
+
+        // 64,64 -> good
+        assert!(RangeProof::verify_batch(
+            &[&rp64_1, &rp64_2][..],
+            Generators::new(64, 1).share(0),
+            &mut transcript,
+            &mut rng
+        ).is_ok());
+
+        // 8,64,64 -> bad
+        assert!(RangeProof::verify_batch(
+            &[&rp8_1, &rp64_1, &rp64_2][..],
+            Generators::new(8, 1).share(0),
+            &mut transcript,
+            &mut rng
+        ).is_err());
+
+        // 64,8,8 -> bad
+        assert!(RangeProof::verify_batch(
+            &[&rp64_1, &rp8_1, &rp8_2][..],
+            Generators::new(64, 1).share(0),
+            &mut transcript,
+            &mut rng
+        ).is_err());
     }
 }
 
