@@ -162,4 +162,4 @@ criterion_group!{
     targets = batch_verify_rp_64_1, batch_verify_rp_64_2, batch_verify_rp_64_4, batch_verify_rp_64_8, batch_verify_rp_64_16
 }
 
-criterion_main!(create_rp, verify_rp);
+criterion_main!(create_rp, verify_rp, batch_verify_rp);
