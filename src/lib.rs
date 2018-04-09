@@ -2,7 +2,6 @@
 #![feature(nll)]
 #![feature(test)]
 #![feature(external_doc)]
-
 #![doc(include = "../README.md")]
 
 extern crate byteorder;
@@ -17,8 +16,7 @@ extern crate test;
 mod util;
 
 #[doc(include = "../docs/notes.md")]
-mod notes {
-}
+mod notes {}
 
 mod proof_transcript;
 mod generators;
