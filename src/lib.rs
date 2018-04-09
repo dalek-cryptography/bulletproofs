@@ -27,8 +27,6 @@ mod generators;
 mod range_proof;
 mod inner_product_proof;
 
-mod scalar;
-
 pub use proof_transcript::ProofTranscript;
 pub use range_proof::RangeProof;
 pub use generators::{Generators, GeneratorsView};

@@ -9,9 +9,6 @@ use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::ristretto;
 use curve25519_dalek::scalar::Scalar;
 
-// XXX upstream into dalek
-use scalar;
-
 use proof_transcript::ProofTranscript;
 
 use util;
@@ -147,7 +144,7 @@ impl Proof {
         // 2. Compute 1/(x_k...x_1) and 1/x_k, ..., 1/x_1
 
         let mut challenges_inv = challenges.clone();
-        let allinv = scalar::batch_invert(&mut challenges_inv);
+        let allinv = Scalar::batch_invert(&mut challenges_inv);
 
         // 3. Compute x_i^2 and (1/x_i)^2
 
