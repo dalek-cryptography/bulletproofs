@@ -68,8 +68,7 @@ impl RangeProof {
         let G = generators.G.to_vec();
         let H = generators.H.to_vec();
 
-        let V =
-            ristretto::multiscalar_mul(&[Scalar::from_u64(v), *v_blinding], &[*B, *B_blinding]);
+        let V = ristretto::multiscalar_mul(&[Scalar::from_u64(v), *v_blinding], &[*B, *B_blinding]);
 
         let a_blinding = Scalar::random(rng);
 
@@ -382,4 +381,3 @@ mod tests {
         create_and_verify_helper(64);
     }
 }
-
