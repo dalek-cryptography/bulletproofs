@@ -60,6 +60,8 @@ impl RangeProof {
         v: u64,
         v_blinding: &Scalar,
     ) -> RangeProof {
+        use subtle::{Choice, ConditionallyAssignable};
+
         let B = generators.B;
         let B_blinding = generators.B_blinding;
 
@@ -75,13 +77,12 @@ impl RangeProof {
         // Compute A = <a_L, G> + <a_R, H> + a_blinding * B_blinding.
         let mut A = B_blinding * a_blinding;
         for i in 0..n {
-            let v_i = (v >> i) & 1;
-            // XXX replace this with a conditional move
-            if v_i == 0 {
-                A -= H[i];
-            } else {
-                A += G[i];
-            }
+            // If v_i = 0, we add a_L[i] * G[i] + a_R[i] * H[i] = - H[i]
+            // If v_i = 1, we add a_L[i] * G[i] + a_R[i] * H[i] =   G[i]
+            let v_i = Choice::from(((v >> i) & 1) as u8);
+            let mut point = -H[i];
+            point.conditional_assign(&G[i], v_i);
+            A += point;
         }
 
         let s_blinding = Scalar::random(rng);
