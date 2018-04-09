@@ -1,3 +1,5 @@
+The `inner_product_proof` module contains API for producing a compact proof of an inner product of two vectors.
+
 Inner product argument protocol
 ===============================
 
