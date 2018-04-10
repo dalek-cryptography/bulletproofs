@@ -36,4 +36,4 @@ mod inner_product_proof;
 
 pub use proof_transcript::ProofTranscript;
 pub use range_proof::RangeProof;
-pub use generators::{CommitmentGenerators, Generators, GeneratorsView};
+pub use generators::{PedersenGenerators, Generators, GeneratorsView};

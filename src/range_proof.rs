@@ -350,8 +350,8 @@ mod tests {
         use bincode;
 
         // Both prover and verifier have access to the generators and the proof
-        use generators::{CommitmentGenerators,Generators};
-        let generators = Generators::new(CommitmentGenerators::generators(), n, 1);
+        use generators::{PedersenGenerators,Generators};
+        let generators = Generators::new(PedersenGenerators::default(), n, 1);
 
         // Serialized proof data
         let proof_bytes: Vec<u8>;

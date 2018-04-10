@@ -6,9 +6,9 @@
 //!
 //! ```
 //! # extern crate ristretto_bulletproofs;
-//! # use ristretto_bulletproofs::{CommitmentGenerators,Generators};
+//! # use ristretto_bulletproofs::{PedersenGenerators,Generators};
 //! # fn main() {
-//! let generators = Generators::new(CommitmentGenerators::generators(), 64,1);
+//! let generators = Generators::new(PedersenGenerators::default(), 64,1);
 //! let view = generators.all();
 //! let G0 = view.G[0];
 //! let H0 = view.H[0];
@@ -89,12 +89,19 @@ pub struct GeneratorsView<'a> {
 }
 
 /// Entry point for producing a pair of base points for Pedersen commitments.
-pub struct CommitmentGenerators {}
+pub struct PedersenGenerators(RistrettoPoint, RistrettoPoint);
 
-impl CommitmentGenerators {
-    /// Produces a pair of generators for a Pedersen commitment.
-    pub fn generators() -> (RistrettoPoint, RistrettoPoint) {
-        (
+impl PedersenGenerators {
+    /// Constructs a pair of pedersen generators
+    /// from a pair of generators provided by the user.
+    pub fn new(A: RistrettoPoint, B: RistrettoPoint) -> Self {
+        PedersenGenerators(A,B)
+    }
+}
+
+impl Default for PedersenGenerators {
+    fn default() -> Self {
+        PedersenGenerators(
             GeneratorsChain::new(b"Bulletproofs.Generators.B").next().unwrap(),
             GeneratorsChain::new(b"Bulletproofs.Generators.B_blinding").next().unwrap()
         )
@@ -103,19 +110,19 @@ impl CommitmentGenerators {
 
 impl Generators {
     /// Creates generators for `m` range proofs of `n` bits each.
-    pub fn new(BB: (RistrettoPoint, RistrettoPoint), n: usize, m: usize) -> Self {
-        let G = GeneratorsChain::new(BB.0.compress().as_bytes())
+    pub fn new(pedersen_generators: PedersenGenerators, n: usize, m: usize) -> Self {
+        let G = GeneratorsChain::new(pedersen_generators.0.compress().as_bytes())
             .take(n * m)
             .collect();
-        let H = GeneratorsChain::new(BB.1.compress().as_bytes())
+        let H = GeneratorsChain::new(pedersen_generators.1.compress().as_bytes())
             .take(n * m)
             .collect();
 
         Generators {
             n,
             m,
-            B: BB.0,
-            B_blinding: BB.1,
+            B: pedersen_generators.0,
+            B_blinding: pedersen_generators.1,
             G,
             H,
         }
@@ -154,7 +161,7 @@ mod tests {
     fn rangeproof_generators() {
         let n = 2;
         let m = 3;
-        let gens = Generators::new(CommitmentGenerators::generators(), n, m);
+        let gens = Generators::new(PedersenGenerators::default(), n, m);
 
         // The concatenation of shares must be the full generator set
         assert_eq!(

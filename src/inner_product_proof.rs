@@ -234,8 +234,8 @@ mod tests {
     fn test_helper_create(n: usize) {
         let mut rng = OsRng::new().unwrap();
 
-        use generators::{CommitmentGenerators,Generators};
-        let gens = Generators::new(CommitmentGenerators::generators(), n, 1);
+        use generators::{PedersenGenerators,Generators};
+        let gens = Generators::new(PedersenGenerators::default(), n, 1);
         let G = gens.share(0).G.to_vec();
         let H = gens.share(0).H.to_vec();
 
