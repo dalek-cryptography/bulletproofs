@@ -15,8 +15,14 @@ extern crate sha2;
 extern crate subtle;
 extern crate tiny_keccak;
 
+#[macro_use]
+extern crate serde_derive;
+
 #[cfg(test)]
 extern crate test;
+
+#[cfg(test)]
+extern crate bincode;
 
 mod util;
 
