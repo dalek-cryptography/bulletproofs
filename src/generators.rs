@@ -22,6 +22,8 @@
 use curve25519_dalek::ristretto::RistrettoPoint;
 use sha2::{Digest, Sha512};
 
+// XXX we should use Sha3 everywhere
+
 /// The `GeneratorsChain` creates an arbitrary-long sequence of orthogonal generators.
 /// The sequence can be deterministically produced starting with an arbitrary point.
 struct GeneratorsChain {

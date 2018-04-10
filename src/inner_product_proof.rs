@@ -170,9 +170,11 @@ impl Proof {
         (challenges_sq, challenges_inv_sq, s)
     }
 
-    // XXX we want to keep this function for later use maybe, but
-    // currently RP folds all verification in one giant multiplication,
-    // so this is unused.
+    /// This method is for testing that proof generation work,
+    /// but for efficiency the actual protocols would use `verification_scalars`
+    /// method to combine inner product verification with other checks
+    /// in a single multiscalar multiplication.
+    #[allow(dead_code)]
     pub fn verify<I>(
         &self,
         transcript: &mut ProofTranscript,
