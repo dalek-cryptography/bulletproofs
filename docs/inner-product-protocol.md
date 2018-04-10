@@ -113,8 +113,8 @@ Since \\(H\\) is computed similarly, but with the roles of
 that \\(H = {\langle 1/{\mathbf{s}}, {\mathbf{H}} \rangle}\\).
 Notice that
 if \\(i'\\) is the bitwise NOT of \\(i\\), then \\(s\_{i'} =
-1/s\_{i}\\), so the vector of inverses \\(1/{\mathbf{s}}\\) is a permutation of
-the vector \\({\mathbf{s}}\\) and no additional computation is required to
+1/s\_{i}\\), so the vector of inverses \\(1/{\mathbf{s}}\\) is a reversed
+vector \\({\mathbf{s}}\\) and no additional computation is required to
 obtain the \\(1/s\_{i}\\).
 
 The verifier’s computation then becomes
@@ -132,5 +132,23 @@ Delaying multiplication
 
 Inner product argument can be verified more efficient if the above multiplication
 is performed as a part of a larger multi-scalar multiplication in the parent protocol.
+
+Lets rewrite the above equation:
+\\[
+\begin{aligned}
+P \quad \stackrel{?}{=} & \quad ab      \cdot Q \\\\
+                      + & \quad {\langle a \cdot {\mathbf{s}}, {\mathbf{G}} \rangle}\\\\
+                      + & \quad {\langle b /{\mathbf{s}}, {\mathbf{H}} \rangle}\\\\
+                      + & \quad {\langle [x_{1}^2,    \dots, x_{k}^2    ], [L_1, \dots, L_{k}] \rangle}\\\\
+                      + & \quad {\langle [x_{1}^{-2}, \dots, x_{k}^{-2} ], [R_1, \dots, R_{k}] \rangle}
+\end{aligned}
+\\] where \\(1/{\mathbf{s}}\\) are inverses of \\(\mathbf{s}\\), computed as a reversed list of \\(\mathbf{s}\\).
+
+The parent protocol already has \\(\\{a, b, Q, \mathbf{G}, \mathbf{H}, L\_{k}, R\_{k}, \\dots, L\_1, R\_1\\}\\),
+so the verifier needs to compute and provide only the following scalars to the parent protocol:
+
+\\[
+  \\{x\_{1}^{2}, x\_{1}^{-2}, \dots, x\_{k}^{2}, x\_{k}^{-2}, s_0, \dots, s_{n-1}\\}
+\\]
 
 

@@ -114,7 +114,7 @@ The result of the inner product proof is a list of \\(2k\\) points and \\(2\\) s
 
 The complete range proof consists of \\(9+2k\\) 32-byte elements:
 \\[
-\\{A, S, T_1, T_2, t(x), {\tilde{t}}(x), \tilde{e}, L\_k, R\_k, \\dots, L\_1, R\_1, a, b\\}
+  \\{A, S, T_1, T_2, t(x), {\tilde{t}}(x), \tilde{e}, L\_k, R\_k, \\dots, L\_1, R\_1, a, b\\}
 \\]
 
 
@@ -123,7 +123,7 @@ Verifier’s algorithm
 
 Verifier’s input is the range size \\(n\\) (in bits), value commitment \\(V\\), and \\(32 \cdot (9 + 2 \lg n)\\) bytes of the proof data:
 \\[
-\\{A, S, T_1, T_2, t(x), {\tilde{t}}(x), \tilde{e}, L\_{\lg n}, R\_{\lg n}, \\dots, L\_1, R\_1, a, b\\}
+  \\{A, S, T_1, T_2, t(x), {\tilde{t}}(x), \tilde{e}, L\_{\lg n}, R\_{\lg n}, \\dots, L\_1, R\_1, a, b\\}
 \\]
 
 Verifier uses Fiat-Shamir transform to obtain challenges by hashing the appropriate data sequentially into the transcript of the protocol:
@@ -163,11 +163,11 @@ Finally, verifier groups all scalars per each point and performs a single multi-
                       + & \quad \Big(w \big(t(x) - ab\big) + c \big(\delta(y,z) - t(x)\big) \Big) \cdot B\\\\
                       + & \quad (-{\widetilde{e}} - c{\tilde{t}}(x)) \cdot \widetilde{B} \\\\
                       + & \quad {\langle {-z\mathbf{1} - a\mathbf{s}}, {\mathbf{G}} \rangle}\\\\
-                      + & \quad {\langle {z\mathbf{1} + {\mathbf{y}}^{-n} \circ (x^2\mathbf{2}^n - b{\mathbf{s}\_{inv}})}, {\mathbf{H}} \rangle}\\\\
+                      + & \quad {\langle {z\mathbf{1} + {\mathbf{y}}^{-n} \circ (x^2\mathbf{2}^n - b/{\mathbf{s}})}, {\mathbf{H}} \rangle}\\\\
                       + & \quad {\langle [x_{1}^2,    \dots, x_{\lg n}^2    ], [L_1, \dots, L_{\lg n}] \rangle}\\\\
                       + & \quad {\langle [x_{1}^{-2}, \dots, x_{\lg n}^{-2} ], [R_1, \dots, R_{\lg n}] \rangle}
 \end{aligned}
-\\] where \\(\mathbf{s}\_{inv}\\) are inverses of \\(\mathbf{s}\\), computed as a reversed list of \\(\mathbf{s}\\).
+\\] where \\(1/{\mathbf{s}}\\) are inverses of \\(\mathbf{s}\\), computed as a reversed list of \\(\mathbf{s}\\).
 
 
 
