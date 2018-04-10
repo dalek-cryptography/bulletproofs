@@ -26,7 +26,7 @@ struct PolyDeg3(Scalar, Scalar, Scalar);
 struct VecPoly2(Vec<Scalar>, Vec<Scalar>);
 
 /// The `RangeProof` struct represents a single range proof.
-#[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct RangeProof {
     /// Commitment to the value
     // XXX this should not be included, so that we can prove about existing commitments
@@ -336,30 +336,75 @@ mod tests {
         assert_eq!(power_g, delta(n, &y, &z),);
     }
 
+    /// Given a bitsize `n`, test the full trip:
+    ///
+    /// 1. Generate a random value and create a proof that it's in range;
+    /// 2. Serialize to wire format;
+    /// 3. Deserialize from wire format;
+    /// 4. Verify the proof.
     fn create_and_verify_helper(n: usize) {
+        // Split the test into two scopes, so that it's explicit what
+        // data is shared between the prover and the verifier.
+
+        // Use bincode for serialization
+        use bincode;
+
+        // Both prover and verifier have access to the generators and the proof
         let generators = Generators::new(n, 1);
-        let mut transcript = ProofTranscript::new(b"RangeproofTest");
-        let mut rng = OsRng::new().unwrap();
 
-        let v: u64 = rng.gen_range(0, (1 << (n - 1)) - 1);
-        let v_blinding = Scalar::random(&mut rng);
+        // Serialized proof data
+        let proof_bytes: Vec<u8>;
 
-        let range_proof = RangeProof::generate_proof(
-            generators.share(0),
-            &mut transcript,
-            &mut rng,
+        // Prover's scope
+        {
+            // Use a customization label for testing proofs
+            let mut transcript = ProofTranscript::new(b"RangeproofTest");
+            let mut rng = OsRng::new().unwrap();
+
+            let v: u64 = rng.gen_range(0, (1 << (n - 1)) - 1);
+            let v_blinding = Scalar::random(&mut rng);
+
+            let range_proof = RangeProof::generate_proof(
+                generators.share(0),
+                &mut transcript,
+                &mut rng,
+                n,
+                v,
+                &v_blinding,
+            );
+
+            // 2. Serialize
+            proof_bytes = bincode::serialize(&range_proof).unwrap();
+        }
+
+        println!(
+            "Rangeproof with {} bits has size {} bytes",
             n,
-            v,
-            &v_blinding,
+            proof_bytes.len()
         );
 
-        let mut transcript = ProofTranscript::new(b"RangeproofTest");
+        // Verifier's scope
+        {
+            // 3. Deserialize
+            let range_proof: RangeProof = bincode::deserialize(&proof_bytes).unwrap();
+            let mut rng = OsRng::new().unwrap();
 
-        assert!(
-            range_proof
-                .verify(generators.share(0), &mut transcript, &mut rng, n)
-                .is_ok()
-        );
+            // 4. Use the same customization label as above to verify
+            let mut transcript = ProofTranscript::new(b"RangeproofTest");
+            assert!(
+                range_proof
+                    .verify(generators.share(0), &mut transcript, &mut rng, n)
+                    .is_ok()
+            );
+
+            // Verification with a different label fails
+            let mut transcript = ProofTranscript::new(b"");
+            assert!(
+                range_proof
+                    .verify(generators.share(0), &mut transcript, &mut rng, n)
+                    .is_err()
+            );
+        }
     }
 
     #[test]

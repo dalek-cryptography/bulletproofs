@@ -17,7 +17,7 @@ use generators::Generators;
 
 use sha2::Sha512;
 
-#[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Proof {
     pub(crate) L_vec: Vec<RistrettoPoint>,
     pub(crate) R_vec: Vec<RistrettoPoint>,
