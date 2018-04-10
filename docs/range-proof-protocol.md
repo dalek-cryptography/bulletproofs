@@ -67,14 +67,13 @@ T\_2 &\gets \operatorname{Com}(t\_2, {\tilde{t}\_2})  && = t\_2 \cdot B + {\tild
 \\] where \\(\tilde{t}\_1, \tilde{t}\_2\\) are sampled randomly from \\({\mathbb Z\_p}\\).
 
 The prover then obtains a challenge scalar \\(x \in {\mathbb Z\_p}\\) using a Fiat-Shamir transform
-by hashing \\(\\{T_1, T_2\\}\\) to the transcript of the protocol.
-
-The prover uses the challenge scalar \\(x\\) to evaluate the polynomials \\(\\{\mathbf{l}(x), \mathbf{r}(x), t(x)\\}\\):
+by hashing \\(\\{T_1, T_2\\}\\) to the transcript of the protocol,
+and uses it to evaluate the polynomials \\(\\{\mathbf{l}(x), \mathbf{r}(x), t(x)\\}\\):
 \\[
 \begin{aligned}
-  {\mathbf{l}}(x) &\gets {\mathbf{l}}\_{0} + {\mathbf{l}}\_{1} x\\\\
-  {\mathbf{r}}(x) &\gets {\mathbf{r}}\_{0} + {\mathbf{r}}\_{1} x\\\\
-  t(x)            &\gets t\_{0} + t\_{1} x + t\_{2} x^{2}
+  \mathbf{l}  &\gets  {\mathbf{l}}\_{0} + {\mathbf{l}}\_{1} x\\\\
+  \mathbf{r}  &\gets  {\mathbf{r}}\_{0} + {\mathbf{r}}\_{1} x\\\\
+  t(x)        &\gets  t\_{0} + t\_{1} x + t\_{2} x^{2}
 \end{aligned}
 \\]
 
@@ -82,14 +81,27 @@ Next, the prover computes the synthetic blinding factors:
 \\[
 \begin{aligned}
   {\tilde{t}}(x) &\gets z^{2} {\tilde{v}} + x {\tilde{t}}\_{1} + x^{2} {\tilde{t}}\_{2} \\\\
-  {\tilde{e}}    &\gets {\widetilde{a}}   + x {\widetilde{s}}
+   \tilde{e}     &\gets {\widetilde{a}}   + x {\widetilde{s}}
 \end{aligned}
 \\]
 
+The prover obtains another challenge scalar \\(w \in {\mathbb Z\_p}\\) using a Fiat-Shamir transform
+by hashing \\(\\{t(x), {\tilde{t}}(x), \tilde{e}\\}\\) to the transcript of the protocol,
+and uses it to create a unique point \\(Q\\):
+\\[
+	Q  \gets  w \cdot B
+\\]
+
+The prover uses (TBD: what stuff goes to IPP)
+
+ used in the [inner product argument](../inner_product_proof/index.html)
 
 Verifier's algorithm
 --------------------
 
-TBD.
+TBD: what verifier receives
+
+TBD: what verifier does.
+
 
 
