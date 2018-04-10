@@ -8,7 +8,7 @@ use std::borrow::Borrow;
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::ristretto;
 use curve25519_dalek::scalar::Scalar;
-use rayon;
+use rayon::iter::*;
 use proof_transcript::ProofTranscript;
 
 use util;
@@ -106,17 +106,19 @@ impl Proof {
                 a_L[i] = a_L[i] * x + x_inv * a_R[i];
                 b_L[i] = b_L[i] * x_inv + x * b_R[i];
             }
-
-            rayon::join(
-                ||
-                for i in 0..n {
-                    G_L[i] = ristretto::multiscalar_mul(&[x_inv, x], &[G_L[i], G_R[i]]);
-                },
-                ||
-                for i in 0..n {
-                    H_L[i] = ristretto::multiscalar_mul(&[x, x_inv], &[H_L[i], H_R[i]]);
-                }
-            );
+            // Parallelized calculation of each index of the vectors G and H.
+            // G_L[i] = G_L[i] * x_inv + G_R[i] * x (for all i)
+            G_L.par_iter_mut().zip(G_R.par_iter())
+                .map(|(G_L_i, G_R_i)| {
+                    *G_L_i = ristretto::multiscalar_mul(&[x_inv, x], &[*G_L_i, *G_R_i]);
+                    }
+                ).for_each(|()|{});
+            // H_L[i] = H_L[i] * x + H_R[i] * x_inv (for all i)
+            H_L.par_iter_mut().zip(H_R.par_iter())
+                .map(|(H_L_i, H_R_i)| {
+                    *H_L_i = ristretto::multiscalar_mul(&[x, x_inv], &[*H_L_i, *H_R_i]);
+                    }
+                ).for_each(|()|{});
 
             a = a_L;
             b = b_L;
