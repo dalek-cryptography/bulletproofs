@@ -11,6 +11,9 @@ We want to prove the relation
 \right\\}
 \\] where \\(n = 2^{k}\\) is a power of \\(2\\).
 
+Prover’s algorithm
+------------------
+
 To start, we sketch the
 interactive version of this protocol, and then describe the
 optimizations discussed in the Bulletproofs paper for the
@@ -57,6 +60,9 @@ challenge, so that each \\(x\_{j}\\) is generated as a hash of the transcript
 \\(L\_{k},R\_{k},\ldots,L\_{j},R\_{j}\\). At the end of the prover’s
 computation, they send \\(a,b,L\_{k},R\_{k},\ldots,L\_{1},R\_{1}\\) to the
 verifier.
+
+Verifier’s algorithm
+--------------------
 
 Since the final \\(G\\) and \\(H\\) values are functions of the challenges
 \\(x\_{k},\ldots,x\_{1}\\), the verifier has to compute them as part of the
@@ -120,3 +126,11 @@ P \overset ? =& aG +bH +abQ - \sum\_{j=1}^{k} \left( L\_{j} x\_{j}^{2} + x\_{j}^
 \\]
 a single multiscalar multiplication with
 \\(n + n + 1 + k + k = 2(n+k) + 1\\) points.
+
+Delaying multiplication
+-----------------------
+
+Inner product argument can be verified more efficient if the above multiplication
+is performed as a part of a larger multi-scalar multiplication in the parent protocol.
+
+
