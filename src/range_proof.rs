@@ -1,221 +1,300 @@
 #![allow(non_snake_case)]
 
+use rand::Rng;
+
 use std::iter;
-use sha2::{Digest, Sha256, Sha512};
+
+use sha2::{Digest, Sha512};
+
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::ristretto;
-use curve25519_dalek::traits::Identity;
+use curve25519_dalek::traits::{Identity, IsIdentity};
 use curve25519_dalek::scalar::Scalar;
-use rand::OsRng;
+
+// XXX rename this maybe ?? at least `inner_product_proof::Proof` is too long.
+// maybe `use inner_product_proof::IPProof` would be better?
+use inner_product_proof;
+
+use proof_transcript::ProofTranscript;
+
+use util;
+
+use generators::{Generators, GeneratorsView};
 
 struct PolyDeg3(Scalar, Scalar, Scalar);
 
 struct VecPoly2(Vec<Scalar>, Vec<Scalar>);
 
-
+/// The `RangeProof` struct represents a single range proof.
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct RangeProof {
-    tau_x: Scalar,
-    mu: Scalar,
-    t: Scalar,
-
-    // don't need if doing inner product proof
-    l: Vec<Scalar>,
-    r: Vec<Scalar>,
-
-    // committed values
-    big_v: RistrettoPoint,
-    big_a: RistrettoPoint,
-    big_s: RistrettoPoint,
-    big_t_1: RistrettoPoint,
-    big_t_2: RistrettoPoint,
-
-    // public knowledge
-    n: usize,
-    g: RistrettoPoint,
-    h: RistrettoPoint,
+    /// Commitment to the value
+    // XXX this should not be included, so that we can prove about existing commitments
+    // included for now so that it's easier to test
+    V: RistrettoPoint,
+    /// Commitment to the bits of the value
+    A: RistrettoPoint,
+    /// Commitment to the blinding factors
+    S: RistrettoPoint,
+    /// Commitment to the \\(t_1\\) coefficient of \\( t(x) \\)
+    T_1: RistrettoPoint,
+    /// Commitment to the \\(t_2\\) coefficient of \\( t(x) \\)
+    T_2: RistrettoPoint,
+    /// Evaluation of the polynomial \\(t(x)\\) at the challenge point \\(x\\)
+    t_x: Scalar,
+    /// Blinding factor for the synthetic commitment to \\(t(x)\\)
+    t_x_blinding: Scalar,
+    /// Blinding factor for the synthetic commitment to the inner-product arguments
+    e_blinding: Scalar,
+    /// Proof data for the inner-product argument.
+    ipp_proof: inner_product_proof::Proof,
 }
 
 impl RangeProof {
-    pub fn generate_proof(v: u64, n: usize) -> RangeProof {
-        let mut rng: OsRng = OsRng::new().unwrap();
-        // useful for debugging:
-        // let mut rng: StdRng = StdRng::from_seed(&[1, 2, 3, 4]);
+    /// Create a rangeproof.
+    pub fn generate_proof<R: Rng>(
+        generators: GeneratorsView,
+        transcript: &mut ProofTranscript,
+        rng: &mut R,
+        n: usize,
+        v: u64,
+        v_blinding: &Scalar,
+    ) -> RangeProof {
+        use subtle::{Choice, ConditionallyAssignable};
 
-        // Setup: generate groups g & h, commit to v (line 34)
-        let g = &RistrettoPoint::hash_from_bytes::<Sha256>("hello".as_bytes());
-        let h = &RistrettoPoint::hash_from_bytes::<Sha256>("there".as_bytes());
-        let g_vec = make_generators(g, n);
-        let h_vec = make_generators(h, n);
-        let gamma = Scalar::random(&mut rng);
-        let big_v = h * gamma + g * Scalar::from_u64(v);
+        let B = generators.B;
+        let B_blinding = generators.B_blinding;
 
-        // Compute big_a (line 39-42)
-        let alpha = Scalar::random(&mut rng);
-        let mut big_a = h * alpha;
+        // Create copies of G, H, so we can pass them to the
+        // (consuming) IPP API later.
+        let G = generators.G.to_vec();
+        let H = generators.H.to_vec();
+
+        let V = ristretto::multiscalar_mul(&[Scalar::from_u64(v), *v_blinding], &[*B, *B_blinding]);
+
+        let a_blinding = Scalar::random(rng);
+
+        // Compute A = <a_L, G> + <a_R, H> + a_blinding * B_blinding.
+        let mut A = B_blinding * a_blinding;
         for i in 0..n {
-            let v_i = (v >> i) & 1;
-            if v_i == 0 {
-                big_a -= h_vec[i];
-            } else {
-                big_a += g_vec[i];
-            }
+            // If v_i = 0, we add a_L[i] * G[i] + a_R[i] * H[i] = - H[i]
+            // If v_i = 1, we add a_L[i] * G[i] + a_R[i] * H[i] =   G[i]
+            let v_i = Choice::from(((v >> i) & 1) as u8);
+            let mut point = -H[i];
+            point.conditional_assign(&G[i], v_i);
+            A += point;
         }
 
-        // Compute big_s (in the paper: S; line 43-45)
-        let points_iter = iter::once(h).chain(g_vec.iter()).chain(h_vec.iter());
-        let randomness: Vec<_> = (0..(1 + 2 * n)).map(|_| Scalar::random(&mut rng)).collect();
-        let big_s = ristretto::multiscalar_mult(&randomness, points_iter);
+        let s_blinding = Scalar::random(rng);
+        let s_L: Vec<_> = (0..n).map(|_| Scalar::random(rng)).collect();
+        let s_R: Vec<_> = (0..n).map(|_| Scalar::random(rng)).collect();
 
-        // Save/label randomness (rho, s_L, s_R) to be used later
-        let rho = &randomness[0];
-        let s_l = &randomness[1..(n + 1)];
-        let s_r = &randomness[(n + 1)..(1 + 2 * n)];
+        // Compute S = <s_L, G> + <s_R, H> + s_blinding * B_blinding.
+        let S = ristretto::multiscalar_mul(
+            iter::once(&s_blinding).chain(s_L.iter()).chain(s_R.iter()),
+            iter::once(B_blinding).chain(G.iter()).chain(H.iter()),
+        );
 
-        // Generate y, z by committing to A, S (line 46-48)
-        let (y, z) = commit(&big_a, &big_s);
+        // Commit to V, A, S and get challenges y, z
+        transcript.commit(V.compress().as_bytes());
+        transcript.commit(A.compress().as_bytes());
+        transcript.commit(S.compress().as_bytes());
+        let y = transcript.challenge_scalar();
+        let z = transcript.challenge_scalar();
+        let zz = z * z;
 
-        // Calculate t by calculating vectors l0, l1, r0, r1 and multiplying
-        let mut l = VecPoly2::new(n);
-        let mut r = VecPoly2::new(n);
-        let z2 = z * z;
-        let mut t = PolyDeg3::new();
+        // Compute l, r
+        let mut l_poly = VecPoly2::zero(n);
+        let mut r_poly = VecPoly2::zero(n);
         let mut exp_y = Scalar::one(); // start at y^0 = 1
         let mut exp_2 = Scalar::one(); // start at 2^0 = 1
+
         for i in 0..n {
-            let v_i = (v >> i) & 1;
-            l.0[i] -= z;
-            l.1[i] += s_l[i];
-            r.0[i] += exp_y * z + z2 * exp_2;
-            r.1[i] += exp_y * s_r[i];
-            if v_i == 0 {
-                r.0[i] -= exp_y;
-            } else {
-                l.0[i] += Scalar::one();
-            }
-            exp_y = exp_y * y; // y^i -> y^(i+1)
-            exp_2 = exp_2 + exp_2; // 2^i -> 2^(i+1)
+            let a_L_i = Scalar::from_u64((v >> i) & 1);
+            let a_R_i = a_L_i - Scalar::one();
+
+            l_poly.0[i] = a_L_i - z;
+            l_poly.1[i] = s_L[i];
+            r_poly.0[i] = exp_y * (a_R_i + z) + zz * exp_2;
+            r_poly.1[i] = exp_y * s_R[i];
+
+            exp_y *= y; // y^i -> y^(i+1)
+            exp_2 += exp_2; // 2^i -> 2^(i+1)
         }
-        t.0 = inner_product(&l.0, &r.0);
-        t.2 = inner_product(&l.1, &r.1);
-        // use Karatsuba algorithm to find t.1 = l.0*r.1 + l.1*r.0
-        let l_add = add_vec(&l.0, &l.1);
-        let r_add = add_vec(&r.0, &r.1);
-        let l_r_mul = inner_product(&l_add, &r_add);
-        t.1 = l_r_mul - t.0 - t.2;
 
-        // Generate x by committing to big_t_1, big_t_2 (line 49-54)
-        let tau_1 = Scalar::random(&mut rng);
-        let tau_2 = Scalar::random(&mut rng);
-        let big_t_1 = g * t.1 + h * tau_1;
-        let big_t_2 = g * t.2 + h * tau_2;
-        let (x, _) = commit(&big_t_1, &big_t_2); // TODO: use a different commit?
+        // Compute t(x) = <l(x),r(x)>
+        let t_poly = l_poly.inner_product(&r_poly);
 
-        // Generate final values for proof (line 55-60)
-        let tau_x = tau_1 * x + tau_2 * x * x + z2 * gamma;
-        let mu = alpha + rho * x;
-        let t_hat = t.0 + t.1 * x + t.2 * x * x;
+        // Form commitments T_1, T_2 to t.1, t.2
+        let t_1_blinding = Scalar::random(rng);
+        let t_2_blinding = Scalar::random(rng);
+        let T_1 = ristretto::multiscalar_mul(&[t_poly.1, t_1_blinding], &[*B, *B_blinding]);
+        let T_2 = ristretto::multiscalar_mul(&[t_poly.2, t_2_blinding], &[*B, *B_blinding]);
 
-        // Calculate l, r - which is only necessary if not doing IPP (line 55-57)
-        // Adding this in a seperate loop so we can remove it easily later
-        let l_total = l.eval(x);
-        let r_total = r.eval(x);
+        // Commit to T_1, T_2 to get the challenge point x
+        transcript.commit(T_1.compress().as_bytes());
+        transcript.commit(T_2.compress().as_bytes());
+        let x = transcript.challenge_scalar();
 
-        // Generate proof! (line 61)
+        // Evaluate t at x and run the IPP
+        let t_x = t_poly.0 + x * (t_poly.1 + x * t_poly.2);
+        let t_x_blinding = zz * v_blinding + x * (t_1_blinding + x * t_2_blinding);
+        let e_blinding = a_blinding + x * s_blinding;
+
+        transcript.commit(t_x.as_bytes());
+        transcript.commit(t_x_blinding.as_bytes());
+        transcript.commit(e_blinding.as_bytes());
+
+        // Get a challenge value to combine statements for the IPP
+        let w = transcript.challenge_scalar();
+        let Q = w * B;
+
+        // Generate the IPP proof
+        let ipp_proof = inner_product_proof::Proof::create(
+            transcript,
+            &Q,
+            util::exp_iter(y.invert()),
+            G,
+            H,
+            l_poly.eval(x),
+            r_poly.eval(x),
+        );
+
         RangeProof {
-            tau_x: tau_x,
-            mu: mu,
-            t: t_hat,
-            l: l_total,
-            r: r_total,
-
-            big_v: big_v,
-            big_a: big_a,
-            big_s: big_s,
-            big_t_1: big_t_1,
-            big_t_2: big_t_2,
-
-            n: n,
-            g: *g,
-            h: *h,
+            V,
+            A,
+            S,
+            T_1,
+            T_2,
+            t_x,
+            t_x_blinding,
+            e_blinding,
+            ipp_proof,
         }
     }
 
-    pub fn verify_proof(&self) -> bool {
-        let (y, z) = commit(&self.big_a, &self.big_s);
-        let (x, _) = commit(&self.big_t_1, &self.big_t_2);
-        let g_vec = make_generators(&self.g, self.n);
-        let mut hprime_vec = make_generators(&self.h, self.n);
+    pub fn verify<R: Rng>(
+        &self,
+        gens: GeneratorsView,
+        transcript: &mut ProofTranscript,
+        rng: &mut R,
+        n: usize,
+    ) -> Result<(), ()> {
+        // First, replay the "interactive" protocol using the proof
+        // data to recompute all challenges.
 
-        // line 63: check that t = t0 + t1 * x + t2 * x * x
-        let z2 = z * z;
-        let z3 = z2 * z;
-        let mut power_g = Scalar::zero();
-        let mut exp_y = Scalar::one(); // start at y^0 = 1
-        let mut exp_2 = Scalar::one(); // start at 2^0 = 1
-        for _ in 0..self.n {
-            power_g += (z - z2) * exp_y - z3 * exp_2;
+        transcript.commit(self.V.compress().as_bytes());
+        transcript.commit(self.A.compress().as_bytes());
+        transcript.commit(self.S.compress().as_bytes());
 
-            exp_y = exp_y * y; // y^i -> y^(i+1)
-            exp_2 = exp_2 + exp_2; // 2^i -> 2^(i+1)
+        let y = transcript.challenge_scalar();
+        let z = transcript.challenge_scalar();
+        let zz = z * z;
+        let minus_z = -z;
+
+        transcript.commit(self.T_1.compress().as_bytes());
+        transcript.commit(self.T_2.compress().as_bytes());
+
+        let x = transcript.challenge_scalar();
+
+        transcript.commit(self.t_x.as_bytes());
+        transcript.commit(self.t_x_blinding.as_bytes());
+        transcript.commit(self.e_blinding.as_bytes());
+
+        let w = transcript.challenge_scalar();
+
+        // Challenge value for batching statements to be verified
+        let c = Scalar::random(rng);
+
+        let (x_sq, x_inv_sq, s) = self.ipp_proof.verification_scalars(transcript);
+        let s_inv = s.iter().rev();
+
+        let a = self.ipp_proof.a;
+        let b = self.ipp_proof.b;
+
+        let g = s.iter().map(|s_i| minus_z - a * s_i);
+        let h = s_inv
+            .zip(util::exp_iter(Scalar::from_u64(2)))
+            .zip(util::exp_iter(y.invert()))
+            .map(|((s_i_inv, exp_2), exp_y_inv)| z + exp_y_inv * (zz * exp_2 - b * s_i_inv));
+
+        let mega_check = ristretto::vartime::multiscalar_mul(
+            iter::once(Scalar::one())
+                .chain(iter::once(x))
+                .chain(iter::once(c * zz))
+                .chain(iter::once(c * x))
+                .chain(iter::once(c * x * x))
+                .chain(iter::once(-self.e_blinding - c * self.t_x_blinding))
+                .chain(iter::once(
+                    w * (self.t_x - a * b) + c * (delta(n, &y, &z) - self.t_x),
+                ))
+                .chain(g)
+                .chain(h)
+                .chain(x_sq.iter().cloned())
+                .chain(x_inv_sq.iter().cloned()),
+            iter::once(&self.A)
+                .chain(iter::once(&self.S))
+                .chain(iter::once(&self.V))
+                .chain(iter::once(&self.T_1))
+                .chain(iter::once(&self.T_2))
+                .chain(iter::once(gens.B_blinding))
+                .chain(iter::once(gens.B))
+                .chain(gens.G.iter())
+                .chain(gens.H.iter())
+                .chain(self.ipp_proof.L_vec.iter())
+                .chain(self.ipp_proof.R_vec.iter()),
+        );
+
+        if mega_check.is_identity() {
+            Ok(())
+        } else {
+            Err(())
         }
-        let t_check = self.g * power_g + self.big_v * z2 + self.big_t_1 * x + self.big_t_2 * x * x;
-        let t_commit = self.g * self.t + self.h * self.tau_x;
-        if t_commit != t_check {
-            //println!("fails check on line 63");
-            return false;
-        }
-
-        // line 62: calculate hprime
-        // line 64: compute commitment to l, r
-        let mut sum_g_vec = RistrettoPoint::identity();
-        for i in 0..self.n {
-            sum_g_vec += g_vec[i];
-        }
-        let mut big_p = self.big_a + self.big_s * x;
-        big_p -= sum_g_vec * z;
-
-        let mut exp_y = Scalar::one(); // start at y^0 = 1
-        let mut exp_2 = Scalar::one(); // start at 2^0 = 1
-        let inverse_y = Scalar::invert(&y);
-        let mut inv_exp_y = Scalar::one(); // start at y^-0 = 1
-        for i in 0..self.n {
-            hprime_vec[i] = hprime_vec[i] * inv_exp_y;
-            big_p += hprime_vec[i] * (z * exp_y + z2 * exp_2);
-            exp_y = exp_y * y; // y^i -> y^(i+1)
-            exp_2 = exp_2 + exp_2; // 2^i -> 2^(i+1)
-            inv_exp_y = inv_exp_y * inverse_y; // y^(-i) * y^(-1) -> y^(-(i+1))
-        }
-
-        // line 65: check that l, r are correct
-        let mut big_p_check = self.h * self.mu;
-        let points_iter = g_vec.iter().chain(hprime_vec.iter());
-        let scalars_iter = self.l.iter().chain(self.r.iter());
-        big_p_check += ristretto::multiscalar_mult(scalars_iter, points_iter);
-        if big_p != big_p_check {
-            //println!("fails check on line 65: big_p != g * l + hprime * r");
-            return false;
-        }
-
-        // line 66: check that t is correct
-        if self.t != inner_product(&self.l, &self.r) {
-            //println!("fails check on line 66: t != l * r");
-            return false;
-        }
-
-        return true;
     }
 }
 
-impl PolyDeg3 {
-    pub fn new() -> PolyDeg3 {
-        PolyDeg3(Scalar::zero(), Scalar::zero(), Scalar::zero())
-    }
+/// Compute
+/// $$
+/// \\delta(y,z) = (z - z^2)<1, y^n> + z^3 <1, 2^n>
+/// $$
+fn delta(n: usize, y: &Scalar, z: &Scalar) -> Scalar {
+    let two = Scalar::from_u64(2);
+
+    // XXX this could be more efficient, esp for powers of 2
+    let sum_of_powers_of_y = util::exp_iter(*y)
+        .take(n)
+        .fold(Scalar::zero(), |acc, x| acc + x);
+
+    let sum_of_powers_of_2 = util::exp_iter(two)
+        .take(n)
+        .fold(Scalar::zero(), |acc, x| acc + x);
+
+    let zz = z * z;
+
+    (z - zz) * sum_of_powers_of_y - z * zz * sum_of_powers_of_2
 }
 
 impl VecPoly2 {
-    pub fn new(n: usize) -> VecPoly2 {
+    pub fn zero(n: usize) -> VecPoly2 {
         VecPoly2(vec![Scalar::zero(); n], vec![Scalar::zero(); n])
     }
+
+    pub fn inner_product(&self, rhs: &VecPoly2) -> PolyDeg3 {
+        // Uses Karatsuba's method
+        let l = self;
+        let r = rhs;
+
+        let t0 = util::inner_product(&l.0, &r.0);
+        let t2 = util::inner_product(&l.1, &r.1);
+
+        let l0_plus_l1 = util::add_vec(&l.0, &l.1);
+        let r0_plus_r1 = util::add_vec(&r.0, &r.1);
+
+        let t1 = util::inner_product(&l0_plus_l1, &r0_plus_r1) - t0 - t2;
+
+        PolyDeg3(t0, t1, t2)
+    }
+
     pub fn eval(&self, x: Scalar) -> Vec<Scalar> {
         let n = self.0.len();
         let mut out = vec![Scalar::zero(); n];
@@ -226,154 +305,125 @@ impl VecPoly2 {
     }
 }
 
-pub fn make_generators(point: &RistrettoPoint, n: usize) -> Vec<RistrettoPoint> {
-    let mut generators = vec![RistrettoPoint::identity(); n];
-
-    generators[0] = RistrettoPoint::hash_from_bytes::<Sha256>(point.compress().as_bytes());
-    for i in 1..n {
-        let prev = generators[i - 1].compress();
-        generators[i] = RistrettoPoint::hash_from_bytes::<Sha256>(prev.as_bytes());
-    }
-    generators
-}
-
-pub fn commit(v1: &RistrettoPoint, v2: &RistrettoPoint) -> (Scalar, Scalar) {
-    let mut c1_digest = Sha512::new();
-    c1_digest.input(v1.compress().as_bytes());
-    c1_digest.input(v2.compress().as_bytes());
-    let c1 = Scalar::from_hash(c1_digest);
-
-    let mut c2_digest = Sha512::new();
-    c2_digest.input(v1.compress().as_bytes());
-    c2_digest.input(v2.compress().as_bytes());
-    c2_digest.input(c1.as_bytes());
-    let c2 = Scalar::from_hash(c2_digest);
-
-    (c1, c2)
-}
-
-pub fn inner_product(a: &[Scalar], b: &[Scalar]) -> Scalar {
-    let mut out = Scalar::zero();
-    if a.len() != b.len() {
-        // throw some error
-        println!("lengths of vectors don't match for inner product multiplication");
-    }
-    for i in 0..a.len() {
-        out += a[i] * b[i];
-    }
-    out
-}
-
-pub fn add_vec(a: &[Scalar], b: &[Scalar]) -> Vec<Scalar> {
-    let mut out = Vec::new();
-    if a.len() != b.len() {
-        // throw some error
-        println!("lengths of vectors don't match for vector addition");
-    }
-    for i in 0..a.len() {
-        out.push(a[i] + b[i]);
-    }
-    out
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rand::Rng;
+    use rand::OsRng;
 
     #[test]
-    fn test_inner_product() {
-        let a = vec![
-            Scalar::from_u64(1),
-            Scalar::from_u64(2),
-            Scalar::from_u64(3),
-            Scalar::from_u64(4),
-        ];
-        let b = vec![
-            Scalar::from_u64(2),
-            Scalar::from_u64(3),
-            Scalar::from_u64(4),
-            Scalar::from_u64(5),
-        ];
-        assert_eq!(Scalar::from_u64(40), inner_product(&a, &b));
-    }
-    #[test]
-    fn test_rp_t() {
-        let rp = RangeProof::generate_proof(1, 1);
-        assert_eq!(rp.t, inner_product(&rp.l, &rp.r));
-        let rp = RangeProof::generate_proof(1, 2);
-        assert_eq!(rp.t, inner_product(&rp.l, &rp.r));
-    }
-    #[test]
-    fn verify_rp_simple() {
-        for n in &[1, 2, 4, 8, 16, 32] {
-            //println!("n: {:?}", n);
-            let rp = RangeProof::generate_proof(0, *n);
-            assert_eq!(rp.verify_proof(), true);
-            let rp = RangeProof::generate_proof(2u64.pow(*n as u32) - 1, *n);
-            assert_eq!(rp.verify_proof(), true);
-            let rp = RangeProof::generate_proof(2u64.pow(*n as u32), *n);
-            assert_eq!(rp.verify_proof(), false);
-            let rp = RangeProof::generate_proof(2u64.pow(*n as u32) + 1, *n);
-            assert_eq!(rp.verify_proof(), false);
-            let rp = RangeProof::generate_proof(u64::max_value(), *n);
-            assert_eq!(rp.verify_proof(), false);
-        }
-    }
-    #[test]
-    fn verify_rp_rand_big() {
-        for _ in 0..50 {
-            let mut rng: OsRng = OsRng::new().unwrap();
-            let v: u64 = rng.next_u64();
-            //println!("v: {:?}", v);
-            let rp = RangeProof::generate_proof(v, 32);
-            let expected = v <= 2u64.pow(32);
-            assert_eq!(rp.verify_proof(), expected);
-        }
-    }
-    #[test]
-    fn verify_rp_rand_small() {
-        for _ in 0..50 {
-            let mut rng: OsRng = OsRng::new().unwrap();
-            let v: u32 = rng.next_u32();
-            //println!("v: {:?}", v);
-            let rp = RangeProof::generate_proof(v as u64, 32);
-            assert_eq!(rp.verify_proof(), true);
-        }
-    }
-}
+    fn test_delta() {
+        let mut rng = OsRng::new().unwrap();
+        let y = Scalar::random(&mut rng);
+        let z = Scalar::random(&mut rng);
 
-#[cfg(all(test, feature = "bench"))]
-mod bench {
-    use super::*;
-    use rand::Rng;
-    use test::Bencher;
+        // Choose n = 256 to ensure we overflow the group order during
+        // the computation, to check that that's done correctly
+        let n = 256;
 
-    #[bench]
-    fn make_generators(b: &mut Bencher) {
-        use curve25519_dalek::constants::RISTRETTO_BASEPOINT_POINT;
-        b.iter(|| make_generators(&RISTRETTO_BASEPOINT_POINT, 100));
+        // code copied from previous implementation
+        let z2 = z * z;
+        let z3 = z2 * z;
+        let mut power_g = Scalar::zero();
+        let mut exp_y = Scalar::one(); // start at y^0 = 1
+        let mut exp_2 = Scalar::one(); // start at 2^0 = 1
+        for _ in 0..n {
+            power_g += (z - z2) * exp_y - z3 * exp_2;
+
+            exp_y = exp_y * y; // y^i -> y^(i+1)
+            exp_2 = exp_2 + exp_2; // 2^i -> 2^(i+1)
+        }
+
+        assert_eq!(power_g, delta(n, &y, &z),);
     }
-    #[bench]
-    fn make_rp_64(b: &mut Bencher) {
-        let mut rng: OsRng = OsRng::new().unwrap();
-        b.iter(|| RangeProof::generate_proof(rng.next_u64(), 64));
+
+    /// Given a bitsize `n`, test the full trip:
+    ///
+    /// 1. Generate a random value and create a proof that it's in range;
+    /// 2. Serialize to wire format;
+    /// 3. Deserialize from wire format;
+    /// 4. Verify the proof.
+    fn create_and_verify_helper(n: usize) {
+        // Split the test into two scopes, so that it's explicit what
+        // data is shared between the prover and the verifier.
+
+        // Use bincode for serialization
+        use bincode;
+
+        // Both prover and verifier have access to the generators and the proof
+        let generators = Generators::new(n, 1);
+
+        // Serialized proof data
+        let proof_bytes: Vec<u8>;
+
+        // Prover's scope
+        {
+            // Use a customization label for testing proofs
+            let mut transcript = ProofTranscript::new(b"RangeproofTest");
+            let mut rng = OsRng::new().unwrap();
+
+            let v: u64 = rng.gen_range(0, (1 << (n - 1)) - 1);
+            let v_blinding = Scalar::random(&mut rng);
+
+            let range_proof = RangeProof::generate_proof(
+                generators.share(0),
+                &mut transcript,
+                &mut rng,
+                n,
+                v,
+                &v_blinding,
+            );
+
+            // 2. Serialize
+            proof_bytes = bincode::serialize(&range_proof).unwrap();
+        }
+
+        println!(
+            "Rangeproof with {} bits has size {} bytes",
+            n,
+            proof_bytes.len()
+        );
+
+        // Verifier's scope
+        {
+            // 3. Deserialize
+            let range_proof: RangeProof = bincode::deserialize(&proof_bytes).unwrap();
+            let mut rng = OsRng::new().unwrap();
+
+            // 4. Use the same customization label as above to verify
+            let mut transcript = ProofTranscript::new(b"RangeproofTest");
+            assert!(
+                range_proof
+                    .verify(generators.share(0), &mut transcript, &mut rng, n)
+                    .is_ok()
+            );
+
+            // Verification with a different label fails
+            let mut transcript = ProofTranscript::new(b"");
+            assert!(
+                range_proof
+                    .verify(generators.share(0), &mut transcript, &mut rng, n)
+                    .is_err()
+            );
+        }
     }
-    #[bench]
-    fn make_rp_32(b: &mut Bencher) {
-        let mut rng: OsRng = OsRng::new().unwrap();
-        b.iter(|| RangeProof::generate_proof(rng.next_u32() as u64, 32));
+
+    #[test]
+    fn create_and_verify_8() {
+        create_and_verify_helper(8);
     }
-    #[bench]
-    fn verify_rp_64(b: &mut Bencher) {
-        let mut rng: OsRng = OsRng::new().unwrap();
-        let rp = RangeProof::generate_proof(rng.next_u64(), 64);
-        b.iter(|| rp.verify_proof());
+
+    #[test]
+    fn create_and_verify_16() {
+        create_and_verify_helper(16);
     }
-    #[bench]
-    fn verify_rp_32(b: &mut Bencher) {
-        let mut rng: OsRng = OsRng::new().unwrap();
-        let rp = RangeProof::generate_proof(rng.next_u32() as u64, 32);
-        b.iter(|| rp.verify_proof());
+
+    #[test]
+    fn create_and_verify_32() {
+        create_and_verify_helper(32);
+    }
+
+    #[test]
+    fn create_and_verify_64() {
+        create_and_verify_helper(64);
     }
 }

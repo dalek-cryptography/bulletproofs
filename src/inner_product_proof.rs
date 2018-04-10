@@ -1,213 +1,314 @@
 #![allow(non_snake_case)]
-#![feature(nll)]
+
+#![doc(include = "../docs/inner-product-protocol.md")]
 
 use std::iter;
+use std::borrow::Borrow;
+
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::ristretto;
 use curve25519_dalek::scalar::Scalar;
-use range_proof::inner_product;
-use range_proof::commit; // replace with the random oracle
-use range_proof::make_generators;
-use sha2::Sha256;
 use rayon;
-use rayon::iter::*;
-// use rayon::iter::IntoParallelRefIterator;
-// use rayon::iter::IntoParallelRefMutIterator;
-// use rayon::iter::IndexedParallelIterator;
-// use rayon::iter::ParallelIterator;
+use proof_transcript::ProofTranscript;
 
-pub struct Prover {
+use util;
 
-}
+use generators::Generators;
 
+use sha2::Sha512;
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Proof {
-	l_vec: Vec<RistrettoPoint>,
-	r_vec: Vec<RistrettoPoint>,
-	a_final: Scalar,
-	b_final: Scalar,
+    pub(crate) L_vec: Vec<RistrettoPoint>,
+    pub(crate) R_vec: Vec<RistrettoPoint>,
+    pub(crate) a: Scalar,
+    pub(crate) b: Scalar,
 }
 
-impl Prover {
-	pub fn prove(
-		mut G_vec: Vec<RistrettoPoint>,
-		mut H_vec: Vec<RistrettoPoint>,
-		mut P: RistrettoPoint,
-		Q: RistrettoPoint,
-		mut a_vec: Vec<Scalar>,
-		mut b_vec: Vec<Scalar>,		
-	) -> Proof {
-		let mut G = &mut G_vec[..];
-		let mut H = &mut H_vec[..];
-		let mut a = &mut a_vec[..];
-		let mut b = &mut b_vec[..];
+impl Proof {
+    /// Create an inner-product proof.
+    ///
+    /// The proof is created with respect to the bases G, Hprime,
+    /// where Hprime[i] = H[i] * Hprime_factors[i].
+    ///
+    /// The `verifier` is passed in as a parameter so that the
+    /// challenges depend on the *entire* transcript (including parent
+    /// protocols).
+    pub fn create<I>(
+        verifier: &mut ProofTranscript,
+        Q: &RistrettoPoint,
+        Hprime_factors: I,
+        mut G_vec: Vec<RistrettoPoint>,
+        mut H_vec: Vec<RistrettoPoint>,
+        mut a_vec: Vec<Scalar>,
+        mut b_vec: Vec<Scalar>,
+    ) -> Proof
+    where
+        I: IntoIterator,
+        I::Item: Borrow<Scalar>,
+    {
+        // Create slices G, H, a, b backed by their respective
+        // vectors.  This lets us reslice as we compress the lengths
+        // of the vectors in the main loop below.
+        let mut G = &mut G_vec[..];
+        let mut H = &mut H_vec[..];
+        let mut a = &mut a_vec[..];
+        let mut b = &mut b_vec[..];
 
-		let mut n = G.len();
-		let lg_n = n.next_power_of_two().trailing_zeros() as usize;
-		let mut L_vec = Vec::with_capacity(lg_n);
-		let mut R_vec = Vec::with_capacity(lg_n);
+        let mut n = G.len();
 
-		while n != 1 {	
-			n = n/2;
-			let (a_l, a_r) = a.split_at_mut(n);
-			let (b_l, b_r) = b.split_at_mut(n);
-			let (G_l, G_r) = G.split_at_mut(n);
-			let (H_l, H_r) = H.split_at_mut(n);	
+        // All of the input vectors must have the same length.
+        assert_eq!(G.len(), n);
+        assert_eq!(H.len(), n);
+        assert_eq!(a.len(), n);
+        assert_eq!(b.len(), n);
 
-			let c_l = inner_product(&a_l, &b_r);
-			let c_r = inner_product(&a_r, &b_l);
+        // XXX save these scalar mults by unrolling them into the
+        // first iteration of the loop below
+        for (H_i, h_i) in H.iter_mut().zip(Hprime_factors.into_iter()) {
+            *H_i = (&*H_i) * h_i.borrow();
+        }
 
-			let L = ristretto::multiscalar_mult(
-				a_l.iter().chain(b_r.iter()).chain(iter::once(&c_l)), 
-				G_r.iter().chain(H_l.iter()).chain(iter::once(&Q))
-			);
+        let lg_n = n.next_power_of_two().trailing_zeros() as usize;
+        let mut L_vec = Vec::with_capacity(lg_n);
+        let mut R_vec = Vec::with_capacity(lg_n);
 
-			let R = ristretto::multiscalar_mult( 
-				a_r.iter().chain(b_l.iter()).chain(iter::once(&c_r)),
-				G_l.iter().chain(H_r.iter()).chain(iter::once(&Q))
-			);
+        while n != 1 {
+            n = n / 2;
+            let (a_L, a_R) = a.split_at_mut(n);
+            let (b_L, b_R) = b.split_at_mut(n);
+            let (G_L, G_R) = G.split_at_mut(n);
+            let (H_L, H_R) = H.split_at_mut(n);
 
-			L_vec.push(L);
-			R_vec.push(R); 
+            let c_L = util::inner_product(&a_L, &b_R);
+            let c_R = util::inner_product(&a_R, &b_L);
 
-			// TODO: use random oracle for the challenge instead
-			let (x, _) = commit(&L, &R);
-			let x_inv = x.invert();
+            let L = ristretto::vartime::multiscalar_mul(
+                a_L.iter().chain(b_R.iter()).chain(iter::once(&c_L)),
+                G_R.iter().chain(H_L.iter()).chain(iter::once(Q)),
+            );
 
-			for i in 0..n {
-				a_l[i] = a_l[i] * x + a_r[i] * x_inv;
-				b_l[i] = b_l[i] * x_inv + b_r[i] * x;
-				// G_l[i] = ristretto::multiscalar_mult(&[x_inv, x], &[G_l[i], G_r[i]]);
-				// H_l[i] = ristretto::multiscalar_mult(&[x, x_inv], &[H_l[i], H_r[i]]);
-			}	
+            let R = ristretto::vartime::multiscalar_mul(
+                a_R.iter().chain(b_L.iter()).chain(iter::once(&c_R)),
+                G_L.iter().chain(H_R.iter()).chain(iter::once(Q)),
+            );
 
-			// parallelize x-axis
-			// G_l.par_iter_mut().zip(G_r.par_iter())
-			// 	.map(|(G_l_i, G_r_i)| {
-			// 		*G_l_i = ristretto::multiscalar_mult(&[x_inv, x], &[*G_l_i, *G_r_i]);
-			// 		}
-			// 	).for_each(|()|{});
-			// H_l.par_iter_mut().zip(H_r.par_iter())
-			// 	.map(|(H_l_i, H_r_i)| {
-			// 		*H_l_i = ristretto::multiscalar_mult(&[x, x_inv], &[*H_l_i, *H_r_i]);
-			// 		}
-			// 	).for_each(|()|{});	
-			rayon::join(||
-				G_l.par_iter_mut().zip(G_r.par_iter())
-					.map(|(G_l_i, G_r_i)| {
-						*G_l_i = ristretto::multiscalar_mult(&[x_inv, x], &[*G_l_i, *G_r_i]);
-						}
-					).for_each(|()|{}),
-				||
-				H_l.par_iter_mut().zip(H_r.par_iter())
-				.map(|(H_l_i, H_r_i)| {
-					*H_l_i = ristretto::multiscalar_mult(&[x, x_inv], &[*H_l_i, *H_r_i]);
-					}
-				).for_each(|()|{}),		
-			);
-			// parallelize y-axis
-			// rayon::join(||
-			// 	for i in 0..n {
-			// 		G_l[i] = ristretto::multiscalar_mult(&[x_inv, x], &[G_l[i], G_r[i]]);
+            L_vec.push(L);
+            R_vec.push(R);
 
-			// 	},
-			// 	||
-			// 	for i in 0..n {
-			// 		H_l[i] = ristretto::multiscalar_mult(&[x, x_inv], &[H_l[i], H_r[i]]);
+            verifier.commit(L.compress().as_bytes());
+            verifier.commit(R.compress().as_bytes());
 
-			// 	}
-			// );
+            let x = verifier.challenge_scalar();
+            let x_inv = x.invert();
 
-			P += ristretto::multiscalar_mult(&[x*x, x_inv*x_inv], &[L, R]);
-			a = a_l;
-			b = b_l;
-			G = G_l;
-			H = H_l;
-		}
-		debug_assert_eq!(a.len(), 1);
-		return Proof {
-			l_vec: L_vec,
-			r_vec: R_vec,
-			a_final: a[0],
-			b_final: b[0],
-		}
-	}
+            for i in 0..n {
+                a_L[i] = a_L[i] * x + x_inv * a_R[i];
+                b_L[i] = b_L[i] * x_inv + x * b_R[i];
+            }
+
+            rayon::join(
+                ||
+                for i in 0..n {
+                    G_L[i] = ristretto::multiscalar_mul(&[x_inv, x], &[G_L[i], G_R[i]]);
+                },
+                ||
+                for i in 0..n {
+                    H_L[i] = ristretto::multiscalar_mul(&[x, x_inv], &[H_L[i], H_R[i]]);
+                }
+            );
+
+            a = a_L;
+            b = b_L;
+            G = G_L;
+            H = H_L;
+        }
+
+        return Proof {
+            L_vec: L_vec,
+            R_vec: R_vec,
+            a: a[0],
+            b: b[0],
+        };
+    }
+
+    pub(crate) fn verification_scalars(
+        &self,
+        transcript: &mut ProofTranscript,
+    ) -> (Vec<Scalar>, Vec<Scalar>, Vec<Scalar>) {
+        let lg_n = self.L_vec.len();
+        let n = 1 << lg_n;
+
+        // 1. Recompute x_k,...,x_1 based on the proof transcript
+
+        let mut challenges = Vec::with_capacity(lg_n);
+        for (L, R) in self.L_vec.iter().zip(self.R_vec.iter()) {
+            // XXX maybe avoid this compression when proof ser/de is sorted out
+            transcript.commit(L.compress().as_bytes());
+            transcript.commit(R.compress().as_bytes());
+
+            challenges.push(transcript.challenge_scalar());
+        }
+
+        // 2. Compute 1/(x_k...x_1) and 1/x_k, ..., 1/x_1
+
+        let mut challenges_inv = challenges.clone();
+        let allinv = Scalar::batch_invert(&mut challenges_inv);
+
+        // 3. Compute x_i^2 and (1/x_i)^2
+
+        for i in 0..lg_n {
+            // XXX missing square fn upstream
+            challenges[i] = challenges[i] * challenges[i];
+            challenges_inv[i] = challenges_inv[i] * challenges_inv[i];
+        }
+        let challenges_sq = challenges;
+        let challenges_inv_sq = challenges_inv;
+
+        // 4. Compute s values inductively.
+
+        let mut s = Vec::with_capacity(n);
+        s.push(allinv);
+        for i in 1..n {
+            let lg_i = (32 - 1 - (i as u32).leading_zeros()) as usize;
+            let k = 1 << lg_i;
+            // The challenges are stored in "creation order" as [x_k,...,x_1],
+            // so x_{lg(i)+1} = is indexed by (lg_n-1) - lg_i
+            let x_lg_i_sq = challenges_sq[(lg_n - 1) - lg_i];
+            s.push(s[i - k] * x_lg_i_sq);
+        }
+
+        (challenges_sq, challenges_inv_sq, s)
+    }
+
+    pub fn verify<I>(
+        &self,
+        transcript: &mut ProofTranscript,
+        Hprime_factors: I,
+        P: &RistrettoPoint,
+        Q: &RistrettoPoint,
+        G: &[RistrettoPoint],
+        H: &[RistrettoPoint],
+    ) -> Result<(), ()>
+    where
+        I: IntoIterator,
+        I::Item: Borrow<Scalar>,
+    {
+        let (x_sq, x_inv_sq, s) = self.verification_scalars(transcript);
+
+        let a_times_s = s.iter().map(|s_i| self.a * s_i);
+
+        // 1/s[i] is s[!i], and !i runs from n-1 to 0 as i runs from 0 to n-1
+        let inv_s = s.iter().rev();
+
+        let h_times_b_div_s = Hprime_factors
+            .into_iter()
+            .zip(inv_s)
+            .map(|(h_i, s_i_inv)| (self.b * s_i_inv) * h_i.borrow());
+
+        let neg_x_sq = x_sq.iter().map(|xi| -xi);
+        let neg_x_inv_sq = x_inv_sq.iter().map(|xi| -xi);
+
+        let expect_P = ristretto::vartime::multiscalar_mul(
+            iter::once(self.a * self.b)
+                .chain(a_times_s)
+                .chain(h_times_b_div_s)
+                .chain(neg_x_sq)
+                .chain(neg_x_inv_sq),
+            iter::once(Q)
+                .chain(G.iter())
+                .chain(H.iter())
+                .chain(self.L_vec.iter())
+                .chain(self.R_vec.iter()),
+        );
+
+        if expect_P == *P {
+            Ok(())
+        } else {
+            Err(())
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
-	use super::*;
-	#[test]
-	fn make_ipp_64() {
-    	let n = 64;
-        let G = &RistrettoPoint::hash_from_bytes::<Sha256>("hello".as_bytes());
-        let H = &RistrettoPoint::hash_from_bytes::<Sha256>("there".as_bytes());
-        let G_vec = make_generators(G, n);
-        let H_vec = make_generators(H, n);
-        let Q = RistrettoPoint::hash_from_bytes::<Sha256>("more".as_bytes());
-        let P = RistrettoPoint::hash_from_bytes::<Sha256>("points".as_bytes());
-        let a_vec = vec![Scalar::from_u64(1); n];
-        let b_vec = vec![Scalar::from_u64(2); n];
-
-        let proof = Prover::prove(G_vec.clone(), H_vec.clone(), P, Q, a_vec.clone(), b_vec.clone());
-
-        assert_eq!(proof.a_final.as_bytes(), 
-        	&[61, 162, 237, 210, 105, 26, 179, 39, 111, 70, 186, 58, 83, 18, 46, 189, 41, 225, 70, 190, 73, 180, 43, 17, 86, 38, 166, 174, 31, 71, 100, 4]);
-        assert_eq!(proof.b_final.as_bytes(), 
-        	&[122, 68, 219, 165, 211, 52, 102, 79, 222, 140, 116, 117, 166, 36, 92, 122, 83, 194, 141, 124, 147, 104, 87, 34, 172, 76, 76, 93, 63, 142, 200, 8]);
-	}
-	#[test]
-	fn make_ipp_32() {
-    	let n = 32;
-        let G = &RistrettoPoint::hash_from_bytes::<Sha256>("hello".as_bytes());
-        let H = &RistrettoPoint::hash_from_bytes::<Sha256>("there".as_bytes());
-        let G_vec = make_generators(G, n);
-        let H_vec = make_generators(H, n);
-        let Q = RistrettoPoint::hash_from_bytes::<Sha256>("more".as_bytes());
-        let P = RistrettoPoint::hash_from_bytes::<Sha256>("points".as_bytes());
-        let a_vec = vec![Scalar::from_u64(1); n];
-        let b_vec = vec![Scalar::from_u64(2); n];
-
-        let proof = Prover::prove(G_vec.clone(), H_vec.clone(), P, Q, a_vec.clone(), b_vec.clone());
-
-        assert_eq!(proof.a_final.as_bytes(), 
-        	&[108, 163, 168, 218, 202, 249, 219, 101, 99, 124, 105, 179, 50, 105, 192, 39, 195, 72, 222, 43, 160, 80, 14, 59, 46, 245, 156, 102, 39, 63, 166, 10]);
-        assert_eq!(proof.b_final.as_bytes(), 
-        	&[235, 114, 91, 88, 123, 144, 165, 115, 240, 91, 219, 195, 134, 216, 161, 58, 134, 145, 188, 87, 64, 161, 28, 118, 92, 234, 57, 205, 78, 126, 76, 5]);
-	}
-}
-
-#[cfg(test)]
-mod bench {
-
     use super::*;
-    use test::Bencher;
 
-    #[bench]
-    fn make_ipp_64(b: &mut Bencher) {
-    	let n = 64;
-        let G = &RistrettoPoint::hash_from_bytes::<Sha256>("hello".as_bytes());
-        let H = &RistrettoPoint::hash_from_bytes::<Sha256>("there".as_bytes());
-        let G_vec = make_generators(G, n);
-        let H_vec = make_generators(H, n);
-        let Q = RistrettoPoint::hash_from_bytes::<Sha256>("more".as_bytes());
-        let P = RistrettoPoint::hash_from_bytes::<Sha256>("points".as_bytes());
-        let a_vec = vec![Scalar::from_u64(1); n];
-        let b_vec = vec![Scalar::from_u64(2); n];
+    use rand::OsRng;
 
-        b.iter(|| Prover::prove(G_vec.clone(), H_vec.clone(), P, Q, a_vec.clone(), b_vec.clone()));
+    fn test_helper_create(n: usize) {
+        let mut rng = OsRng::new().unwrap();
+
+        let gens = Generators::new(n, 1);
+        let G = gens.share(0).G.to_vec();
+        let H = gens.share(0).H.to_vec();
+
+        // Q would be determined upstream in the protocol, so we pick a random one.
+        let Q = RistrettoPoint::hash_from_bytes::<Sha512>(b"test point");
+
+        // a and b are the vectors for which we want to prove c = <a,b>
+        let a: Vec<_> = (0..n).map(|_| Scalar::random(&mut rng)).collect();
+        let b: Vec<_> = (0..n).map(|_| Scalar::random(&mut rng)).collect();
+        let c = util::inner_product(&a, &b);
+
+        // y_inv is (the inverse of) a random challenge
+        let y_inv = Scalar::random(&mut rng);
+
+        // P would be determined upstream, but we need a correct P to check the proof.
+        //
+        // To generate P = <a,G> + <b,H'> + <a,b> Q, compute
+        //             P = <a,G> + <b',H> + <a,b> Q,
+        // where b' = b \circ y^(-n)
+        let b_prime = b.iter().zip(util::exp_iter(y_inv)).map(|(bi, yi)| bi * yi);
+        // a.iter() has Item=&Scalar, need Item=Scalar to chain with b_prime
+        let a_prime = a.iter().cloned();
+
+        let P = ristretto::vartime::multiscalar_mul(
+            a_prime.chain(b_prime).chain(iter::once(c)),
+            G.iter().chain(H.iter()).chain(iter::once(&Q)),
+        );
+
+        let mut verifier = ProofTranscript::new(b"innerproducttest");
+        let proof = Proof::create(
+            &mut verifier,
+            &Q,
+            util::exp_iter(y_inv),
+            G.clone(),
+            H.clone(),
+            a.clone(),
+            b.clone(),
+        );
+
+        let mut verifier = ProofTranscript::new(b"innerproducttest");
+        assert!(
+            proof
+                .verify(&mut verifier, util::exp_iter(y_inv), &P, &Q, &G, &H)
+                .is_ok()
+        );
     }
-    #[bench]
-    fn make_ipp_32(b: &mut Bencher) {
-    	let n = 32;
-        let G = &RistrettoPoint::hash_from_bytes::<Sha256>("hello".as_bytes());
-        let H = &RistrettoPoint::hash_from_bytes::<Sha256>("there".as_bytes());
-        let G_vec = make_generators(G, n);
-        let H_vec = make_generators(H, n);
-        let Q = RistrettoPoint::hash_from_bytes::<Sha256>("more".as_bytes());
-        let P = RistrettoPoint::hash_from_bytes::<Sha256>("points".as_bytes());
-        let a_vec = vec![Scalar::from_u64(1); n];
-        let b_vec = vec![Scalar::from_u64(2); n];
 
-        b.iter(|| Prover::prove(G_vec.clone(), H_vec.clone(), P, Q, a_vec.clone(), b_vec.clone()));
+    #[test]
+    fn make_ipp_1() {
+        test_helper_create(1);
+    }
+
+    #[test]
+    fn make_ipp_2() {
+        test_helper_create(2);
+    }
+
+    #[test]
+    fn make_ipp_4() {
+        test_helper_create(4);
+    }
+
+    #[test]
+    fn make_ipp_32() {
+        test_helper_create(32);
+    }
+
+    #[test]
+    fn make_ipp_64() {
+        test_helper_create(64);
     }
 }
