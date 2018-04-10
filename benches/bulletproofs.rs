@@ -9,8 +9,8 @@ extern crate curve25519_dalek;
 use curve25519_dalek::scalar::Scalar;
 
 extern crate ristretto_bulletproofs;
-use ristretto_bulletproofs::generators::{Generators, GeneratorsView};
-use ristretto_bulletproofs::proof_transcript::ProofTranscript;
+use ristretto_bulletproofs::{Generators};
+use ristretto_bulletproofs::ProofTranscript;
 use ristretto_bulletproofs::RangeProof;
 
 fn bench_create_helper(n: usize, c: &mut Criterion) {
@@ -59,7 +59,35 @@ fn bench_verify_helper(n: usize, c: &mut Criterion) {
             // Each verification requires a clean transcript.
             let mut transcript = ProofTranscript::new(b"RangeproofTest");
 
-            rp.verify(generators.share(0), &mut transcript, &mut rng, n)
+            rp.verify(generators.share(0), &mut transcript, &mut rng)
+        });
+    });
+}
+
+fn bench_batch_verify_helper(n: usize, m: usize, c: &mut Criterion) {
+    c.bench_function(&format!("batch_verify_rangeproof_n_{}_m_{}", n, m), move |b| {
+        let generators = Generators::new(n, 1);
+        let mut rng = OsRng::new().unwrap();
+
+        let rps: Vec<_> = (0..m).map(|_| {
+            let mut transcript = ProofTranscript::new(b"RangeproofTest");
+            let v: u64 = rng.gen_range(0, (1 << (n - 1)) - 1);
+            let v_blinding = Scalar::random(&mut rng);
+            RangeProof::generate_proof(
+                generators.share(0),
+                &mut transcript,
+                &mut rng,
+                n,
+                v,
+                &v_blinding,
+            )
+        }).collect();
+
+        b.iter(|| {
+            // Each verification requires a clean transcript.
+            let mut transcript = ProofTranscript::new(b"RangeproofTest");
+
+            RangeProof::verify_batch(rps.as_slice(), generators.share(0), &mut transcript, &mut rng)
         });
     });
 }
@@ -108,4 +136,34 @@ criterion_group!{
     targets = verify_rp_8, verify_rp_16, verify_rp_32, verify_rp_64
 }
 
-criterion_main!(create_rp, verify_rp);
+fn batch_verify_rp_64_1(c: &mut Criterion) {
+    bench_batch_verify_helper(64, 1, c);
+}
+
+fn batch_verify_rp_64_2(c: &mut Criterion) {
+    bench_batch_verify_helper(64, 2, c);
+}
+
+fn batch_verify_rp_64_4(c: &mut Criterion) {
+    bench_batch_verify_helper(64, 4, c);
+}
+
+fn batch_verify_rp_64_8(c: &mut Criterion) {
+    bench_batch_verify_helper(64, 8, c);
+}
+
+fn batch_verify_rp_64_16(c: &mut Criterion) {
+    bench_batch_verify_helper(64, 16, c);
+}
+
+fn batch_verify_rp_64_100(c: &mut Criterion) {
+    bench_batch_verify_helper(64, 100, c);
+}
+
+criterion_group!{
+    name = batch_verify_rp;
+    config = Criterion::default();
+    targets = batch_verify_rp_64_1, batch_verify_rp_64_2, batch_verify_rp_64_4, batch_verify_rp_64_8, batch_verify_rp_64_16, batch_verify_rp_64_100
+}
+
+criterion_main!(create_rp, verify_rp, batch_verify_rp);
