@@ -14,32 +14,82 @@ The range proof is a zero-knowledge proof of the following relation
 \right\\}
 \\] where \\(n = 2^{k}\\) is a power of \\(2\\).
 
-The protocol begins by computing three commitments: to the value \\(v\\), to the bits of that value \\(\mathbf{a}\_{L,R}\\), and to the per-bit blinding factors \\(\mathbf{s}\_{L,R}\\).
+Prover's algorithm
+------------------
 
-Each bit \\(a_i\\) is committed twice: as \\(a\_{L,i} = a\_i\\) and as \\(a\_{R,i} = a_i - 1\\).
+The protocol begins by computing three commitments: to the value \\(v\\),
+to the bits of that value \\(\mathbf{a}\_{L,R}\\),
+and to the per-bit blinding factors \\(\mathbf{s}\_{L,R}\\).
+
+Each bit \\(a_i\\) is committed twice: as \\(a\_{L,i} \gets a\_i\\) and as \\(a\_{R,i} \gets a_i - 1\\).
 Similarly for the blinding factors \\(\mathbf{s}\_{L,R}\\).
 
 \\[
 \begin{aligned}
-V &= \operatorname{Com}(v, {\widetilde{v}})                   && = v \cdot B + {\widetilde{v}} \cdot {\widetilde{B}} \\\\
-A &= \operatorname{Com}({\mathbf{a}}\_{L}, {\mathbf{a}}\_{R}) && = {\langle {\mathbf{a}}\_L, {\mathbf{G}} \rangle} + {\langle {\mathbf{a}}\_R, {\mathbf{H}} \rangle} + {\widetilde{a}} {\widetilde{B}} \\\\
-S &= \operatorname{Com}({\mathbf{s}}\_{L}, {\mathbf{s}}\_{R}) && = {\langle {\mathbf{s}}\_L, {\mathbf{G}} \rangle} + {\langle {\mathbf{s}}\_R, {\mathbf{H}} \rangle} + {\widetilde{s}} {\widetilde{B}} \\\\
+V &\gets \operatorname{Com}(v, {\widetilde{v}})                   && = v \cdot B + {\widetilde{v}} \cdot {\widetilde{B}} \\\\
+A &\gets \operatorname{Com}({\mathbf{a}}\_{L}, {\mathbf{a}}\_{R}) && = {\langle {\mathbf{a}}\_L, {\mathbf{G}} \rangle} + {\langle {\mathbf{a}}\_R, {\mathbf{H}} \rangle} + {\widetilde{a}} {\widetilde{B}} \\\\
+S &\gets \operatorname{Com}({\mathbf{s}}\_{L}, {\mathbf{s}}\_{R}) && = {\langle {\mathbf{s}}\_L, {\mathbf{G}} \rangle} + {\langle {\mathbf{s}}\_R, {\mathbf{H}} \rangle} + {\widetilde{s}} {\widetilde{B}} \\\\
 \end{aligned}
-\\] where \\(\widetilde{v}, \widetilde{a}, \widetilde{s}\\) are sampled randomly from \\({\mathbb Z\_p}\\) and \\(\mathbf{s}\_{L,R}\\) are sampled randomly from \\({\mathbb Z\_p}^{n}\\).
+\\] where \\(\widetilde{v}, \widetilde{a}, \widetilde{s}\\) are sampled randomly
+from \\({\mathbb Z\_p}\\) and \\(\mathbf{s}\_{L,R}\\) are sampled randomly from \\({\mathbb Z\_p}^{n}\\).
 
+The prover then obtains challenge scalars \\(y,z \in {\mathbb Z\_p}\\) using a Fiat-Shamir transform,
+so that each scalar is generated as a hash of the transcript of \\(\\{V, A, S\\}\\).
 
-
-
-<!--
-OLD STUFF:
-
+Using the challenges and the secret vectors, the prover constructs vector polynomials:
 \\[
+\begin{aligned}
+  {\mathbf{l}}(x) &= {\mathbf{l}}\_{0} + {\mathbf{l}}\_{1} x && = ({\mathbf{a}}\_{L} + {\mathbf{s}}\_{L} x) - z {\mathbf{1}} & \in {\mathbb Z\_p}[x]^{n}  \\\\
+  {\mathbf{r}}(x) &= {\mathbf{r}}\_{0} + {\mathbf{r}}\_{1} x && = {\mathbf{y}}^{n} \circ \left( ({\mathbf{a}}\_{R} + {\mathbf{s}}\_{R} x\right)  + z {\mathbf{1}}) + z^{2} {\mathbf{2}}^{n} &\in {\mathbb Z\_p}[x]^{n} 
+\end{aligned}
+\\]
 
-{\mathbf{s}}\_{L}, {\mathbf{s}}\_{R} \\;{\xleftarrow{\\$}}\\; {\mathbb Z\_p}^{n},
+The inner product of the above vector polynomials is:
+\\[
+  t(x) = {\langle {\mathbf{l}}(x), {\mathbf{r}}(x) \rangle} = t\_{0} + t\_{1} x + t\_{2} x^{2}, 
+\\]
 
-\operatorname{PK}\left\\{
-  ({\mathbf{G}}, {\mathbf{H}} \in {\mathbb G}^n, P, Q \in {\mathbb G}; {\mathbf{a}}, {\mathbf{b}} \in {\mathbb Z\_p}^n)
-  : P = {\langle {\mathbf{a}}, {\mathbf{G}} \rangle} + {\langle {\mathbf{b}}, {\mathbf{H}} \rangle} + {\langle {\mathbf{a}}, {\mathbf{b}} \rangle} Q
-\right\\}
-\\] where \\(n = 2^{k}\\) is a power of \\(2\\).
--->
+The prover uses Karatsuba’s method to compute the coefficients of that polynomial as follows:
+\\[
+\begin{aligned}
+  t\_{0} &\gets {\langle {\mathbf{l}}\_{0}, {\mathbf{r}}\_{0} \rangle},  \\\\
+  t\_{2} &\gets {\langle {\mathbf{l}}\_{1}, {\mathbf{r}}\_{1} \rangle},  \\\\
+  t\_{1} &\gets {\langle {\mathbf{l}}\_{0} + {\mathbf{l}}\_{1}, {\mathbf{r}}\_{0} + {\mathbf{r}}\_{1} \rangle} - t\_{0} - t\_{2} 
+\end{aligned}
+\\]
+
+The prover commits to the terms \\(t_1, t_2\\):
+\\[
+\begin{aligned}
+T\_1 &\gets \operatorname{Com}(t\_1, {\tilde{t}\_1})  && = t\_1 \cdot B + {\tilde{t}\_1} \cdot {\widetilde{B}} \\\\
+T\_2 &\gets \operatorname{Com}(t\_2, {\tilde{t}\_2})  && = t\_2 \cdot B + {\tilde{t}\_2} \cdot {\widetilde{B}}
+\end{aligned}
+\\] where \\(\tilde{t}\_1, \tilde{t}\_2\\) are sampled randomly from \\({\mathbb Z\_p}\\).
+
+The prover then obtains a challenge scalar \\(x \in {\mathbb Z\_p}\\) using a Fiat-Shamir transform
+by hashing \\(\\{T_1, T_2\\}\\) to the transcript of the protocol.
+
+The prover uses the challenge scalar \\(x\\) to evaluate the polynomials \\(\\{\mathbf{l}(x), \mathbf{r}(x), t(x)\\}\\):
+\\[
+\begin{aligned}
+  {\mathbf{l}}(x) &\gets {\mathbf{l}}\_{0} + {\mathbf{l}}\_{1} x\\\\
+  {\mathbf{r}}(x) &\gets {\mathbf{r}}\_{0} + {\mathbf{r}}\_{1} x\\\\
+  t(x)            &\gets t\_{0} + t\_{1} x + t\_{2} x^{2}
+\end{aligned}
+\\]
+
+Next, the prover computes the synthetic blinding factors:
+\\[
+\begin{aligned}
+  {\tilde{t}}(x) &\gets z^{2} {\tilde{v}} + x {\tilde{t}}\_{1} + x^{2} {\tilde{t}}\_{2} \\\\
+  {\tilde{e}}    &\gets {\widetilde{a}}   + x {\widetilde{s}}
+\end{aligned}
+\\]
+
+
+Verifier's algorithm
+--------------------
+
+TBD.
+
+

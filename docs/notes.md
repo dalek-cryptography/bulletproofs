@@ -313,7 +313,7 @@ The commitments \\(V\\), \\(T\_{1}\\), \\(T\_{2}\\) are related to each other an
 \begin{aligned}
   t(x) B                     &\quad &= \quad & z^{2}vB                     & \quad &+ \quad & \delta(y,z) B  & \quad &+ \quad& x t\_{1} B                     &\quad &+\quad & x^2 t\_{2} B \\\\
     +                        &\quad &  \quad &  +                          & \quad &  \quad &  +             & \quad &  \quad& +                             &\quad & \quad & +   \\\\
-  {\widetilde{t}}(x) {\widetilde{B}} &\quad &= \quad & z^2 {\widetilde{v}} {\widetilde{B}} & \quad &+ \quad & 0 {\widetilde{B}}  & \quad &+ \quad& x {\widetilde{t}}\_{1} {\widetilde{B}} &\quad &+\quad & x^{2} {\widetilde{t}}\_{2} {\widetilde{B}} \\\\
+  {\tilde{t}}(x) {\widetilde{B}} &\quad &= \quad & z^2 {\widetilde{v}} {\widetilde{B}} & \quad &+ \quad & 0 {\widetilde{B}}  & \quad &+ \quad& x {\tilde{t}}\_{1} {\widetilde{B}} &\quad &+\quad & x^{2} {\tilde{t}}\_{2} {\widetilde{B}} \\\\
     \shortparallel           &\quad &  \quad & \shortparallel              & \quad &  \quad & \shortparallel & \quad &  \quad& \shortparallel                &\quad & \quad & \shortparallel   \\\\
                  &\quad &= \quad & z V                         & \quad &+ \quad & \delta(y,z) B  & \quad &+ \quad& x T\_{1}                       &\quad &+\quad & x^{2} T\_{2}
 \end{aligned}
@@ -321,17 +321,17 @@ The commitments \\(V\\), \\(T\_{1}\\), \\(T\_{2}\\) are related to each other an
 Notice that the sum of each column is a commitment to the variable in the top
 row using the blinding factor in the second row.
 The sum of all of the columns is
-\\(t(x) B + {\widetilde{t}}(x) {\widetilde{B}}\\), a commitment to the value
+\\(t(x) B + {\tilde{t}}(x) {\widetilde{B}}\\), a commitment to the value
 of \\(t\\) at the point \\(x\\), using the synthetic blinding factor[^1]
 \\[
-  {\widetilde{t}}(x) = z^{2} {\widetilde{v}} + x {\widetilde{t}}\_{1} + x^{2} {\widetilde{t}}\_{2}.
+  {\tilde{t}}(x) = z^{2} {\tilde{v}} + x {\tilde{t}}\_{1} + x^{2} {\tilde{t}}\_{2}.
 \\]
 To convince the verifier that
 \\(t(x) = z^2v + \delta(y,z) + t\_{1} x + t\_{2} x^{2}\\), the prover sends
-the opening \\(t(x), {\widetilde{t}}(x)\\) to the verifier, who uses the
+the opening \\(t(x), {\tilde{t}}(x)\\) to the verifier, who uses the
 bottom row of the diagram to check consistency:
 \\[
-  t(x) B + {\widetilde{t}}(x) {\widetilde{B}} \stackrel{?}{=} z V + \delta(y,z) B + x T\_{1} + x^{2} T\_{2}. 
+  t(x) B + {\tilde{t}}(x) {\widetilde{B}} \stackrel{?}{=} z V + \delta(y,z) B + x T\_{1} + x^{2} T\_{2}. 
 \\]
 
 [^1]: The blinding factor is synthetic in the sense that it is
