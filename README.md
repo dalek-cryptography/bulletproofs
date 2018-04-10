@@ -1,19 +1,43 @@
 # Ristretto Bulletproofs
 
-Implementing [bulletproofs](https://crypto.stanford.edu/bulletproofs/) using [ristretto](https://github.com/dalek-cryptography/ed25519-dalek).
+A pure-Rust implementation of [Bulletproofs][bp_website] using [Ristretto][ristretto].
 
-Step 1 of a larger proposed proposed plan, detailed [here](https://github.com/chain/research/issues/7).
+This crate contains both an implementation and a set of notes on how and why
+Bulletproofs work.  The external documentation describes how to use this
+crate's API, while the internal documentation contains the notes.
+Unfortunately, `cargo doc` does not yet have support for custom HTML injection
+and for documenting private members, so the documentation is built using:
 
-## Development
-
-Run tests:
-
+```text
+make doc           # Builds external documentation
+make doc-internal  # Builds internal documentation
 ```
-cargo test
+
+Unfortunately `cargo doc --open` rebuilds the docs without the custom
+invocation, so it may be necessary to rerun `make`.
+
+The description of how Bulletproofs work is found in the (internal) `notes` module.
+
+## WARNING
+
+This code is still research-quality.  It is not (yet) suitable for deployment.
+
+## Tests
+
+Run tests with `cargo test`.
+
+## Features
+
+The `yolocrypto` feature enables the `yolocrypto` feature in
+`curve25519-dalek`, which enables the experimental AVX2 backend.  To use it for
+Bulletproofs, the `target_cpu` must support AVX2:
+
+```text
+RUSTFLAGS="-C target_cpu=skylake" cargo bench --features "yolocrypto"
 ```
 
-Run benchmarks:
+This crate uses [criterion.rs][criterion] for benchmarks.
 
-```
-cargo bench --features="bench"
-```
+[bp_website]: https://crypto.stanford.edu/bulletproofs/
+[ristretto]: https://doc.dalek.rs/curve25519_dalek/ristretto/index.html
+[criterion]: https://github.com/japaric/criterion.rs
