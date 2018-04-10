@@ -114,8 +114,8 @@ obtain the \\(1/s\_{i}\\).
 The verifier’s computation then becomes
 \\[
 \begin{aligned}
-P \overset ? =& aG +bH +abQ - \sum\_{j=1}^{k} \left( L\_{k} x\_{k}^{2} + x\_{k}^{-2} R\_{k} \right) \\\\
-=& {\langle a \cdot {\mathbf{s}}, {\mathbf{G}} \rangle} + {\langle b /{\mathbf{s}}, {\mathbf{H}} \rangle} + abQ - \sum\_{j=1}^{k} \left( L\_{k} x\_{k}^{2} + x\_{k}^{-2} R\_{k} \right),
+P \overset ? =& aG +bH +abQ - \sum\_{j=1}^{k} \left( L\_{j} x\_{j}^{2} + x\_{j}^{-2} R\_{j} \right) \\\\
+=& {\langle a \cdot {\mathbf{s}}, {\mathbf{G}} \rangle} + {\langle b /{\mathbf{s}}, {\mathbf{H}} \rangle} + abQ - \sum\_{j=1}^{k} \left( L\_{j} x\_{j}^{2} + x\_{j}^{-2} R\_{j} \right),
 \end{aligned}
 \\]
 a single multiscalar multiplication with

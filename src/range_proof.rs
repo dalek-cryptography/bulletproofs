@@ -226,10 +226,10 @@ impl RangeProof {
                 .chain(iter::once(c * zz))
                 .chain(iter::once(c * x))
                 .chain(iter::once(c * x * x))
-                .chain(iter::once(-self.e_blinding - c * self.t_x_blinding))
                 .chain(iter::once(
                     w * (self.t_x - a * b) + c * (delta(n, &y, &z) - self.t_x),
                 ))
+                .chain(iter::once(-self.e_blinding - c * self.t_x_blinding))
                 .chain(g)
                 .chain(h)
                 .chain(x_sq.iter().cloned())
@@ -239,8 +239,8 @@ impl RangeProof {
                 .chain(iter::once(&self.V))
                 .chain(iter::once(&self.T_1))
                 .chain(iter::once(&self.T_2))
-                .chain(iter::once(gens.B_blinding))
                 .chain(iter::once(gens.B))
+                .chain(iter::once(gens.B_blinding))
                 .chain(gens.G.iter())
                 .chain(gens.H.iter())
                 .chain(self.ipp_proof.L_vec.iter())

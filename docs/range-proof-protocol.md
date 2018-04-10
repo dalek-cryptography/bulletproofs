@@ -14,7 +14,7 @@ The range proof is a zero-knowledge proof of the following relation
 \right\\}
 \\] where \\(n = 2^{k}\\) is a power of \\(2\\).
 
-Prover's algorithm
+Prover’s algorithm
 ------------------
 
 The protocol begins by computing three commitments: to the value \\(v\\),
@@ -118,12 +118,59 @@ The complete range proof consists of \\(9+2k\\) 32-byte elements:
 \\]
 
 
-Verifier's algorithm
+Verifier’s algorithm
 --------------------
 
-TBD: what verifier receives
+Verifier’s input is the range size \\(n\\) (in bits), value commitment \\(V\\), and \\(32 \cdot (9 + 2 \lg n)\\) bytes of the proof data:
+\\[
+\\{A, S, T_1, T_2, t(x), {\tilde{t}}(x), \tilde{e}, L\_{\lg n}, R\_{\lg n}, \\dots, L\_1, R\_1, a, b\\}
+\\]
 
-TBD: what verifier does.
+Verifier uses Fiat-Shamir transform to obtain challenges by hashing the appropriate data sequentially into the transcript of the protocol:
+
+1. \\(\\{V, A, S\\}\\) are hashed to obtain challenge scalars \\(y,z \in {\mathbb Z\_p}\\),
+2. \\(\\{T_1, T_2\\}\\) are hashed to obtain a challenge \\(x \in {\mathbb Z\_p}\\),
+3. \\(\\{t(x), {\tilde{t}}(x), \tilde{e}\\}\\) are hased to obtain a challenge \\(w \in {\mathbb Z\_p}\\).
+
+Verifier computes the following scalars for the [inner product argument](../inner_product_proof/index.html):
+
+\\[
+	\\{x\_{1}^{2}, x\_{1}^{-2}, \dots, x\_{\lg n}^{2}, x\_{\lg n}^{-2}, s_0, \dots, s_{n-1}\\}
+\\]
+
+The goal is to verify these two equations:
+
+\\[
+\begin{aligned}
+t(x) w B - {\widetilde{e}} {\widetilde{B}} + A + x S + {\langle z {\mathbf{y}}^n + z^2 {\mathbf{2}}^n, {\mathbf{y}}^{-n} \circ {\mathbf{H}} \rangle} - z{\langle {\mathbf{1}}, {\mathbf{G}} \rangle} \stackrel{?}{=}\\\\
+\stackrel{?}{=} {\langle a \cdot {\mathbf{s}}, {\mathbf{G}} \rangle} + {\langle b /{\mathbf{s}}, {\mathbf{y}}^{-n} \circ {\mathbf{H}} \rangle} + abwB - \sum\_{j=1}^{k} \left( L\_{j} x\_{j}^{2} + x\_{j}^{-2} R\_{j} \right)\\\\
+t(x) B + {\tilde{t}}(x) {\widetilde{B}} \stackrel{?}{=} z^2 V + \delta(y,z) B + x T\_{1} + x^{2} T\_{2}
+\end{aligned}
+\\] where \\(\delta(y,z) = (z - z^{2}) \langle 1, {\mathbf{y}}^{n} \rangle + z^{3} \langle \mathbf{1}, {\mathbf{2}}^{n} \rangle\\).
+
+Verifier combines two equations in one by sampling a random factor \\(c \\; {\xleftarrow{\\$}} \\; {\mathbb Z\_p}\\),
+multiplying the second equation by \\(c\\), and adding it to the first equation.
+
+Finally, verifier groups all scalars per each point and performs a single multi-scalar multiplication over \\((7 + 2n + 2\\lg n)\\) points:
+
+\\[
+\begin{aligned}
+0 \quad \stackrel{?}{=} & \quad 1       \cdot A \\\\
+                      + & \quad x       \cdot S \\\\
+                      + & \quad cz^2    \cdot V \\\\
+                      + & \quad cx      \cdot T_1 \\\\
+                      + & \quad cx^2    \cdot T_2 \\\\
+                      + & \quad \Big(w \big(t(x) - ab\big) + c \big(\delta(y,z) - t(x)\big) \Big) \cdot B\\\\
+                      + & \quad (-{\widetilde{e}} - c{\tilde{t}}(x)) \cdot \widetilde{B} \\\\
+                      + & \quad {\langle {-z\mathbf{1} - a\mathbf{s}}, {\mathbf{G}} \rangle}\\\\
+                      + & \quad {\langle {z\mathbf{1} + {\mathbf{y}}^{-n} \circ (x^2\mathbf{2}^n - b{\mathbf{s}\_{inv}})}, {\mathbf{H}} \rangle}\\\\
+                      + & \quad {\langle [x_{1}^2,    \dots, x_{\lg n}^2    ], [L_1, \dots, L_{\lg n}] \rangle}\\\\
+                      + & \quad {\langle [x_{1}^{-2}, \dots, x_{\lg n}^{-2} ], [R_1, \dots, R_{\lg n}] \rangle}
+\end{aligned}
+\\] where \\(\mathbf{s}\_{inv}\\) are inverses of \\(\mathbf{s}\\), computed as a reversed list of \\(\mathbf{s}\\).
+
+
+
 
 
 

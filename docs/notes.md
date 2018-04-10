@@ -331,7 +331,7 @@ To convince the verifier that
 the opening \\(t(x), {\tilde{t}}(x)\\) to the verifier, who uses the
 bottom row of the diagram to check consistency:
 \\[
-  t(x) B + {\tilde{t}}(x) {\widetilde{B}} \stackrel{?}{=} z V + \delta(y,z) B + x T\_{1} + x^{2} T\_{2}. 
+  t(x) B + {\tilde{t}}(x) {\widetilde{B}} \stackrel{?}{=} z^2 V + \delta(y,z) B + x T\_{1} + x^{2} T\_{2}.
 \\]
 
 [^1]: The blinding factor is synthetic in the sense that it is
