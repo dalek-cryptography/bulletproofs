@@ -462,20 +462,20 @@ second equation by an orthogonal generator
 \begin{aligned}
     P &{}={}&& {\langle {\mathbf{a}}, {\mathbf{G}} \rangle} + {\langle {\mathbf{b}}, {\mathbf{H}} \rangle}\\\\
       &{}+{}&&\\\\
-    c \cdot w \cdot B &{}={}&&  {\langle {\mathbf{a}}, {\mathbf{b}} \rangle} \cdot w \cdot B
+    c w B &{}={}&&  {\langle {\mathbf{a}}, {\mathbf{b}} \rangle} w B
 \end{aligned}
 \\]
 let’s simplify the resulting equation using the following definitions:
 \\[
 \begin{aligned}
     k &= \lg n \\\\
-    P\_k &= P + c \cdot w \cdot B \\\\
-    Q &= w \cdot B
+    P\_k &= P + cwB \\\\
+    Q &= wB
 \end{aligned}
 \\]
 The equation becomes:
 \\[
-    P\_k = {\langle {\mathbf{a}}, {\mathbf{G}} \rangle} + {\langle {\mathbf{b}}, {\mathbf{H}} \rangle} + {\langle {\mathbf{a}}, {\mathbf{b}} \rangle} \cdot Q 
+    P\_k = {\langle {\mathbf{a}}, {\mathbf{G}} \rangle} + {\langle {\mathbf{b}}, {\mathbf{H}} \rangle} + {\langle {\mathbf{a}}, {\mathbf{b}} \rangle} Q 
 \\]
 The combined equation is useful because it will allow us
 to compress each vector in half and arrive to the same form. By doing
@@ -546,15 +546,19 @@ variable \\(u\_{k-1}\\) in the same way as we used \\(u\_k\\) and arrive
 to even shorter vectors. We will continue doing so until we end up with
 vectors
 \\({\mathbf{a}}^{(0)}, {\mathbf{b}}^{(0)}, {\mathbf{G}}^{(0)}, {\mathbf{H}}^{(0)}\\),
-each containing one item, and \\(P\_0\\) containing all accumulated cross-terms:
+each containing one item, and \\(P\_0\\) containing all accumulated cross-terms at each step:
 \\[
 \begin{aligned}
-    P\_0 &= a^{(0)}\_0 \cdot G^{(0)}\_0 + b^{(0)}\_0 \cdot H^{(0)}\_0 + a^{(0)}\_0 \cdot b^{(0)}\_0 \cdot Q\\\\
+    P\_0 &= a^{(0)}\_0 G^{(0)}\_0 + b^{(0)}\_0 H^{(0)}\_0 + a^{(0)}\_0 b^{(0)}\_0 Q\\\\
     P\_0 &= P\_k + \sum\_{j=1}^{k} \left( L\_{j} u\_{j}^{2} + u\_{j}^{-2} R\_{j} \right)
 \end{aligned}
 \\]
 
-TBD: show complete check where \\(cwB\\) is explicit.
+Rewriting the above with the definitions \\(P_k = P + cwB\\) and \\(Q = wB\\) gives the
+final statement:
+\\[
+    P + c w B = a^{(0)}\_0 G^{(0)}\_0 + b^{(0)}\_0 H^{(0)}\_0 + a^{(0)}\_0 b^{(0)}\_0 wB - \sum\_{j=1}^{k} \left( L\_{j} u\_{j}^{2} + u\_{j}^{-2} R\_{j} \right)
+\\]
 
 At this point the prover can transmit two scalars \\(a^{(0)}\_0\\) and
 \\(b^{(0)}\_0\\) to the verifier, so they check the final statement directly

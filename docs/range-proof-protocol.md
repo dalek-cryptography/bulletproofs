@@ -142,7 +142,7 @@ The goal is to verify these two equations:
 
 \\[
 \begin{aligned}
-t(x) w B - {\widetilde{e}} {\widetilde{B}} + A + x S + {\langle z {\mathbf{y}}^n + z^2 {\mathbf{2}}^n, {\mathbf{y}}^{-n} \circ {\mathbf{H}} \rangle} - z{\langle {\mathbf{1}}, {\mathbf{G}} \rangle} \stackrel{?}{=}\\\\
+- {\widetilde{e}} {\widetilde{B}} + A + x S + {\langle z {\mathbf{y}}^n + z^2 {\mathbf{2}}^n, {\mathbf{y}}^{-n} \circ {\mathbf{H}} \rangle} - z{\langle {\mathbf{1}}, {\mathbf{G}} \rangle} + t(x)wB \stackrel{?}{=}\\\\
 \stackrel{?}{=} {\langle a \cdot {\mathbf{s}}, {\mathbf{G}} \rangle} + {\langle b /{\mathbf{s}}, {\mathbf{y}}^{-n} \circ {\mathbf{H}} \rangle} + abwB - \sum\_{j=1}^{k} \left( L\_{j} x\_{j}^{2} + x\_{j}^{-2} R\_{j} \right)\\\\
 t(x) B + {\tilde{t}}(x) {\widetilde{B}} \stackrel{?}{=} z^2 V + \delta(y,z) B + x T\_{1} + x^{2} T\_{2}
 \end{aligned}
