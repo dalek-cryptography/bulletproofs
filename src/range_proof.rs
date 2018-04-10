@@ -256,9 +256,9 @@ impl RangeProof {
 }
 
 /// Compute
-/// $$
-/// \\delta(y,z) = (z - z^2)<1, y^n> + z^3 <1, 2^n>
-/// $$
+/// \\[
+/// \delta(y,z) = (z - z^{2}) \langle 1, {\mathbf{y}}^{n} \rangle + z^{3} \langle \mathbf{1}, {\mathbf{2}}^{n} \rangle
+/// \\]
 fn delta(n: usize, y: &Scalar, z: &Scalar) -> Scalar {
     let two = Scalar::from_u64(2);
 

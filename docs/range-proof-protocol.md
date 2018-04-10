@@ -39,8 +39,12 @@ so that each scalar is generated as a hash of the transcript of \\(\\{V, A, S\\}
 Using the challenges and the secret vectors, the prover constructs vector polynomials:
 \\[
 \begin{aligned}
-  {\mathbf{l}}(x) &= {\mathbf{l}}\_{0} + {\mathbf{l}}\_{1} x && = ({\mathbf{a}}\_{L} + {\mathbf{s}}\_{L} x) - z {\mathbf{1}} & \in {\mathbb Z\_p}[x]^{n}  \\\\
-  {\mathbf{r}}(x) &= {\mathbf{r}}\_{0} + {\mathbf{r}}\_{1} x && = {\mathbf{y}}^{n} \circ \left( ({\mathbf{a}}\_{R} + {\mathbf{s}}\_{R} x\right)  + z {\mathbf{1}}) + z^{2} {\mathbf{2}}^{n} &\in {\mathbb Z\_p}[x]^{n} 
+  {\mathbf{l}}(x) &= {\mathbf{l}}\_{0} + {\mathbf{l}}\_{1} x \\\\
+  {\mathbf{r}}(x) &= {\mathbf{r}}\_{0} + {\mathbf{r}}\_{1} x \\\\
+  {\mathbf{l}}\_{0} &\gets {\mathbf{a}}\_{L} - z {\mathbf{1}} \\\\
+  {\mathbf{l}}\_{1} &\gets {\mathbf{s}}\_{L} \\\\
+  {\mathbf{r}}\_{0} &\gets {\mathbf{y}}^{n} \circ ({\mathbf{a}}\_{R}   + z {\mathbf{1}}) + z^{2} {\mathbf{2}}^{n} \\\\
+  {\mathbf{r}}\_{1} &\gets {\mathbf{y}}^{n} \circ {\mathbf{s}}\_{R}
 \end{aligned}
 \\]
 
@@ -92,9 +96,27 @@ and uses it to create a unique point \\(Q\\):
 	Q  \gets  w \cdot B
 \\]
 
-The prover uses (TBD: what stuff goes to IPP)
+The the prover then performs the [inner product argument](../inner_product_proof/index.html) to prove the relation:
+\\[
+\operatorname{PK}\left\\{
+  ({\mathbf{G}}, {\mathbf{H}}' \in {\mathbb G}^n, P, Q \in {\mathbb G}; {\mathbf{l}}, {\mathbf{r}} \in {\mathbb Z\_p}^n)
+  : P = {\langle {\mathbf{l}}, {\mathbf{G}} \rangle} + {\langle {\mathbf{r}}, {\mathbf{H}}' \rangle} + {\langle {\mathbf{l}}, {\mathbf{r}} \rangle} Q
+\right\\}
+\\] where
+\\[
+\begin{aligned}
+	P &= -{\widetilde{e}} {\widetilde{B}} + A + x S + {\langle z {\mathbf{y}}^n + z^2 {\mathbf{2}}^n, {\mathbf{H}}' \rangle} - z{\langle {\mathbf{1}}, {\mathbf{G}} \rangle}; \\\\
+	{\mathbf{H}}' &= {\mathbf{y}}^{-n} \circ {\mathbf{H}}
+\end{aligned}
+\\]
 
- used in the [inner product argument](../inner_product_proof/index.html)
+The result of the inner product proof is a list of \\(2k\\) points and \\(2\\) scalars: \\(\\{L\_k, R\_k, \\dots, L\_1, R\_1, a, b\\}\\).
+
+The complete range proof consists of \\(9+2k\\) 32-byte elements:
+\\[
+\\{A, S, T_1, T_2, t(x), {\tilde{t}}(x), \tilde{e}, L\_k, R\_k, \\dots, L\_1, R\_1, a, b\\}
+\\]
+
 
 Verifier's algorithm
 --------------------
