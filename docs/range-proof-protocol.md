@@ -151,7 +151,7 @@ t(x) B + {\tilde{t}}(x) {\widetilde{B}} \stackrel{?}{=} z^2 V + \delta(y,z) B + 
 Verifier combines two equations in one by sampling a random factor \\(c \\; {\xleftarrow{\\$}} \\; {\mathbb Z\_p}\\),
 multiplying the second equation by \\(c\\), and adding it to the first equation.
 
-Finally, verifier groups all scalars per each point and performs a single multi-scalar multiplication over \\((7 + 2n + 2\\lg n)\\) points:
+Finally, verifier groups all scalars per each point and performs a single multiscalar multiplication over \\((7 + 2n + 2\\lg n)\\) points:
 
 \\[
 \begin{aligned}

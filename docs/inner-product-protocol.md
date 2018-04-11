@@ -3,6 +3,8 @@ The `inner_product_proof` module contains API for producing a compact proof of a
 Inner product argument protocol
 ===============================
 
+These notes explain how the protocol is implemented in the [`Proof`](struct.Proof.html) type.
+
 We want to prove the relation
 \\[
 \operatorname{PK}\left\\{
@@ -131,7 +133,7 @@ Delaying multiplication
 -----------------------
 
 Inner product argument can be verified more efficient if the above multiplication
-is performed as a part of a larger multi-scalar multiplication in the parent protocol.
+is performed as a part of a larger multiscalar multiplication in the parent protocol.
 
 Lets rewrite the above equation:
 \\[
