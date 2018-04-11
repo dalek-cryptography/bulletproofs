@@ -11,7 +11,7 @@ use curve25519_dalek::ristretto;
 use curve25519_dalek::traits::IsIdentity;
 use curve25519_dalek::scalar::Scalar;
 
-use inner_product_proof::{InnerProductProof};
+use inner_product_proof::{inner_product, InnerProductProof};
 
 use proof_transcript::ProofTranscript;
 
@@ -278,13 +278,13 @@ impl VecPoly2 {
         let l = self;
         let r = rhs;
 
-        let t0 = util::inner_product(&l.0, &r.0);
-        let t2 = util::inner_product(&l.1, &r.1);
+        let t0 = inner_product(&l.0, &r.0);
+        let t2 = inner_product(&l.1, &r.1);
 
         let l0_plus_l1 = util::add_vec(&l.0, &l.1);
         let r0_plus_r1 = util::add_vec(&r.0, &r.1);
 
-        let t1 = util::inner_product(&l0_plus_l1, &r0_plus_r1) - t0 - t2;
+        let t1 = inner_product(&l0_plus_l1, &r0_plus_r1) - t0 - t2;
 
         PolyDeg3(t0, t1, t2)
     }

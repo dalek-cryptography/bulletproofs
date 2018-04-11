@@ -76,8 +76,8 @@ impl InnerProductProof {
             let (G_L, G_R) = G.split_at_mut(n);
             let (H_L, H_R) = H.split_at_mut(n);
 
-            let c_L = util::inner_product(&a_L, &b_R);
-            let c_R = util::inner_product(&a_R, &b_L);
+            let c_L = inner_product(&a_L, &b_R);
+            let c_R = inner_product(&a_R, &b_L);
 
             let L = ristretto::vartime::multiscalar_mul(
                 a_L.iter().chain(b_R.iter()).chain(iter::once(&c_L)),
@@ -224,6 +224,24 @@ impl InnerProductProof {
     }
 }
 
+
+/// Computes an inner product of two vectors
+/// \\[
+///    {\langle {\mathbf{a}}, {\mathbf{b}} \rangle} = \sum\_{i=0}^{n-1} a\_i \cdot b\_i.
+/// \\]
+/// Panics if the lengths of \\(\mathbf{a}\\) and \\(\mathbf{b}\\) are not equal.
+pub fn inner_product(a: &[Scalar], b: &[Scalar]) -> Scalar {
+    let mut out = Scalar::zero();
+    if a.len() != b.len() {
+        panic!("inner_product(a,b): lengths of vectors do not match");
+    }
+    for i in 0..a.len() {
+        out += a[i] * b[i];
+    }
+    out
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -245,7 +263,7 @@ mod tests {
         // a and b are the vectors for which we want to prove c = <a,b>
         let a: Vec<_> = (0..n).map(|_| Scalar::random(&mut rng)).collect();
         let b: Vec<_> = (0..n).map(|_| Scalar::random(&mut rng)).collect();
-        let c = util::inner_product(&a, &b);
+        let c = inner_product(&a, &b);
 
         // y_inv is (the inverse of) a random challenge
         let y_inv = Scalar::random(&mut rng);
@@ -306,5 +324,22 @@ mod tests {
     #[test]
     fn make_ipp_64() {
         test_helper_create(64);
+    }
+
+    #[test]
+    fn test_inner_product() {
+        let a = vec![
+            Scalar::from_u64(1),
+            Scalar::from_u64(2),
+            Scalar::from_u64(3),
+            Scalar::from_u64(4),
+        ];
+        let b = vec![
+            Scalar::from_u64(2),
+            Scalar::from_u64(3),
+            Scalar::from_u64(4),
+            Scalar::from_u64(5),
+        ];
+        assert_eq!(Scalar::from_u64(40), inner_product(&a, &b));
     }
 }
