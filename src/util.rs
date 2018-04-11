@@ -2,6 +2,13 @@
 #![allow(non_snake_case)]
 
 use curve25519_dalek::scalar::Scalar;
+use inner_product_proof::inner_product;
+
+/// Represents a degree-1 vector polynomial \\(\mathbf{a} + \mathbf{b} \cdot x\\).
+pub struct VecPoly2(pub Vec<Scalar>, pub Vec<Scalar>);
+
+/// Represents a degree-2 scalar polynomial \\(a + b \cdot x + c \cdot x^2\\)
+pub struct PolyDeg3(pub Scalar, pub Scalar, pub Scalar);
 
 /// Provides an iterator over the powers of a `Scalar`.
 ///
@@ -38,6 +45,38 @@ pub fn add_vec(a: &[Scalar], b: &[Scalar]) -> Vec<Scalar> {
     }
     out
 }
+
+impl VecPoly2 {
+    pub fn zero(n: usize) -> VecPoly2 {
+        VecPoly2(vec![Scalar::zero(); n], vec![Scalar::zero(); n])
+    }
+
+    pub fn inner_product(&self, rhs: &VecPoly2) -> PolyDeg3 {
+        // Uses Karatsuba's method
+        let l = self;
+        let r = rhs;
+
+        let t0 = inner_product(&l.0, &r.0);
+        let t2 = inner_product(&l.1, &r.1);
+
+        let l0_plus_l1 = add_vec(&l.0, &l.1);
+        let r0_plus_r1 = add_vec(&r.0, &r.1);
+
+        let t1 = inner_product(&l0_plus_l1, &r0_plus_r1) - t0 - t2;
+
+        PolyDeg3(t0, t1, t2)
+    }
+
+    pub fn eval(&self, x: Scalar) -> Vec<Scalar> {
+        let n = self.0.len();
+        let mut out = vec![Scalar::zero(); n];
+        for i in 0..n {
+            out[i] += self.0[i] + self.1[i] * x;
+        }
+        out
+    }
+}
+
 
 #[cfg(test)]
 mod tests {

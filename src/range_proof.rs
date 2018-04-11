@@ -11,17 +11,13 @@ use curve25519_dalek::ristretto;
 use curve25519_dalek::traits::IsIdentity;
 use curve25519_dalek::scalar::Scalar;
 
-use inner_product_proof::{inner_product, InnerProductProof};
+use inner_product_proof::InnerProductProof;
 
 use proof_transcript::ProofTranscript;
 
 use util;
 
 use generators::GeneratorsView;
-
-struct PolyDeg3(Scalar, Scalar, Scalar);
-
-struct VecPoly2(Vec<Scalar>, Vec<Scalar>);
 
 /// The `RangeProof` struct represents a single range proof.
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -98,8 +94,8 @@ impl RangeProof {
         let zz = z * z;
 
         // Compute l, r
-        let mut l_poly = VecPoly2::zero(n);
-        let mut r_poly = VecPoly2::zero(n);
+        let mut l_poly = util::VecPoly2::zero(n);
+        let mut r_poly = util::VecPoly2::zero(n);
         let mut exp_y = Scalar::one(); // start at y^0 = 1
         let mut exp_2 = Scalar::one(); // start at 2^0 = 1
 
@@ -266,37 +262,6 @@ fn delta(n: usize, y: &Scalar, z: &Scalar) -> Scalar {
     let zz = z * z;
 
     (z - zz) * sum_of_powers_of_y - z * zz * sum_of_powers_of_2
-}
-
-impl VecPoly2 {
-    pub fn zero(n: usize) -> VecPoly2 {
-        VecPoly2(vec![Scalar::zero(); n], vec![Scalar::zero(); n])
-    }
-
-    pub fn inner_product(&self, rhs: &VecPoly2) -> PolyDeg3 {
-        // Uses Karatsuba's method
-        let l = self;
-        let r = rhs;
-
-        let t0 = inner_product(&l.0, &r.0);
-        let t2 = inner_product(&l.1, &r.1);
-
-        let l0_plus_l1 = util::add_vec(&l.0, &l.1);
-        let r0_plus_r1 = util::add_vec(&r.0, &r.1);
-
-        let t1 = inner_product(&l0_plus_l1, &r0_plus_r1) - t0 - t2;
-
-        PolyDeg3(t0, t1, t2)
-    }
-
-    pub fn eval(&self, x: Scalar) -> Vec<Scalar> {
-        let n = self.0.len();
-        let mut out = vec![Scalar::zero(); n];
-        for i in 0..n {
-            out[i] += self.0[i] + self.1[i] * x;
-        }
-        out
-    }
 }
 
 #[cfg(test)]
