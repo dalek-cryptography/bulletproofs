@@ -124,7 +124,7 @@ impl Proof {
     }
 
     /// Computes three vectors of verification scalars \\([u\_{i}^{2}]\\), \\([u\_{i}^{-2}]\\) and \\([s\_{i}]\\) for combined multiscalar multiplication
-    /// in a parent protocol. See [inner product protocol notes](index.html#delaying-multiplication) for details.
+    /// in a parent protocol. See [inner product protocol notes](index.html#verification-equation) for details.
     pub(crate) fn verification_scalars(
         &self,
         transcript: &mut ProofTranscript,

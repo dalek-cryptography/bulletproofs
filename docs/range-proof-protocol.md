@@ -18,11 +18,11 @@ Prover’s algorithm
 ------------------
 
 The protocol begins by computing three commitments: to the value \\(v\\),
-to the bits of that value \\(\mathbf{a}\_{L,R}\\),
-and to the per-bit blinding factors \\(\mathbf{s}\_{L,R}\\).
+to the bits of that value \\(\mathbf{a}\_{L}, \mathbf{a}\_{R}\\),
+and to the per-bit blinding factors \\(\mathbf{s}\_{L}, \mathbf{s}\_{R}\\).
 
 Each bit \\(a_i\\) is committed twice: as \\(a\_{L,i} \gets a\_i\\) and as \\(a\_{R,i} \gets a_i - 1\\).
-Similarly for the blinding factors \\(\mathbf{s}\_{L,R}\\).
+Similarly for the blinding factors \\(\mathbf{s}\_{L}, \mathbf{s}\_{R}\\).
 
 \\[
 \begin{aligned}
@@ -31,10 +31,10 @@ A &\gets \operatorname{Com}({\mathbf{a}}\_{L}, {\mathbf{a}}\_{R}) && = {\langle 
 S &\gets \operatorname{Com}({\mathbf{s}}\_{L}, {\mathbf{s}}\_{R}) && = {\langle {\mathbf{s}}\_L, {\mathbf{G}} \rangle} + {\langle {\mathbf{s}}\_R, {\mathbf{H}} \rangle} + {\widetilde{s}} {\widetilde{B}} \\\\
 \end{aligned}
 \\] where \\(\widetilde{v}, \widetilde{a}, \widetilde{s}\\) are sampled randomly
-from \\({\mathbb Z\_p}\\) and \\(\mathbf{s}\_{L,R}\\) are sampled randomly from \\({\mathbb Z\_p}^{n}\\).
+from \\({\mathbb Z\_p}\\) and \\(\mathbf{s}\_{L}, \mathbf{s}\_{R}\\) are sampled randomly from \\({\mathbb Z\_p}^{n}\\).
 
-The prover then obtains challenge scalars \\(y,z \in {\mathbb Z\_p}\\) using a Fiat-Shamir transform,
-so that each scalar is generated as a hash of the transcript of \\(\\{V, A, S\\}\\).
+The prover adds \\(\\{V, A, S\\}\\) to the protocol transcript
+and obtains challenge scalars \\(y,z \in {\mathbb Z\_p}\\).
 
 Using the challenges and the secret vectors, the prover constructs vector polynomials:
 \\[
@@ -70,8 +70,8 @@ T\_2 &\gets \operatorname{Com}(t\_2, {\tilde{t}\_2})  && = t\_2 \cdot B + {\tild
 \end{aligned}
 \\] where \\(\tilde{t}\_1, \tilde{t}\_2\\) are sampled randomly from \\({\mathbb Z\_p}\\).
 
-The prover then obtains a challenge scalar \\(x \in {\mathbb Z\_p}\\) using a Fiat-Shamir transform
-by hashing \\(\\{T_1, T_2\\}\\) to the transcript of the protocol,
+The prover adds \\(\\{T_1, T_2\\}\\) to the protocol transcript,
+obtains a challenge scalar \\(x \in {\mathbb Z\_p}\\)
 and uses it to evaluate the polynomials \\(\\{\mathbf{l}(x), \mathbf{r}(x), t(x)\\}\\):
 \\[
 \begin{aligned}
@@ -89,11 +89,11 @@ Next, the prover computes the synthetic blinding factors:
 \end{aligned}
 \\]
 
-The prover obtains another challenge scalar \\(w \in {\mathbb Z\_p}\\) using a Fiat-Shamir transform
-by hashing \\(\\{t(x), {\tilde{t}}(x), \tilde{e}\\}\\) to the transcript of the protocol,
-and uses it to create a unique point \\(Q\\):
+The prover adds \\(\\{t(x), {\tilde{t}}(x), \tilde{e}\\}\\) to the protocol transcript,
+obtains a challenge scalar \\(w \in {\mathbb Z\_p}\\),
+and uses it to create a point \\(Q\\):
 \\[
-	Q  \gets  w \cdot B
+	Q \gets  w \cdot B
 \\]
 
 The the prover then performs the [inner product argument](../inner_product_proof/index.html) to prove the relation:
@@ -102,13 +102,7 @@ The the prover then performs the [inner product argument](../inner_product_proof
   ({\mathbf{G}}, {\mathbf{H}}' \in {\mathbb G}^n, P', Q \in {\mathbb G}; {\mathbf{l}}, {\mathbf{r}} \in {\mathbb Z\_p}^n)
   : P' = {\langle {\mathbf{l}}, {\mathbf{G}} \rangle} + {\langle {\mathbf{r}}, {\mathbf{H}}' \rangle} + {\langle {\mathbf{l}}, {\mathbf{r}} \rangle} Q
 \right\\}
-\\] where
-\\[
-\begin{aligned}
-	P' &= -{\widetilde{e}} {\widetilde{B}} + A + x S + {\langle z {\mathbf{y}}^n + z^2 {\mathbf{2}}^n, {\mathbf{H}}' \rangle} - z{\langle {\mathbf{1}}, {\mathbf{G}} \rangle} + t(x)wB; \\\\
-	{\mathbf{H}}' &= {\mathbf{y}}^{-n} \circ {\mathbf{H}}
-\end{aligned}
-\\]
+\\] where \\({\mathbf{H}}' = {\mathbf{y}}^{-n} \circ {\mathbf{H}}\\).
 
 The result of the inner product proof is a list of \\(2k\\) points and \\(2\\) scalars: \\(\\{L\_k, R\_k, \\dots, L\_1, R\_1, a, b\\}\\).
 
@@ -121,37 +115,57 @@ The complete range proof consists of \\(9+2k\\) 32-byte elements:
 Verifier’s algorithm
 --------------------
 
-Verifier’s input is the range size \\(n\\) (in bits), value commitment \\(V\\), and \\(32 \cdot (9 + 2 \lg n)\\) bytes of the proof data:
+Verifier’s input is the range size \\(n = 2^k\\) (in bits), value commitment \\(V\\), and \\(32 \cdot (9 + 2 k)\\) bytes of the proof data:
 \\[
-  \\{A, S, T_1, T_2, t(x), {\tilde{t}}(x), \tilde{e}, L\_{\lg n}, R\_{\lg n}, \\dots, L\_1, R\_1, a, b\\}
+  \\{A, S, T_1, T_2, t(x), {\tilde{t}}(x), \tilde{e}, L\_{k}, R\_{k}, \\dots, L\_1, R\_1, a, b\\}
 \\]
 
 Verifier uses Fiat-Shamir transform to obtain challenges by hashing the appropriate data sequentially into the transcript of the protocol:
 
-1. \\(\\{V, A, S\\}\\) are hashed to obtain challenge scalars \\(y,z \in {\mathbb Z\_p}\\),
-2. \\(\\{T_1, T_2\\}\\) are hashed to obtain a challenge \\(x \in {\mathbb Z\_p}\\),
-3. \\(\\{t(x), {\tilde{t}}(x), \tilde{e}\\}\\) are hased to obtain a challenge \\(w \in {\mathbb Z\_p}\\).
+1. \\(V, A, S\\) are hashed to obtain challenge scalars \\(y,z \in {\mathbb Z\_p}\\),
+2. \\(T_1, T_2\\) are hashed to obtain a challenge \\(x \in {\mathbb Z\_p}\\),
+3. \\(t(x), {\tilde{t}}(x), \tilde{e}\\) are hased to obtain a challenge \\(w \in {\mathbb Z\_p}\\).
 
 Verifier computes the following scalars for the [inner product argument](../inner_product_proof/index.html):
 
 \\[
-	\\{x\_{1}^{2}, x\_{1}^{-2}, \dots, x\_{\lg n}^{2}, x\_{\lg n}^{-2}, s_0, \dots, s_{n-1}\\}
+	\\{u\_{1}^{2}, \dots, u\_{k}^{2}, u\_{1}^{-2}, \dots, u\_{k}^{-2}, s_0, \dots, s_{n-1}\\}
 \\]
 
-The goal is to verify these two equations:
+The goal of the verifier is to check two equations:
 
-\\[
-\begin{aligned}
- \-{\widetilde{e}} {\widetilde{B}} + A + x S + {\langle z {\mathbf{y}}^n + z^2 {\mathbf{2}}^n, {\mathbf{y}}^{-n} \circ {\mathbf{H}} \rangle} - z{\langle {\mathbf{1}}, {\mathbf{G}} \rangle} + t(x)wB \stackrel{?}{=}\\\\
-\stackrel{?}{=} {\langle a \cdot {\mathbf{s}}, {\mathbf{G}} \rangle} + {\langle b /{\mathbf{s}}, {\mathbf{y}}^{-n} \circ {\mathbf{H}} \rangle} + abwB - \sum\_{j=1}^{k} \left( L\_{j} x\_{j}^{2} + x\_{j}^{-2} R\_{j} \right)\\\\
-t(x) B + {\tilde{t}}(x) {\widetilde{B}} \stackrel{?}{=} z^2 V + \delta(y,z) B + x T\_{1} + x^{2} T\_{2}
-\end{aligned}
-\\] where \\(\delta(y,z) = (z - z^{2}) \langle 1, {\mathbf{y}}^{n} \rangle + z^{3} \langle \mathbf{1}, {\mathbf{2}}^{n} \rangle\\).
+1. First, verify the constant term of the polynomial \\(t(x)\\) (see [notes](../notes/index.html#proving-that-t_0-is-correct)):
+
+  \\[
+  t(x) B + {\tilde{t}}(x) {\widetilde{B}} \stackrel{?}{=} z^2 V + \delta(y,z) B + x T\_{1} + x^{2} T\_{2}.
+  \\]
+  where \\(\delta(y,z) = (z - z^{2}) \langle 1, {\mathbf{y}}^{n} \rangle + z^{3} \langle \mathbf{1}, {\mathbf{2}}^{n} \rangle\\).
+
+  Rewriting as a comparison with the identity point:
+  \\[
+  0 \stackrel{?}{=} z^2 V + \delta(y,z) B + x T\_{1} + x^{2} T\_{2} - t(x) B - {\tilde{t}}(x) {\widetilde{B}}.
+  \\]
+
+2. Second, verify the inner product argument for the vectors \\(\mathbf{l}(x), \mathbf{r}(x)\\) that form the \\(t(x)\\) (see [inner-product protocol](../inner_product_proof/index.html#verification-equation))
+  
+  \\[
+  P' \overset ? = {\langle a \cdot {\mathbf{s}}, {\mathbf{G}} \rangle} + {\langle {\mathbf{y}^{-n}} \circ (b /{\mathbf{s}}), {\mathbf{H}} \rangle} + abQ - \sum\_{j=1}^{k} \left( L\_{j} u\_{j}^{2} + u\_{j}^{-2} R\_{j} \right).
+  \\]
+
+  Rewriting as a comparison with the identity point and expanding \\(Q = wB\\) and \\(P' = P + t(x) wB\\) as [needed for transition to the inner-product protocol](../notes/index.html#inner-product-proof):
+  
+  \\[
+  0 \overset ? = P + t(x) wB - {\langle a \cdot {\mathbf{s}}, {\mathbf{G}} \rangle} - {\langle {\mathbf{y}^{-n}} \circ (b /{\mathbf{s}}), {\mathbf{H}} \rangle} - abwB + \sum\_{j=1}^{k} \left( L\_{j} u\_{j}^{2} + u\_{j}^{-2} R\_{j} \right),
+  \\]
+  where the [definition](../notes/index.html#proving-that-mathbflx-mathbfrx-are-correct) of \\(P\\) is:
+  \\[
+  P  = -{\widetilde{e}} {\widetilde{B}} + A + x S + {\langle z {\mathbf{1}} + z^2 {\mathbf{y}^{-n}} \circ {\mathbf{2}}^n, {\mathbf{H}} \rangle} - z{\langle {\mathbf{1}}, {\mathbf{G}} \rangle}.
+\\]
 
 Verifier combines two equations in one by sampling a random factor \\(c \\; {\xleftarrow{\\$}} \\; {\mathbb Z\_p}\\),
-multiplying the second equation by \\(c\\), and adding it to the first equation.
+multiplying the first equation by \\(c\\), and adding it with the second equation.
 
-Finally, verifier groups all scalars per each point and performs a single multiscalar multiplication over \\((7 + 2n + 2\\lg n)\\) points:
+Finally, verifier groups all scalars per each point and performs a single multiscalar multiplication over \\((7 + 2n + 2k)\\) points:
 
 \\[
 \begin{aligned}
@@ -163,9 +177,9 @@ Finally, verifier groups all scalars per each point and performs a single multis
                       + & \quad \Big(w \big(t(x) - ab\big) + c \big(\delta(y,z) - t(x)\big) \Big) \cdot B\\\\
                       + & \quad (-{\widetilde{e}} - c{\tilde{t}}(x)) \cdot \widetilde{B} \\\\
                       + & \quad {\langle {-z\mathbf{1} - a\mathbf{s}}, {\mathbf{G}} \rangle}\\\\
-                      + & \quad {\langle {z\mathbf{1} + {\mathbf{y}}^{-n} \circ (x^2\mathbf{2}^n - b/{\mathbf{s}})}, {\mathbf{H}} \rangle}\\\\
-                      + & \quad {\langle [x_{1}^2,    \dots, x_{\lg n}^2    ], [L_1, \dots, L_{\lg n}] \rangle}\\\\
-                      + & \quad {\langle [x_{1}^{-2}, \dots, x_{\lg n}^{-2} ], [R_1, \dots, R_{\lg n}] \rangle}
+                      + & \quad {\langle {z\mathbf{1} + {\mathbf{y}}^{-n} \circ (z^2\mathbf{2}^n - b/{\mathbf{s}})}, {\mathbf{H}} \rangle}\\\\
+                      + & \quad {\langle [x_{1}^2,    \dots, x_{k}^2    ], [L_1, \dots, L_{k}] \rangle}\\\\
+                      + & \quad {\langle [x_{1}^{-2}, \dots, x_{k}^{-2} ], [R_1, \dots, R_{k}] \rangle}
 \end{aligned}
 \\] where \\(1/{\mathbf{s}}\\) are inverses of \\(\mathbf{s}\\), computed as a reversed list of \\(\mathbf{s}\\).
 

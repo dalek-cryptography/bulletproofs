@@ -113,11 +113,14 @@ Since \\(H\\) is computed similarly, but with the roles of
 \\({\mathbf{H}}\_{\operatorname{lo}}\\) and
 \\({\mathbf{H}}\_{\operatorname{hi}}\\) reversed, a similar argument shows
 that \\(H = {\langle 1/{\mathbf{s}}, {\mathbf{H}} \rangle}\\).
-Notice that
-if \\(i'\\) is the bitwise NOT of \\(i\\), then \\(s\_{i'} =
-1/s\_{i}\\), so the vector of inverses \\(1/{\mathbf{s}}\\) is a reversed
+
+Notice that if \\(i'\\) is the bitwise \\(\texttt{NOT}\\) of \\(i\\), then \\(s\_{i'} = 1/s\_{i}\\),
+and as \\(i\\) runs from \\(0\\) to \\((2^k - 1)\\), \\(i'\\) runs from \\((2^k - 1)\\) to \\(0\\),
+so the vector of inverses \\(1/{\mathbf{s}}\\) is a reversed
 vector \\({\mathbf{s}}\\) and no additional computation is required to
 obtain the \\(1/s\_{i}\\).
+
+### Verification equation
 
 The verifier’s computation then becomes
 \\[
@@ -129,30 +132,10 @@ P' \overset ? =& aG +bH +abQ - \sum\_{j=1}^{k} \left( L\_{j} u\_{j}^{2} + u\_{j}
 a single multiscalar multiplication with
 \\(n + n + 1 + k + k = 2(n+k) + 1\\) points.
 
-Delaying multiplication
------------------------
-
-Inner product argument can be verified more efficient if the above multiplication
-is performed as a part of a larger multiscalar multiplication in the parent protocol.
-
-Lets rewrite the above equation:
-\\[
-\begin{aligned}
-P' \quad \stackrel{?}{=} & && \quad ab      \cdot Q \\\\
-                      &&+ & \quad {\langle a \cdot {\mathbf{s}}, {\mathbf{G}} \rangle}\\\\
-                      &&+ & \quad {\langle b /{\mathbf{s}}, {\mathbf{H}} \rangle}\\\\
-                      &&\- & \quad {\langle [u\_{1}^2,    \dots, u\_{k}^2    ], [L_1, \dots, L_{k}] \rangle}\\\\
-                      &&\- & \quad {\langle [u\_{1}^{-2}, \dots, u\_{k}^{-2} ], [R_1, \dots, R_{k}] \rangle}
-\end{aligned}
-\\] where \\(1/{\mathbf{s}}\\) are inverses of \\(\mathbf{s}\\), computed as a reversed list of \\(\mathbf{s}\\).
-
-The parent protocol already has \\(\\{a, b, P', Q, \mathbf{G}, \mathbf{H}, L\_{k}, R\_{k}, \\dots, L\_1, R\_1\\}\\),
-so the verifier needs to compute and provide only the following scalars to the parent protocol:
+In order to combine the computation above with other checks in a parent protocol, we can provide these scalars:
 
 \\[
-  \\{u\_{1}^{2}, u\_{1}^{-2}, \dots, u\_{k}^{2}, u\_{k}^{-2}, s_0, \dots, s_{n-1}\\}.
+  \\{u\_{1}^{2}, \dots, u\_{k}^{2}, u\_{1}^{-2}, \dots, u\_{k}^{-2}, s_0, \dots, s_{n-1}\\}.
 \\]
 
-Use the [`Proof::verification_scalars`] method to produce these scalars for a given inner product proof.
-
-[`Proof::verification_scalars`]: struct.Proof.html#method.verification_scalars
+Use the [`Proof::verification_scalars`](struct.Proof.html#method.verification_scalars) method to produce these scalars for a given inner product proof.
