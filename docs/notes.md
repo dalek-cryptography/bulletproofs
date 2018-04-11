@@ -87,7 +87,7 @@ The variable renaming is as follows:
 \end{aligned}
 \\]
 
-Range Proofs from Inner Products
+Range Proofs from inner products
 ================================
 
 The goal of a *range proof* is for a prover to convince a verifier
@@ -313,7 +313,7 @@ The commitments \\(V\\), \\(T\_{1}\\), \\(T\_{2}\\) are related to each other an
 \begin{aligned}
   t(x) B                     &\quad &= \quad & z^{2}vB                     & \quad &+ \quad & \delta(y,z) B  & \quad &+ \quad& x t\_{1} B                     &\quad &+\quad & x^2 t\_{2} B \\\\
     +                        &\quad &  \quad &  +                          & \quad &  \quad &  +             & \quad &  \quad& +                             &\quad & \quad & +   \\\\
-  {\widetilde{t}}(x) {\widetilde{B}} &\quad &= \quad & z^2 {\widetilde{v}} {\widetilde{B}} & \quad &+ \quad & 0 {\widetilde{B}}  & \quad &+ \quad& x {\widetilde{t}}\_{1} {\widetilde{B}} &\quad &+\quad & x^{2} {\widetilde{t}}\_{2} {\widetilde{B}} \\\\
+  {\tilde{t}}(x) {\widetilde{B}} &\quad &= \quad & z^2 {\widetilde{v}} {\widetilde{B}} & \quad &+ \quad & 0 {\widetilde{B}}  & \quad &+ \quad& x {\tilde{t}}\_{1} {\widetilde{B}} &\quad &+\quad & x^{2} {\tilde{t}}\_{2} {\widetilde{B}} \\\\
     \shortparallel           &\quad &  \quad & \shortparallel              & \quad &  \quad & \shortparallel & \quad &  \quad& \shortparallel                &\quad & \quad & \shortparallel   \\\\
                  &\quad &= \quad & z V                         & \quad &+ \quad & \delta(y,z) B  & \quad &+ \quad& x T\_{1}                       &\quad &+\quad & x^{2} T\_{2}
 \end{aligned}
@@ -321,17 +321,17 @@ The commitments \\(V\\), \\(T\_{1}\\), \\(T\_{2}\\) are related to each other an
 Notice that the sum of each column is a commitment to the variable in the top
 row using the blinding factor in the second row.
 The sum of all of the columns is
-\\(t(x) B + {\widetilde{t}}(x) {\widetilde{B}}\\), a commitment to the value
+\\(t(x) B + {\tilde{t}}(x) {\widetilde{B}}\\), a commitment to the value
 of \\(t\\) at the point \\(x\\), using the synthetic blinding factor[^1]
 \\[
-  {\widetilde{t}}(x) = z^{2} {\widetilde{v}} + x {\widetilde{t}}\_{1} + x^{2} {\widetilde{t}}\_{2}.
+  {\tilde{t}}(x) = z^{2} {\tilde{v}} + x {\tilde{t}}\_{1} + x^{2} {\tilde{t}}\_{2}.
 \\]
 To convince the verifier that
 \\(t(x) = z^2v + \delta(y,z) + t\_{1} x + t\_{2} x^{2}\\), the prover sends
-the opening \\(t(x), {\widetilde{t}}(x)\\) to the verifier, who uses the
+the opening \\(t(x), {\tilde{t}}(x)\\) to the verifier, who uses the
 bottom row of the diagram to check consistency:
 \\[
-  t(x) B + {\widetilde{t}}(x) {\widetilde{B}} \stackrel{?}{=} z V + \delta(y,z) B + x T\_{1} + x^{2} T\_{2}. 
+  t(x) B + {\tilde{t}}(x) {\widetilde{B}} \stackrel{?}{=} z^2 V + \delta(y,z) B + x T\_{1} + x^{2} T\_{2}.
 \\]
 
 [^1]: The blinding factor is synthetic in the sense that it is
@@ -406,7 +406,10 @@ To convince the verifier that
 sends \\({\widetilde{e}}\\) to the verifier, who uses the bottom row
 to compute
 \\[
-  P = -{\widetilde{e}} {\widetilde{B}} + A + x S + {\langle z {\mathbf{y}}^n + z^2 {\mathbf{2}}^n, {\mathbf{H}}' \rangle} - z{\langle {\mathbf{1}}, {\mathbf{G}} \rangle}; 
+\begin{aligned}
+  P &= -{\widetilde{e}} {\widetilde{B}} + A + x S + {\langle z {\mathbf{y}}^n + z^2 {\mathbf{2}}^n, {\mathbf{H}}' \rangle} - z{\langle {\mathbf{1}}, {\mathbf{G}} \rangle}\\\\
+    &= -{\widetilde{e}} {\widetilde{B}} + A + x S + {\langle z {\mathbf{1}} + z^2 {\mathbf{y}^{-n}} \circ {\mathbf{2}}^n, {\mathbf{H}} \rangle} - z{\langle {\mathbf{1}}, {\mathbf{G}} \rangle};
+\end{aligned}
 \\]
 if the prover is honest, this is
 \\(P = {\langle {\mathbf{l}}(x), {\mathbf{G}} \rangle} + {\langle {\mathbf{r}}(x), {\mathbf{H}}' \rangle}\\),
@@ -414,7 +417,7 @@ so the verifier uses \\(P\\), \\(t(x)\\) as inputs to the inner-product protocol
 to prove that
 \\(t(x) = {\langle {\mathbf{l}}(x), {\mathbf{r}}(x) \rangle}\\).
 
-Inner-Product Proof
+Inner-product proof
 ===================
 
 First, let’s observe that the prover can simply send vectors
@@ -454,28 +457,28 @@ for the following relation:
     c &{}={}&& {\langle {\mathbf{a}}, {\mathbf{b}} \rangle}
 \end{aligned}
 \\]
-let’s compress these two statements into one equation using an
+Let’s compress these two statements into one equation using an
 indeterminate variable \\(w \in {\mathbb Z\_{p}^{\times}}\\) and multiplying the
-second equation by an additional orthogonal generator
-\\(Q \in {\mathbb G}\\):
+second equation by an orthogonal generator
+\\(B \in {\mathbb G}\\):
 \\[
 \begin{aligned}
     P &{}={}&& {\langle {\mathbf{a}}, {\mathbf{G}} \rangle} + {\langle {\mathbf{b}}, {\mathbf{H}} \rangle}\\\\
       &{}+{}&&\\\\
-    c \cdot w \cdot Q &{}={}&&  {\langle {\mathbf{a}}, {\mathbf{b}} \rangle} \cdot w \cdot Q
+    c w B &{}={}&&  {\langle {\mathbf{a}}, {\mathbf{b}} \rangle} w B
 \end{aligned}
 \\]
-let’s simplify the resulting equation using the following definitions:
+Let’s simplify the resulting equation using the following definitions:
 \\[
 \begin{aligned}
     k &= \lg n \\\\
-    P\_k &= P + c \cdot w \cdot Q \\\\
-    \hat{Q} &= w \cdot Q
+    P' &= P + cwB \\\\
+    Q &= wB
 \end{aligned}
 \\]
 The equation becomes:
 \\[
-    P\_k = {\langle {\mathbf{a}}, {\mathbf{G}} \rangle} + {\langle {\mathbf{b}}, {\mathbf{H}} \rangle} + {\langle {\mathbf{a}}, {\mathbf{b}} \rangle} \cdot \hat{Q} 
+    P' = {\langle {\mathbf{a}}, {\mathbf{G}} \rangle} + {\langle {\mathbf{b}}, {\mathbf{H}} \rangle} + {\langle {\mathbf{a}}, {\mathbf{b}} \rangle} Q 
 \\]
 The combined equation is useful because it will allow us
 to compress each vector in half and arrive to the same form. By doing
@@ -483,16 +486,13 @@ such compression \\(\lg n\\) times we will end up with an equation where
 both vectors are one-element long and we can simply transmit them to
 check the final equality directly.
 
-If the prover can demonstrate that the above \\(P\_k\\) has such structure
-over generators \\({\mathbf{G}}\\), \\({\mathbf{H}}\\) and \\(\hat Q\\) for all
+If the prover can demonstrate that the above \\(P'\\) has such structure
+over generators \\({\mathbf{G}}\\), \\({\mathbf{H}}\\) and \\(Q\\) for all
 \\(w \in {\mathbb Z\_{p}^{*}}\\), then the original \\(P\\) and \\(c\\) must satisfy
 the original relation
-\\[
-\begin{aligned}
-    P = {\langle {\mathbf{a}}, {\mathbf{G}} \rangle} + {\langle {\mathbf{b}}, {\mathbf{H}} \rangle} \wedge
-    c = {\langle {\mathbf{a}}, {\mathbf{b}} \rangle}
-\end{aligned}
-\\]
+\\((P = {\langle {\mathbf{a}}, {\mathbf{G}} \rangle} + {\langle {\mathbf{b}}, {\mathbf{H}} \rangle}
+\wedge c = {\langle {\mathbf{a}}, {\mathbf{b}} \rangle})\\).
+
 Let’s introduce an indeterminate variable \\(u\_k \in {\mathbb Z\_{p}^{\times}}\\)
 and compress the vectors by adding the left and the right halves
 separated by the variable \\(u\_k\\):
@@ -507,9 +507,9 @@ separated by the variable \\(u\_k\\):
 The powers of \\(u\_k\\) are chosen so they cancel out in the
 inner products of interest as will be shown below.
 
-Let’s now define \\(P\_{k-1}\\) using the same equation as for \\(P_k\\), but using the compressed vectors:
+Let \\(P\_k = P'\\) and define \\(P\_{k-1}\\) using the same equation as for \\(P\_k\\), but using the compressed vectors:
 \\[
-    P\_{k-1} = {\langle {\mathbf{a}}^{(k-1)}, {\mathbf{G}}^{(k-1)} \rangle} + {\langle {\mathbf{b}}^{(k-1)}, {\mathbf{H}}^{(k-1)} \rangle} + {\langle {\mathbf{a}}^{(k-1)}, {\mathbf{b}}^{(k-1)} \rangle} \cdot \hat{Q} 
+    P\_{k-1} = {\langle {\mathbf{a}}^{(k-1)}, {\mathbf{G}}^{(k-1)} \rangle} + {\langle {\mathbf{b}}^{(k-1)}, {\mathbf{H}}^{(k-1)} \rangle} + {\langle {\mathbf{a}}^{(k-1)}, {\mathbf{b}}^{(k-1)} \rangle} \cdot Q
 \\]
 Expanding it in terms of the original \\({\mathbf{a}}\\), \\({\mathbf{b}}\\),
 \\({\mathbf{G}}\\) and \\({\mathbf{H}}\\) gives:
@@ -517,7 +517,7 @@ Expanding it in terms of the original \\({\mathbf{a}}\\), \\({\mathbf{b}}\\),
 \begin{aligned}
     P\_{k-1} &{}={}& &{\langle {\mathbf{a}}\_L \cdot u\_k   + u\_k^{-1} \cdot {\mathbf{a}}\_R, {\mathbf{G}}\_L \cdot u^{-1}\_k + u\_k \cdot {\mathbf{G}}\_R      \rangle} + \\\\
              &&  &{\langle {\mathbf{b}}\_L \cdot u^{-1}\_k  + u\_k \cdot {\mathbf{b}}\_R,      {\mathbf{H}}\_L \cdot u\_k      + u^{-1}\_k \cdot {\mathbf{H}}\_R \rangle} + \\\\
-             &&  &{\langle {\mathbf{a}}\_L \cdot u\_k       + u^{-1}\_k \cdot {\mathbf{a}}\_R,      {\mathbf{b}}\_L \cdot u^{-1}\_k + u\_k \cdot {\mathbf{b}}\_R      \rangle} \cdot \hat{Q}
+             &&  &{\langle {\mathbf{a}}\_L \cdot u\_k       + u^{-1}\_k \cdot {\mathbf{a}}\_R,      {\mathbf{b}}\_L \cdot u^{-1}\_k + u\_k \cdot {\mathbf{b}}\_R      \rangle} \cdot Q
 \end{aligned}
 \\]
 Breaking down in simpler products:
@@ -525,7 +525,7 @@ Breaking down in simpler products:
 \begin{aligned}
     P\_{k-1} &{}={}& &{\langle {\mathbf{a}}\_L, {\mathbf{G}}\_L \rangle} + {\langle {\mathbf{a}}\_R, {\mathbf{G}}\_R \rangle} &{}+{}& u\_k^2 {\langle {\mathbf{a}}\_L, {\mathbf{G}}\_R \rangle} + u^{-2}\_k {\langle {\mathbf{a}}\_R, {\mathbf{G}}\_L \rangle} + \\\\
        &&      &{\langle {\mathbf{b}}\_L, {\mathbf{H}}\_L \rangle} + {\langle {\mathbf{b}}\_R, {\mathbf{H}}\_R \rangle} &{}+{}& u^2\_k {\langle {\mathbf{b}}\_R, {\mathbf{H}}\_L \rangle} + u^{-2}\_k {\langle {\mathbf{b}}\_L, {\mathbf{H}}\_R \rangle} + \\\\
-       &&      &({\langle {\mathbf{a}}\_L, {\mathbf{b}}\_L \rangle} + {\langle {\mathbf{a}}\_R, {\mathbf{b}}\_R \rangle})\cdot \hat{Q} &{}+{}& (u^2\_k {\langle {\mathbf{a}}\_L, {\mathbf{b}}\_R \rangle} + u^{-2}\_k {\langle {\mathbf{a}}\_R, {\mathbf{b}}\_L \rangle}) \cdot \hat{Q}
+       &&      &({\langle {\mathbf{a}}\_L, {\mathbf{b}}\_L \rangle} + {\langle {\mathbf{a}}\_R, {\mathbf{b}}\_R \rangle})\cdot Q &{}+{}& (u^2\_k {\langle {\mathbf{a}}\_L, {\mathbf{b}}\_R \rangle} + u^{-2}\_k {\langle {\mathbf{a}}\_R, {\mathbf{b}}\_L \rangle}) \cdot Q
 \end{aligned}
 \\]
 We now see that the left two columns in the above equation is the
@@ -535,8 +535,8 @@ terms with \\(u^2\_k\\) as \\(L\_k\\) and all terms with \\(u^{-2}\_k\\) as \\(R
 \\[
 \begin{aligned}
     P\_{k-1} &= P\_k + u^2\_k \cdot L\_k + u^{-2}\_k \cdot R\_k\\\\
-    L\_k  &= {\langle {\mathbf{a}}\_L, {\mathbf{G}}\_R \rangle} + {\langle {\mathbf{b}}\_R, {\mathbf{H}}\_L \rangle} + {\langle {\mathbf{a}}\_L, {\mathbf{b}}\_R \rangle} \cdot \hat{Q}\\\\
-    R\_k  &= {\langle {\mathbf{a}}\_R, {\mathbf{G}}\_L \rangle} + {\langle {\mathbf{b}}\_L, {\mathbf{H}}\_R \rangle} + {\langle {\mathbf{a}}\_R, {\mathbf{b}}\_L \rangle} \cdot \hat{Q}
+    L\_k  &= {\langle {\mathbf{a}}\_L, {\mathbf{G}}\_R \rangle} + {\langle {\mathbf{b}}\_R, {\mathbf{H}}\_L \rangle} + {\langle {\mathbf{a}}\_L, {\mathbf{b}}\_R \rangle} \cdot Q\\\\
+    R\_k  &= {\langle {\mathbf{a}}\_R, {\mathbf{G}}\_L \rangle} + {\langle {\mathbf{b}}\_L, {\mathbf{H}}\_R \rangle} + {\langle {\mathbf{a}}\_R, {\mathbf{b}}\_L \rangle} \cdot Q
 \end{aligned}
 \\]
 If the prover commits to \\(L\_k\\) and \\(R\_k\\) before \\(u\_k\\) is randomly
@@ -549,10 +549,20 @@ variable \\(u\_{k-1}\\) in the same way as we used \\(u\_k\\) and arrive
 to even shorter vectors. We will continue doing so until we end up with
 vectors
 \\({\mathbf{a}}^{(0)}, {\mathbf{b}}^{(0)}, {\mathbf{G}}^{(0)}, {\mathbf{H}}^{(0)}\\),
-each containing one item:
+each containing one item, and \\(P\_0\\) containing all accumulated cross-terms at each step:
 \\[
-    P\_0 = a^{(0)}\_0 \cdot G^{(0)}\_0 + b^{(0)}\_0 \cdot H^{(0)}\_0 + a^{(0)}\_0 \cdot b^{(0)}\_0 \cdot \hat{Q} 
+\begin{aligned}
+    P\_0 &= a^{(0)}\_0 G^{(0)}\_0 + b^{(0)}\_0 H^{(0)}\_0 + a^{(0)}\_0 b^{(0)}\_0 Q\\\\
+    P\_0 &= P\_k + \sum\_{j=1}^{k} \left( L\_{j} u\_{j}^{2} + u\_{j}^{-2} R\_{j} \right)
+\end{aligned}
 \\]
+
+Rewriting the above with the definitions \\(P\_k = P' = P + cwB\\) and \\(Q = wB\\) gives the
+final statement:
+\\[
+    P + c w B = a^{(0)}\_0 G^{(0)}\_0 + b^{(0)}\_0 H^{(0)}\_0 + a^{(0)}\_0 b^{(0)}\_0 wB - \sum\_{j=1}^{k} \left( L\_{j} u\_{j}^{2} + u\_{j}^{-2} R\_{j} \right)
+\\]
+
 At this point the prover can transmit two scalars \\(a^{(0)}\_0\\) and
 \\(b^{(0)}\_0\\) to the verifier, so they check the final statement directly
 by computing both sides of the equation.
