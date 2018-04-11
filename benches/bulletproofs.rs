@@ -8,6 +8,7 @@ use rand::{OsRng, Rng};
 
 extern crate curve25519_dalek;
 use curve25519_dalek::scalar::Scalar;
+use curve25519_dalek::ristretto;
 
 extern crate ristretto_bulletproofs;
 use ristretto_bulletproofs::{PedersenGenerators, Generators};
@@ -47,6 +48,8 @@ fn bench_verify_helper(n: usize, c: &mut Criterion) {
         let v: u64 = rng.gen_range(0, (1 << (n - 1)) - 1);
         let v_blinding = Scalar::random(&mut rng);
 
+        let vc = ristretto::multiscalar_mul(&[Scalar::from_u64(v), v_blinding], &[*generators.share(0).B, *generators.share(0).B_blinding]);
+
         let rp = RangeProof::generate_proof(
             generators.share(0),
             &mut transcript,
@@ -60,7 +63,7 @@ fn bench_verify_helper(n: usize, c: &mut Criterion) {
             // Each verification requires a clean transcript.
             let mut transcript = ProofTranscript::new(b"RangeproofTest");
 
-            rp.verify(generators.share(0), &mut transcript, &mut rng, n)
+            rp.verify(&vc, generators.share(0), &mut transcript, &mut rng, n)
         });
     });
 }

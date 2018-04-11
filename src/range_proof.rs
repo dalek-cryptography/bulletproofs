@@ -28,10 +28,6 @@ struct VecPoly2(Vec<Scalar>, Vec<Scalar>);
 /// The `RangeProof` struct represents a single range proof.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct RangeProof {
-    /// Commitment to the value
-    // XXX this should not be included, so that we can prove about existing commitments
-    // included for now so that it's easier to test
-    V: RistrettoPoint,
     /// Commitment to the bits of the value
     A: RistrettoPoint,
     /// Commitment to the blinding factors
@@ -161,7 +157,6 @@ impl RangeProof {
         );
 
         RangeProof {
-            V,
             A,
             S,
             T_1,
@@ -175,6 +170,7 @@ impl RangeProof {
 
     pub fn verify<R: Rng>(
         &self,
+        V: &RistrettoPoint,
         gens: GeneratorsView,
         transcript: &mut ProofTranscript,
         rng: &mut R,
@@ -183,7 +179,7 @@ impl RangeProof {
         // First, replay the "interactive" protocol using the proof
         // data to recompute all challenges.
 
-        transcript.commit(self.V.compress().as_bytes());
+        transcript.commit(V.compress().as_bytes());
         transcript.commit(self.A.compress().as_bytes());
         transcript.commit(self.S.compress().as_bytes());
 
@@ -234,7 +230,7 @@ impl RangeProof {
                 .chain(x_inv_sq.iter().cloned()),
             iter::once(&self.A)
                 .chain(iter::once(&self.S))
-                .chain(iter::once(&self.V))
+                .chain(iter::once(V))
                 .chain(iter::once(&self.T_1))
                 .chain(iter::once(&self.T_2))
                 .chain(iter::once(gens.B))
@@ -355,6 +351,7 @@ mod tests {
 
         // Serialized proof data
         let proof_bytes: Vec<u8>;
+        let value_commitment: RistrettoPoint;
 
         // Prover's scope
         {
@@ -376,6 +373,9 @@ mod tests {
 
             // 2. Serialize
             proof_bytes = bincode::serialize(&range_proof).unwrap();
+
+            let gens = generators.share(0);
+            value_commitment = ristretto::multiscalar_mul(&[Scalar::from_u64(v), v_blinding], &[*gens.B, *gens.B_blinding]);
         }
 
         println!(
@@ -394,7 +394,12 @@ mod tests {
             let mut transcript = ProofTranscript::new(b"RangeproofTest");
             assert!(
                 range_proof
-                    .verify(generators.share(0), &mut transcript, &mut rng, n)
+                    .verify(
+                        &value_commitment,
+                        generators.share(0),
+                        &mut transcript,
+                        &mut rng,
+                        n)
                     .is_ok()
             );
 
@@ -402,7 +407,12 @@ mod tests {
             let mut transcript = ProofTranscript::new(b"");
             assert!(
                 range_proof
-                    .verify(generators.share(0), &mut transcript, &mut rng, n)
+                    .verify(
+                        &value_commitment,
+                        generators.share(0),
+                        &mut transcript,
+                        &mut rng,
+                        n)
                     .is_err()
             );
         }
