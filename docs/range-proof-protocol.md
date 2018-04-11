@@ -99,13 +99,13 @@ and uses it to create a unique point \\(Q\\):
 The the prover then performs the [inner product argument](../inner_product_proof/index.html) to prove the relation:
 \\[
 \operatorname{PK}\left\\{
-  ({\mathbf{G}}, {\mathbf{H}}' \in {\mathbb G}^n, P, Q \in {\mathbb G}; {\mathbf{l}}, {\mathbf{r}} \in {\mathbb Z\_p}^n)
-  : P = {\langle {\mathbf{l}}, {\mathbf{G}} \rangle} + {\langle {\mathbf{r}}, {\mathbf{H}}' \rangle} + {\langle {\mathbf{l}}, {\mathbf{r}} \rangle} Q
+  ({\mathbf{G}}, {\mathbf{H}}' \in {\mathbb G}^n, P_k, Q \in {\mathbb G}; {\mathbf{l}}, {\mathbf{r}} \in {\mathbb Z\_p}^n)
+  : P_k = {\langle {\mathbf{l}}, {\mathbf{G}} \rangle} + {\langle {\mathbf{r}}, {\mathbf{H}}' \rangle} + {\langle {\mathbf{l}}, {\mathbf{r}} \rangle} Q
 \right\\}
 \\] where
 \\[
 \begin{aligned}
-	P &= -{\widetilde{e}} {\widetilde{B}} + A + x S + {\langle z {\mathbf{y}}^n + z^2 {\mathbf{2}}^n, {\mathbf{H}}' \rangle} - z{\langle {\mathbf{1}}, {\mathbf{G}} \rangle}; \\\\
+	P_k &= -{\widetilde{e}} {\widetilde{B}} + A + x S + {\langle z {\mathbf{y}}^n + z^2 {\mathbf{2}}^n, {\mathbf{H}}' \rangle} - z{\langle {\mathbf{1}}, {\mathbf{G}} \rangle} + t(x)wB; \\\\
 	{\mathbf{H}}' &= {\mathbf{y}}^{-n} \circ {\mathbf{H}}
 \end{aligned}
 \\]

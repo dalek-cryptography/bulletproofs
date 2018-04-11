@@ -28,19 +28,19 @@ The protocol consists of \\(k = \lg n\\) rounds, indexed by
 \end{aligned}
 \\]
 and sends \\(L\_{j}, R\_{j}\\) to the verifier. The verifier responds with a
-challenge value \\(x\_{j} {\xleftarrow{\\$}}{\mathbb{Z}\_p}\\). The prover uses
-\\(x\_{j}\\) to compute
+challenge value \\(u\_{j} {\xleftarrow{\\$}}{\mathbb{Z}\_p}\\). The prover uses
+\\(u\_{j}\\) to compute
 \\[
 \begin{aligned}
-  {\mathbf{a}} &\gets {\mathbf{a}}\_{\operatorname{lo}} \cdot x\_{j} + x\_{j}^{-1} \cdot {\mathbf{a}}\_{\operatorname{hi}}, \\\\
-  {\mathbf{b}} &\gets {\mathbf{b}}\_{\operatorname{lo}} \cdot x\_{j}^{-1} + x\_{j} \cdot {\mathbf{a}}\_{\operatorname{hi}},
+  {\mathbf{a}} &\gets {\mathbf{a}}\_{\operatorname{lo}} \cdot u\_{j} + u\_{j}^{-1} \cdot {\mathbf{a}}\_{\operatorname{hi}}, \\\\
+  {\mathbf{b}} &\gets {\mathbf{b}}\_{\operatorname{lo}} \cdot u\_{j}^{-1} + u\_{j} \cdot {\mathbf{a}}\_{\operatorname{hi}},
 \end{aligned}
 \\]
 the prover and verifier both compute
 \\[
 \begin{aligned}
-  {\mathbf{G}} &\gets {\mathbf{G}}\_{\operatorname{lo}} \cdot x\_{j}^{-1} + x\_{j} \cdot {\mathbf{G}}\_{\operatorname{hi}}, \\\\
-  {\mathbf{H}} &\gets {\mathbf{H}}\_{\operatorname{lo}} \cdot x\_{j} + x\_{j}^{-1} \cdot {\mathbf{H}}\_{\operatorname{hi}},
+  {\mathbf{G}} &\gets {\mathbf{G}}\_{\operatorname{lo}} \cdot u\_{j}^{-1} + u\_{j} \cdot {\mathbf{G}}\_{\operatorname{hi}}, \\\\
+  {\mathbf{H}} &\gets {\mathbf{H}}\_{\operatorname{lo}} \cdot u\_{j} + u\_{j}^{-1} \cdot {\mathbf{H}}\_{\operatorname{hi}},
 \end{aligned}
 \\]
 and use these vectors (all of length \\(2^{j-1}\\)) for the next round.
@@ -49,14 +49,14 @@ After the last (\\(j = 1\\)) round, the prover sends
 if and only if
 \\[
 \begin{aligned}
-L\_{1} x\_{1}^{2} + \cdots + L\_{k} x\_{k}^{2} + P_k + R\_{k} x\_{k}^{-2} + \cdots + R\_{1} x\_{1}^{-2}&\overset ? = aG + bH + abQ,
+L\_{1} u\_{1}^{2} + \cdots + L\_{k} u\_{k}^{2} + P_k + R\_{k} u\_{k}^{-2} + \cdots + R\_{1} u\_{1}^{-2}&\overset ? = aG + bH + abQ,
 \end{aligned}
 \\]
 where \\(G, H = {\mathbf{G}}\_{0}, {\mathbf{H}}\_{0}\\).
 
 To make the protocol noninteractive, we replace the transmission of the
-\\(L\_{j}\\) and \\(R\_{j}\\) and the response \\(x\_{j}\\) with a Fiat-Shamir
-challenge, so that each \\(x\_{j}\\) is generated as a hash of the transcript
+\\(L\_{j}\\) and \\(R\_{j}\\) and the response \\(u\_{j}\\) with a Fiat-Shamir
+challenge, so that each \\(u\_{j}\\) is generated as a hash of the transcript
 \\(L\_{k},R\_{k},\ldots,L\_{j},R\_{j}\\). At the end of the prover’s
 computation, they send \\(a,b,L\_{k},R\_{k},\ldots,L\_{1},R\_{1}\\) to the
 verifier.
@@ -65,24 +65,24 @@ Verifier’s algorithm
 --------------------
 
 Since the final \\(G\\) and \\(H\\) values are functions of the challenges
-\\(x\_{k},\ldots,x\_{1}\\), the verifier has to compute them as part of the
+\\(u\_{k},\ldots,u\_{1}\\), the verifier has to compute them as part of the
 verification process. However, while the prover needs to compute the
 intermediate vectors \\({\mathbf{G}}\\), \\({\mathbf{H}}\\) in order to compute
 the \\(L\_{j}\\) and \\(R\_{j}\\), the verifier doesn’t, and can compute the final
 \\(G\\), \\(H\\) directly from the vectors \\({\mathbf{G}}\\), \\({\mathbf{H}}\\) and
-the challenges \\(x\_{k}, \ldots, x\_{1}\\).
+the challenges \\(u\_{k}, \ldots, u\_{1}\\).
 
 Let \\({\mathbf{G}}^{(j)}\\) be the value of \\({\mathbf{G}}\\) in the \\(j\\)-th
 round, and let \\(G\_{i}\\) be the \\(i\\)-th entry of the initial vector
 \\({\mathbf{G}}^{(k)} =
 (G\_{0}, \ldots, G\_{n-1})\\). We have \\[
 \begin{aligned}
-  {\mathbf{G}}^{(j-1)} = ({\mathbf{G}}^{(j)})\_{\operatorname{lo}} x\_{j}^{-1} + ({\mathbf{G}}^{(j)})\_{\operatorname{hi}} x\_{j},\end{aligned}
+  {\mathbf{G}}^{(j-1)} = ({\mathbf{G}}^{(j)})\_{\operatorname{lo}} u\_{j}^{-1} + ({\mathbf{G}}^{(j)})\_{\operatorname{hi}} u\_{j},\end{aligned}
 \\]
 so the coefficient of \\(G\_{i}\\) in the final \\(G\\) value is
 \\[
 \begin{aligned}
-  s\_{i} &= x\_{k}^{b(i,k)} \cdots x\_1^{b(i,1)},\end{aligned}
+  s\_{i} &= u\_{k}^{b(i,k)} \cdots u\_1^{b(i,1)},\end{aligned}
 \\] where
 \\(b(i,j)\\) is either \\(-1\\) or \\(+1\\), according to whether \\(G\_{i}\\) appears in
 the left or right half of \\({\mathbf{G}}^{(j)}\\). Since \\(G\_{i}\\) appears in
@@ -120,8 +120,8 @@ obtain the \\(1/s\_{i}\\).
 The verifier’s computation then becomes
 \\[
 \begin{aligned}
-P_k \overset ? =& aG +bH +abQ - \sum\_{j=1}^{k} \left( L\_{j} x\_{j}^{2} + x\_{j}^{-2} R\_{j} \right) \\\\
-=& {\langle a \cdot {\mathbf{s}}, {\mathbf{G}} \rangle} + {\langle b /{\mathbf{s}}, {\mathbf{H}} \rangle} + abQ - \sum\_{j=1}^{k} \left( L\_{j} x\_{j}^{2} + x\_{j}^{-2} R\_{j} \right),
+P_k \overset ? =& aG +bH +abQ - \sum\_{j=1}^{k} \left( L\_{j} u\_{j}^{2} + u\_{j}^{-2} R\_{j} \right) \\\\
+=& {\langle a \cdot {\mathbf{s}}, {\mathbf{G}} \rangle} + {\langle b /{\mathbf{s}}, {\mathbf{H}} \rangle} + abQ - \sum\_{j=1}^{k} \left( L\_{j} u\_{j}^{2} + u\_{j}^{-2} R\_{j} \right),
 \end{aligned}
 \\]
 a single multiscalar multiplication with
@@ -139,8 +139,8 @@ Lets rewrite the above equation:
 P_k \quad \stackrel{?}{=} & \quad ab      \cdot Q \\\\
                       + & \quad {\langle a \cdot {\mathbf{s}}, {\mathbf{G}} \rangle}\\\\
                       + & \quad {\langle b /{\mathbf{s}}, {\mathbf{H}} \rangle}\\\\
-                      + & \quad {\langle [x_{1}^2,    \dots, x_{k}^2    ], [L_1, \dots, L_{k}] \rangle}\\\\
-                      + & \quad {\langle [x_{1}^{-2}, \dots, x_{k}^{-2} ], [R_1, \dots, R_{k}] \rangle}
+                      + & \quad {\langle [u\_{1}^2,    \dots, u\_{k}^2    ], [L_1, \dots, L_{k}] \rangle}\\\\
+                      + & \quad {\langle [u\_{1}^{-2}, \dots, u\_{k}^{-2} ], [R_1, \dots, R_{k}] \rangle}
 \end{aligned}
 \\] where \\(1/{\mathbf{s}}\\) are inverses of \\(\mathbf{s}\\), computed as a reversed list of \\(\mathbf{s}\\).
 
@@ -148,7 +148,7 @@ The parent protocol already has \\(\\{a, b, P_k, Q, \mathbf{G}, \mathbf{H}, L\_{
 so the verifier needs to compute and provide only the following scalars to the parent protocol:
 
 \\[
-  \\{x\_{1}^{2}, x\_{1}^{-2}, \dots, x\_{k}^{2}, x\_{k}^{-2}, s_0, \dots, s_{n-1}\\}
+  \\{u\_{1}^{2}, u\_{1}^{-2}, \dots, u\_{k}^{2}, u\_{k}^{-2}, s_0, \dots, s_{n-1}\\}
 \\]
 
 
