@@ -33,7 +33,7 @@ S &\gets \operatorname{Com}({\mathbf{s}}\_{L}, {\mathbf{s}}\_{R}) && = {\langle 
 \\] where \\(\widetilde{v}, \widetilde{a}, \widetilde{s}\\) are sampled randomly
 from \\({\mathbb Z\_p}\\) and \\(\mathbf{s}\_{L}, \mathbf{s}\_{R}\\) are sampled randomly from \\({\mathbb Z\_p}^{n}\\).
 
-The prover adds \\(\\{V, A, S\\}\\) to the protocol transcript
+The prover adds \\(V, A, S\\) to the protocol transcript
 and obtains challenge scalars \\(y,z \in {\mathbb Z\_p}\\).
 
 Using the challenges and the secret vectors, the prover constructs vector polynomials:
@@ -70,9 +70,9 @@ T\_2 &\gets \operatorname{Com}(t\_2, {\tilde{t}\_2})  && = t\_2 \cdot B + {\tild
 \end{aligned}
 \\] where \\(\tilde{t}\_1, \tilde{t}\_2\\) are sampled randomly from \\({\mathbb Z\_p}\\).
 
-The prover adds \\(\\{T_1, T_2\\}\\) to the protocol transcript,
+The prover adds \\(T_1, T_2\\) to the protocol transcript,
 obtains a challenge scalar \\(x \in {\mathbb Z\_p}\\)
-and uses it to evaluate the polynomials \\(\\{\mathbf{l}(x), \mathbf{r}(x), t(x)\\}\\):
+and uses it to evaluate the polynomials \\(\mathbf{l}(x), \mathbf{r}(x), t(x)\\):
 \\[
 \begin{aligned}
   \mathbf{l}  &\gets  {\mathbf{l}}\_{0} + {\mathbf{l}}\_{1} x\\\\
@@ -89,7 +89,7 @@ Next, the prover computes the synthetic blinding factors:
 \end{aligned}
 \\]
 
-The prover adds \\(\\{t(x), {\tilde{t}}(x), \tilde{e}\\}\\) to the protocol transcript,
+The prover adds \\(t(x), {\tilde{t}}(x), \tilde{e}\\) to the protocol transcript,
 obtains a challenge scalar \\(w \in {\mathbb Z\_p}\\),
 and uses it to create a point \\(Q\\):
 \\[
@@ -120,11 +120,11 @@ Verifier’s input is the range size \\(n = 2^k\\) (in bits), value commitment \
   \\{A, S, T_1, T_2, t(x), {\tilde{t}}(x), \tilde{e}, L\_{k}, R\_{k}, \\dots, L\_1, R\_1, a, b\\}
 \\]
 
-Verifier uses Fiat-Shamir transform to obtain challenges by hashing the appropriate data sequentially into the transcript of the protocol:
+Verifier uses Fiat-Shamir transform to obtain challenges by adding the appropriate data sequentially to the protocol transcript:
 
-1. \\(V, A, S\\) are hashed to obtain challenge scalars \\(y,z \in {\mathbb Z\_p}\\),
-2. \\(T_1, T_2\\) are hashed to obtain a challenge \\(x \in {\mathbb Z\_p}\\),
-3. \\(t(x), {\tilde{t}}(x), \tilde{e}\\) are hased to obtain a challenge \\(w \in {\mathbb Z\_p}\\).
+1. \\(V, A, S\\) are added to obtain challenge scalars \\(y,z \in {\mathbb Z\_p}\\),
+2. \\(T_1, T_2\\) are added to obtain a challenge \\(x \in {\mathbb Z\_p}\\),
+3. \\(t(x), {\tilde{t}}(x), \tilde{e}\\) are added to obtain a challenge \\(w \in {\mathbb Z\_p}\\).
 
 Verifier computes the following scalars for the [inner product argument](../inner_product_proof/index.html):
 
