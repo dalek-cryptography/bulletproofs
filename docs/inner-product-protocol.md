@@ -6,8 +6,8 @@ Inner product argument protocol
 We want to prove the relation
 \\[
 \operatorname{PK}\left\\{
-  ({\mathbf{G}}, {\mathbf{H}} \in {\mathbb G}^n, P_k, Q \in {\mathbb G}; {\mathbf{a}}, {\mathbf{b}} \in {\mathbb Z\_p}^n)
-  : P_k = {\langle {\mathbf{a}}, {\mathbf{G}} \rangle} + {\langle {\mathbf{b}}, {\mathbf{H}} \rangle} + {\langle {\mathbf{a}}, {\mathbf{b}} \rangle} Q
+  ({\mathbf{G}}, {\mathbf{H}} \in {\mathbb G}^n, P', Q \in {\mathbb G}; {\mathbf{a}}, {\mathbf{b}} \in {\mathbb Z\_p}^n)
+  : P' = {\langle {\mathbf{a}}, {\mathbf{G}} \rangle} + {\langle {\mathbf{b}}, {\mathbf{H}} \rangle} + {\langle {\mathbf{a}}, {\mathbf{b}} \rangle} Q
 \right\\}
 \\] where \\(n = 2^{k}\\) is a power of \\(2\\).
 
@@ -49,7 +49,7 @@ After the last (\\(j = 1\\)) round, the prover sends
 if and only if
 \\[
 \begin{aligned}
-L\_{1} u\_{1}^{2} + \cdots + L\_{k} u\_{k}^{2} + P_k + R\_{k} u\_{k}^{-2} + \cdots + R\_{1} u\_{1}^{-2}&\overset ? = aG + bH + abQ,
+L\_{1} u\_{1}^{2} + \cdots + L\_{k} u\_{k}^{2} + P' + R\_{k} u\_{k}^{-2} + \cdots + R\_{1} u\_{1}^{-2}&\overset ? = aG + bH + abQ,
 \end{aligned}
 \\]
 where \\(G, H = {\mathbf{G}}\_{0}, {\mathbf{H}}\_{0}\\).
@@ -120,7 +120,7 @@ obtain the \\(1/s\_{i}\\).
 The verifier’s computation then becomes
 \\[
 \begin{aligned}
-P_k \overset ? =& aG +bH +abQ - \sum\_{j=1}^{k} \left( L\_{j} u\_{j}^{2} + u\_{j}^{-2} R\_{j} \right) \\\\
+P' \overset ? =& aG +bH +abQ - \sum\_{j=1}^{k} \left( L\_{j} u\_{j}^{2} + u\_{j}^{-2} R\_{j} \right) \\\\
 =& {\langle a \cdot {\mathbf{s}}, {\mathbf{G}} \rangle} + {\langle b /{\mathbf{s}}, {\mathbf{H}} \rangle} + abQ - \sum\_{j=1}^{k} \left( L\_{j} u\_{j}^{2} + u\_{j}^{-2} R\_{j} \right),
 \end{aligned}
 \\]
@@ -136,19 +136,21 @@ is performed as a part of a larger multi-scalar multiplication in the parent pro
 Lets rewrite the above equation:
 \\[
 \begin{aligned}
-P_k \quad \stackrel{?}{=} & \quad ab      \cdot Q \\\\
-                      + & \quad {\langle a \cdot {\mathbf{s}}, {\mathbf{G}} \rangle}\\\\
-                      + & \quad {\langle b /{\mathbf{s}}, {\mathbf{H}} \rangle}\\\\
-                      + & \quad {\langle [u\_{1}^2,    \dots, u\_{k}^2    ], [L_1, \dots, L_{k}] \rangle}\\\\
-                      + & \quad {\langle [u\_{1}^{-2}, \dots, u\_{k}^{-2} ], [R_1, \dots, R_{k}] \rangle}
+P' \quad \stackrel{?}{=} & && \quad ab      \cdot Q \\\\
+                      &&+ & \quad {\langle a \cdot {\mathbf{s}}, {\mathbf{G}} \rangle}\\\\
+                      &&+ & \quad {\langle b /{\mathbf{s}}, {\mathbf{H}} \rangle}\\\\
+                      &&\- & \quad {\langle [u\_{1}^2,    \dots, u\_{k}^2    ], [L_1, \dots, L_{k}] \rangle}\\\\
+                      &&\- & \quad {\langle [u\_{1}^{-2}, \dots, u\_{k}^{-2} ], [R_1, \dots, R_{k}] \rangle}
 \end{aligned}
 \\] where \\(1/{\mathbf{s}}\\) are inverses of \\(\mathbf{s}\\), computed as a reversed list of \\(\mathbf{s}\\).
 
-The parent protocol already has \\(\\{a, b, P_k, Q, \mathbf{G}, \mathbf{H}, L\_{k}, R\_{k}, \\dots, L\_1, R\_1\\}\\),
+The parent protocol already has \\(\\{a, b, P', Q, \mathbf{G}, \mathbf{H}, L\_{k}, R\_{k}, \\dots, L\_1, R\_1\\}\\),
 so the verifier needs to compute and provide only the following scalars to the parent protocol:
 
 \\[
-  \\{u\_{1}^{2}, u\_{1}^{-2}, \dots, u\_{k}^{2}, u\_{k}^{-2}, s_0, \dots, s_{n-1}\\}
+  \\{u\_{1}^{2}, u\_{1}^{-2}, \dots, u\_{k}^{2}, u\_{k}^{-2}, s_0, \dots, s_{n-1}\\}.
 \\]
 
+Use the [`Proof::verification_scalars`] method to produce these scalars for a given inner product proof.
 
+[`Proof::verification_scalars`]: struct.Proof.html#method.verification_scalars

@@ -454,7 +454,7 @@ for the following relation:
     c &{}={}&& {\langle {\mathbf{a}}, {\mathbf{b}} \rangle}
 \end{aligned}
 \\]
-let’s compress these two statements into one equation using an
+Let’s compress these two statements into one equation using an
 indeterminate variable \\(w \in {\mathbb Z\_{p}^{\times}}\\) and multiplying the
 second equation by an orthogonal generator
 \\(B \in {\mathbb G}\\):
@@ -465,17 +465,17 @@ second equation by an orthogonal generator
     c w B &{}={}&&  {\langle {\mathbf{a}}, {\mathbf{b}} \rangle} w B
 \end{aligned}
 \\]
-let’s simplify the resulting equation using the following definitions:
+Let’s simplify the resulting equation using the following definitions:
 \\[
 \begin{aligned}
     k &= \lg n \\\\
-    P\_k &= P + cwB \\\\
+    P' &= P + cwB \\\\
     Q &= wB
 \end{aligned}
 \\]
 The equation becomes:
 \\[
-    P\_k = {\langle {\mathbf{a}}, {\mathbf{G}} \rangle} + {\langle {\mathbf{b}}, {\mathbf{H}} \rangle} + {\langle {\mathbf{a}}, {\mathbf{b}} \rangle} Q 
+    P' = {\langle {\mathbf{a}}, {\mathbf{G}} \rangle} + {\langle {\mathbf{b}}, {\mathbf{H}} \rangle} + {\langle {\mathbf{a}}, {\mathbf{b}} \rangle} Q 
 \\]
 The combined equation is useful because it will allow us
 to compress each vector in half and arrive to the same form. By doing
@@ -483,8 +483,8 @@ such compression \\(\lg n\\) times we will end up with an equation where
 both vectors are one-element long and we can simply transmit them to
 check the final equality directly.
 
-If the prover can demonstrate that the above \\(P\_k\\) has such structure
-over generators \\({\mathbf{G}}\\), \\({\mathbf{H}}\\) and \\(\hat Q\\) for all
+If the prover can demonstrate that the above \\(P'\\) has such structure
+over generators \\({\mathbf{G}}\\), \\({\mathbf{H}}\\) and \\(Q\\) for all
 \\(w \in {\mathbb Z\_{p}^{*}}\\), then the original \\(P\\) and \\(c\\) must satisfy
 the original relation
 \\((P = {\langle {\mathbf{a}}, {\mathbf{G}} \rangle} + {\langle {\mathbf{b}}, {\mathbf{H}} \rangle}
@@ -504,7 +504,7 @@ separated by the variable \\(u\_k\\):
 The powers of \\(u\_k\\) are chosen so they cancel out in the
 inner products of interest as will be shown below.
 
-Let’s now define \\(P\_{k-1}\\) using the same equation as for \\(P_k\\), but using the compressed vectors:
+Let \\(P\_k = P'\\) and define \\(P\_{k-1}\\) using the same equation as for \\(P\_k\\), but using the compressed vectors:
 \\[
     P\_{k-1} = {\langle {\mathbf{a}}^{(k-1)}, {\mathbf{G}}^{(k-1)} \rangle} + {\langle {\mathbf{b}}^{(k-1)}, {\mathbf{H}}^{(k-1)} \rangle} + {\langle {\mathbf{a}}^{(k-1)}, {\mathbf{b}}^{(k-1)} \rangle} \cdot Q
 \\]
@@ -554,7 +554,7 @@ each containing one item, and \\(P\_0\\) containing all accumulated cross-terms 
 \end{aligned}
 \\]
 
-Rewriting the above with the definitions \\(P_k = P + cwB\\) and \\(Q = wB\\) gives the
+Rewriting the above with the definitions \\(P\_k = P' = P + cwB\\) and \\(Q = wB\\) gives the
 final statement:
 \\[
     P + c w B = a^{(0)}\_0 G^{(0)}\_0 + b^{(0)}\_0 H^{(0)}\_0 + a^{(0)}\_0 b^{(0)}\_0 wB - \sum\_{j=1}^{k} \left( L\_{j} u\_{j}^{2} + u\_{j}^{-2} R\_{j} \right)
