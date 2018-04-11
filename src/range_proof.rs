@@ -11,9 +11,7 @@ use curve25519_dalek::ristretto;
 use curve25519_dalek::traits::IsIdentity;
 use curve25519_dalek::scalar::Scalar;
 
-// XXX rename this maybe ?? at least `inner_product_proof::Proof` is too long.
-// maybe `use inner_product_proof::IPProof` would be better?
-use inner_product_proof;
+use inner_product_proof::{InnerProductProof};
 
 use proof_transcript::ProofTranscript;
 
@@ -43,7 +41,7 @@ pub struct RangeProof {
     /// Blinding factor for the synthetic commitment to the inner-product arguments
     e_blinding: Scalar,
     /// Proof data for the inner-product argument.
-    ipp_proof: inner_product_proof::Proof,
+    ipp_proof: InnerProductProof,
 }
 
 impl RangeProof {
@@ -146,7 +144,7 @@ impl RangeProof {
         let Q = w * B;
 
         // Generate the IPP proof
-        let ipp_proof = inner_product_proof::Proof::create(
+        let ipp_proof = InnerProductProof::create(
             transcript,
             &Q,
             util::exp_iter(y.invert()),

@@ -14,14 +14,14 @@ use proof_transcript::ProofTranscript;
 use util;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct Proof {
+pub struct InnerProductProof {
     pub(crate) L_vec: Vec<RistrettoPoint>,
     pub(crate) R_vec: Vec<RistrettoPoint>,
     pub(crate) a: Scalar,
     pub(crate) b: Scalar,
 }
 
-impl Proof {
+impl InnerProductProof {
     /// Create an inner-product proof.
     ///
     /// The proof is created with respect to the bases \\(G\\), \\(H'\\),
@@ -38,7 +38,7 @@ impl Proof {
         mut H_vec: Vec<RistrettoPoint>,
         mut a_vec: Vec<Scalar>,
         mut b_vec: Vec<Scalar>,
-    ) -> Proof
+    ) -> InnerProductProof
     where
         I: IntoIterator,
         I::Item: Borrow<Scalar>,
@@ -111,7 +111,7 @@ impl Proof {
             H = H_L;
         }
 
-        return Proof {
+        return InnerProductProof {
             L_vec: L_vec,
             R_vec: R_vec,
             a: a[0],
@@ -265,7 +265,7 @@ mod tests {
         );
 
         let mut verifier = ProofTranscript::new(b"innerproducttest");
-        let proof = Proof::create(
+        let proof = InnerProductProof::create(
             &mut verifier,
             &Q,
             util::exp_iter(y_inv),
