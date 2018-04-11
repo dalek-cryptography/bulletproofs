@@ -94,8 +94,8 @@ impl RangeProof {
         let zz = z * z;
 
         // Compute l, r
-        let mut l_poly = util::VecPoly2::zero(n);
-        let mut r_poly = util::VecPoly2::zero(n);
+        let mut l_poly = util::VecPoly1::zero(n);
+        let mut r_poly = util::VecPoly1::zero(n);
         let mut exp_y = Scalar::one(); // start at y^0 = 1
         let mut exp_2 = Scalar::one(); // start at 2^0 = 1
 

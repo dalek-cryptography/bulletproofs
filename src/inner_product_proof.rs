@@ -11,8 +11,6 @@ use curve25519_dalek::scalar::Scalar;
 
 use proof_transcript::ProofTranscript;
 
-use util;
-
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct InnerProductProof {
     pub(crate) L_vec: Vec<RistrettoPoint>,
@@ -248,6 +246,7 @@ mod tests {
 
     use rand::OsRng;
     use sha2::Sha512;
+    use util;
 
     fn test_helper_create(n: usize) {
         let mut rng = OsRng::new().unwrap();
