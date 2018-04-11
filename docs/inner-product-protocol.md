@@ -3,7 +3,7 @@ The `inner_product_proof` module contains API for producing a compact proof of a
 Inner product argument protocol
 ===============================
 
-These notes explain how the protocol is implemented in the [`Proof`](struct.Proof.html) type.
+These notes explain how the protocol is implemented in the [`InnerProductProof`](struct.InnerProductProof.html) type.
 
 We want to prove the relation
 \\[
@@ -138,4 +138,4 @@ In order to combine the computation above with other checks in a parent protocol
   \\{u\_{1}^{2}, \dots, u\_{k}^{2}, u\_{1}^{-2}, \dots, u\_{k}^{-2}, s_0, \dots, s_{n-1}\\}.
 \\]
 
-Use the [`Proof::verification_scalars`](struct.Proof.html#method.verification_scalars) method to produce these scalars for a given inner product proof.
+Use the [`InnerProductProof::verification_scalars`](struct.InnerProductProof.html#method.verification_scalars) method to produce these scalars for a given inner product proof.
