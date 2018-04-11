@@ -9,8 +9,8 @@ extern crate curve25519_dalek;
 use curve25519_dalek::scalar::Scalar;
 
 extern crate ristretto_bulletproofs;
-use ristretto_bulletproofs::generators::{Generators, GeneratorsView};
-use ristretto_bulletproofs::proof_transcript::ProofTranscript;
+use ristretto_bulletproofs::{Generators, GeneratorsView};
+use ristretto_bulletproofs::ProofTranscript;
 use ristretto_bulletproofs::RangeProof;
 
 fn bench_create_helper(n: usize, c: &mut Criterion) {
