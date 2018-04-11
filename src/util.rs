@@ -77,6 +77,12 @@ impl VecPoly1 {
     }
 }
 
+impl Poly2 {
+    pub fn eval(&self, x: Scalar) -> Scalar {
+        self.0 + x * (self.1 + x * self.2)
+    }
+}
+
 
 #[cfg(test)]
 mod tests {

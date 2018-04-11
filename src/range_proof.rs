@@ -127,7 +127,7 @@ impl RangeProof {
         let x = transcript.challenge_scalar();
 
         // Evaluate t at x and run the IPP
-        let t_x = t_poly.0 + x * (t_poly.1 + x * t_poly.2);
+        let t_x = t_poly.eval(x);
         let t_x_blinding = zz * v_blinding + x * (t_1_blinding + x * t_2_blinding);
         let e_blinding = a_blinding + x * s_blinding;
 
