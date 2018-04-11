@@ -28,8 +28,8 @@ pub struct Proof {
 impl Proof {
     /// Create an inner-product proof.
     ///
-    /// The proof is created with respect to the bases G, Hprime,
-    /// where Hprime[i] = H[i] * Hprime_factors[i].
+    /// The proof is created with respect to the bases \\(G\\), \\(H'\\),
+    /// where \\(H'\_i = H\_i \cdot \texttt{Hprime\\_factors}\_i\\).
     ///
     /// The `verifier` is passed in as a parameter so that the
     /// challenges depend on the *entire* transcript (including parent
@@ -134,6 +134,8 @@ impl Proof {
         };
     }
 
+    /// Computes three vectors of verification scalars \\([u\_{i}^{2}]\\), \\([u\_{i}^{-2}]\\) and \\([s\_{i}]\\) for combined multiscalar multiplication
+    /// in a parent protocol. See [inner product protocol notes](index.html#verification-equation) for details.
     pub(crate) fn verification_scalars(
         &self,
         transcript: &mut ProofTranscript,
