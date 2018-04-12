@@ -1,4 +1,5 @@
 #![allow(non_snake_case)]
+#![deny(missing_docs)]
 
 #![doc(include = "../docs/range-proof-protocol.md")]
 
@@ -41,7 +42,23 @@ pub struct RangeProof {
 }
 
 impl RangeProof {
-    /// Create a rangeproof.
+    /// Create a rangeproof for a given pair of value `v` and
+    /// blinding scalar `v_blinding`.
+    ///
+    /// Usage:
+    /// ```ascii
+    /// let n = 64;
+    /// let generators = Generators::new(PedersenGenerators::default(), n, 1);
+    /// let mut transcript = ProofTranscript::new(b"RangeproofTest");
+    /// let proof = RangeProof::generate_proof(
+    ///     generators.share(0),
+    ///     &mut transcript,
+    ///     &mut rng,
+    ///     n,
+    ///     v,
+    ///     &v_blinding,
+    /// );
+    /// ```
     pub fn generate_proof<R: Rng>(
         generators: GeneratorsView,
         transcript: &mut ProofTranscript,
@@ -162,6 +179,21 @@ impl RangeProof {
         }
     }
 
+    /// Verifies a rangeproof for a given value commitment \\(V\\).
+    ///
+    /// Usage:
+    /// ```ascii
+    /// let n = 64;
+    /// let generators = Generators::new(PedersenGenerators::default(), n, 1);
+    /// let mut transcript = ProofTranscript::new(b"RangeproofTest");
+    /// proof.verify(
+    ///     &V,
+    ///     generators.share(0),
+    ///     &mut transcript,
+    ///     &mut OsRng::new().unwrap(),
+    ///     n
+    /// );
+    /// ```
     pub fn verify<R: Rng>(
         &self,
         V: &RistrettoPoint,
