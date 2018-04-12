@@ -62,7 +62,7 @@ impl RangeProof {
         let a_blinding = Scalar::random(rng);
 
         // Compute A = <a_L, G> + <a_R, H> + a_blinding * B_blinding.
-        let mut A = generators.pedersen_generators.1 * a_blinding;
+        let mut A = generators.pedersen_generators.B_blinding * a_blinding;
         for i in 0..n {
             // If v_i = 0, we add a_L[i] * G[i] + a_R[i] * H[i] = - H[i]
             // If v_i = 1, we add a_L[i] * G[i] + a_R[i] * H[i] =   G[i]
@@ -79,7 +79,7 @@ impl RangeProof {
         // Compute S = <s_L, G> + <s_R, H> + s_blinding * B_blinding.
         let S = ristretto::multiscalar_mul(
             iter::once(&s_blinding).chain(s_L.iter()).chain(s_R.iter()),
-            iter::once(&generators.pedersen_generators.1).chain(G.iter()).chain(H.iter()),
+            iter::once(&generators.pedersen_generators.B_blinding).chain(G.iter()).chain(H.iter()),
         );
 
         // Commit to V, A, S and get challenges y, z
@@ -134,7 +134,7 @@ impl RangeProof {
 
         // Get a challenge value to combine statements for the IPP
         let w = transcript.challenge_scalar();
-        let Q = w * generators.pedersen_generators.0;
+        let Q = w * generators.pedersen_generators.B;
 
         // Generate the IPP proof
         let ipp_proof = InnerProductProof::create(
@@ -224,8 +224,8 @@ impl RangeProof {
                 .chain(iter::once(V))
                 .chain(iter::once(&self.T_1))
                 .chain(iter::once(&self.T_2))
-                .chain(iter::once(&gens.pedersen_generators.0))
-                .chain(iter::once(&gens.pedersen_generators.1))
+                .chain(iter::once(&gens.pedersen_generators.B))
+                .chain(iter::once(&gens.pedersen_generators.B_blinding))
                 .chain(gens.G.iter())
                 .chain(gens.H.iter())
                 .chain(self.ipp_proof.L_vec.iter())

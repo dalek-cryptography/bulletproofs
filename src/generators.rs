@@ -88,37 +88,43 @@ pub struct GeneratorsView<'a> {
 
 /// Entry point for producing a pair of base points for Pedersen commitments.
 #[derive(Clone)]
-pub struct PedersenGenerators(pub RistrettoPoint, pub RistrettoPoint);
+pub struct PedersenGenerators {
+    /// Base for the committed value
+    pub B: RistrettoPoint,
+
+    /// Base for the blinding factor
+    pub B_blinding: RistrettoPoint,
+}
 
 impl PedersenGenerators {
     /// Constructs a pair of pedersen generators
     /// from a pair of generators provided by the user.
-    pub fn new(A: RistrettoPoint, B: RistrettoPoint) -> Self {
-        PedersenGenerators(A,B)
+    pub fn new(B: RistrettoPoint, B_blinding: RistrettoPoint) -> Self {
+        PedersenGenerators{B,B_blinding}
     }
 
     /// Creates a pedersen commitment using the value scalar and a blinding factor.
     pub fn commit(&self, value: Scalar, blinding: Scalar) -> RistrettoPoint {
-        ristretto::multiscalar_mul(&[value, blinding], &[self.0, self.1])
+        ristretto::multiscalar_mul(&[value, blinding], &[self.B, self.B_blinding])
     }
 }
 
 impl Default for PedersenGenerators {
     fn default() -> Self {
-        PedersenGenerators(
-            GeneratorsChain::new(b"Bulletproofs.Generators.B").next().unwrap(),
-            GeneratorsChain::new(b"Bulletproofs.Generators.B_blinding").next().unwrap()
-        )
+        PedersenGenerators {
+            B: GeneratorsChain::new(b"Bulletproofs.Generators.B").next().unwrap(),
+            B_blinding: GeneratorsChain::new(b"Bulletproofs.Generators.B_blinding").next().unwrap()
+        }
     }
 }
 
 impl Generators {
     /// Creates generators for `m` range proofs of `n` bits each.
     pub fn new(pedersen_generators: PedersenGenerators, n: usize, m: usize) -> Self {
-        let G = GeneratorsChain::new(pedersen_generators.0.compress().as_bytes())
+        let G = GeneratorsChain::new(pedersen_generators.B.compress().as_bytes())
             .take(n * m)
             .collect();
-        let H = GeneratorsChain::new(pedersen_generators.1.compress().as_bytes())
+        let H = GeneratorsChain::new(pedersen_generators.B_blinding.compress().as_bytes())
             .take(n * m)
             .collect();
 
