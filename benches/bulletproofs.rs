@@ -41,14 +41,15 @@ fn bench_create_helper(n: usize, c: &mut Criterion) {
 
 fn bench_verify_helper(n: usize, c: &mut Criterion) {
     c.bench_function(&format!("verify_rangeproof_n_{}", n), move |b| {
-        let generators = Generators::new(PedersenGenerators::default(), n, 1);
+        let pg = PedersenGenerators::default();
+        let generators = Generators::new(pg.clone(), n, 1);
         let mut rng = OsRng::new().unwrap();
 
         let mut transcript = ProofTranscript::new(b"RangeproofTest");
         let v: u64 = rng.gen_range(0, (1 << (n - 1)) - 1);
         let v_blinding = Scalar::random(&mut rng);
 
-        let vc = ristretto::multiscalar_mul(&[Scalar::from_u64(v), v_blinding], &[*generators.share(0).B, *generators.share(0).B_blinding]);
+        let vc =  pg.commit(Scalar::from_u64(v), v_blinding);
 
         let rp = RangeProof::generate_proof(
             generators.share(0),

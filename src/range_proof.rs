@@ -52,20 +52,17 @@ impl RangeProof {
     ) -> RangeProof {
         use subtle::{Choice, ConditionallyAssignable};
 
-        let B = generators.B;
-        let B_blinding = generators.B_blinding;
-
         // Create copies of G, H, so we can pass them to the
         // (consuming) IPP API later.
         let G = generators.G.to_vec();
         let H = generators.H.to_vec();
 
-        let V = ristretto::multiscalar_mul(&[Scalar::from_u64(v), *v_blinding], &[*B, *B_blinding]);
+        let V = generators.pedersen_generators.commit(Scalar::from_u64(v), *v_blinding);
 
         let a_blinding = Scalar::random(rng);
 
         // Compute A = <a_L, G> + <a_R, H> + a_blinding * B_blinding.
-        let mut A = B_blinding * a_blinding;
+        let mut A = generators.pedersen_generators.1 * a_blinding;
         for i in 0..n {
             // If v_i = 0, we add a_L[i] * G[i] + a_R[i] * H[i] = - H[i]
             // If v_i = 1, we add a_L[i] * G[i] + a_R[i] * H[i] =   G[i]
@@ -82,7 +79,7 @@ impl RangeProof {
         // Compute S = <s_L, G> + <s_R, H> + s_blinding * B_blinding.
         let S = ristretto::multiscalar_mul(
             iter::once(&s_blinding).chain(s_L.iter()).chain(s_R.iter()),
-            iter::once(B_blinding).chain(G.iter()).chain(H.iter()),
+            iter::once(&generators.pedersen_generators.1).chain(G.iter()).chain(H.iter()),
         );
 
         // Commit to V, A, S and get challenges y, z
@@ -118,8 +115,8 @@ impl RangeProof {
         // Form commitments T_1, T_2 to t.1, t.2
         let t_1_blinding = Scalar::random(rng);
         let t_2_blinding = Scalar::random(rng);
-        let T_1 = ristretto::multiscalar_mul(&[t_poly.1, t_1_blinding], &[*B, *B_blinding]);
-        let T_2 = ristretto::multiscalar_mul(&[t_poly.2, t_2_blinding], &[*B, *B_blinding]);
+        let T_1 = generators.pedersen_generators.commit(t_poly.1, t_1_blinding);
+        let T_2 = generators.pedersen_generators.commit(t_poly.2, t_2_blinding);
 
         // Commit to T_1, T_2 to get the challenge point x
         transcript.commit(T_1.compress().as_bytes());
@@ -137,7 +134,7 @@ impl RangeProof {
 
         // Get a challenge value to combine statements for the IPP
         let w = transcript.challenge_scalar();
-        let Q = w * B;
+        let Q = w * generators.pedersen_generators.0;
 
         // Generate the IPP proof
         let ipp_proof = InnerProductProof::create(
@@ -227,8 +224,8 @@ impl RangeProof {
                 .chain(iter::once(V))
                 .chain(iter::once(&self.T_1))
                 .chain(iter::once(&self.T_2))
-                .chain(iter::once(gens.B))
-                .chain(iter::once(gens.B_blinding))
+                .chain(iter::once(&gens.pedersen_generators.0))
+                .chain(iter::once(&gens.pedersen_generators.1))
                 .chain(gens.G.iter())
                 .chain(gens.H.iter())
                 .chain(self.ipp_proof.L_vec.iter())
@@ -338,7 +335,7 @@ mod tests {
             proof_bytes = bincode::serialize(&range_proof).unwrap();
 
             let gens = generators.share(0);
-            value_commitment = ristretto::multiscalar_mul(&[Scalar::from_u64(v), v_blinding], &[*gens.B, *gens.B_blinding]);
+            value_commitment = gens.pedersen_generators.commit(Scalar::from_u64(v), v_blinding);
         }
 
         println!(
