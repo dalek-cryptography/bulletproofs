@@ -110,13 +110,13 @@ impl Proof {
             // G_L[i] = G_L[i] * x_inv + G_R[i] * x (for all i)
             G_L.par_iter_mut().zip(G_R.par_iter())
                 .for_each(|(G_L_i, G_R_i)| {
-                    *G_L_i = ristretto::multiscalar_mul(&[x_inv, x], &[*G_L_i, *G_R_i]);
+                    *G_L_i = ristretto::vartime::multiscalar_mul(&[x_inv, x], &[*G_L_i, *G_R_i]);
                     }
                 );
             // H_L[i] = H_L[i] * x + H_R[i] * x_inv (for all i)
             H_L.par_iter_mut().zip(H_R.par_iter())
                 .for_each(|(H_L_i, H_R_i)| {
-                    *H_L_i = ristretto::multiscalar_mul(&[x, x_inv], &[*H_L_i, *H_R_i]);
+                    *H_L_i = ristretto::vartime::multiscalar_mul(&[x, x_inv], &[*H_L_i, *H_R_i]);
                     }
                 );
 
