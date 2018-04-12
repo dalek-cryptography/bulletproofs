@@ -8,7 +8,6 @@ use rand::{OsRng, Rng};
 
 extern crate curve25519_dalek;
 use curve25519_dalek::scalar::Scalar;
-use curve25519_dalek::ristretto;
 
 extern crate ristretto_bulletproofs;
 use ristretto_bulletproofs::{PedersenGenerators, Generators};
