@@ -86,7 +86,7 @@ pub struct GeneratorsView<'a> {
     pub H: &'a [RistrettoPoint],
 }
 
-/// Entry point for producing a pair of base points for Pedersen commitments.
+/// Represents a pair of base points for Pedersen commitments.
 #[derive(Clone)]
 pub struct PedersenGenerators {
     /// Base for the committed value
@@ -97,13 +97,13 @@ pub struct PedersenGenerators {
 }
 
 impl PedersenGenerators {
-    /// Constructs a pair of pedersen generators
+    /// Constructs a pair of Pedersen generators
     /// from a pair of generators provided by the user.
     pub fn new(B: RistrettoPoint, B_blinding: RistrettoPoint) -> Self {
         PedersenGenerators{B,B_blinding}
     }
 
-    /// Creates a pedersen commitment using the value scalar and a blinding factor.
+    /// Creates a Pedersen commitment using the value scalar and a blinding factor.
     pub fn commit(&self, value: Scalar, blinding: Scalar) -> RistrettoPoint {
         ristretto::multiscalar_mul(&[value, blinding], &[self.B, self.B_blinding])
     }
