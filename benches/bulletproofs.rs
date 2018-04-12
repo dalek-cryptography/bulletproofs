@@ -40,12 +40,15 @@ fn bench_create_helper(n: usize, c: &mut Criterion) {
 
 fn bench_verify_helper(n: usize, c: &mut Criterion) {
     c.bench_function(&format!("verify_rangeproof_n_{}", n), move |b| {
-        let generators = Generators::new(PedersenGenerators::default(), n, 1);
+        let pg = PedersenGenerators::default();
+        let generators = Generators::new(pg.clone(), n, 1);
         let mut rng = OsRng::new().unwrap();
 
         let mut transcript = ProofTranscript::new(b"RangeproofTest");
         let v: u64 = rng.gen_range(0, (1 << (n - 1)) - 1);
         let v_blinding = Scalar::random(&mut rng);
+
+        let vc =  pg.commit(Scalar::from_u64(v), v_blinding);
 
         let rp = RangeProof::generate_proof(
             generators.share(0),
@@ -60,7 +63,7 @@ fn bench_verify_helper(n: usize, c: &mut Criterion) {
             // Each verification requires a clean transcript.
             let mut transcript = ProofTranscript::new(b"RangeproofTest");
 
-            rp.verify(generators.share(0), &mut transcript, &mut rng, n)
+            rp.verify(&vc, generators.share(0), &mut transcript, &mut rng, n)
         });
     });
 }
