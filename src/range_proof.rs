@@ -6,11 +6,9 @@ use rand::Rng;
 
 use std::iter;
 
-use sha2::{Digest, Sha512};
-
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::ristretto;
-use curve25519_dalek::traits::{Identity, IsIdentity};
+use curve25519_dalek::traits::IsIdentity;
 use curve25519_dalek::scalar::Scalar;
 
 // XXX rename this maybe ?? at least `inner_product_proof::Proof` is too long.
@@ -21,7 +19,7 @@ use proof_transcript::ProofTranscript;
 
 use util;
 
-use generators::{Generators, GeneratorsView};
+use generators::GeneratorsView;
 
 struct PolyDeg3(Scalar, Scalar, Scalar);
 
@@ -352,7 +350,8 @@ mod tests {
         use bincode;
 
         // Both prover and verifier have access to the generators and the proof
-        let generators = Generators::new(n, 1);
+        use generators::{PedersenGenerators,Generators};
+        let generators = Generators::new(PedersenGenerators::default(), n, 1);
 
         // Serialized proof data
         let proof_bytes: Vec<u8>;
