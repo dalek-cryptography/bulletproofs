@@ -52,6 +52,9 @@ impl RangeProof {
     ) -> RangeProof {
         use subtle::{Choice, ConditionallyAssignable};
 
+        // Commit the range size to domain-separate from rangeproofs of different lengths.
+        transcript.commit_u64(n as u64);
+
         // Create copies of G, H, so we can pass them to the
         // (consuming) IPP API later.
         let G = generators.G.to_vec();
@@ -170,6 +173,7 @@ impl RangeProof {
         // First, replay the "interactive" protocol using the proof
         // data to recompute all challenges.
 
+        transcript.commit_u64(n as u64);
         transcript.commit(V.compress().as_bytes());
         transcript.commit(self.A.compress().as_bytes());
         transcript.commit(self.S.compress().as_bytes());
