@@ -14,10 +14,6 @@ use proof_transcript::ProofTranscript;
 
 use util;
 
-use generators::Generators;
-
-use sha2::Sha512;
-
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Proof {
     pub(crate) L_vec: Vec<RistrettoPoint>,
@@ -187,6 +183,11 @@ impl Proof {
         (challenges_sq, challenges_inv_sq, s)
     }
 
+    /// This method is for testing that proof generation work,
+    /// but for efficiency the actual protocols would use `verification_scalars`
+    /// method to combine inner product verification with other checks
+    /// in a single multiscalar multiplication.
+    #[allow(dead_code)]
     pub fn verify<I>(
         &self,
         transcript: &mut ProofTranscript,
@@ -241,11 +242,13 @@ mod tests {
     use super::*;
 
     use rand::OsRng;
+    use sha2::Sha512;
 
     fn test_helper_create(n: usize) {
         let mut rng = OsRng::new().unwrap();
 
-        let gens = Generators::new(n, 1);
+        use generators::{PedersenGenerators,Generators};
+        let gens = Generators::new(PedersenGenerators::default(), n, 1);
         let G = gens.share(0).G.to_vec();
         let H = gens.share(0).H.to_vec();
 
