@@ -1,5 +1,4 @@
 #![allow(non_snake_case)]
-#![deny(missing_docs)]
 
 #![doc(include = "../docs/inner-product-protocol.md")]
 
