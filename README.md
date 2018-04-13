@@ -6,6 +6,10 @@ This crate contains both an implementation and a set of notes on how and why
 Bulletproofs work.  The [external documentation][doc_external] describes how to use this
 crate’s API, while the [internal documentation][doc_internal] contains the notes.
 
+## WARNING
+
+This code is still research-quality.  It is not (yet) suitable for deployment.
+
 ## Documentation
 
 * [Public API documentation][doc_external]
@@ -26,13 +30,14 @@ make doc-internal  # Builds internal documentation
 Note: `cargo doc --open` rebuilds the docs without the custom
 invocation, so it may be necessary to rerun `make`.
 
-## WARNING
-
-This code is still research-quality.  It is not (yet) suitable for deployment.
-
 ## Tests
 
 Run tests with `cargo test`.
+
+## Benchmarks
+
+This crate uses [criterion.rs][criterion] for benchmarks.  Run benchmarks with
+`cargo bench`.
 
 ## Features
 
@@ -44,7 +49,19 @@ Bulletproofs, the `target_cpu` must support AVX2:
 RUSTFLAGS="-C target_cpu=skylake" cargo bench --features "yolocrypto"
 ```
 
-This crate uses [criterion.rs][criterion] for benchmarks.
+Skylake-X CPUs have double the AVX2 registers. To use them, try
+
+```text
+RUSTFLAGS="-C target_cpu=skylake-avx512" cargo bench --features "yolocrypto"
+```
+
+This prevents spills in the AVX2 parallel field multiplication code, but causes
+worse code generation elsewhere ¯\\_(ツ)_/¯
+
+## About
+
+This is a research project being built for Chain, Inc, by Henry de Valence,
+Cathie Yun, and Oleg Andreev.
 
 [bp_website]: https://crypto.stanford.edu/bulletproofs/
 [ristretto]: https://doc.dalek.rs/curve25519_dalek/ristretto/index.html
