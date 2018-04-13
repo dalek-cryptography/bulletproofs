@@ -56,7 +56,7 @@ RUSTFLAGS="-C target_cpu=skylake-avx512" cargo bench --features "yolocrypto"
 ```
 
 This prevents spills in the AVX2 parallel field multiplication code, but causes
-worse code generation elsewhere ¯\\_(ツ)_/¯
+worse code generation elsewhere ¯\\\_(ツ)\_/¯
 
 ## About
 
