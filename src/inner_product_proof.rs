@@ -93,14 +93,14 @@ impl InnerProductProof {
             verifier.commit(L.compress().as_bytes());
             verifier.commit(R.compress().as_bytes());
 
-            let x = verifier.challenge_scalar();
-            let x_inv = x.invert();
+            let u = verifier.challenge_scalar();
+            let u_inv = u.invert();
 
             for i in 0..n {
-                a_L[i] = a_L[i] * x + x_inv * a_R[i];
-                b_L[i] = b_L[i] * x_inv + x * b_R[i];
-                G_L[i] = ristretto::vartime::multiscalar_mul(&[x_inv, x], &[G_L[i], G_R[i]]);
-                H_L[i] = ristretto::vartime::multiscalar_mul(&[x, x_inv], &[H_L[i], H_R[i]]);
+                a_L[i] = a_L[i] * u + u_inv * a_R[i];
+                b_L[i] = b_L[i] * u_inv + u * b_R[i];
+                G_L[i] = ristretto::vartime::multiscalar_mul(&[u_inv, u], &[G_L[i], G_R[i]]);
+                H_L[i] = ristretto::vartime::multiscalar_mul(&[u, u_inv], &[H_L[i], H_R[i]]);
             }
 
             a = a_L;
@@ -137,12 +137,12 @@ impl InnerProductProof {
             challenges.push(transcript.challenge_scalar());
         }
 
-        // 2. Compute 1/(x_k...x_1) and 1/x_k, ..., 1/x_1
+        // 2. Compute 1/(u_k...u_1) and 1/u_k, ..., 1/u_1
 
         let mut challenges_inv = challenges.clone();
         let allinv = Scalar::batch_invert(&mut challenges_inv);
 
-        // 3. Compute x_i^2 and (1/x_i)^2
+        // 3. Compute u_i^2 and (1/u_i)^2
 
         for i in 0..lg_n {
             // XXX missing square fn upstream
@@ -159,10 +159,10 @@ impl InnerProductProof {
         for i in 1..n {
             let lg_i = (32 - 1 - (i as u32).leading_zeros()) as usize;
             let k = 1 << lg_i;
-            // The challenges are stored in "creation order" as [x_k,...,x_1],
-            // so x_{lg(i)+1} = is indexed by (lg_n-1) - lg_i
-            let x_lg_i_sq = challenges_sq[(lg_n - 1) - lg_i];
-            s.push(s[i - k] * x_lg_i_sq);
+            // The challenges are stored in "creation order" as [u_k,...,u_1],
+            // so u_{lg(i)+1} = is indexed by (lg_n-1) - lg_i
+            let u_lg_i_sq = challenges_sq[(lg_n - 1) - lg_i];
+            s.push(s[i - k] * u_lg_i_sq);
         }
 
         (challenges_sq, challenges_inv_sq, s)
@@ -186,7 +186,7 @@ impl InnerProductProof {
         I: IntoIterator,
         I::Item: Borrow<Scalar>,
     {
-        let (x_sq, x_inv_sq, s) = self.verification_scalars(transcript);
+        let (u_sq, u_inv_sq, s) = self.verification_scalars(transcript);
 
         let a_times_s = s.iter().map(|s_i| self.a * s_i);
 
@@ -198,15 +198,15 @@ impl InnerProductProof {
             .zip(inv_s)
             .map(|(h_i, s_i_inv)| (self.b * s_i_inv) * h_i.borrow());
 
-        let neg_x_sq = x_sq.iter().map(|xi| -xi);
-        let neg_x_inv_sq = x_inv_sq.iter().map(|xi| -xi);
+        let neg_u_sq = u_sq.iter().map(|ui| -ui);
+        let neg_u_inv_sq = u_inv_sq.iter().map(|ui| -ui);
 
         let expect_P = ristretto::vartime::multiscalar_mul(
             iter::once(self.a * self.b)
                 .chain(a_times_s)
                 .chain(h_times_b_div_s)
-                .chain(neg_x_sq)
-                .chain(neg_x_inv_sq),
+                .chain(neg_u_sq)
+                .chain(neg_u_inv_sq),
             iter::once(Q)
                 .chain(G.iter())
                 .chain(H.iter())
