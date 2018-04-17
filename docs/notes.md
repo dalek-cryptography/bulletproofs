@@ -123,13 +123,13 @@ and powers of two \\({\mathbf{2}}^{n} = (1,2,4,\ldots,2^{n-1})\\):
     &= a_{0}\cdot 2^0 + \dots + a_{n-1}\cdot 2^{n-1}.
 \end{aligned}
 \\]
-We need \\({\mathbf{a}}\\) to be a vector of integers \\(\\{0,1\\}\\),
-which can be expressed with an additional condition
+We need \\({\mathbf{a}}\\) to be a vector of integers \\(\\{0,1\\}\\).
+This can be expressed with an additional condition
 \\[
 {\mathbf{a}} \circ ({\mathbf{a}} - {\mathbf{1}}) = {\mathbf{0}}^{n},
 \\]
 where \\({\mathbf{x}} \circ {\mathbf{y}}\\) denotes the entry-wise multiplication of two vectors.
-If any bit is not \\(0\\) or \\(1\\), then the result of multiplication will not be an all-zero vector[^1].
+The result of multiplication can be all-zero if and only if every bit is actually \\(0\\) or \\(1\\)[^1].
 
 As a result of representing value in binary, the range condition \\(v \in [0, 2^{n})\\)
 is equivalent to the pair of conditions
@@ -153,7 +153,7 @@ eventually need to make separate commitments to the vectors
 \\]
 
 [^1]: Generally, condition \\(x=0 \vee y=0\\) can be expressed as \\(x \cdot y = 0\\),
-as the multiplication can be zero if and only if any of the terms is zero.
+as the product can be zero if and only if one of the terms is zero.
 
 
 Proving vectors of statements with a single statement
