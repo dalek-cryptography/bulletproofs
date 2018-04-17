@@ -10,14 +10,6 @@ pub struct VecPoly1(pub Vec<Scalar>, pub Vec<Scalar>);
 /// Represents a degree-2 scalar polynomial \\(a + b \cdot x + c \cdot x^2\\)
 pub struct Poly2(pub Scalar, pub Scalar, pub Scalar);
 
-pub struct PolyDeg3(pub Scalar, pub Scalar, pub Scalar);
-
-impl PolyDeg3 {
-    pub fn eval(&self, x: &Scalar) -> Scalar {
-        self.0 + x * (self.1 + x * self.2)
-    }
-}
-
 /// Provides an iterator over the powers of a `Scalar`.
 ///
 /// This struct is created by the `exp_iter` function.

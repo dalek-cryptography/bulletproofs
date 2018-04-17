@@ -32,10 +32,9 @@ mod notes {}
 mod proof_transcript;
 mod generators;
 mod range_proof;
-mod multi_range_proof;
+mod aggregated_range_proof;
 mod inner_product_proof;
 
 pub use proof_transcript::ProofTranscript;
 pub use range_proof::RangeProof;
 pub use generators::{PedersenGenerators, Generators, GeneratorsView};
-pub use multi_range_proof::Proof;
