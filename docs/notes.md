@@ -157,7 +157,7 @@ Proving vectors of statements with a single statement
 The statements above are statements about vectors, or equivalently, a
 vector of statements about each entry. Now, we want to combine these
 into a single statement. Since \\({\mathbf{b}} = {\mathbf{0}}\\) if and only
-if \\({\langle {\mathbf{b}}, {\mathbf{y}}^{n} \rangle} = 0\\) for every \\(y\\),
+if \\({\langle {\mathbf{b}}, {\mathbf{y}}^{n} \rangle} = 0\\) for every \\(y\\)[^1],
 the statements above are implied by
 \\[
 \begin{aligned}
@@ -177,6 +177,13 @@ z^{2} v
          +   {\langle {\mathbf{a}}\_{L}, {\mathbf{a}}\_{R} \circ {\mathbf{y}}^{n} \rangle} 
 \end{aligned}
 \\]
+
+[^1]: This is because the polynomial in terms of \\(y\\) is zero at every point
+if and only if every term of it is zero. The verifier is going to sample
+a random \\(y\\) after the prover commits to all the values forming the terms of
+that polynomial, making the probability that the prover cheated negligible (\\(2^{-q}\\)),
+where \\(q\\) is the group order (for Edwards 25519 \\(q \approx 2^{252}\\)).
+
 
 Combining inner-products
 ------------------------
@@ -335,7 +342,7 @@ Notice that the sum of each column is a commitment to the variable in the top
 row using the blinding factor in the second row.
 The sum of all of the columns is
 \\(t(x) B + {\tilde{t}}(x) {\widetilde{B}}\\), a commitment to the value
-of \\(t\\) at the point \\(x\\), using the synthetic blinding factor[^1]
+of \\(t\\) at the point \\(x\\), using the synthetic blinding factor[^2]
 \\[
   {\tilde{t}}(x) = z^{2} {\tilde{v}} + x {\tilde{t}}\_{1} + x^{2} {\tilde{t}}\_{2}.
 \\]
@@ -347,7 +354,7 @@ bottom row of the diagram to check consistency:
   t(x) B + {\tilde{t}}(x) {\widetilde{B}} \stackrel{?}{=} z^2 V + \delta(y,z) B + x T\_{1} + x^{2} T\_{2}.
 \\]
 
-[^1]: The blinding factor is synthetic in the sense that it is
+[^2]: The blinding factor is synthetic in the sense that it is
     synthesized from the blinding factors of the other commitments.
 
 Proving that \\({\mathbf{l}}(x)\\), \\({\mathbf{r}}(x)\\) are correct
