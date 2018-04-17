@@ -114,17 +114,30 @@ the verifier.
 Proving range statements with bit vectors
 -----------------------------------------
 
-Write the bits of \\(v\\) as \\({\mathbf{a}}\\). If \\({\mathbf{2}}^{n}\\) is the
-vector \\((1,2,4,\ldots,2^{n-1})\\) of powers of \\(2\\), then
+Write the vector of bits of \\(v\\) as \\({\mathbf{a}}\\). If \\({\mathbf{2}}^{n}\\) is the
+vector \\((1,2,4,\ldots,2^{n-1})\\) of powers of \\(2\\), then the \\(v\\) can be 
+represented in binary as follows:
+\\[
+\begin{aligned}
+  v &= {\langle {\mathbf{a}}, {\mathbf{2}}^{n} \rangle}  \\\\
+    &= a_{0}\cdot 2^0 + \dots + a_{n-1}\cdot 2^{n-1}.
+\end{aligned}
+\\]
+We also need a condition representing that \\({\mathbf{a}}\\) is a vector of integers \\(\\{0,1\\}\\):
+\\[
+{\mathbf{a}} \circ ({\mathbf{a}} - {\mathbf{1}}) = {\mathbf{0}}^{n},
+\\]
+where \\({\mathbf{x}} \circ {\mathbf{y}}\\) denotes the entry-wise multiplication of two vectors.
+If any bit is not \\(0\\) or \\(1\\), then the result of multiplication will not be zero.
+
+Representing the value in binary makes the range condition \\(v \in [0, 2^{n})\\)
+equivalent to the pair of conditions:
 \\[
 \begin{aligned}
   {\langle {\mathbf{a}}, {\mathbf{2}}^{n} \rangle} &= v,  \\\\
-  {\mathbf{a}} \circ ({\mathbf{a}} - {\mathbf{1}}) &= {\mathbf{0}}^{n} .
+  {\mathbf{a}} \circ ({\mathbf{a}} - {\mathbf{1}}) &= {\mathbf{0}}^{n}.
 \end{aligned}
 \\]
-Here \\({\mathbf{x}} \circ {\mathbf{y}}\\) denotes the entry-wise
-multiplication of two vectors.
-Together, these conditions imply the range condition.
 We will
 eventually need to make separate commitments to the vectors
 \\({\mathbf{a}}\\) and \\({\mathbf{a}} - {\mathbf{1}}\\), so we set
