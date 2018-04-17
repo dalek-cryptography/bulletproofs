@@ -8,10 +8,9 @@ use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::traits::{Identity, IsIdentity};
 use curve25519_dalek::scalar::Scalar;
 use std::clone::Clone;
-use scalar::scalar_pow_vartime;
 use proof_transcript::ProofTranscript;
 use generators::{Generators, GeneratorsView};
-use util::{self, PolyDeg3, VecPoly2};
+use util::{self};
 use inner_product_proof;
 
 /// Party is an entry-point API for setting up a party.
@@ -76,7 +75,7 @@ impl<'a> PartyAwaitingPosition<'a> {
 
         let a_blinding = Scalar::random(&mut rng);
         // Compute A = <a_L, G> + <a_R, H> + a_blinding * B_blinding
-        let mut A = gen_share.B_blinding * a_blinding;
+        let mut A = gen_share.pedersen_generators.B_blinding * a_blinding;
         for i in 0..self.n {
             let v_i = (self.v >> i) & 1;
             // XXX replace this with a conditional move
@@ -92,9 +91,9 @@ impl<'a> PartyAwaitingPosition<'a> {
         let s_R: Vec<Scalar> = (0..self.n).map(|_| Scalar::random(&mut rng)).collect();
 
         // Compute S = <s_L, G> + <s_R, H> + s_blinding * B_blinding
-        let S = ristretto::multiscalar_mult(
+        let S = ristretto::multiscalar_mul(
             iter::once(&s_blinding).chain(s_L.iter()).chain(s_R.iter()),
-            iter::once(gen_share.B_blinding)
+            iter::once(&gen_share.pedersen_generators.B_blinding)
                 .chain(gen_share.G.iter())
                 .chain(gen_share.H.iter()),
         );
@@ -190,12 +189,12 @@ impl<'a> PartyAwaitingValueChallenge<'a> {
         rng: &mut R,
     ) -> (PartyAwaitingPolyChallenge, PolyCommitment) {
         let n = self.n;
-        let offset_y = scalar_pow_vartime(&y, (self.j * n) as u64);
-        let offset_z = scalar_pow_vartime(&z, self.j as u64);
+        let offset_y = util::scalar_exp_vartime(&y, (self.j * n) as u64);
+        let offset_z = util::scalar_exp_vartime(&z, self.j as u64);
 
         // Calculate t by calculating vectors l0, l1, r0, r1 and multiplying
-        let mut l_poly = VecPoly2::zero(n);
-        let mut r_poly = VecPoly2::zero(n);
+        let mut l_poly = util::VecPoly1::zero(n);
+        let mut r_poly = util::VecPoly1::zero(n);
 
         let zz = z * z;
         let mut exp_y = offset_y; // start at y^j
@@ -254,9 +253,9 @@ pub struct PartyAwaitingPolyChallenge {
 
     z: Scalar,
     offset_z: Scalar,
-    l_poly: VecPoly2,
-    r_poly: VecPoly2,
-    t_poly: PolyDeg3,
+    l_poly: util::VecPoly1,
+    r_poly: util::VecPoly1,
+    t_poly: util::Poly2,
     v_blinding: Scalar,
     a_blinding: Scalar,
     s_blinding: Scalar,
@@ -267,14 +266,14 @@ pub struct PartyAwaitingPolyChallenge {
 impl PartyAwaitingPolyChallenge {
     pub fn apply_challenge(&self, x: &Scalar) -> ProofShare {
         // Generate final values for proof (line 55-60)
-        let t_blinding_poly = PolyDeg3(
+        let t_blinding_poly = util::Poly2(
             self.z * self.z * self.offset_z * self.v_blinding,
             self.t_1_blinding,
             self.t_2_blinding,
         );
 
-        let t_x = self.t_poly.eval(x);
-        let t_x_blinding = t_blinding_poly.eval(x);
+        let t_x = self.t_poly.eval(*x);
+        let t_x_blinding = t_blinding_poly.eval(*x);
         let e_blinding = self.a_blinding + self.s_blinding * x;
         let l_vec = self.l_poly.eval(*x);
         let r_vec = self.r_poly.eval(*x);
@@ -384,7 +383,7 @@ impl DealerAwaitingShares {
 
         // Get a challenge value to combine statements for the IPP
         let w = self.transcript.challenge_scalar();
-        let Q = w * gen.B;
+        let Q = w * gen.pedersen_generators.B;
 
         let l_vec: Vec<Scalar> = proof_shares
             .iter()
@@ -394,7 +393,7 @@ impl DealerAwaitingShares {
             .iter()
             .flat_map(|ps| ps.r_vec.clone().into_iter())
             .collect();
-        let ipp_proof = inner_product_proof::Proof::create(
+        let ipp_proof = inner_product_proof::InnerProductProof::create(
             &mut self.transcript,
             &Q,
             util::exp_iter(y.invert()),
@@ -442,7 +441,7 @@ pub struct Proof {
     /// Blinding factor for the synthetic commitment to the inner-product arguments
     pub e_blinding: Scalar,
     /// Proof data for the inner-product argument.
-    pub ipp_proof: inner_product_proof::Proof,
+    pub ipp_proof: inner_product_proof::InnerProductProof,
 
     // FIXME: don't need if doing inner product proof
     pub l: Vec<Scalar>,
@@ -455,8 +454,10 @@ impl Proof {
     }
 
     pub fn create_multi<R: Rng>(values: Vec<u64>, n: usize, rng: &mut R) -> Proof {
+        use generators::{PedersenGenerators,Generators};
+
         let m = values.len();
-        let generators = Generators::new(n, m);
+        let generators = Generators::new(PedersenGenerators::default(), n, m);
 
         let parties: Vec<_> = values
             .iter()
@@ -486,10 +487,12 @@ impl Proof {
     }
 
     pub fn verify<R: Rng>(&self, rng: &mut R) -> Result<(), ()> {
+        use generators::{PedersenGenerators,Generators};
+
         let n = self.n;
         let m = self.value_commitments.len();
 
-        let generators = Generators::new(n, m);
+        let generators = Generators::new(PedersenGenerators::default(), n, m);
         let gen = generators.all();
 
         let mut transcript = ProofTranscript::new(b"MultiRangeProof");
@@ -544,7 +547,7 @@ impl Proof {
                 z + exp_y_inv * (zz * z_and_2 - b * s_i_inv)
             });
 
-        let mega_check = ristretto::vartime::multiscalar_mult(
+        let mega_check = ristretto::vartime::multiscalar_mul(
             iter::once(Scalar::one())
                 .chain(iter::once(x))
                 .chain(util::exp_iter(z).take(m).map(|z_exp| c * zz * z_exp))
@@ -564,8 +567,8 @@ impl Proof {
                 .chain(self.value_commitments.iter())
                 .chain(iter::once(&self.T_1))
                 .chain(iter::once(&self.T_2))
-                .chain(iter::once(gen.B_blinding))
-                .chain(iter::once(gen.B))
+                .chain(iter::once(&gen.pedersen_generators.B_blinding))
+                .chain(iter::once(&gen.pedersen_generators.B))
                 .chain(gen.G.iter())
                 .chain(gen.H.iter())
                 .chain(self.ipp_proof.L_vec.iter())
@@ -614,9 +617,9 @@ fn pedersen_commitment<R: Rng>(
 ) -> (RistrettoPoint, Scalar) {
     let blinding = Scalar::random(&mut rng);
 
-    let commitment = ristretto::multiscalar_mult(
+    let commitment = ristretto::multiscalar_mul(
         iter::once(scalar).chain(iter::once(&blinding)),
-        iter::once(generators.B).chain(iter::once(generators.B_blinding)),
+        iter::once(generators.pedersen_generators.B).chain(iter::once(generators.pedersen_generators.B_blinding)),
     );
     (commitment, blinding)
 }
@@ -634,9 +637,9 @@ where
     let blinding = Scalar::random(&mut rng);
     // FIXME: we do this because of lifetime mismatch of scalars and &blinding.
     let scalars: Vec<_> = scalars.into_iter().collect();
-    let C = ristretto::multiscalar_mult(
+    let C = ristretto::multiscalar_mul(
         iter::once(&blinding).chain(scalars.into_iter()),
-        iter::once(generators.B_blinding)
+        iter::once(&generators.pedersen_generators.B_blinding)
             .chain(generators.G.iter())
             .chain(generators.H.iter()),
     );
@@ -689,40 +692,3 @@ mod tests {
         test_u64(8);
     }
 }
-
-// #[cfg(test)]
-// mod bench {
-//     use super::*;
-//     use rand::OsRng;
-//     use test::Bencher;
-
-//     fn make_u32(m: usize, b: &mut Bencher) {
-//         let mut rng = OsRng::new().unwrap();
-//         let v: Vec<u64>  = iter::repeat(())
-//             .map(|()| rng.next_u32() as u64).take(m).collect();
-//         b.iter(|| Proof::create_multi(v, 32, &mut rng));
-//     }
-
-//     fn make_u64(m: usize, b: &mut Bencher) {
-//         let mut rng: OsRng = OsRng::new().unwrap();
-//         let v: Vec<u64> = iter::repeat(())
-//             .map(|()| rng.next_u32() as u64).take(m).collect();
-//         b.iter(|| Proof::create_multi(v, 32, &mut rng));
-//     }
-
-//     fn verify_u32(m: usize, b: &mut Bencher) {
-//         let mut rng: OsRng = OsRng::new().unwrap();
-//         let v: Vec<u64> = iter::repeat(())
-//             .map(|()| rng.next_u32() as u64).take(m).collect();
-//         let rp = Proof::create_multi(v, 32, &mut rng);
-//         b.iter(|| rp.verify(&mut rng));
-//     }
-
-//     fn verify_u64(m: usize, b: &mut Bencher) {
-//         let mut rng: OsRng = OsRng::new().unwrap();
-//         let v: Vec<u64> = iter::repeat(())
-//             .map(|()| rng.next_u64()).take(m).collect();
-//         let rp = Proof::create_multi(v, 64, &mut rng);
-//         b.iter(|| rp.verify(&mut rng));
-//     }
-// }

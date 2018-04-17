@@ -31,15 +31,17 @@ use byteorder::{ByteOrder, LittleEndian};
 /// ensure that their challenge values are bound to the *entire* proof
 /// transcript, not just the sub-protocol.
 ///
-/// Internally, the `ProofTranscript` uses the Keccak sponge to
-/// absorb messages and squeeze challenges.
+/// Internally, the `ProofTranscript` is supposed to use Keccak to
+/// absorb incoming messages and to squeeze challenges.  The
+/// construction currently used is ad-hoc, has no security analysis,
+/// and is **only suitable for testing**.
 ///
 /// # Example
 ///
 /// ```
 /// # extern crate curve25519_dalek;
 /// # extern crate ristretto_bulletproofs;
-/// # use ristretto_bulletproofs::proof_transcript::ProofTranscript;
+/// # use ristretto_bulletproofs::ProofTranscript;
 /// # fn main() {
 ///
 /// use curve25519_dalek::constants;

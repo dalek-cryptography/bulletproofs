@@ -2,6 +2,13 @@
 #![allow(non_snake_case)]
 
 use curve25519_dalek::scalar::Scalar;
+use inner_product_proof::inner_product;
+
+/// Represents a degree-1 vector polynomial \\(\mathbf{a} + \mathbf{b} \cdot x\\).
+pub struct VecPoly1(pub Vec<Scalar>, pub Vec<Scalar>);
+
+/// Represents a degree-2 scalar polynomial \\(a + b \cdot x + c \cdot x^2\\)
+pub struct Poly2(pub Scalar, pub Scalar, pub Scalar);
 
 pub struct PolyDeg3(pub Scalar, pub Scalar, pub Scalar);
 
@@ -35,14 +42,24 @@ pub fn exp_iter(x: Scalar) -> ScalarExp {
     ScalarExp { x, next_exp_x }
 }
 
-pub struct VecPoly2(pub Vec<Scalar>, pub Vec<Scalar>);
+pub fn add_vec(a: &[Scalar], b: &[Scalar]) -> Vec<Scalar> {
+    let mut out = Vec::new();
+    if a.len() != b.len() {
+        // throw some error
+        println!("lengths of vectors don't match for vector addition");
+    }
+    for i in 0..a.len() {
+        out.push(a[i] + b[i]);
+    }
+    out
+}
 
-impl VecPoly2 {
-    pub fn zero(n: usize) -> VecPoly2 {
-        VecPoly2(vec![Scalar::zero(); n], vec![Scalar::zero(); n])
+impl VecPoly1 {
+    pub fn zero(n: usize) -> Self {
+        VecPoly1(vec![Scalar::zero(); n], vec![Scalar::zero(); n])
     }
 
-    pub fn inner_product(&self, rhs: &VecPoly2) -> PolyDeg3 {
+    pub fn inner_product(&self, rhs: &VecPoly1) -> Poly2 {
         // Uses Karatsuba's method
         let l = self;
         let r = rhs;
@@ -55,7 +72,7 @@ impl VecPoly2 {
 
         let t1 = inner_product(&l0_plus_l1, &r0_plus_r1) - t0 - t2;
 
-        PolyDeg3(t0, t1, t2)
+        Poly2(t0, t1, t2)
     }
 
     pub fn eval(&self, x: Scalar) -> Vec<Scalar> {
@@ -68,29 +85,29 @@ impl VecPoly2 {
     }
 }
 
-pub fn inner_product(a: &[Scalar], b: &[Scalar]) -> Scalar {
-    let mut out = Scalar::zero();
-    if a.len() != b.len() {
-        // throw some error
-        println!("lengths of vectors don't match for inner product multiplication");
+impl Poly2 {
+    pub fn eval(&self, x: Scalar) -> Scalar {
+        self.0 + x * (self.1 + x * self.2)
     }
-    for i in 0..a.len() {
-        out += a[i] * b[i];
-    }
-    out
 }
 
-pub fn add_vec(a: &[Scalar], b: &[Scalar]) -> Vec<Scalar> {
-    let mut out = Vec::new();
-    if a.len() != b.len() {
-        // throw some error
-        println!("lengths of vectors don't match for vector addition");
+/// Raises `x` to the power `n` using binary exponentiation,
+/// with (1 to 2)*lg(n) scalar multiplications.
+/// TODO: a consttime version of this would be awfully similar to a Montgomery ladder.
+pub fn scalar_exp_vartime(x: &Scalar, mut n: u64) -> Scalar {
+    let mut result = Scalar::one();
+    let mut aux = *x; // x, x^2, x^4, x^8, ...
+    while n > 0 {
+        let bit = n & 1;
+        if bit == 1 {
+            result = result * aux;
+        }
+        n = n >> 1;
+        aux = aux * aux; // FIXME: one unnecessary mult at the last step here!
     }
-    for i in 0..a.len() {
-        out.push(a[i] + b[i]);
-    }
-    out
+    result
 }
+
 
 #[cfg(test)]
 mod tests {
@@ -121,5 +138,32 @@ mod tests {
             Scalar::from_u64(5),
         ];
         assert_eq!(Scalar::from_u64(40), inner_product(&a, &b));
+    }
+
+    /// Raises `x` to the power `n`.
+    pub fn scalar_exp_vartime_slow(x: &Scalar, n: u64) -> Scalar {
+        let mut result = Scalar::one();
+        for _ in 0..n {
+            result = result * x;
+        }
+        result
+    }
+
+    #[test]
+    fn scalar_exp() {
+        let x = Scalar::from_bits(
+            *b"\x84\xfc\xbcOx\x12\xa0\x06\xd7\x91\xd9z:'\xdd\x1e!CE\xf7\xb1\xb9Vz\x810sD\x96\x85\xb5\x07",
+        );
+        assert_eq!(scalar_exp_vartime(&x, 0), Scalar::one());
+        assert_eq!(scalar_exp_vartime(&x, 1), x);
+        assert_eq!(scalar_exp_vartime(&x, 2), x * x);
+        assert_eq!(scalar_exp_vartime(&x, 3), x * x * x);
+        assert_eq!(scalar_exp_vartime(&x, 4), x * x * x * x);
+        assert_eq!(scalar_exp_vartime(&x, 5), x * x * x * x * x);
+        assert_eq!(scalar_exp_vartime(&x, 64), scalar_exp_vartime_slow(&x, 64));
+        assert_eq!(
+            scalar_exp_vartime(&x, 0b11001010),
+            scalar_exp_vartime_slow(&x, 0b11001010)
+        );
     }
 }
