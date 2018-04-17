@@ -477,7 +477,7 @@ for the following relation:
     c &{}={}&& {\langle {\mathbf{a}}, {\mathbf{b}} \rangle}
 \end{aligned}
 \\]
-Let’s compress these two statements into one equation using an
+Let’s combine these two statements into one equation using an
 indeterminate variable \\(w \in {\mathbb Z\_{p}^{\times}}\\) and multiplying the
 second equation by an orthogonal generator
 \\(B \in {\mathbb G}\\):
