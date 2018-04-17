@@ -114,24 +114,25 @@ the verifier.
 Proving range statements with bit vectors
 -----------------------------------------
 
-Write the vector of bits of \\(v\\) as \\({\mathbf{a}}\\). If \\({\mathbf{2}}^{n}\\) is the
-vector \\((1,2,4,\ldots,2^{n-1})\\) of powers of \\(2\\), then the \\(v\\) can be 
-represented in binary as follows:
+Let \\({\mathbf{a}}\\) be the vector of bits of \\(v\\).
+Then, \\(v\\) can be represented as an inner product of bits \\({\mathbf{a}}\\)
+and powers of two \\({\mathbf{2}}^{n} = (1,2,4,\ldots,2^{n-1})\\):
 \\[
 \begin{aligned}
   v &= {\langle {\mathbf{a}}, {\mathbf{2}}^{n} \rangle}  \\\\
     &= a_{0}\cdot 2^0 + \dots + a_{n-1}\cdot 2^{n-1}.
 \end{aligned}
 \\]
-We also need a condition representing that \\({\mathbf{a}}\\) is a vector of integers \\(\\{0,1\\}\\):
+We need \\({\mathbf{a}}\\) to be a vector of integers \\(\\{0,1\\}\\),
+which can be expressed with an additional condition
 \\[
 {\mathbf{a}} \circ ({\mathbf{a}} - {\mathbf{1}}) = {\mathbf{0}}^{n},
 \\]
 where \\({\mathbf{x}} \circ {\mathbf{y}}\\) denotes the entry-wise multiplication of two vectors.
-If any bit is not \\(0\\) or \\(1\\), then the result of multiplication will not be zero.
+If any bit is not \\(0\\) or \\(1\\), then the result of multiplication will not be an all-zero vector[^1].
 
-Representing the value in binary makes the range condition \\(v \in [0, 2^{n})\\)
-equivalent to the pair of conditions:
+As a result of representing value in binary, the range condition \\(v \in [0, 2^{n})\\)
+is equivalent to the pair of conditions
 \\[
 \begin{aligned}
   {\langle {\mathbf{a}}, {\mathbf{2}}^{n} \rangle} &= v,  \\\\
@@ -151,13 +152,17 @@ eventually need to make separate commitments to the vectors
 \end{aligned}
 \\]
 
+[^1]: Generally, condition \\(x=0 \vee y=0\\) can be expressed as \\(x \cdot y = 0\\),
+as the multiplication can be zero if and only if any of the terms is zero.
+
+
 Proving vectors of statements with a single statement
 -----------------------------------------------------
 
 The statements above are statements about vectors, or equivalently, a
 vector of statements about each entry. Now, we want to combine these
 into a single statement. Since \\({\mathbf{b}} = {\mathbf{0}}\\) if and only
-if \\({\langle {\mathbf{b}}, {\mathbf{y}}^{n} \rangle} = 0\\) for every \\(y\\)[^1],
+if \\({\langle {\mathbf{b}}, {\mathbf{y}}^{n} \rangle} = 0\\) for every \\(y\\)[^2],
 the statements above are implied by
 \\[
 \begin{aligned}
@@ -178,11 +183,10 @@ z^{2} v
 \end{aligned}
 \\]
 
-[^1]: This is because the polynomial in terms of \\(y\\) is zero at every point
+[^2]: This is because the polynomial in terms of \\(y\\) is zero at every point
 if and only if every term of it is zero. The verifier is going to sample
 a random \\(y\\) after the prover commits to all the values forming the terms of
-that polynomial, making the probability that the prover cheated negligible (\\(2^{-q}\\)),
-where \\(q\\) is the group order (for Edwards 25519 \\(q \approx 2^{252}\\)).
+that polynomial, making the probability that the prover cheated negligible.
 
 
 Combining inner-products
@@ -342,7 +346,7 @@ Notice that the sum of each column is a commitment to the variable in the top
 row using the blinding factor in the second row.
 The sum of all of the columns is
 \\(t(x) B + {\tilde{t}}(x) {\widetilde{B}}\\), a commitment to the value
-of \\(t\\) at the point \\(x\\), using the synthetic blinding factor[^2]
+of \\(t\\) at the point \\(x\\), using the synthetic blinding factor[^3]
 \\[
   {\tilde{t}}(x) = z^{2} {\tilde{v}} + x {\tilde{t}}\_{1} + x^{2} {\tilde{t}}\_{2}.
 \\]
@@ -354,7 +358,7 @@ bottom row of the diagram to check consistency:
   t(x) B + {\tilde{t}}(x) {\widetilde{B}} \stackrel{?}{=} z^2 V + \delta(y,z) B + x T\_{1} + x^{2} T\_{2}.
 \\]
 
-[^2]: The blinding factor is synthetic in the sense that it is
+[^3]: The blinding factor is synthetic in the sense that it is
     synthesized from the blinding factors of the other commitments.
 
 Proving that \\({\mathbf{l}}(x)\\), \\({\mathbf{r}}(x)\\) are correct
