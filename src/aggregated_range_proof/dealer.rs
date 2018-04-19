@@ -1,19 +1,18 @@
 use curve25519_dalek::ristretto::RistrettoPoint;
-use curve25519_dalek::traits::Identity;
 use curve25519_dalek::scalar::Scalar;
-use std::clone::Clone;
-use proof_transcript::ProofTranscript;
+use curve25519_dalek::traits::Identity;
 use generators::GeneratorsView;
-use util::{self};
 use inner_product_proof;
+use proof_transcript::ProofTranscript;
+use std::clone::Clone;
+use util;
 
 use super::messages::*;
-
 
 /// Dealer is an entry-point API for setting up a dealer
 pub struct Dealer {}
 
-impl Dealer{
+impl Dealer {
     /// Creates a new dealer with the given parties and a number of bits
     pub fn new(
         transcript: &mut ProofTranscript,
@@ -58,15 +57,7 @@ impl DealerAwaitingValues {
         let y = transcript.challenge_scalar();
         let z = transcript.challenge_scalar();
 
-        (
-            DealerAwaitingPoly {
-                n: self.n,
-            },
-            ValueChallenge {
-                y,
-                z,
-            }
-        )
+        (DealerAwaitingPoly { n: self.n }, ValueChallenge { y, z })
     }
 }
 
@@ -92,14 +83,7 @@ impl DealerAwaitingPoly {
 
         let x = transcript.challenge_scalar();
 
-        (
-            DealerAwaitingShares {
-                n: self.n,
-            },
-            PolyChallenge {
-                x,
-            }
-        )
+        (DealerAwaitingShares { n: self.n }, PolyChallenge { x })
     }
 }
 
@@ -119,32 +103,35 @@ impl DealerAwaitingShares {
             .iter()
             .map(|ps| ps.value_commitment.V.clone())
             .collect();
-        let A = proof_shares.iter().fold(
-            RistrettoPoint::identity(),
-            |A, ps| A + ps.value_commitment.A,
-        );
-        let S = proof_shares.iter().fold(
-            RistrettoPoint::identity(),
-            |S, ps| S + ps.value_commitment.S,
-        );
-        let T_1 = proof_shares.iter().fold(
-            RistrettoPoint::identity(),
-            |T_1, ps| T_1 + ps.poly_commitment.T_1,
-        );
-        let T_2 = proof_shares.iter().fold(
-            RistrettoPoint::identity(),
-            |T_2, ps| T_2 + ps.poly_commitment.T_2,
-        );
-        let t = proof_shares.iter().fold(
-            Scalar::zero(),
-            |acc, ps| acc + ps.t_x,
-        );
-        let t_x_blinding = proof_shares.iter().fold(Scalar::zero(), |acc, ps| {
-            acc + ps.t_x_blinding
-        });
-        let e_blinding = proof_shares.iter().fold(Scalar::zero(), |acc, ps| {
-            acc + ps.e_blinding
-        });
+        let A = proof_shares
+            .iter()
+            .fold(RistrettoPoint::identity(), |A, ps| {
+                A + ps.value_commitment.A
+            });
+        let S = proof_shares
+            .iter()
+            .fold(RistrettoPoint::identity(), |S, ps| {
+                S + ps.value_commitment.S
+            });
+        let T_1 = proof_shares
+            .iter()
+            .fold(RistrettoPoint::identity(), |T_1, ps| {
+                T_1 + ps.poly_commitment.T_1
+            });
+        let T_2 = proof_shares
+            .iter()
+            .fold(RistrettoPoint::identity(), |T_2, ps| {
+                T_2 + ps.poly_commitment.T_2
+            });
+        let t = proof_shares
+            .iter()
+            .fold(Scalar::zero(), |acc, ps| acc + ps.t_x);
+        let t_x_blinding = proof_shares
+            .iter()
+            .fold(Scalar::zero(), |acc, ps| acc + ps.t_x_blinding);
+        let e_blinding = proof_shares
+            .iter()
+            .fold(Scalar::zero(), |acc, ps| acc + ps.e_blinding);
         transcript.commit(t.as_bytes());
         transcript.commit(t_x_blinding.as_bytes());
         transcript.commit(e_blinding.as_bytes());

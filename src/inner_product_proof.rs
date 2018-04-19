@@ -2,11 +2,11 @@
 
 #![doc(include = "../docs/inner-product-protocol.md")]
 
-use std::iter;
 use std::borrow::Borrow;
+use std::iter;
 
-use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::ristretto;
+use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
 
 use proof_transcript::ProofTranscript;
@@ -193,11 +193,10 @@ impl InnerProductProof {
         // 1/s[i] is s[!i], and !i runs from n-1 to 0 as i runs from 0 to n-1
         let inv_s = s.iter().rev();
 
-        let h_times_b_div_s = Hprime_factors.into_iter().zip(inv_s).map(
-            |(h_i, s_i_inv)| {
-                (self.b * s_i_inv) * h_i.borrow()
-            },
-        );
+        let h_times_b_div_s = Hprime_factors
+            .into_iter()
+            .zip(inv_s)
+            .map(|(h_i, s_i_inv)| (self.b * s_i_inv) * h_i.borrow());
 
         let neg_x_sq = x_sq.iter().map(|xi| -xi);
         let neg_x_inv_sq = x_inv_sq.iter().map(|xi| -xi);
@@ -215,10 +214,13 @@ impl InnerProductProof {
                 .chain(self.R_vec.iter()),
         );
 
-        if expect_P == *P { Ok(()) } else { Err(()) }
+        if expect_P == *P {
+            Ok(())
+        } else {
+            Err(())
+        }
     }
 }
-
 
 /// Computes an inner product of two vectors
 /// \\[
@@ -236,7 +238,6 @@ pub fn inner_product(a: &[Scalar], b: &[Scalar]) -> Scalar {
     out
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -248,7 +249,7 @@ mod tests {
     fn test_helper_create(n: usize) {
         let mut rng = OsRng::new().unwrap();
 
-        use generators::{PedersenGenerators,Generators};
+        use generators::{Generators, PedersenGenerators};
         let gens = Generators::new(PedersenGenerators::default(), n, 1);
         let G = gens.share(0).G.to_vec();
         let H = gens.share(0).H.to_vec();

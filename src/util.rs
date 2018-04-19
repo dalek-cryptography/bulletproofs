@@ -100,7 +100,6 @@ pub fn scalar_exp_vartime(x: &Scalar, mut n: u64) -> Scalar {
     result
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;

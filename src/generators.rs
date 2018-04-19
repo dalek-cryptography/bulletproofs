@@ -101,7 +101,7 @@ impl PedersenGenerators {
     /// Constructs a pair of Pedersen generators
     /// from a pair of generators provided by the user.
     pub fn new(B: RistrettoPoint, B_blinding: RistrettoPoint) -> Self {
-        PedersenGenerators{B,B_blinding}
+        PedersenGenerators { B, B_blinding }
     }
 
     /// Creates a Pedersen commitment using the value scalar and a blinding factor.
@@ -113,8 +113,12 @@ impl PedersenGenerators {
 impl Default for PedersenGenerators {
     fn default() -> Self {
         PedersenGenerators {
-            B: GeneratorsChain::new(b"Bulletproofs.Generators.B").next().unwrap(),
-            B_blinding: GeneratorsChain::new(b"Bulletproofs.Generators.B_blinding").next().unwrap()
+            B: GeneratorsChain::new(b"Bulletproofs.Generators.B")
+                .next()
+                .unwrap(),
+            B_blinding: GeneratorsChain::new(b"Bulletproofs.Generators.B_blinding")
+                .next()
+                .unwrap(),
         }
     }
 }

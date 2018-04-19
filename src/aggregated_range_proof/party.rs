@@ -1,11 +1,11 @@
-use std::iter;
-use rand::Rng;
 use curve25519_dalek::ristretto;
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
-use std::clone::Clone;
 use generators::Generators;
-use util::{self};
+use rand::Rng;
+use std::clone::Clone;
+use std::iter;
+use util;
 
 use super::messages::*;
 
@@ -19,7 +19,10 @@ impl Party {
         n: usize,
         generators: &Generators,
     ) -> PartyAwaitingPosition {
-        let V = generators.share(0).pedersen_generators.commit(Scalar::from_u64(v), v_blinding);
+        let V = generators
+            .share(0)
+            .pedersen_generators
+            .commit(Scalar::from_u64(v), v_blinding);
 
         PartyAwaitingPosition {
             generators: generators,
@@ -145,9 +148,15 @@ impl<'a> PartyAwaitingValueChallenge<'a> {
         // Generate x by committing to T_1, T_2 (line 49-54)
         let t_1_blinding = Scalar::random(rng);
         let t_2_blinding = Scalar::random(rng);
-        let T_1 = self.generators.share(self.j).pedersen_generators.commit(t_poly.1, t_1_blinding);
-        let T_2 = self.generators.share(self.j).pedersen_generators.commit(t_poly.2, t_2_blinding);
-           
+        let T_1 = self.generators
+            .share(self.j)
+            .pedersen_generators
+            .commit(t_poly.1, t_1_blinding);
+        let T_2 = self.generators
+            .share(self.j)
+            .pedersen_generators
+            .commit(t_poly.2, t_2_blinding);
+
         let poly_commitment = PolyCommitment { T_1, T_2 };
 
         let papc = PartyAwaitingPolyChallenge {

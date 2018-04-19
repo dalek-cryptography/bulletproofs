@@ -1,19 +1,19 @@
-use std::iter;
-use rand::Rng;
 use curve25519_dalek::scalar::Scalar;
 use proof_transcript::ProofTranscript;
+use rand::Rng;
+use std::iter;
 
+use super::dealer::*;
 use super::messages::*;
 use super::party::*;
-use super::dealer::*;
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use rand::OsRng;
 
-    fn create_multi<R: Rng>(rng: &mut R, values: Vec<u64>, n: usize, ) -> Proof {
-        use generators::{PedersenGenerators,Generators};
+    fn create_multi<R: Rng>(rng: &mut R, values: Vec<u64>, n: usize) -> Proof {
+        use generators::{Generators, PedersenGenerators};
 
         let m = values.len();
         let generators = Generators::new(PedersenGenerators::default(), n, m);
@@ -35,18 +35,28 @@ mod tests {
             .map(|(j, p)| p.assign_position(j, rng))
             .unzip();
 
-        let (dealer, value_challenge) = dealer.receive_value_commitments(&mut transcript, &value_commitments);
+        let (dealer, value_challenge) =
+            dealer.receive_value_commitments(&mut transcript, &value_commitments);
 
         let (parties, poly_commitments): (Vec<_>, Vec<_>) = parties
             .into_iter()
             .map(|p| p.apply_challenge(&value_challenge, rng))
             .unzip();
 
-        let (dealer, poly_challenge) = dealer.receive_poly_commitments(&mut transcript, &poly_commitments);
+        let (dealer, poly_challenge) =
+            dealer.receive_poly_commitments(&mut transcript, &poly_commitments);
 
-        let proof_shares: Vec<ProofShare> = parties.into_iter().map(|p| p.apply_challenge(&poly_challenge)).collect();
+        let proof_shares: Vec<ProofShare> = parties
+            .into_iter()
+            .map(|p| p.apply_challenge(&poly_challenge))
+            .collect();
 
-        dealer.receive_shares(&mut transcript, &proof_shares, &generators.all(), value_challenge.y)
+        dealer.receive_shares(
+            &mut transcript,
+            &proof_shares,
+            &generators.all(),
+            value_challenge.y,
+        )
     }
 
     fn test_u32(m: usize) {
@@ -54,7 +64,9 @@ mod tests {
         let mut transcript = ProofTranscript::new(b"AggregatedRangeProofTest");
 
         let v: Vec<u64> = iter::repeat(())
-            .map(|()| rng.next_u32() as u64).take(m).collect();
+            .map(|()| rng.next_u32() as u64)
+            .take(m)
+            .collect();
         let rp = create_multi(&mut rng, v, 32);
         assert!(rp.verify(&mut rng, &mut transcript).is_ok());
     }
@@ -63,8 +75,7 @@ mod tests {
         let mut rng = OsRng::new().unwrap();
         let mut transcript = ProofTranscript::new(b"AggregatedRangeProofTest");
 
-        let v: Vec<u64> = iter::repeat(())
-            .map(|()| rng.next_u64()).take(m).collect();
+        let v: Vec<u64> = iter::repeat(()).map(|()| rng.next_u64()).take(m).collect();
         let rp = create_multi(&mut rng, v, 64);
         assert!(rp.verify(&mut rng, &mut transcript).is_ok());
     }
