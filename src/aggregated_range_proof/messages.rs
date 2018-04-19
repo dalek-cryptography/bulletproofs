@@ -68,10 +68,6 @@ pub struct Proof {
     pub e_blinding: Scalar,
     /// Proof data for the inner-product argument.
     pub ipp_proof: inner_product_proof::InnerProductProof,
-
-    // FIXME: don't need if doing inner product proof
-    pub l: Vec<Scalar>,
-    pub r: Vec<Scalar>,
 }
 
 impl Proof {
@@ -101,18 +97,18 @@ impl Proof {
             .map(|(j, p)| p.assign_position(j, rng))
             .unzip();
 
-        let (dealer, y, z) = dealer.receive_value_commitments(&value_commitments);
+        let (dealer, value_challenge) = dealer.receive_value_commitments(&value_commitments);
 
         let (parties, poly_commitments): (Vec<_>, Vec<_>) = parties
             .iter()
-            .map(|p| p.apply_challenge(&ValueChallenge{y:y, z:z}, rng))
+            .map(|p| p.apply_challenge(&value_challenge, rng))
             .unzip();
 
-        let (dealer, x) = dealer.receive_poly_commitments(&poly_commitments);
+        let (dealer, poly_challenge) = dealer.receive_poly_commitments(&poly_commitments);
 
-        let proof_shares: Vec<ProofShare> = parties.iter().map(|p| p.apply_challenge(&PolyChallenge{x:x})).collect();
+        let proof_shares: Vec<ProofShare> = parties.iter().map(|p| p.apply_challenge(&poly_challenge)).collect();
 
-        dealer.receive_shares(&proof_shares, &generators.all(), y)
+        dealer.receive_shares(&proof_shares, &generators.all(), value_challenge.y)
     }
 
     pub fn verify<R: Rng>(&self, rng: &mut R) -> Result<(), ()> {

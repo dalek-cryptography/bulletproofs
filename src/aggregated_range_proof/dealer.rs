@@ -38,7 +38,7 @@ impl DealerAwaitingValues {
     pub fn receive_value_commitments(
         mut self,
         vc: &Vec<ValueCommitment>,
-    ) -> (DealerAwaitingPoly, Scalar, Scalar) {
+    ) -> (DealerAwaitingPoly, ValueChallenge) {
         // TODO: test that vc is length `m`.
         let mut A = RistrettoPoint::identity();
         let mut S = RistrettoPoint::identity();
@@ -63,8 +63,10 @@ impl DealerAwaitingValues {
                 transcript: self.transcript,
                 n: self.n,
             },
-            y,
-            z,
+            ValueChallenge {
+                y,
+                z,
+            }
         )
     }
 }
@@ -78,7 +80,7 @@ impl DealerAwaitingPoly {
     pub fn receive_poly_commitments(
         mut self,
         poly_commitments: &Vec<PolyCommitment>,
-    ) -> (DealerAwaitingShares, Scalar) {
+    ) -> (DealerAwaitingShares, PolyChallenge) {
         // Commit sums of T1s and T2s.
         let mut T1 = RistrettoPoint::identity();
         let mut T2 = RistrettoPoint::identity();
@@ -96,7 +98,9 @@ impl DealerAwaitingPoly {
                 transcript: self.transcript,
                 n: self.n,
             },
-            x,
+            PolyChallenge {
+                x,
+            }
         )
     }
 }
@@ -180,8 +184,6 @@ impl DealerAwaitingShares {
             t_x_blinding,
             e_blinding,
             ipp_proof,
-            l: l_vec,
-            r: r_vec,
         }
     }
 }
