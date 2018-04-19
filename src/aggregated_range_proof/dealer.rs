@@ -13,22 +13,21 @@ use super::messages::*;
 /// Dealer is an entry-point API for setting up a dealer
 pub struct Dealer {}
 
-impl Dealer {
+impl Dealer{
     /// Creates a new dealer with the given parties and a number of bits
     pub fn new(
+        transcript: &mut ProofTranscript,
         n: usize,
         m: usize,
     ) -> Result<DealerAwaitingValues, &'static str> {
-        let mut transcript = ProofTranscript::new(b"MultiRangeProof");
         transcript.commit_u64(n as u64);
         transcript.commit_u64(m as u64);
-        Ok(DealerAwaitingValues { transcript, n, m })
+        Ok(DealerAwaitingValues { n, m })
     }
 }
 
 /// When the dealer is initialized, it only knows the size of the set.
 pub struct DealerAwaitingValues {
-    transcript: ProofTranscript,
     n: usize,
     m: usize,
 }
@@ -36,7 +35,8 @@ pub struct DealerAwaitingValues {
 impl DealerAwaitingValues {
     /// Combines commitments and computes challenge variables.
     pub fn receive_value_commitments(
-        mut self,
+        self,
+        transcript: &mut ProofTranscript,
         vc: &Vec<ValueCommitment>,
     ) -> (DealerAwaitingPoly, ValueChallenge) {
         // TODO: test that vc is length `m`.
@@ -45,22 +45,21 @@ impl DealerAwaitingValues {
 
         for commitment in vc.iter() {
             // Commit each V individually
-            self.transcript.commit(commitment.V.compress().as_bytes());
+            transcript.commit(commitment.V.compress().as_bytes());
 
             // Commit sums of As and Ss.
             A += commitment.A;
             S += commitment.S;
         }
 
-        self.transcript.commit(A.compress().as_bytes());
-        self.transcript.commit(S.compress().as_bytes());
+        transcript.commit(A.compress().as_bytes());
+        transcript.commit(S.compress().as_bytes());
 
-        let y = self.transcript.challenge_scalar();
-        let z = self.transcript.challenge_scalar();
+        let y = transcript.challenge_scalar();
+        let z = transcript.challenge_scalar();
 
         (
             DealerAwaitingPoly {
-                transcript: self.transcript,
                 n: self.n,
             },
             ValueChallenge {
@@ -72,13 +71,13 @@ impl DealerAwaitingValues {
 }
 
 pub struct DealerAwaitingPoly {
-    transcript: ProofTranscript,
     n: usize,
 }
 
 impl DealerAwaitingPoly {
     pub fn receive_poly_commitments(
-        mut self,
+        self,
+        transcript: &mut ProofTranscript,
         poly_commitments: &Vec<PolyCommitment>,
     ) -> (DealerAwaitingShares, PolyChallenge) {
         // Commit sums of T1s and T2s.
@@ -88,14 +87,13 @@ impl DealerAwaitingPoly {
             T1 += commitment.T_1;
             T2 += commitment.T_2;
         }
-        self.transcript.commit(T1.compress().as_bytes());
-        self.transcript.commit(T2.compress().as_bytes());
+        transcript.commit(T1.compress().as_bytes());
+        transcript.commit(T2.compress().as_bytes());
 
-        let x = self.transcript.challenge_scalar();
+        let x = transcript.challenge_scalar();
 
         (
             DealerAwaitingShares {
-                transcript: self.transcript,
                 n: self.n,
             },
             PolyChallenge {
@@ -106,13 +104,13 @@ impl DealerAwaitingPoly {
 }
 
 pub struct DealerAwaitingShares {
-    transcript: ProofTranscript,
     n: usize,
 }
 
 impl DealerAwaitingShares {
     pub fn receive_shares(
-        mut self,
+        self,
+        transcript: &mut ProofTranscript,
         proof_shares: &Vec<ProofShare>,
         gen: &GeneratorsView,
         y: Scalar,
@@ -147,12 +145,12 @@ impl DealerAwaitingShares {
         let e_blinding = proof_shares.iter().fold(Scalar::zero(), |acc, ps| {
             acc + ps.e_blinding
         });
-        self.transcript.commit(t.as_bytes());
-        self.transcript.commit(t_x_blinding.as_bytes());
-        self.transcript.commit(e_blinding.as_bytes());
+        transcript.commit(t.as_bytes());
+        transcript.commit(t_x_blinding.as_bytes());
+        transcript.commit(e_blinding.as_bytes());
 
         // Get a challenge value to combine statements for the IPP
-        let w = self.transcript.challenge_scalar();
+        let w = transcript.challenge_scalar();
         let Q = w * gen.pedersen_generators.B;
 
         let l_vec: Vec<Scalar> = proof_shares
@@ -164,7 +162,7 @@ impl DealerAwaitingShares {
             .flat_map(|ps| ps.r_vec.clone().into_iter())
             .collect();
         let ipp_proof = inner_product_proof::InnerProductProof::create(
-            &mut self.transcript,
+            transcript,
             &Q,
             util::exp_iter(y.invert()),
             gen.G.to_vec(),

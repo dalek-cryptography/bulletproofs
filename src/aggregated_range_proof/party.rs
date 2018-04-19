@@ -44,7 +44,7 @@ impl<'a> PartyAwaitingPosition<'a> {
     /// Assigns the position to a party,
     /// at which point the party knows its generators.
     pub fn assign_position<R: Rng>(
-        &self,
+        self,
         j: usize,
         mut rng: &mut R,
     ) -> (PartyAwaitingValueChallenge<'a>, ValueCommitment) {
@@ -112,7 +112,7 @@ pub struct PartyAwaitingValueChallenge<'a> {
 
 impl<'a> PartyAwaitingValueChallenge<'a> {
     pub fn apply_challenge<R: Rng>(
-        &self,
+        self,
         vc: &ValueChallenge,
         rng: &mut R,
     ) -> (PartyAwaitingPolyChallenge, PolyCommitment) {
@@ -186,7 +186,7 @@ pub struct PartyAwaitingPolyChallenge {
 }
 
 impl PartyAwaitingPolyChallenge {
-    pub fn apply_challenge(&self, pc: &PolyChallenge) -> ProofShare {
+    pub fn apply_challenge(self, pc: &PolyChallenge) -> ProofShare {
         // Generate final values for proof (line 55-60)
         let t_blinding_poly = util::Poly2(
             self.z * self.z * self.offset_z * self.v_blinding,

@@ -8,8 +8,6 @@ use curve25519_dalek::ristretto;
 use curve25519_dalek::traits::IsIdentity;
 use proof_transcript::ProofTranscript;
 use util::{self};
-use super::party::*;
-use super::dealer::*;
 
 #[derive(Clone)]
 pub struct ValueCommitment {
@@ -71,7 +69,7 @@ pub struct Proof {
 }
 
 impl Proof {
-    pub fn verify<R: Rng>(&self, rng: &mut R) -> Result<(), ()> {
+    pub fn verify<R: Rng>(&self, rng: &mut R, transcript: &mut ProofTranscript) -> Result<(), ()> {
         use generators::{PedersenGenerators,Generators};
 
         let n = self.n;
@@ -80,7 +78,6 @@ impl Proof {
         let generators = Generators::new(PedersenGenerators::default(), n, m);
         let gen = generators.all();
 
-        let mut transcript = ProofTranscript::new(b"MultiRangeProof");
         transcript.commit_u64(n as u64);
         transcript.commit_u64(m as u64);
 
@@ -109,7 +106,7 @@ impl Proof {
         // Challenge value for batching statements to be verified
         let c = Scalar::random(rng);
 
-        let (x_sq, x_inv_sq, s) = self.ipp_proof.verification_scalars(&mut transcript);
+        let (x_sq, x_inv_sq, s) = self.ipp_proof.verification_scalars(transcript);
 
         let s_inv = s.iter().rev();
 
