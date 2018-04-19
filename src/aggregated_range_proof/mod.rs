@@ -32,7 +32,7 @@ mod tests {
             })
             .collect();
 
-        let dealer = Dealer::new(&mut transcript, n, m);
+        let dealer = Dealer::new(n, m, &mut transcript).unwrap();
 
         let (parties, value_commitments): (Vec<_>, Vec<_>) = parties
             .into_iter()
@@ -40,28 +40,34 @@ mod tests {
             .map(|(j, p)| p.assign_position(j, rng))
             .unzip();
 
-        let (dealer, value_challenge) =
-            dealer.receive_value_commitments(&mut transcript, &value_commitments);
+        // let (a, b) = dealer.receive_value_commitments(&mut transcript, &value_commitments).unwrap();
+
+        let (dealer, value_challenge) = dealer
+            .receive_value_commitments(&value_commitments, &mut transcript)
+            .unwrap();
 
         let (parties, poly_commitments): (Vec<_>, Vec<_>) = parties
             .into_iter()
             .map(|p| p.apply_challenge(&value_challenge, rng))
             .unzip();
 
-        let (dealer, poly_challenge) =
-            dealer.receive_poly_commitments(&mut transcript, &poly_commitments);
+        let (dealer, poly_challenge) = dealer
+            .receive_poly_commitments(&poly_commitments, &mut transcript)
+            .unwrap();
 
         let proof_shares: Vec<ProofShare> = parties
             .into_iter()
             .map(|p| p.apply_challenge(&poly_challenge))
             .collect();
 
-        dealer.receive_shares(
-            &mut transcript,
-            &proof_shares,
-            &generators.all(),
-            value_challenge.y,
-        )
+        dealer
+            .receive_shares(
+                &proof_shares,
+                &generators.all(),
+                value_challenge.y,
+                &mut transcript,
+            )
+            .unwrap()
     }
 
     fn test_u32(m: usize) {
