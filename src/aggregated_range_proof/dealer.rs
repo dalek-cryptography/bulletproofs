@@ -61,13 +61,15 @@ impl DealerAwaitingValueCommitments {
 
         let y = transcript.challenge_scalar();
         let z = transcript.challenge_scalar();
+        let value_challenge = ValueChallenge { y, z };
 
         Ok((
             DealerAwaitingPolyCommitments {
                 n: self.n,
                 m: self.m,
+                value_challenge: value_challenge.clone(),
             },
-            ValueChallenge { y, z },
+            value_challenge,
         ))
     }
 }
@@ -76,6 +78,7 @@ impl DealerAwaitingValueCommitments {
 pub struct DealerAwaitingPolyCommitments {
     n: usize,
     m: usize,
+    value_challenge: ValueChallenge,
 }
 
 impl DealerAwaitingPolyCommitments {
@@ -101,13 +104,16 @@ impl DealerAwaitingPolyCommitments {
         transcript.commit(T2.compress().as_bytes());
 
         let x = transcript.challenge_scalar();
+        let poly_challenge = PolyChallenge { x };
 
         Ok((
             DealerAwaitingProofShares {
                 n: self.n,
                 m: self.m,
+                value_challenge: self.value_challenge,
+                poly_challenge: poly_challenge.clone(),
             },
-            PolyChallenge { x },
+            poly_challenge,
         ))
     }
 }
@@ -116,6 +122,8 @@ impl DealerAwaitingPolyCommitments {
 pub struct DealerAwaitingProofShares {
     n: usize,
     m: usize,
+    value_challenge: ValueChallenge,
+    poly_challenge: PolyChallenge,
 }
 
 impl DealerAwaitingProofShares {
@@ -123,13 +131,23 @@ impl DealerAwaitingProofShares {
         self,
         proof_shares: &Vec<ProofShare>,
         gen: &GeneratorsView,
-        y: Scalar,
         transcript: &mut ProofTranscript,
     ) -> Result<Proof, &'static str> {
         if self.m != proof_shares.len() {
             return Err(
                 "Length of proof shares doesn't match expected length m",
             );
+        }
+
+        for (_j, proof_share) in proof_shares.iter().enumerate() {
+            if proof_share
+                .verify_share(&self.value_challenge, &self.poly_challenge)
+                .is_err()
+            {
+                return Err(
+                    "One of the proof shares is invalid", // TODO: print which one (j) is invalid
+                );
+            }
         }
 
         let value_commitments = proof_shares
@@ -184,7 +202,7 @@ impl DealerAwaitingProofShares {
         let ipp_proof = inner_product_proof::InnerProductProof::create(
             transcript,
             &Q,
-            util::exp_iter(y.invert()),
+            util::exp_iter(self.value_challenge.y.invert()),
             gen.G.to_vec(),
             gen.H.to_vec(),
             l_vec.clone(),

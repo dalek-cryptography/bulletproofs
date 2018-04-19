@@ -46,7 +46,16 @@ pub struct ProofShare {
     pub r_vec: Vec<Scalar>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+impl ProofShare {
+    pub fn verify_share(
+        &self,
+        value_challenge: &ValueChallenge,
+        poly_challenge: &PolyChallenge,
+    ) -> Result<(), ()> {
+        Ok(())
+    }
+}
+
 pub struct Proof {
     pub n: usize,
     /// Commitment to the value
