@@ -113,31 +113,30 @@ pub struct PartyAwaitingValueChallenge<'a> {
 impl<'a> PartyAwaitingValueChallenge<'a> {
     pub fn apply_challenge<R: Rng>(
         &self,
-        y: &Scalar,
-        z: &Scalar,
+        vc: &ValueChallenge,
         rng: &mut R,
     ) -> (PartyAwaitingPolyChallenge, PolyCommitment) {
         let n = self.n;
-        let offset_y = util::scalar_exp_vartime(&y, (self.j * n) as u64);
-        let offset_z = util::scalar_exp_vartime(&z, self.j as u64);
+        let offset_y = util::scalar_exp_vartime(&vc.y, (self.j * n) as u64);
+        let offset_z = util::scalar_exp_vartime(&vc.z, self.j as u64);
 
         // Calculate t by calculating vectors l0, l1, r0, r1 and multiplying
         let mut l_poly = util::VecPoly1::zero(n);
         let mut r_poly = util::VecPoly1::zero(n);
 
-        let zz = z * z;
+        let zz = vc.z * vc.z;
         let mut exp_y = offset_y; // start at y^j
         let mut exp_2 = Scalar::one(); // start at 2^0 = 1
         for i in 0..n {
             let a_L_i = Scalar::from_u64((self.v >> i) & 1);
             let a_R_i = a_L_i - Scalar::one();
 
-            l_poly.0[i] = a_L_i - z;
+            l_poly.0[i] = a_L_i - vc.z;
             l_poly.1[i] = self.s_L[i];
-            r_poly.0[i] = exp_y * (a_R_i + z) + zz * offset_z * exp_2;
+            r_poly.0[i] = exp_y * (a_R_i + vc.z) + zz * offset_z * exp_2;
             r_poly.1[i] = exp_y * self.s_R[i];
 
-            exp_y = exp_y * y; // y^i -> y^(i+1)
+            exp_y = exp_y * vc.y; // y^i -> y^(i+1)
             exp_2 = exp_2 + exp_2; // 2^i -> 2^(i+1)
         }
 
@@ -152,9 +151,9 @@ impl<'a> PartyAwaitingValueChallenge<'a> {
         let poly_commitment = PolyCommitment { T_1, T_2 };
 
         let papc = PartyAwaitingPolyChallenge {
-            value_commitment: self.value_commitment.clone(),
+            value_commitment: self.value_commitment.clone(), // TODO: don't use clone (should consume self)
             poly_commitment: poly_commitment.clone(),
-            z: *z,
+            z: vc.z,
             offset_z,
             l_poly,
             r_poly,
@@ -187,7 +186,7 @@ pub struct PartyAwaitingPolyChallenge {
 }
 
 impl PartyAwaitingPolyChallenge {
-    pub fn apply_challenge(&self, x: &Scalar) -> ProofShare {
+    pub fn apply_challenge(&self, pc: &PolyChallenge) -> ProofShare {
         // Generate final values for proof (line 55-60)
         let t_blinding_poly = util::Poly2(
             self.z * self.z * self.offset_z * self.v_blinding,
@@ -195,11 +194,11 @@ impl PartyAwaitingPolyChallenge {
             self.t_2_blinding,
         );
 
-        let t_x = self.t_poly.eval(*x);
-        let t_x_blinding = t_blinding_poly.eval(*x);
-        let e_blinding = self.a_blinding + self.s_blinding * x;
-        let l_vec = self.l_poly.eval(*x);
-        let r_vec = self.r_poly.eval(*x);
+        let t_x = self.t_poly.eval(pc.x);
+        let t_x_blinding = t_blinding_poly.eval(pc.x);
+        let e_blinding = self.a_blinding + self.s_blinding * &pc.x;
+        let l_vec = self.l_poly.eval(pc.x);
+        let r_vec = self.r_poly.eval(pc.x);
 
         ProofShare {
             value_commitment: self.value_commitment.clone(),

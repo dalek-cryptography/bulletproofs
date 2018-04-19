@@ -18,10 +18,19 @@ pub struct ValueCommitment {
     pub S: RistrettoPoint,
 }
 
+pub struct ValueChallenge {
+	pub y: Scalar,
+	pub z: Scalar,
+}
+
 #[derive(Clone)]
 pub struct PolyCommitment {
     pub T_1: RistrettoPoint,
     pub T_2: RistrettoPoint,
+}
+
+pub struct PolyChallenge {
+	pub x: Scalar,
 }
 
 #[derive(Clone)]
@@ -92,18 +101,18 @@ impl Proof {
             .map(|(j, p)| p.assign_position(j, rng))
             .unzip();
 
-        let (dealer, y, z) = dealer.present_value_commitments(&value_commitments);
+        let (dealer, y, z) = dealer.receive_value_commitments(&value_commitments);
 
         let (parties, poly_commitments): (Vec<_>, Vec<_>) = parties
             .iter()
-            .map(|p| p.apply_challenge(&y, &z, rng))
+            .map(|p| p.apply_challenge(&ValueChallenge{y:y, z:z}, rng))
             .unzip();
 
-        let (dealer, x) = dealer.present_poly_commitments(&poly_commitments);
+        let (dealer, x) = dealer.receive_poly_commitments(&poly_commitments);
 
-        let proof_shares: Vec<ProofShare> = parties.iter().map(|p| p.apply_challenge(&x)).collect();
+        let proof_shares: Vec<ProofShare> = parties.iter().map(|p| p.apply_challenge(&PolyChallenge{x:x})).collect();
 
-        dealer.present_shares(&proof_shares, &generators.all(), y)
+        dealer.receive_shares(&proof_shares, &generators.all(), y)
     }
 
     pub fn verify<R: Rng>(&self, rng: &mut R) -> Result<(), ()> {
@@ -167,17 +176,17 @@ impl Proof {
                 z + exp_y_inv * (zz * z_and_2 - b * s_i_inv)
             });
 
+        let value_commitment_scalars = util::exp_iter(z).take(m).map(|z_exp| c * zz * z_exp);
+        let basepoint_scalar =  w * (self.t_x - a * b) + c * (delta(n, m, &y, &z) - self.t_x);
+
         let mega_check = ristretto::vartime::multiscalar_mul(
             iter::once(Scalar::one())
                 .chain(iter::once(x))
-                .chain(util::exp_iter(z).take(m).map(|z_exp| c * zz * z_exp))
+                .chain(value_commitment_scalars)
                 .chain(iter::once(c * x))
                 .chain(iter::once(c * x * x))
                 .chain(iter::once(-self.e_blinding - c * self.t_x_blinding))
-                .chain(iter::once(
-                    w * (self.t_x - a * b) +
-                        c * (delta(n, m, &y, &z) - self.t_x),
-                ))
+                .chain(iter::once(basepoint_scalar))
                 .chain(g)
                 .chain(h)
                 .chain(x_sq.iter().cloned())

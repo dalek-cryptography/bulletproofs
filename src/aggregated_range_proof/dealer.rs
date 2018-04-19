@@ -22,7 +22,7 @@ impl Dealer {
         let mut transcript = ProofTranscript::new(b"MultiRangeProof");
         transcript.commit_u64(n as u64);
         transcript.commit_u64(m as u64);
-        Ok(DealerAwaitingValues { transcript, n })
+        Ok(DealerAwaitingValues { transcript, n, m })
     }
 }
 
@@ -30,14 +30,16 @@ impl Dealer {
 pub struct DealerAwaitingValues {
     transcript: ProofTranscript,
     n: usize,
+    m: usize,
 }
 
 impl DealerAwaitingValues {
     /// Combines commitments and computes challenge variables.
-    pub fn present_value_commitments(
+    pub fn receive_value_commitments(
         mut self,
         vc: &Vec<ValueCommitment>,
     ) -> (DealerAwaitingPoly, Scalar, Scalar) {
+        // TODO: test that vc is length `m`.
         let mut A = RistrettoPoint::identity();
         let mut S = RistrettoPoint::identity();
 
@@ -73,7 +75,7 @@ pub struct DealerAwaitingPoly {
 }
 
 impl DealerAwaitingPoly {
-    pub fn present_poly_commitments(
+    pub fn receive_poly_commitments(
         mut self,
         poly_commitments: &Vec<PolyCommitment>,
     ) -> (DealerAwaitingShares, Scalar) {
@@ -105,7 +107,7 @@ pub struct DealerAwaitingShares {
 }
 
 impl DealerAwaitingShares {
-    pub fn present_shares(
+    pub fn receive_shares(
         mut self,
         proof_shares: &Vec<ProofShare>,
         gen: &GeneratorsView,
