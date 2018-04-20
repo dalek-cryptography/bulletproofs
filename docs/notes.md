@@ -115,7 +115,7 @@ Proving range statements with bit vectors
 -----------------------------------------
 
 Let \\({\mathbf{a}}\\) be the vector of bits of \\(v\\).
-Then, \\(v\\) can be represented as an inner product of bits \\({\mathbf{a}}\\)
+Then \\(v\\) can be represented as an inner product of bits \\({\mathbf{a}}\\)
 and powers of two \\({\mathbf{2}}^{n} = (1,2,4,\ldots,2^{n-1})\\):
 \\[
 \begin{aligned}
@@ -126,7 +126,7 @@ and powers of two \\({\mathbf{2}}^{n} = (1,2,4,\ldots,2^{n-1})\\):
 We need \\({\mathbf{a}}\\) to be a vector of integers \\(\\{0,1\\}\\).
 This can be expressed with an additional condition
 \\[
-{\mathbf{a}} \circ ({\mathbf{a}} - {\mathbf{1}}) = {\mathbf{0}}^{n},
+{\mathbf{a}} \circ ({\mathbf{a}} - {\mathbf{1}}) = {\mathbf{0}},
 \\]
 where \\({\mathbf{x}} \circ {\mathbf{y}}\\) denotes the entry-wise multiplication of two vectors.
 The result of multiplication can be all-zero if and only if every bit is actually \\(0\\) or \\(1\\)[^1].
@@ -136,7 +136,7 @@ is equivalent to the pair of conditions
 \\[
 \begin{aligned}
   {\langle {\mathbf{a}}, {\mathbf{2}}^{n} \rangle} &= v,  \\\\
-  {\mathbf{a}} \circ ({\mathbf{a}} - {\mathbf{1}}) &= {\mathbf{0}}^{n}.
+  {\mathbf{a}} \circ ({\mathbf{a}} - {\mathbf{1}}) &= {\mathbf{0}}.
 \end{aligned}
 \\]
 We will
@@ -153,7 +153,8 @@ eventually need to make separate commitments to the vectors
 \\]
 
 [^1]: Generally, condition \\(x=0 \vee y=0\\) can be expressed as \\(x \cdot y = 0\\),
-as the product can be zero if and only if one of the terms is zero.
+as the product can be zero if and only if at least one of the terms is zero.
+This trick allows implementing logical `OR` with any number of terms.
 
 
 Proving vectors of statements with a single statement
@@ -187,6 +188,7 @@ z^{2} v
 if and only if every term of it is zero. The verifier is going to sample
 a random \\(y\\) after the prover commits to all the values forming the terms of
 that polynomial, making the probability that the prover cheated negligible.
+This trick allows implementing logical `AND` with any number of terms.
 
 
 Combining inner-products
