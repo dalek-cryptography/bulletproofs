@@ -129,7 +129,7 @@ This can be expressed with an additional condition
 {\mathbf{a}} \circ ({\mathbf{a}} - {\mathbf{1}}) = {\mathbf{0}},
 \\]
 where \\({\mathbf{x}} \circ {\mathbf{y}}\\) denotes the entry-wise multiplication of two vectors.
-The result of multiplication can be all-zero if and only if every bit is actually \\(0\\) or \\(1\\)[^1].
+The result of multiplication can be all-zero if and only if every bit is actually \\(0\\) or[^1] \\(1\\).
 
 As a result of representing value in binary, the range condition \\(v \in [0, 2^{n})\\)
 is equivalent to the pair of conditions
@@ -161,9 +161,12 @@ Proving vectors of statements with a single statement
 -----------------------------------------------------
 
 The statements above are statements about vectors, or equivalently, a
-vector of statements about each entry. Now, we want to combine these
-into a single statement. Since \\({\mathbf{b}} = {\mathbf{0}}\\) if and only
-if \\({\langle {\mathbf{b}}, {\mathbf{y}}^{n} \rangle} = 0\\) for every \\(y\\)[^2],
+vector of statements about each entry. We want to combine all of these
+into a single statement.
+
+First, we will combine each of the two vector-statements into a single statement.
+Since \\({\mathbf{b}} = {\mathbf{0}}\\) if and only
+if[^2] \\({\langle {\mathbf{b}}, {\mathbf{y}}^{n} \rangle} = 0\\) for every \\(y\\),
 the statements above are implied by
 \\[
 \begin{aligned}
@@ -172,8 +175,10 @@ the statements above are implied by
   {\langle {\mathbf{a}}\_{L}, {\mathbf{a}}\_{R} \circ {\mathbf{y}}^{n} \rangle} &= 0
 \end{aligned}
 \\]
-for the verifier’s choice of a challenge value \\(y\\). These statements can
-then be combined in the same way, using the verifier’s choice of \\(z\\):
+for the verifier’s choice of a challenge value \\(y\\).
+
+The three resulting statements can then be combined in the same way,
+using the verifier’s choice of \\(z\\):
 \\[
 \begin{aligned}
 z^{2} v 
