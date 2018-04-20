@@ -139,9 +139,9 @@ impl DealerAwaitingProofShares {
             );
         }
 
-        for (_j, proof_share) in proof_shares.iter().enumerate() {
+        for (j, proof_share) in proof_shares.iter().enumerate() {
             if proof_share
-                .verify_share(&self.value_challenge, &self.poly_challenge)
+                .verify_share(self.n, j, &self.value_challenge, &self.poly_challenge)
                 .is_err()
             {
                 return Err(

@@ -49,9 +49,101 @@ pub struct ProofShare {
 impl ProofShare {
     pub fn verify_share(
         &self,
+        n: usize,
+        j: usize,
         value_challenge: &ValueChallenge,
         poly_challenge: &PolyChallenge,
-    ) -> Result<(), ()> {
+    ) -> Result<(), &'static str> {
+    	use generators::{Generators, PedersenGenerators};
+    	let generators = Generators::new(PedersenGenerators::default(), n, j+1);
+    	let gen = generators.share(j);
+
+    	// renames for convenience
+    	let y = value_challenge.y;
+    	let y_inv = y.invert();
+    	let z = value_challenge.z;
+        let zz = z * z;
+        let minus_z = -z;
+        let x = poly_challenge.x;
+        let one = Scalar::one();
+        let two = Scalar::from_u64(2);
+
+    	if self.t_x != inner_product_proof::inner_product(&self.l_vec, &self.r_vec) {
+    		return Err("Inner product of l_vec and r_vec is not equal to t_x")
+    	}
+
+    	// TODO: find a better way to calculate this :(
+		let mut y_j_inv = one; // y^(-j) when j=0
+		let mut y_j = one; // y^j when j=0
+		let mut z_j = one; // z^j when j=0
+		for _ in 0..j {
+			y_j_inv = y_j_inv * y_inv;
+			y_j = y_j * y;
+			z_j = z_j * z;
+		}
+    	// if j != 0 {
+	    // 	y_neg_j = util::exp_iter(value_challenge.y.invert()).take(j).last().unwrap(); // y^(-j)
+	    // 	z_j = util::exp_iter(value_challenge.z).take(j).last().unwrap(); // z^j
+    	// }
+
+    	let g = self.l_vec.iter().map(|l_i| minus_z - l_i );
+    	let h = self.r_vec.iter()
+    		.zip(util::exp_iter(two))
+    		.zip(util::exp_iter(y_inv))
+    		.map(|((r_i, exp_2), exp_y_inv)| 
+    			z + 
+    			exp_y_inv * y_j_inv * (- r_i) + 
+    			exp_y_inv * y_j_inv * (zz * z_j * exp_2)
+    		);
+    	
+    	let P_check = ristretto::vartime::multiscalar_mul(
+    		iter::once(Scalar::one())
+    			.chain(iter::once(x))
+    			.chain(iter::once(- self.e_blinding))
+    			.chain(g)
+    			.chain(h),
+
+    		iter::once(&self.value_commitment.A)
+    			.chain(iter::once(&self.value_commitment.S))
+    			.chain(iter::once(&gen.pedersen_generators.B_blinding))
+    			.chain(gen.G.iter())
+    			.chain(gen.H.iter())
+    	);
+
+    	if !P_check.is_identity() {
+    		return Err("P check is not equal to zero")
+    	}
+
+   		///////// calculate delta
+	    // XXX this could be more efficient, esp for powers of 2
+	    let sum_of_powers_of_y = util::exp_iter(y)
+	        .take(n)
+	        .fold(Scalar::zero(), |acc, x| acc + x);
+
+	    // XXX TODO: just calculate (2^n - 1) instead
+	    let sum_of_powers_of_2 = util::exp_iter(two)
+	        .take(n)
+	        .fold(Scalar::zero(), |acc, x| acc + x);
+
+    	let delta = (z - zz) * sum_of_powers_of_y * y_j - z * zz * sum_of_powers_of_2 * z_j;
+
+    	let t_check = ristretto::vartime::multiscalar_mul(
+    		iter::once(zz * z_j)
+    		.chain(iter::once(x))
+    		.chain(iter::once(x * x))
+    		.chain(iter::once(delta - self.t_x))
+    		.chain(iter::once(-self.t_x_blinding)),
+    		iter::once(&self.value_commitment.V)
+    		.chain(iter::once(&self.poly_commitment.T_1))
+    		.chain(iter::once(&self.poly_commitment.T_2))
+    		.chain(iter::once(&gen.pedersen_generators.B))
+    		.chain(iter::once(&gen.pedersen_generators.B_blinding))
+    	);
+
+    	if !t_check.is_identity() {
+    		return Err("t check is not equal to zero")
+    	}
+
         Ok(())
     }
 }
