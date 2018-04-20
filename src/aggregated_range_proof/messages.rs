@@ -58,42 +58,30 @@ impl ProofShare {
     	let generators = Generators::new(PedersenGenerators::default(), n, j+1);
     	let gen = generators.share(j);
 
-    	// renames for convenience
+    	// renaming and precomputation
+    	let x = poly_challenge.x;
     	let y = value_challenge.y;
-    	let y_inv = y.invert();
     	let z = value_challenge.z;
         let zz = z * z;
         let minus_z = -z;
-        let x = poly_challenge.x;
-        let one = Scalar::one();
-        let two = Scalar::from_u64(2);
+	    let z_j = util::exp_iter(z).take(j+1).last().unwrap(); // z^j
+	    let y_jn = util::exp_iter(y).take(j*n+1).last().unwrap(); // y^(j*n)
+	    let y_jn_inv = y_jn.invert(); // y^(-j*n)
+	    let y_inv = y.invert(); // y^(-1)
 
     	if self.t_x != inner_product_proof::inner_product(&self.l_vec, &self.r_vec) {
     		return Err("Inner product of l_vec and r_vec is not equal to t_x")
     	}
 
-    	// TODO: find a better way to calculate this :(
-		let mut y_j_inv = one; // y^(-j) when j=0
-		let mut y_j = one; // y^j when j=0
-		let mut z_j = one; // z^j when j=0
-		for _ in 0..j {
-			y_j_inv = y_j_inv * y_inv;
-			y_j = y_j * y;
-			z_j = z_j * z;
-		}
-    	// if j != 0 {
-	    // 	y_neg_j = util::exp_iter(value_challenge.y.invert()).take(j).last().unwrap(); // y^(-j)
-	    // 	z_j = util::exp_iter(value_challenge.z).take(j).last().unwrap(); // z^j
-    	// }
 
     	let g = self.l_vec.iter().map(|l_i| minus_z - l_i );
     	let h = self.r_vec.iter()
-    		.zip(util::exp_iter(two))
+    		.zip(util::exp_iter(Scalar::from_u64(2)))
     		.zip(util::exp_iter(y_inv))
     		.map(|((r_i, exp_2), exp_y_inv)| 
     			z + 
-    			exp_y_inv * y_j_inv * (- r_i) + 
-    			exp_y_inv * y_j_inv * (zz * z_j * exp_2)
+    			exp_y_inv * y_jn_inv * (- r_i) + 
+    			exp_y_inv * y_jn_inv * (zz * z_j * exp_2)
     		);
     	
     	let P_check = ristretto::vartime::multiscalar_mul(
@@ -114,18 +102,10 @@ impl ProofShare {
     		return Err("P check is not equal to zero")
     	}
 
-   		///////// calculate delta
-	    // XXX this could be more efficient, esp for powers of 2
-	    let sum_of_powers_of_y = util::exp_iter(y)
-	        .take(n)
-	        .fold(Scalar::zero(), |acc, x| acc + x);
+	    let sum_of_powers_of_y = sum_of_powers_of(&y, n);
+	    let sum_of_powers_of_2 = sum_of_powers_of(&Scalar::from_u64(2), n);
 
-	    // XXX TODO: just calculate (2^n - 1) instead
-	    let sum_of_powers_of_2 = util::exp_iter(two)
-	        .take(n)
-	        .fold(Scalar::zero(), |acc, x| acc + x);
-
-    	let delta = (z - zz) * sum_of_powers_of_y * y_j - z * zz * sum_of_powers_of_2 * z_j;
+    	let delta = (z - zz) * sum_of_powers_of_y * y_jn - z * zz * sum_of_powers_of_2 * z_j;
 
     	let t_check = ristretto::vartime::multiscalar_mul(
     		iter::once(zz * z_j)
@@ -269,23 +249,16 @@ impl Proof {
 
 /// Compute delta(y,z) = (z - z^2)<1^n*m, y^n*m> + z^3 <1, 2^n*m> * \sum_j=0^(m-1) z^j
 fn delta(n: usize, m: usize, y: &Scalar, z: &Scalar) -> Scalar {
-    let two = Scalar::from_u64(2);
+    let sum_y = sum_of_powers_of(y, n*m);
+    let sum_2 = sum_of_powers_of(&Scalar::from_u64(2), n);
+    let sum_z = sum_of_powers_of(z, m);
 
-    // XXX this could be more efficient, esp for powers of 2
-    let sum_of_powers_of_y = util::exp_iter(*y)
-        .take(n * m)
-        .fold(Scalar::zero(), |acc, x| acc + x);
+    (z - z * z) * sum_y - z * z * z * sum_2 * sum_z
+}
 
-    // XXX TODO: just calculate (2^n - 1) instead
-    let sum_of_powers_of_2 = util::exp_iter(two)
-        .take(n)
-        .fold(Scalar::zero(), |acc, x| acc + x);
-
-    let sum_of_powers_of_z = util::exp_iter(*z)
-        .take(m)
-        .fold(Scalar::zero(), |acc, x| acc + x);
-
-    let zz = z * z;
-
-    (z - zz) * sum_of_powers_of_y - z * zz * sum_of_powers_of_2 * sum_of_powers_of_z
+// XXX this could be more efficient, esp for powers of 2
+fn sum_of_powers_of(a: &Scalar, to: usize) -> Scalar {
+	util::exp_iter(*a)
+		.take(to)
+		.fold(Scalar::zero(), |acc, x| acc + x)
 }
