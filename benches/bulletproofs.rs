@@ -10,9 +10,9 @@ extern crate curve25519_dalek;
 use curve25519_dalek::scalar::Scalar;
 
 extern crate ristretto_bulletproofs;
-use ristretto_bulletproofs::{PedersenGenerators, Generators};
 use ristretto_bulletproofs::ProofTranscript;
 use ristretto_bulletproofs::RangeProof;
+use ristretto_bulletproofs::{Generators, PedersenGenerators};
 
 fn bench_create_helper(n: usize, c: &mut Criterion) {
     c.bench_function(&format!("create_rangeproof_n_{}", n), move |b| {
@@ -48,7 +48,7 @@ fn bench_verify_helper(n: usize, c: &mut Criterion) {
         let v: u64 = rng.gen_range(0, (1 << (n - 1)) - 1);
         let v_blinding = Scalar::random(&mut rng);
 
-        let vc =  pg.commit(Scalar::from_u64(v), v_blinding);
+        let vc = pg.commit(Scalar::from_u64(v), v_blinding);
 
         let rp = RangeProof::generate_proof(
             generators.share(0),

@@ -2,11 +2,11 @@
 
 #![doc(include = "../docs/inner-product-protocol.md")]
 
-use std::iter;
 use std::borrow::Borrow;
+use std::iter;
 
-use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::ristretto;
+use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
 
 use proof_transcript::ProofTranscript;
@@ -222,7 +222,6 @@ impl InnerProductProof {
     }
 }
 
-
 /// Computes an inner product of two vectors
 /// \\[
 ///    {\langle {\mathbf{a}}, {\mathbf{b}} \rangle} = \sum\_{i=0}^{n-1} a\_i \cdot b\_i.
@@ -239,7 +238,6 @@ pub fn inner_product(a: &[Scalar], b: &[Scalar]) -> Scalar {
     out
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -251,7 +249,7 @@ mod tests {
     fn test_helper_create(n: usize) {
         let mut rng = OsRng::new().unwrap();
 
-        use generators::{PedersenGenerators,Generators};
+        use generators::{Generators, PedersenGenerators};
         let gens = Generators::new(PedersenGenerators::default(), n, 1);
         let G = gens.share(0).G.to_vec();
         let H = gens.share(0).H.to_vec();

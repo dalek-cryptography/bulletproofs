@@ -83,6 +83,22 @@ impl Poly2 {
     }
 }
 
+/// Raises `x` to the power `n` using binary exponentiation,
+/// with (1 to 2)*lg(n) scalar multiplications.
+/// TODO: a consttime version of this would be awfully similar to a Montgomery ladder.
+pub fn scalar_exp_vartime(x: &Scalar, mut n: u64) -> Scalar {
+    let mut result = Scalar::one();
+    let mut aux = *x; // x, x^2, x^4, x^8, ...
+    while n > 0 {
+        let bit = n & 1;
+        if bit == 1 {
+            result = result * aux;
+        }
+        n = n >> 1;
+        aux = aux * aux; // FIXME: one unnecessary mult at the last step here!
+    }
+    result
+}
 
 #[cfg(test)]
 mod tests {
@@ -96,5 +112,49 @@ mod tests {
         assert_eq!(exp_2[1], Scalar::from_u64(2));
         assert_eq!(exp_2[2], Scalar::from_u64(4));
         assert_eq!(exp_2[3], Scalar::from_u64(8));
+    }
+
+    #[test]
+    fn test_inner_product() {
+        let a = vec![
+            Scalar::from_u64(1),
+            Scalar::from_u64(2),
+            Scalar::from_u64(3),
+            Scalar::from_u64(4),
+        ];
+        let b = vec![
+            Scalar::from_u64(2),
+            Scalar::from_u64(3),
+            Scalar::from_u64(4),
+            Scalar::from_u64(5),
+        ];
+        assert_eq!(Scalar::from_u64(40), inner_product(&a, &b));
+    }
+
+    /// Raises `x` to the power `n`.
+    pub fn scalar_exp_vartime_slow(x: &Scalar, n: u64) -> Scalar {
+        let mut result = Scalar::one();
+        for _ in 0..n {
+            result = result * x;
+        }
+        result
+    }
+
+    #[test]
+    fn scalar_exp() {
+        let x = Scalar::from_bits(
+            *b"\x84\xfc\xbcOx\x12\xa0\x06\xd7\x91\xd9z:'\xdd\x1e!CE\xf7\xb1\xb9Vz\x810sD\x96\x85\xb5\x07",
+        );
+        assert_eq!(scalar_exp_vartime(&x, 0), Scalar::one());
+        assert_eq!(scalar_exp_vartime(&x, 1), x);
+        assert_eq!(scalar_exp_vartime(&x, 2), x * x);
+        assert_eq!(scalar_exp_vartime(&x, 3), x * x * x);
+        assert_eq!(scalar_exp_vartime(&x, 4), x * x * x * x);
+        assert_eq!(scalar_exp_vartime(&x, 5), x * x * x * x * x);
+        assert_eq!(scalar_exp_vartime(&x, 64), scalar_exp_vartime_slow(&x, 64));
+        assert_eq!(
+            scalar_exp_vartime(&x, 0b11001010),
+            scalar_exp_vartime_slow(&x, 0b11001010)
+        );
     }
 }
