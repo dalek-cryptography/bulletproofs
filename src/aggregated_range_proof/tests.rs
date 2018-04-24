@@ -27,7 +27,7 @@ mod tests {
             })
             .collect();
 
-        let dealer = Dealer::new(&mut transcript, n, m).unwrap();
+        let dealer = Dealer::new(&mut transcript, n, m);
 
         let (parties, value_commitments): (Vec<_>, Vec<_>) = parties
             .into_iter()
