@@ -19,7 +19,7 @@ impl Party {
         generators: &Generators,
     ) -> Result<PartyAwaitingPosition, &'static str> {
         if !n.is_power_of_two() {
-            return Err("n is not a power of two")
+            return Err("n is not a power of two");
         }
         let V = generators
             .share(0)

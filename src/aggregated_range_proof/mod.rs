@@ -39,7 +39,7 @@ mod tests {
             .enumerate()
             .map(|(j, p)| p.assign_position(j, rng))
             .unzip();
-            
+
         let (dealer, value_challenge) = dealer
             .receive_value_commitments(&value_commitments, &mut transcript)
             .unwrap();
