@@ -18,6 +18,12 @@ impl Dealer {
         m: usize,
         transcript: &mut ProofTranscript,
     ) -> Result<DealerAwaitingValueCommitments, &'static str> {
+        if !n.is_power_of_two() {
+            return Err("n is not a power of two")
+        }
+        if !m.is_power_of_two() {
+            return Err("m is not a power of two")
+        }
         transcript.commit_u64(n as u64);
         transcript.commit_u64(m as u64);
         Ok(DealerAwaitingValueCommitments { n, m })
