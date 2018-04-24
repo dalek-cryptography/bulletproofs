@@ -86,8 +86,6 @@ impl ProofTranscript {
         // from the previous versions of this implementation.
         ro.commit(b"ProofTranscript v2");
         ro.commit(label);
-        let mut empty = [0;0];
-        ro.challenge_bytes(&mut empty[..]);
         ro
     }
 
@@ -213,17 +211,17 @@ mod tests {
             ro.challenge_bytes(&mut ch);
             assert_eq!(
                 hex::encode(ch),
-                "956ea2a6919ea9d83523fcf31e96b78d10070d25e2c74e9b9fbab6e39f75c587"
+                "dec44a90f423c15874f7c0afaf62cc6cc0987bf428202cb3508fc7d7c9b5b30a"
             );
             ro.challenge_bytes(&mut ch);
             assert_eq!(
                 hex::encode(ch),
-                "86533e8e5dad89cbea10d4a6c05a126713d6672005ab3e6737665f25cbad37b7"
+                "f83256ef4964d71ec6f2dd2f79db70820c781bd8c3d1fceec7cbfa4965d4e530"
             );
             ro.challenge_bytes(&mut ch);
             assert_eq!(
                 hex::encode(ch),
-                "25b9a2ef2ee8a8e5f2a2397c13cd2ddb28f88c7aef9860d0c9e405383fa0a072"
+                "962f9ef161604c5dcbe3387773b293a0e27a6e6ee14ec5d9f6c78a45c36fc0e1"
             );
         }
 
@@ -234,18 +232,18 @@ mod tests {
             ro.challenge_bytes(&mut ch);
             assert_eq!(
                 hex::encode(ch),
-                "956ea2a6919ea9d83523fcf31e96b78d10070d25e2c74e9b9fbab6e39f75c587"
+                "dec44a90f423c15874f7c0afaf62cc6cc0987bf428202cb3508fc7d7c9b5b30a"
             );
             ro.commit(b"extra commitment");
             ro.challenge_bytes(&mut ch);
             assert_eq!(
                 hex::encode(ch),
-                "9322b9a5b29adb4a2f50649a7827cfd8e6e385ec02b29c75375720d8dcb18e02"
+                "edf99afca6c21e4240f33826d60cb1b7c5d59d3dd363d2928bab7b8f94d24eaa"
             );
             ro.challenge_bytes(&mut ch);
             assert_eq!(
                 hex::encode(ch),
-                "ea6f00d4158902aff1e4336c8774f0ad753baec8e90df3485240dbc9e4244813"
+                "a42eabb9d1c9c73dc8c33c0933cee8d5fabd48fcab686d9fcb8f1680841e4369"
             );
         }
     }
@@ -258,7 +256,7 @@ mod tests {
             {
                 let mut ch = [0u8; 8];
                 ro.challenge_bytes(&mut ch);
-                assert_eq!(hex::encode(ch), "b66f3c6296c4e048");
+                assert_eq!(hex::encode(ch), "3a941266af4275d5");
             }
         }
         {
@@ -268,7 +266,7 @@ mod tests {
             {
                 let mut ch = [0u8; 8];
                 ro.challenge_bytes(&mut ch);
-                assert_eq!(hex::encode(ch), "d4633732e4ab0ebb");
+                assert_eq!(hex::encode(ch), "644d94299bcc5590");
             }
         }
         {
@@ -278,7 +276,7 @@ mod tests {
             {
                 let mut ch = [0u8; 8];
                 ro.challenge_bytes(&mut ch);
-                assert_eq!(hex::encode(ch), "3a8811dd01672b37");
+                assert_eq!(hex::encode(ch), "14f18d260e679f9a");
             }
         }
         {
@@ -289,7 +287,7 @@ mod tests {
             {
                 let mut ch = [0u8; 8];
                 ro.challenge_bytes(&mut ch);
-                assert_eq!(hex::encode(ch), "49800ad89aedfd44");
+                assert_eq!(hex::encode(ch), "09dccc9d7dfa6f37");
             }
         }
     }
@@ -301,22 +299,22 @@ mod tests {
         {
             let mut ch = [0u8; 16];
             ro.challenge_bytes(&mut ch);
-            assert_eq!(hex::encode(ch), "2c56459cdec02be511b7f97a41a54eba");
+            assert_eq!(hex::encode(ch), "60890c8d774932db1aba587941cbffca");
             ro.challenge_bytes(&mut ch);
-            assert_eq!(hex::encode(ch), "dfa982f9ad6167f3eb5eea78815d062b");
+            assert_eq!(hex::encode(ch), "bb9308c7d34769ae2a3c040394efb2ab");
         }
 
         let mut ro = ProofTranscript::new(b"TestProtocol");
         {
             let mut ch = [0u8; 8];
             ro.challenge_bytes(&mut ch);
-            assert_eq!(hex::encode(ch), "c5103a6cfa35c699");
+            assert_eq!(hex::encode(ch), "cc76fac64922bc58");
             ro.challenge_bytes(&mut ch);
-            assert_eq!(hex::encode(ch), "d471afab3b0a2ff1");
+            assert_eq!(hex::encode(ch), "d259804aae5c3246");
             ro.challenge_bytes(&mut ch);
-            assert_eq!(hex::encode(ch), "4697bc53108977b2");
+            assert_eq!(hex::encode(ch), "6d3a732156286895");
             ro.challenge_bytes(&mut ch);
-            assert_eq!(hex::encode(ch), "67e8d3923df50dd0");
+            assert_eq!(hex::encode(ch), "2165dcd38764b5ae");
         }
     }
 
