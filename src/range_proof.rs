@@ -7,10 +7,10 @@ use rand::Rng;
 
 use std::iter;
 
-use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::ristretto;
-use curve25519_dalek::traits::IsIdentity;
+use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
+use curve25519_dalek::traits::IsIdentity;
 
 use inner_product_proof::InnerProductProof;
 
@@ -77,7 +77,9 @@ impl RangeProof {
         let G = generators.G.to_vec();
         let H = generators.H.to_vec();
 
-        let V = generators.pedersen_generators.commit(Scalar::from_u64(v), *v_blinding);
+        let V = generators
+            .pedersen_generators
+            .commit(Scalar::from_u64(v), *v_blinding);
 
         let a_blinding = Scalar::random(rng);
 
@@ -99,7 +101,9 @@ impl RangeProof {
         // Compute S = <s_L, G> + <s_R, H> + s_blinding * B_blinding.
         let S = ristretto::multiscalar_mul(
             iter::once(&s_blinding).chain(s_L.iter()).chain(s_R.iter()),
-            iter::once(&generators.pedersen_generators.B_blinding).chain(G.iter()).chain(H.iter()),
+            iter::once(&generators.pedersen_generators.B_blinding)
+                .chain(G.iter())
+                .chain(H.iter()),
         );
 
         // Commit to V, A, S and get challenges y, z
@@ -135,8 +139,12 @@ impl RangeProof {
         // Form commitments T_1, T_2 to t.1, t.2
         let t_1_blinding = Scalar::random(rng);
         let t_2_blinding = Scalar::random(rng);
-        let T_1 = generators.pedersen_generators.commit(t_poly.1, t_1_blinding);
-        let T_2 = generators.pedersen_generators.commit(t_poly.2, t_2_blinding);
+        let T_1 = generators
+            .pedersen_generators
+            .commit(t_poly.1, t_1_blinding);
+        let T_2 = generators
+            .pedersen_generators
+            .commit(t_poly.2, t_2_blinding);
 
         // Commit to T_1, T_2 to get the challenge point x
         transcript.commit(T_1.compress().as_bytes());
@@ -342,7 +350,7 @@ mod tests {
         use bincode;
 
         // Both prover and verifier have access to the generators and the proof
-        use generators::{PedersenGenerators,Generators};
+        use generators::{Generators, PedersenGenerators};
         let generators = Generators::new(PedersenGenerators::default(), n, 1);
 
         // Serialized proof data
@@ -371,7 +379,8 @@ mod tests {
             proof_bytes = bincode::serialize(&range_proof).unwrap();
 
             let gens = generators.share(0);
-            value_commitment = gens.pedersen_generators.commit(Scalar::from_u64(v), v_blinding);
+            value_commitment = gens.pedersen_generators
+                .commit(Scalar::from_u64(v), v_blinding);
         }
 
         println!(
@@ -395,7 +404,8 @@ mod tests {
                         generators.share(0),
                         &mut transcript,
                         &mut rng,
-                        n)
+                        n
+                    )
                     .is_ok()
             );
 
@@ -408,7 +418,8 @@ mod tests {
                         generators.share(0),
                         &mut transcript,
                         &mut rng,
-                        n)
+                        n
+                    )
                     .is_err()
             );
         }
