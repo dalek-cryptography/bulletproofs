@@ -13,7 +13,7 @@ use super::messages::*;
 pub struct Dealer {}
 
 impl Dealer {
-    /// Creates a new dealer with the given parties and a number of bits
+    /// Creates a new dealer coordinating `m` parties proving `n`-bit ranges.
     pub fn new(
         transcript: &mut ProofTranscript,
         n: usize,
