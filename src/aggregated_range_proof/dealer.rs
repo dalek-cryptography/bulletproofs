@@ -4,7 +4,6 @@ use curve25519_dalek::traits::Identity;
 use generators::GeneratorsView;
 use inner_product_proof;
 use proof_transcript::ProofTranscript;
-use std::clone::Clone;
 use util;
 
 use super::messages::*;
@@ -101,7 +100,7 @@ impl DealerAwaitingShares {
     ) -> Proof {
         let value_commitments = proof_shares
             .iter()
-            .map(|ps| ps.value_commitment.V.clone())
+            .map(|ps| ps.value_commitment.V)
             .collect();
         let A = proof_shares
             .iter()

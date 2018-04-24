@@ -3,7 +3,6 @@ use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
 use generators::Generators;
 use rand::Rng;
-use std::clone::Clone;
 use std::iter;
 use util;
 
@@ -85,10 +84,9 @@ impl<'a> PartyAwaitingPosition<'a> {
             n: self.n,
             v: self.v,
             v_blinding: self.v_blinding,
-
-            j,
             generators: self.generators,
-            value_commitment: value_commitment.clone(),
+            j,
+            value_commitment,
             a_blinding,
             s_blinding,
             s_L,
@@ -161,8 +159,8 @@ impl<'a> PartyAwaitingValueChallenge<'a> {
         let poly_commitment = PolyCommitment { T_1, T_2 };
 
         let papc = PartyAwaitingPolyChallenge {
-            value_commitment: self.value_commitment.clone(), //TODO: remove clone
-            poly_commitment: poly_commitment.clone(),
+            value_commitment: self.value_commitment,
+            poly_commitment,
             z: vc.z,
             offset_z,
             l_poly,
@@ -182,7 +180,6 @@ impl<'a> PartyAwaitingValueChallenge<'a> {
 pub struct PartyAwaitingPolyChallenge {
     value_commitment: ValueCommitment,
     poly_commitment: PolyCommitment,
-
     z: Scalar,
     offset_z: Scalar,
     l_poly: util::VecPoly1,
@@ -211,8 +208,8 @@ impl PartyAwaitingPolyChallenge {
         let r_vec = self.r_poly.eval(pc.x);
 
         ProofShare {
-            value_commitment: self.value_commitment.clone(),
-            poly_commitment: self.poly_commitment.clone(), // TODO: remove clone
+            value_commitment: self.value_commitment,
+            poly_commitment: self.poly_commitment,
             t_x_blinding,
             t_x,
             e_blinding,
