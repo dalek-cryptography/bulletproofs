@@ -17,10 +17,10 @@ impl Dealer {
         transcript: &mut ProofTranscript,
         n: usize,
         m: usize,
-    ) -> Result<DealerAwaitingValues, &'static str> {
+    ) -> DealerAwaitingValues {
         transcript.commit_u64(n as u64);
         transcript.commit_u64(m as u64);
-        Ok(DealerAwaitingValues { n, m })
+        DealerAwaitingValues { n, m }
     }
 }
 
@@ -37,7 +37,7 @@ impl DealerAwaitingValues {
         transcript: &mut ProofTranscript,
         vc: &Vec<ValueCommitment>,
     ) -> (DealerAwaitingPoly, ValueChallenge) {
-        // TODO: test that vc is length `m`.
+        assert!(vc.len() == self.m);
         let mut A = RistrettoPoint::identity();
         let mut S = RistrettoPoint::identity();
 
