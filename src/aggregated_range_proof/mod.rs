@@ -28,7 +28,7 @@ mod tests {
             .iter()
             .map(|&v| {
                 let v_blinding = Scalar::random(rng);
-                Party::new(v, v_blinding, n, &generators)
+                Party::new(v, v_blinding, n, &generators).unwrap()
             })
             .collect();
 
@@ -39,9 +39,7 @@ mod tests {
             .enumerate()
             .map(|(j, p)| p.assign_position(j, rng))
             .unzip();
-
-        // let (a, b) = dealer.receive_value_commitments(&mut transcript, &value_commitments).unwrap();
-
+            
         let (dealer, value_challenge) = dealer
             .receive_value_commitments(&value_commitments, &mut transcript)
             .unwrap();
