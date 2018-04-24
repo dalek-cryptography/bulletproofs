@@ -73,7 +73,6 @@ impl ProofShare {
     		return Err("Inner product of l_vec and r_vec is not equal to t_x")
     	}
 
-
     	let g = self.l_vec.iter().map(|l_i| minus_z - l_i );
     	let h = self.r_vec.iter()
     		.zip(util::exp_iter(Scalar::from_u64(2)))
@@ -83,7 +82,6 @@ impl ProofShare {
     			exp_y_inv * y_jn_inv * (- r_i) + 
     			exp_y_inv * y_jn_inv * (zz * z_j * exp_2)
     		);
-    	
     	let P_check = ristretto::vartime::multiscalar_mul(
     		iter::once(Scalar::one())
     			.chain(iter::once(x))
@@ -97,16 +95,13 @@ impl ProofShare {
     			.chain(gen.G.iter())
     			.chain(gen.H.iter())
     	);
-
     	if !P_check.is_identity() {
     		return Err("P check is not equal to zero")
     	}
 
 	    let sum_of_powers_of_y = sum_of_powers_of(&y, n);
 	    let sum_of_powers_of_2 = sum_of_powers_of(&Scalar::from_u64(2), n);
-
     	let delta = (z - zz) * sum_of_powers_of_y * y_jn - z * zz * sum_of_powers_of_2 * z_j;
-
     	let t_check = ristretto::vartime::multiscalar_mul(
     		iter::once(zz * z_j)
     		.chain(iter::once(x))
@@ -119,12 +114,26 @@ impl ProofShare {
     		.chain(iter::once(&gen.pedersen_generators.B))
     		.chain(iter::once(&gen.pedersen_generators.B_blinding))
     	);
-
     	if !t_check.is_identity() {
     		return Err("t check is not equal to zero")
     	}
 
         Ok(())
+    }
+}
+
+// TODO: rename this to something that sounds less awkward
+pub struct ProofBlame {
+    pub proof_share: ProofShare,
+    pub n: usize,
+    pub j: usize,
+    pub value_challenge: ValueChallenge,
+    pub poly_challenge: PolyChallenge,
+}
+
+impl ProofBlame {
+    pub fn blame(&self) -> Result<(), &'static str> {
+        self.proof_share.verify_share(self.n, self.j, &self.value_challenge, &self.poly_challenge)
     }
 }
 

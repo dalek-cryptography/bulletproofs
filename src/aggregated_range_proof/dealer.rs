@@ -132,22 +132,22 @@ impl DealerAwaitingProofShares {
         proof_shares: &Vec<ProofShare>,
         gen: &GeneratorsView,
         transcript: &mut ProofTranscript,
-    ) -> Result<Proof, &'static str> {
+    ) -> Result<(Proof, Vec<ProofBlame>), &'static str> {
         if self.m != proof_shares.len() {
             return Err(
                 "Length of proof shares doesn't match expected length m",
             );
         }
 
+        let mut proof_blame = Vec::new();
         for (j, proof_share) in proof_shares.iter().enumerate() {
-            if proof_share
-                .verify_share(self.n, j, &self.value_challenge, &self.poly_challenge)
-                .is_err()
-            {
-                return Err(
-                    "One of the proof shares is invalid", // TODO: print which one (j) is invalid
-                );
-            }
+            proof_blame.push( ProofBlame{
+                proof_share: proof_share.clone(),
+                n: self.n,
+                j: j,
+                value_challenge: self.value_challenge.clone(),
+                poly_challenge: self.poly_challenge.clone(),
+            });
         }
 
         let value_commitments = proof_shares
@@ -209,7 +209,7 @@ impl DealerAwaitingProofShares {
             r_vec.clone(),
         );
 
-        Ok(Proof {
+        let aggregated_proof = Proof {
             n: self.n,
             value_commitments,
             A,
@@ -220,6 +220,8 @@ impl DealerAwaitingProofShares {
             t_x_blinding,
             e_blinding,
             ipp_proof,
-        })
+        };
+
+        Ok((aggregated_proof, proof_blame))
     }
 }

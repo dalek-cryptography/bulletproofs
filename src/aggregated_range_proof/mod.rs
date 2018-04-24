@@ -66,7 +66,7 @@ mod tests {
                 &generators.all(),
                 &mut transcript,
             )
-            .unwrap()
+            .unwrap().0
     }
 
     fn test_u32(m: usize) {
