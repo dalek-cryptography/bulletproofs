@@ -141,7 +141,7 @@ impl DealerAwaitingProofShares {
 
         let mut proof_blame = Vec::new();
         for (j, proof_share) in proof_shares.iter().enumerate() {
-            proof_blame.push( ProofBlame{
+            proof_blame.push(ProofBlame {
                 proof_share: proof_share.clone(),
                 n: self.n,
                 j: j,

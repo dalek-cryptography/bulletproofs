@@ -34,7 +34,7 @@ mod proof_transcript;
 mod range_proof;
 pub mod aggregated_range_proof;
 
+pub use aggregated_range_proof::*;
 pub use generators::{Generators, GeneratorsView, PedersenGenerators};
 pub use proof_transcript::ProofTranscript;
 pub use range_proof::RangeProof;
-pub use aggregated_range_proof::*;

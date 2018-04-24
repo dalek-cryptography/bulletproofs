@@ -61,12 +61,9 @@ mod tests {
             .collect();
 
         dealer
-            .receive_shares(
-                &proof_shares,
-                &generators.all(),
-                &mut transcript,
-            )
-            .unwrap().0
+            .receive_shares(&proof_shares, &generators.all(), &mut transcript)
+            .unwrap()
+            .0
     }
 
     fn test_u32(m: usize) {
