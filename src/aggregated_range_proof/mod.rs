@@ -1,8 +1,8 @@
 #![allow(non_snake_case)]
 
-mod dealer;
-mod messages;
-mod party;
+pub mod dealer;
+pub mod messages;
+pub mod party;
 
 #[cfg(test)]
 mod tests {
