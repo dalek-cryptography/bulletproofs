@@ -54,69 +54,67 @@ impl ProofShare {
         value_challenge: &ValueChallenge,
         poly_challenge: &PolyChallenge,
     ) -> Result<(), &'static str> {
-    	use generators::{Generators, PedersenGenerators};
-    	let generators = Generators::new(PedersenGenerators::default(), n, j+1);
-    	let gen = generators.share(j);
+        use generators::{Generators, PedersenGenerators};
+        let generators = Generators::new(PedersenGenerators::default(), n, j + 1);
+        let gen = generators.share(j);
 
-    	// renaming and precomputation
-    	let x = poly_challenge.x;
-    	let y = value_challenge.y;
-    	let z = value_challenge.z;
+        // renaming and precomputation
+        let x = poly_challenge.x;
+        let y = value_challenge.y;
+        let z = value_challenge.z;
         let zz = z * z;
         let minus_z = -z;
-	    let z_j = util::exp_iter(z).take(j+1).last().unwrap(); // z^j
-	    let y_jn = util::exp_iter(y).take(j*n+1).last().unwrap(); // y^(j*n)
-	    let y_jn_inv = y_jn.invert(); // y^(-j*n)
-	    let y_inv = y.invert(); // y^(-1)
+        let z_j = util::exp_iter(z).take(j + 1).last().unwrap(); // z^j
+        let y_jn = util::exp_iter(y).take(j * n + 1).last().unwrap(); // y^(j*n)
+        let y_jn_inv = y_jn.invert(); // y^(-j*n)
+        let y_inv = y.invert(); // y^(-1)
 
-    	if self.t_x != inner_product_proof::inner_product(&self.l_vec, &self.r_vec) {
-    		return Err("Inner product of l_vec and r_vec is not equal to t_x")
-    	}
+        if self.t_x != inner_product_proof::inner_product(&self.l_vec, &self.r_vec) {
+            return Err("Inner product of l_vec and r_vec is not equal to t_x");
+        }
 
-    	let g = self.l_vec.iter().map(|l_i| minus_z - l_i );
-    	let h = self.r_vec.iter()
-    		.zip(util::exp_iter(Scalar::from_u64(2)))
-    		.zip(util::exp_iter(y_inv))
-    		.map(|((r_i, exp_2), exp_y_inv)| 
-    			z + 
-    			exp_y_inv * y_jn_inv * (- r_i) + 
-    			exp_y_inv * y_jn_inv * (zz * z_j * exp_2)
-    		);
-    	let P_check = ristretto::vartime::multiscalar_mul(
-    		iter::once(Scalar::one())
-    			.chain(iter::once(x))
-    			.chain(iter::once(- self.e_blinding))
-    			.chain(g)
-    			.chain(h),
+        let g = self.l_vec.iter().map(|l_i| minus_z - l_i);
+        let h = self.r_vec
+            .iter()
+            .zip(util::exp_iter(Scalar::from_u64(2)))
+            .zip(util::exp_iter(y_inv))
+            .map(|((r_i, exp_2), exp_y_inv)| {
+                z + exp_y_inv * y_jn_inv * (-r_i) + exp_y_inv * y_jn_inv * (zz * z_j * exp_2)
+            });
+        let P_check = ristretto::vartime::multiscalar_mul(
+            iter::once(Scalar::one())
+                .chain(iter::once(x))
+                .chain(iter::once(-self.e_blinding))
+                .chain(g)
+                .chain(h),
+            iter::once(&self.value_commitment.A)
+                .chain(iter::once(&self.value_commitment.S))
+                .chain(iter::once(&gen.pedersen_generators.B_blinding))
+                .chain(gen.G.iter())
+                .chain(gen.H.iter()),
+        );
+        if !P_check.is_identity() {
+            return Err("P check is not equal to zero");
+        }
 
-    		iter::once(&self.value_commitment.A)
-    			.chain(iter::once(&self.value_commitment.S))
-    			.chain(iter::once(&gen.pedersen_generators.B_blinding))
-    			.chain(gen.G.iter())
-    			.chain(gen.H.iter())
-    	);
-    	if !P_check.is_identity() {
-    		return Err("P check is not equal to zero")
-    	}
-
-	    let sum_of_powers_of_y = sum_of_powers_of(&y, n);
-	    let sum_of_powers_of_2 = sum_of_powers_of(&Scalar::from_u64(2), n);
-    	let delta = (z - zz) * sum_of_powers_of_y * y_jn - z * zz * sum_of_powers_of_2 * z_j;
-    	let t_check = ristretto::vartime::multiscalar_mul(
-    		iter::once(zz * z_j)
-    		.chain(iter::once(x))
-    		.chain(iter::once(x * x))
-    		.chain(iter::once(delta - self.t_x))
-    		.chain(iter::once(-self.t_x_blinding)),
-    		iter::once(&self.value_commitment.V)
-    		.chain(iter::once(&self.poly_commitment.T_1))
-    		.chain(iter::once(&self.poly_commitment.T_2))
-    		.chain(iter::once(&gen.pedersen_generators.B))
-    		.chain(iter::once(&gen.pedersen_generators.B_blinding))
-    	);
-    	if !t_check.is_identity() {
-    		return Err("t check is not equal to zero")
-    	}
+        let sum_of_powers_of_y = sum_of_powers_of(&y, n);
+        let sum_of_powers_of_2 = sum_of_powers_of(&Scalar::from_u64(2), n);
+        let delta = (z - zz) * sum_of_powers_of_y * y_jn - z * zz * sum_of_powers_of_2 * z_j;
+        let t_check = ristretto::vartime::multiscalar_mul(
+            iter::once(zz * z_j)
+                .chain(iter::once(x))
+                .chain(iter::once(x * x))
+                .chain(iter::once(delta - self.t_x))
+                .chain(iter::once(-self.t_x_blinding)),
+            iter::once(&self.value_commitment.V)
+                .chain(iter::once(&self.poly_commitment.T_1))
+                .chain(iter::once(&self.poly_commitment.T_2))
+                .chain(iter::once(&gen.pedersen_generators.B))
+                .chain(iter::once(&gen.pedersen_generators.B_blinding)),
+        );
+        if !t_check.is_identity() {
+            return Err("t check is not equal to zero");
+        }
 
         Ok(())
     }
@@ -133,7 +131,8 @@ pub struct ProofBlame {
 
 impl ProofBlame {
     pub fn blame(&self) -> Result<(), &'static str> {
-        self.proof_share.verify_share(self.n, self.j, &self.value_challenge, &self.poly_challenge)
+        self.proof_share
+            .verify_share(self.n, self.j, &self.value_challenge, &self.poly_challenge)
     }
 }
 
@@ -258,7 +257,7 @@ impl Proof {
 
 /// Compute delta(y,z) = (z - z^2)<1^n*m, y^n*m> + z^3 <1, 2^n*m> * \sum_j=0^(m-1) z^j
 fn delta(n: usize, m: usize, y: &Scalar, z: &Scalar) -> Scalar {
-    let sum_y = sum_of_powers_of(y, n*m);
+    let sum_y = sum_of_powers_of(y, n * m);
     let sum_2 = sum_of_powers_of(&Scalar::from_u64(2), n);
     let sum_z = sum_of_powers_of(z, m);
 
@@ -267,7 +266,7 @@ fn delta(n: usize, m: usize, y: &Scalar, z: &Scalar) -> Scalar {
 
 // XXX this could be more efficient, esp for powers of 2
 fn sum_of_powers_of(a: &Scalar, to: usize) -> Scalar {
-	util::exp_iter(*a)
-		.take(to)
-		.fold(Scalar::zero(), |acc, x| acc + x)
+    util::exp_iter(*a)
+        .take(to)
+        .fold(Scalar::zero(), |acc, x| acc + x)
 }
