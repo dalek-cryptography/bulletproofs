@@ -17,26 +17,26 @@ impl Dealer {
         transcript: &mut ProofTranscript,
         n: usize,
         m: usize,
-    ) -> DealerAwaitingValues {
+    ) -> DealerAwaitingValueCommitments {
         transcript.commit_u64(n as u64);
         transcript.commit_u64(m as u64);
-        DealerAwaitingValues { n, m }
+        DealerAwaitingValueCommitments { n, m }
     }
 }
 
 /// When the dealer is initialized, it only knows the size of the set.
-pub struct DealerAwaitingValues {
+pub struct DealerAwaitingValueCommitments {
     n: usize,
     m: usize,
 }
 
-impl DealerAwaitingValues {
+impl DealerAwaitingValueCommitments {
     /// Combines commitments and computes challenge variables.
     pub fn receive_value_commitments(
         self,
         transcript: &mut ProofTranscript,
         vc: &Vec<ValueCommitment>,
-    ) -> (DealerAwaitingPoly, ValueChallenge) {
+    ) -> (DealerAwaitingPolyCommitments, ValueChallenge) {
         assert!(vc.len() == self.m);
         let mut A = RistrettoPoint::identity();
         let mut S = RistrettoPoint::identity();
@@ -56,20 +56,20 @@ impl DealerAwaitingValues {
         let y = transcript.challenge_scalar();
         let z = transcript.challenge_scalar();
 
-        (DealerAwaitingPoly { n: self.n }, ValueChallenge { y, z })
+        (DealerAwaitingPolyCommitments { n: self.n }, ValueChallenge { y, z })
     }
 }
 
-pub struct DealerAwaitingPoly {
+pub struct DealerAwaitingPolyCommitments {
     n: usize,
 }
 
-impl DealerAwaitingPoly {
+impl DealerAwaitingPolyCommitments {
     pub fn receive_poly_commitments(
         self,
         transcript: &mut ProofTranscript,
         poly_commitments: &Vec<PolyCommitment>,
-    ) -> (DealerAwaitingShares, PolyChallenge) {
+    ) -> (DealerAwaitingProofShares, PolyChallenge) {
         // Commit sums of T1s and T2s.
         let mut T1 = RistrettoPoint::identity();
         let mut T2 = RistrettoPoint::identity();
@@ -82,15 +82,15 @@ impl DealerAwaitingPoly {
 
         let x = transcript.challenge_scalar();
 
-        (DealerAwaitingShares { n: self.n }, PolyChallenge { x })
+        (DealerAwaitingProofShares { n: self.n }, PolyChallenge { x })
     }
 }
 
-pub struct DealerAwaitingShares {
+pub struct DealerAwaitingProofShares {
     n: usize,
 }
 
-impl DealerAwaitingShares {
+impl DealerAwaitingProofShares {
     pub fn receive_shares(
         self,
         transcript: &mut ProofTranscript,
