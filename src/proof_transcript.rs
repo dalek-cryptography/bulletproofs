@@ -27,12 +27,13 @@ use byteorder::{ByteOrder, LittleEndian};
 /// ensure that their challenge values are bound to the *entire* proof
 /// transcript, not just the sub-protocol.
 ///
-/// Internally, the `ProofTranscript` is supposed to use Keccak to
-/// absorb incoming messages and to squeeze challenges.  The
-/// construction currently used is ad-hoc, has no security analysis,
-/// and is **only suitable for testing**.
+/// ## Warning
 ///
-/// # Example
+/// Internally, the `ProofTranscript` uses ad-hoc duplex construction
+/// using Keccak that absorbs incoming messages and squeezes challenges.
+/// There is no security analysis yet, so it is **only suitable for testing**.
+///
+/// ## Example
 ///
 /// ```
 /// # extern crate curve25519_dalek;
@@ -116,6 +117,10 @@ impl ProofTranscript {
     }
 
     /// Extracts an arbitrary-sized challenge byte slice.
+    ///
+    /// Note: each call performs at least one Keccak permutation,
+    /// so if you need to read multiple logical challenges at once,
+    /// you should read a bigger slice in one call for minimal overhead.
     pub fn challenge_bytes(&mut self, output: &mut [u8]) {
         let len = output.len();
         if output.len() > (u16::max_value() as usize) {
@@ -134,25 +139,16 @@ impl ProofTranscript {
     ///
     /// This is a convenience method that extracts 64 bytes and
     /// reduces modulo the group order.
+    ///
+    /// Note: each call performs at least one Keccak permutation,
+    /// so if you need to read multiple challenge scalars,
+    /// for the minimal overhead you should read `n*64` bytes
+    /// using the `challenge_bytes` method and reduce each
+    /// 64-byte window into a scalar yourself.
     pub fn challenge_scalar(&mut self) -> Scalar {
         let mut buf = [0u8; 64];
         self.challenge_bytes(&mut buf);
         Scalar::from_bytes_mod_order_wide(&buf)
-    }
-
-    /// Extracts a pair of challenge scalars.
-    ///
-    /// This is a convenience method that extracts 128 bytes and
-    /// reduces each 64-byte half modulo the group order.
-    pub fn challenge_scalars_pair(&mut self) -> (Scalar, Scalar) {
-        let mut buf128 = [0u8; 128];
-        let mut buf64 = [0u8; 64];
-        self.challenge_bytes(&mut buf128);
-        buf64.copy_from_slice(&buf128[..64]);
-        let a = Scalar::from_bytes_mod_order_wide(&buf64);
-        buf64.copy_from_slice(&buf128[64..]);
-        let b = Scalar::from_bytes_mod_order_wide(&buf64);
-        (a,b)
     }
 
     /// Internal API: writes 2-byte length prefix.
