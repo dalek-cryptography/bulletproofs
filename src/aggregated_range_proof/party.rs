@@ -3,7 +3,6 @@ use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
 use generators::Generators;
 use rand::Rng;
-use std::clone::Clone;
 use std::iter;
 use util;
 
@@ -56,14 +55,15 @@ impl<'a> PartyAwaitingPosition<'a> {
         let a_blinding = Scalar::random(&mut rng);
         // Compute A = <a_L, G> + <a_R, H> + a_blinding * B_blinding
         let mut A = gen_share.pedersen_generators.B_blinding * a_blinding;
+
+        use subtle::{Choice, ConditionallyAssignable};
         for i in 0..self.n {
-            let v_i = (self.v >> i) & 1;
-            // XXX replace this with a conditional move
-            if v_i == 1 {
-                A += gen_share.G[i]; // + bit*G_i
-            } else {
-                A -= gen_share.H[i]; // + (bit-1)*H_i
-            }
+            // If v_i = 0, we add a_L[i] * G[i] + a_R[i] * H[i] = - H[i]
+            // If v_i = 1, we add a_L[i] * G[i] + a_R[i] * H[i] =   G[i]
+            let v_i = Choice::from(((self.v >> i) & 1) as u8);
+            let mut point = -gen_share.H[i];
+            point.conditional_assign(&gen_share.G[i], v_i);
+            A += point;
         }
 
         let s_blinding = Scalar::random(&mut rng);
@@ -84,10 +84,9 @@ impl<'a> PartyAwaitingPosition<'a> {
             n: self.n,
             v: self.v,
             v_blinding: self.v_blinding,
-
-            j,
             generators: self.generators,
-            value_commitment: value_commitment.clone(),
+            j,
+            value_commitment,
             a_blinding,
             s_blinding,
             s_L,
@@ -160,8 +159,8 @@ impl<'a> PartyAwaitingValueChallenge<'a> {
         let poly_commitment = PolyCommitment { T_1, T_2 };
 
         let papc = PartyAwaitingPolyChallenge {
-            value_commitment: self.value_commitment.clone(), //TODO: remove clone
-            poly_commitment: poly_commitment.clone(),
+            value_commitment: self.value_commitment,
+            poly_commitment,
             z: vc.z,
             offset_z,
             l_poly,
@@ -181,7 +180,6 @@ impl<'a> PartyAwaitingValueChallenge<'a> {
 pub struct PartyAwaitingPolyChallenge {
     value_commitment: ValueCommitment,
     poly_commitment: PolyCommitment,
-
     z: Scalar,
     offset_z: Scalar,
     l_poly: util::VecPoly1,
@@ -210,8 +208,8 @@ impl PartyAwaitingPolyChallenge {
         let r_vec = self.r_poly.eval(pc.x);
 
         ProofShare {
-            value_commitment: self.value_commitment.clone(),
-            poly_commitment: self.poly_commitment.clone(), // TODO: remove clone
+            value_commitment: self.value_commitment,
+            poly_commitment: self.poly_commitment,
             t_x_blinding,
             t_x,
             e_blinding,

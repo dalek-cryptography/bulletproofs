@@ -9,29 +9,31 @@ use rand::Rng;
 use std::iter;
 use util;
 
-#[derive(Clone)]
+#[derive(Serialize, Deserialize, Copy, Clone, Debug)]
 pub struct ValueCommitment {
     pub V: RistrettoPoint,
     pub A: RistrettoPoint,
     pub S: RistrettoPoint,
 }
 
+#[derive(Serialize, Deserialize, Copy, Clone, Debug)]
 pub struct ValueChallenge {
     pub y: Scalar,
     pub z: Scalar,
 }
 
-#[derive(Clone)]
+#[derive(Serialize, Deserialize, Copy, Clone, Debug)]
 pub struct PolyCommitment {
     pub T_1: RistrettoPoint,
     pub T_2: RistrettoPoint,
 }
 
+#[derive(Serialize, Deserialize, Copy, Clone, Debug)]
 pub struct PolyChallenge {
     pub x: Scalar,
 }
 
-#[derive(Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ProofShare {
     pub value_commitment: ValueCommitment,
     pub poly_commitment: PolyCommitment,
@@ -44,6 +46,7 @@ pub struct ProofShare {
     pub r_vec: Vec<Scalar>,
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Proof {
     pub n: usize,
     /// Commitment to the value
