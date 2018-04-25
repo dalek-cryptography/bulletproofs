@@ -8,7 +8,7 @@ pub mod party;
 mod tests {
     use std::iter;
 
-    use rand::{Rng, OsRng};
+    use rand::{OsRng, Rng};
 
     use curve25519_dalek::scalar::Scalar;
     use proof_transcript::ProofTranscript;

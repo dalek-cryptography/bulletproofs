@@ -45,9 +45,7 @@ impl DealerAwaitingValueCommitments {
         transcript: &mut ProofTranscript,
     ) -> Result<(DealerAwaitingPolyCommitments, ValueChallenge), &'static str> {
         if self.m != value_commitments.len() {
-            return Err(
-                "Length of value commitments doesn't match expected length m",
-            );
+            return Err("Length of value commitments doesn't match expected length m");
         }
 
         let mut A = RistrettoPoint::identity();
@@ -94,9 +92,7 @@ impl DealerAwaitingPolyCommitments {
         transcript: &mut ProofTranscript,
     ) -> Result<(DealerAwaitingProofShares, PolyChallenge), &'static str> {
         if self.m != poly_commitments.len() {
-            return Err(
-                "Length of poly commitments doesn't match expected length m",
-            );
+            return Err("Length of poly commitments doesn't match expected length m");
         }
 
         // Commit sums of T1s and T2s.
@@ -140,9 +136,7 @@ impl DealerAwaitingProofShares {
         transcript: &mut ProofTranscript,
     ) -> Result<(Proof, Vec<ProofBlame>), &'static str> {
         if self.m != proof_shares.len() {
-            return Err(
-                "Length of proof shares doesn't match expected length m",
-            );
+            return Err("Length of proof shares doesn't match expected length m");
         }
 
         let mut proof_blame = Vec::new();
