@@ -100,6 +100,33 @@ pub fn scalar_exp_vartime(x: &Scalar, mut n: u64) -> Scalar {
     result
 }
 
+/// Takes the sum of all the powers of `x`, up to `n`
+/// If `n` is a power of 2, it uses the efficient algorithm with `2*lg n` multiplcations and additions.
+/// If `n` is not a power of 2, it uses the slow algorithm with `n` multiplications and additions.
+/// In the Bulletproofs case, all calls to `sum_of_powers` should have `n` as a power of 2.
+pub fn sum_of_powers(x: &Scalar, n: usize) -> Scalar {
+    if !n.is_power_of_two() {
+        return sum_of_powers_slow(x, n);
+    }
+    if n == 0 || n == 1 {
+        return Scalar::from_u64(n as u64);
+    }
+    let mut m = n;
+    let mut result = Scalar::one() + x;
+    let mut factor = *x;
+    while m > 2 {
+        factor = factor * factor;
+        result = result + factor * result;
+        m = m / 2;
+    }
+    result
+}
+
+// takes the sum of all of the powers of x, up to n
+fn sum_of_powers_slow(x: &Scalar, n: usize) -> Scalar {
+    exp_iter(*x).take(n).fold(Scalar::zero(), |acc, x| acc + x)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -132,7 +159,7 @@ mod tests {
     }
 
     /// Raises `x` to the power `n`.
-    pub fn scalar_exp_vartime_slow(x: &Scalar, n: u64) -> Scalar {
+    fn scalar_exp_vartime_slow(x: &Scalar, n: u64) -> Scalar {
         let mut result = Scalar::one();
         for _ in 0..n {
             result = result * x;
@@ -141,7 +168,7 @@ mod tests {
     }
 
     #[test]
-    fn scalar_exp() {
+    fn test_scalar_exp() {
         let x = Scalar::from_bits(
             *b"\x84\xfc\xbcOx\x12\xa0\x06\xd7\x91\xd9z:'\xdd\x1e!CE\xf7\xb1\xb9Vz\x810sD\x96\x85\xb5\x07",
         );
@@ -156,5 +183,30 @@ mod tests {
             scalar_exp_vartime(&x, 0b11001010),
             scalar_exp_vartime_slow(&x, 0b11001010)
         );
+    }
+
+    #[test]
+    fn test_sum_of_powers() {
+        let x = Scalar::from_u64(10);
+        assert_eq!(sum_of_powers_slow(&x, 0), sum_of_powers(&x, 0));
+        assert_eq!(sum_of_powers_slow(&x, 1), sum_of_powers(&x, 1));
+        assert_eq!(sum_of_powers_slow(&x, 2), sum_of_powers(&x, 2));
+        assert_eq!(sum_of_powers_slow(&x, 4), sum_of_powers(&x, 4));
+        assert_eq!(sum_of_powers_slow(&x, 8), sum_of_powers(&x, 8));
+        assert_eq!(sum_of_powers_slow(&x, 16), sum_of_powers(&x, 16));
+        assert_eq!(sum_of_powers_slow(&x, 32), sum_of_powers(&x, 32));
+        assert_eq!(sum_of_powers_slow(&x, 64), sum_of_powers(&x, 64));
+    }
+
+    #[test]
+    fn test_sum_of_powers_slow() {
+        let x = Scalar::from_u64(10);
+        assert_eq!(sum_of_powers_slow(&x, 0), Scalar::zero());
+        assert_eq!(sum_of_powers_slow(&x, 1), Scalar::one());
+        assert_eq!(sum_of_powers_slow(&x, 2), Scalar::from_u64(11));
+        assert_eq!(sum_of_powers_slow(&x, 3), Scalar::from_u64(111));
+        assert_eq!(sum_of_powers_slow(&x, 4), Scalar::from_u64(1111));
+        assert_eq!(sum_of_powers_slow(&x, 5), Scalar::from_u64(11111));
+        assert_eq!(sum_of_powers_slow(&x, 6), Scalar::from_u64(111111));
     }
 }
