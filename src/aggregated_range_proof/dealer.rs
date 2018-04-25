@@ -134,14 +134,14 @@ impl DealerAwaitingProofShares {
         proof_shares: &Vec<ProofShare>,
         gen: &GeneratorsView,
         transcript: &mut ProofTranscript,
-    ) -> Result<(Proof, Vec<ProofBlame>), &'static str> {
+    ) -> Result<(Proof, Vec<ProofShareVerifier>), &'static str> {
         if self.m != proof_shares.len() {
             return Err("Length of proof shares doesn't match expected length m");
         }
 
-        let mut proof_blame = Vec::new();
+        let mut share_verifiers = Vec::new();
         for (j, proof_share) in proof_shares.iter().enumerate() {
-            proof_blame.push(ProofBlame {
+            share_verifiers.push(ProofShareVerifier {
                 proof_share: proof_share.clone(),
                 n: self.n,
                 j: j,
@@ -222,6 +222,6 @@ impl DealerAwaitingProofShares {
             ipp_proof,
         };
 
-        Ok((aggregated_proof, proof_blame))
+        Ok((aggregated_proof, share_verifiers))
     }
 }

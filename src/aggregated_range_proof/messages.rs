@@ -120,7 +120,7 @@ impl ProofShare {
     }
 }
 
-pub struct ProofBlame {
+pub struct ProofShareVerifier {
     pub proof_share: ProofShare,
     pub n: usize,
     pub j: usize,
@@ -128,9 +128,9 @@ pub struct ProofBlame {
     pub poly_challenge: PolyChallenge,
 }
 
-impl ProofBlame {
+impl ProofShareVerifier {
     /// Returns whether the proof share is valid (Ok) or invalid (Err)
-    pub fn blame(&self) -> Result<(), &'static str> {
+    pub fn verify_share(&self) -> Result<(), &'static str> {
         self.proof_share
             .verify_share(self.n, self.j, &self.value_challenge, &self.poly_challenge)
     }
