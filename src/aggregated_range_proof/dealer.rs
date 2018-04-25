@@ -56,7 +56,10 @@ impl DealerAwaitingValueCommitments {
         let y = transcript.challenge_scalar();
         let z = transcript.challenge_scalar();
 
-        (DealerAwaitingPolyCommitments { n: self.n }, ValueChallenge { y, z })
+        (
+            DealerAwaitingPolyCommitments { n: self.n },
+            ValueChallenge { y, z },
+        )
     }
 }
 

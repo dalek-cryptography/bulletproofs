@@ -28,19 +28,11 @@ mod util;
 
 #[doc(include = "../docs/notes.md")]
 mod notes {}
-<<<<<<< HEAD
-
-mod aggregated_range_proof;
-=======
->>>>>>> origin/main
+pub mod aggregated_range_proof;
 mod generators;
 mod inner_product_proof;
 mod proof_transcript;
 mod range_proof;
-<<<<<<< HEAD
-=======
-pub mod aggregated_range_proof;
->>>>>>> origin/main
 
 pub use generators::{Generators, GeneratorsView, PedersenGenerators};
 pub use proof_transcript::ProofTranscript;
