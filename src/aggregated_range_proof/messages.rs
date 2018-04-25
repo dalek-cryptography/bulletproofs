@@ -97,9 +97,9 @@ impl ProofShare {
             return Err("P check is not equal to zero");
         }
 
-        let sum_of_powers_of_y = sum_of_powers_of(&y, n);
-        let sum_of_powers_of_2 = sum_of_powers_of(&Scalar::from_u64(2), n);
-        let delta = (z - zz) * sum_of_powers_of_y * y_jn - z * zz * sum_of_powers_of_2 * z_j;
+        let sum_of_powers_y = util::sum_of_powers(&y, n);
+        let sum_of_powers_2 = util::sum_of_powers(&Scalar::from_u64(2), n);
+        let delta = (z - zz) * sum_of_powers_y * y_jn - z * zz * sum_of_powers_2 * z_j;
         let t_check = ristretto::vartime::multiscalar_mul(
             iter::once(zz * z_j)
                 .chain(iter::once(x))
@@ -257,16 +257,9 @@ impl Proof {
 
 /// Compute delta(y,z) = (z - z^2)<1^n*m, y^n*m> + z^3 <1, 2^n*m> * \sum_j=0^(m-1) z^j
 fn delta(n: usize, m: usize, y: &Scalar, z: &Scalar) -> Scalar {
-    let sum_y = sum_of_powers_of(y, n * m);
-    let sum_2 = sum_of_powers_of(&Scalar::from_u64(2), n);
-    let sum_z = sum_of_powers_of(z, m);
+    let sum_y = util::sum_of_powers(y, n * m);
+    let sum_2 = util::sum_of_powers(&Scalar::from_u64(2), n);
+    let sum_z = util::sum_of_powers(z, m);
 
     (z - z * z) * sum_y - z * z * z * sum_2 * sum_z
-}
-
-// XXX this could be more efficient, esp for powers of 2
-fn sum_of_powers_of(a: &Scalar, to: usize) -> Scalar {
-    util::exp_iter(*a)
-        .take(to)
-        .fold(Scalar::zero(), |acc, x| acc + x)
 }
