@@ -28,7 +28,6 @@ mod util;
 
 #[doc(include = "../docs/notes.md")]
 mod notes {}
-
 pub mod aggregated_range_proof;
 mod generators;
 mod inner_product_proof;

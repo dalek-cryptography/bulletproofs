@@ -17,7 +17,7 @@ mod tests {
     use super::messages::*;
     use super::party::*;
 
-    fn create_multi<R: Rng>(rng: &mut R, values: Vec<u64>, n: usize) -> Proof {
+    fn create_multi<R: Rng>(rng: &mut R, values: Vec<u64>, n: usize) -> (Proof, Vec<ProofBlame>) {
         use generators::{Generators, PedersenGenerators};
 
         let m = values.len();
@@ -61,7 +61,6 @@ mod tests {
         dealer
             .receive_shares(&proof_shares, &generators.all(), &mut transcript)
             .unwrap()
-            .0
     }
 
     fn test_u32(m: usize) {
@@ -72,8 +71,12 @@ mod tests {
             .map(|()| rng.next_u32() as u64)
             .take(m)
             .collect();
-        let rp = create_multi(&mut rng, v, 32);
-        assert!(rp.verify(&mut rng, &mut transcript).is_ok());
+        let (proof, proof_blames) = create_multi(&mut rng, v, 32);
+        assert!(proof.verify(&mut rng, &mut transcript).is_ok());
+        proof_blames
+            .iter()
+            .map(|pb| assert!(pb.blame().is_ok()))
+            .last();
     }
 
     fn test_u64(m: usize) {
@@ -81,8 +84,12 @@ mod tests {
         let mut transcript = ProofTranscript::new(b"AggregatedRangeProofTest");
 
         let v: Vec<u64> = iter::repeat(()).map(|()| rng.next_u64()).take(m).collect();
-        let rp = create_multi(&mut rng, v, 64);
-        assert!(rp.verify(&mut rng, &mut transcript).is_ok());
+        let (proof, proof_blames) = create_multi(&mut rng, v, 64);
+        assert!(proof.verify(&mut rng, &mut transcript).is_ok());
+        proof_blames
+            .iter()
+            .map(|pb| assert!(pb.blame().is_ok()))
+            .last();
     }
 
     #[test]
