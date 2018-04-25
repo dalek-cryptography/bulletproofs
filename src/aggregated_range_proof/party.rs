@@ -17,19 +17,22 @@ impl Party {
         v_blinding: Scalar,
         n: usize,
         generators: &Generators,
-    ) -> PartyAwaitingPosition {
+    ) -> Result<PartyAwaitingPosition, &'static str> {
+        if !n.is_power_of_two() || n > 64 {
+            return Err("n is not valid: must be a power of 2, and less than or equal to 64");
+        }
         let V = generators
             .share(0)
             .pedersen_generators
             .commit(Scalar::from_u64(v), v_blinding);
 
-        PartyAwaitingPosition {
+        Ok(PartyAwaitingPosition {
             generators: generators,
             n,
             v,
             v_blinding,
             V,
-        }
+        })
     }
 }
 
@@ -103,7 +106,7 @@ pub struct PartyAwaitingValueChallenge<'a> {
     v: u64,
     v_blinding: Scalar,
 
-    j: usize, // index of the party, 1..m as in original paper
+    j: usize,
     generators: &'a Generators,
     value_commitment: ValueCommitment,
     a_blinding: Scalar,
@@ -194,7 +197,6 @@ pub struct PartyAwaitingPolyChallenge {
 
 impl PartyAwaitingPolyChallenge {
     pub fn apply_challenge(self, pc: &PolyChallenge) -> ProofShare {
-        // Generate final values for proof (line 55-60)
         let t_blinding_poly = util::Poly2(
             self.z * self.z * self.offset_z * self.v_blinding,
             self.t_1_blinding,
