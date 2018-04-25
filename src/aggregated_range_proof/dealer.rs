@@ -14,17 +14,24 @@ pub struct Dealer {}
 impl Dealer {
     /// Creates a new dealer coordinating `m` parties proving `n`-bit ranges.
     pub fn new(
-        transcript: &mut ProofTranscript,
         n: usize,
         m: usize,
-    ) -> DealerAwaitingValueCommitments {
+        transcript: &mut ProofTranscript,
+    ) -> Result<DealerAwaitingValueCommitments, &'static str> {
+        if !n.is_power_of_two() || n > 64 {
+            return Err("n is not valid: must be a power of 2, and less than or equal to 64");
+        }
+        if !m.is_power_of_two() {
+            return Err("m is not valid: must be a power of 2");
+        }
         transcript.commit_u64(n as u64);
         transcript.commit_u64(m as u64);
-        DealerAwaitingValueCommitments { n, m }
+        Ok(DealerAwaitingValueCommitments { n, m })
     }
 }
 
 /// When the dealer is initialized, it only knows the size of the set.
+#[derive(Debug)]
 pub struct DealerAwaitingValueCommitments {
     n: usize,
     m: usize,
@@ -34,14 +41,17 @@ impl DealerAwaitingValueCommitments {
     /// Combines commitments and computes challenge variables.
     pub fn receive_value_commitments(
         self,
+        value_commitments: &Vec<ValueCommitment>,
         transcript: &mut ProofTranscript,
-        vc: &Vec<ValueCommitment>,
-    ) -> (DealerAwaitingPolyCommitments, ValueChallenge) {
-        assert!(vc.len() == self.m);
+    ) -> Result<(DealerAwaitingPolyCommitments, ValueChallenge), &'static str> {
+        if self.m != value_commitments.len() {
+            return Err("Length of value commitments doesn't match expected length m");
+        }
+
         let mut A = RistrettoPoint::identity();
         let mut S = RistrettoPoint::identity();
 
-        for commitment in vc.iter() {
+        for commitment in value_commitments.iter() {
             // Commit each V individually
             transcript.commit(commitment.V.compress().as_bytes());
 
@@ -55,21 +65,36 @@ impl DealerAwaitingValueCommitments {
 
         let y = transcript.challenge_scalar();
         let z = transcript.challenge_scalar();
+        let value_challenge = ValueChallenge { y, z };
 
-        (DealerAwaitingPolyCommitments { n: self.n }, ValueChallenge { y, z })
+        Ok((
+            DealerAwaitingPolyCommitments {
+                n: self.n,
+                m: self.m,
+                value_challenge: value_challenge.clone(),
+            },
+            value_challenge,
+        ))
     }
 }
 
+#[derive(Debug)]
 pub struct DealerAwaitingPolyCommitments {
     n: usize,
+    m: usize,
+    value_challenge: ValueChallenge,
 }
 
 impl DealerAwaitingPolyCommitments {
     pub fn receive_poly_commitments(
         self,
-        transcript: &mut ProofTranscript,
         poly_commitments: &Vec<PolyCommitment>,
-    ) -> (DealerAwaitingProofShares, PolyChallenge) {
+        transcript: &mut ProofTranscript,
+    ) -> Result<(DealerAwaitingProofShares, PolyChallenge), &'static str> {
+        if self.m != poly_commitments.len() {
+            return Err("Length of poly commitments doesn't match expected length m");
+        }
+
         // Commit sums of T1s and T2s.
         let mut T1 = RistrettoPoint::identity();
         let mut T2 = RistrettoPoint::identity();
@@ -81,23 +106,50 @@ impl DealerAwaitingPolyCommitments {
         transcript.commit(T2.compress().as_bytes());
 
         let x = transcript.challenge_scalar();
+        let poly_challenge = PolyChallenge { x };
 
-        (DealerAwaitingProofShares { n: self.n }, PolyChallenge { x })
+        Ok((
+            DealerAwaitingProofShares {
+                n: self.n,
+                m: self.m,
+                value_challenge: self.value_challenge,
+                poly_challenge: poly_challenge.clone(),
+            },
+            poly_challenge,
+        ))
     }
 }
 
+#[derive(Debug)]
 pub struct DealerAwaitingProofShares {
     n: usize,
+    m: usize,
+    value_challenge: ValueChallenge,
+    poly_challenge: PolyChallenge,
 }
 
 impl DealerAwaitingProofShares {
     pub fn receive_shares(
         self,
-        transcript: &mut ProofTranscript,
         proof_shares: &Vec<ProofShare>,
         gen: &GeneratorsView,
-        y: Scalar,
-    ) -> Proof {
+        transcript: &mut ProofTranscript,
+    ) -> Result<(Proof, Vec<ProofShareVerifier>), &'static str> {
+        if self.m != proof_shares.len() {
+            return Err("Length of proof shares doesn't match expected length m");
+        }
+
+        let mut share_verifiers = Vec::new();
+        for (j, proof_share) in proof_shares.iter().enumerate() {
+            share_verifiers.push(ProofShareVerifier {
+                proof_share: proof_share.clone(),
+                n: self.n,
+                j: j,
+                value_challenge: self.value_challenge.clone(),
+                poly_challenge: self.poly_challenge.clone(),
+            });
+        }
+
         let value_commitments = proof_shares
             .iter()
             .map(|ps| ps.value_commitment.V)
@@ -150,14 +202,14 @@ impl DealerAwaitingProofShares {
         let ipp_proof = inner_product_proof::InnerProductProof::create(
             transcript,
             &Q,
-            util::exp_iter(y.invert()),
+            util::exp_iter(self.value_challenge.y.invert()),
             gen.G.to_vec(),
             gen.H.to_vec(),
             l_vec.clone(),
             r_vec.clone(),
         );
 
-        Proof {
+        let aggregated_proof = Proof {
             n: self.n,
             value_commitments,
             A,
@@ -168,6 +220,8 @@ impl DealerAwaitingProofShares {
             t_x_blinding,
             e_blinding,
             ipp_proof,
-        }
+        };
+
+        Ok((aggregated_proof, share_verifiers))
     }
 }
