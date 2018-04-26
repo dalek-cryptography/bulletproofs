@@ -178,4 +178,59 @@ mod tests {
     fn create_and_verify_n_64_m_8() {
         singleparty_create_and_verify_helper(64, 8);
     }
+
+    #[test]
+    fn detect_dishonest_party_during_aggregation() {
+        use self::dealer::*;
+        use self::messages::*;
+        use self::party::*;
+
+        // Simulate two parties, one of which will be dishonest and use a 64-bit value.
+        let m = 2;
+        let n = 32;
+
+        let generators = Generators::new(PedersenGenerators::default(), n, m);
+
+        let mut rng = OsRng::new().unwrap();
+        let mut transcript = ProofTranscript::new(b"AggregatedRangeProofTest");
+
+        // Party 0 is honest and uses a 32-bit value
+        let v0 = rng.next_u32() as u64;
+        let v0_blinding = Scalar::random(&mut rng);
+        let party0 = Party::new(v0, v0_blinding, n, &generators).unwrap();
+
+        // Party 1 is dishonest and uses a 64-bit value
+        let v1 = rng.next_u64();
+        let v1_blinding = Scalar::random(&mut rng);
+        let party1 = Party::new(v1, v1_blinding, n, &generators).unwrap();
+
+        let dealer = Dealer::new(generators.all(), n, m, &mut transcript).unwrap();
+
+        let (party0, value_com0) = party0.assign_position(0, &mut rng);
+        let (party1, value_com1) = party1.assign_position(1, &mut rng);
+
+        let (dealer, value_challenge) = dealer
+            .receive_value_commitments(&[value_com0, value_com1])
+            .unwrap();
+
+        let (party0, poly_com0) = party0.apply_challenge(&value_challenge, &mut rng);
+        let (party1, poly_com1) = party1.apply_challenge(&value_challenge, &mut rng);
+
+        let (dealer, poly_challenge) = dealer
+            .receive_poly_commitments(&[poly_com0, poly_com1])
+            .unwrap();
+
+        let share0 = party0.apply_challenge(&poly_challenge);
+        let share1 = party1.apply_challenge(&poly_challenge);
+
+        match dealer.receive_shares(&mut rng, &[share0, share1]) {
+            Ok(_proof) => {
+                panic!("The proof was malformed, but it was not detected");
+            }
+            Err(e) => {
+                // XXX when we have error types, check that it was party 1 that did it
+                assert_eq!(e, "proof failed to verify");
+            }
+        }
+    }
 }
