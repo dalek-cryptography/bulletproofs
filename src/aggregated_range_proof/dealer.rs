@@ -49,7 +49,7 @@ impl<'a, 'b> DealerAwaitingValueCommitments<'a, 'b> {
     /// Combines commitments and computes challenge variables.
     pub fn receive_value_commitments(
         self,
-        value_commitments: &Vec<ValueCommitment>,
+        value_commitments: &[ValueCommitment],
     ) -> Result<(DealerAwaitingPolyCommitments<'a, 'b>, ValueChallenge), &'static str> {
         if self.m != value_commitments.len() {
             return Err("Length of value commitments doesn't match expected length m");
@@ -98,7 +98,7 @@ pub struct DealerAwaitingPolyCommitments<'a, 'b> {
 impl<'a, 'b> DealerAwaitingPolyCommitments<'a, 'b> {
     pub fn receive_poly_commitments(
         self,
-        poly_commitments: &Vec<PolyCommitment>,
+        poly_commitments: &[PolyCommitment],
     ) -> Result<(DealerAwaitingProofShares<'a, 'b>, PolyChallenge), &'static str> {
         if self.m != poly_commitments.len() {
             return Err("Length of poly commitments doesn't match expected length m");
@@ -143,7 +143,7 @@ pub struct DealerAwaitingProofShares<'a, 'b> {
 impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
     pub fn receive_shares(
         self,
-        proof_shares: &Vec<ProofShare>,
+        proof_shares: &[ProofShare],
     ) -> Result<(AggregatedProof, Vec<ProofShareVerifier>), &'static str> {
         if self.m != proof_shares.len() {
             return Err("Length of proof shares doesn't match expected length m");
