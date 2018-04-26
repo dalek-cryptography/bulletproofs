@@ -108,9 +108,7 @@ mod tests {
             let mut rng = OsRng::new().unwrap();
             let mut transcript = ProofTranscript::new(b"AggregatedRangeProofTest");
 
-            // XXX this takes max = 2^{n-1} to avoid problems at n = 64
-            // would be better to use max = 2^n - 1
-            let (min, max) = (0u64, 1 << (n - 1));
+            let (min, max) = (0u64, ((1u128 << n) - 1) as u64);
             let values: Vec<u64> = (0..m).map(|_| rng.gen_range(min, max)).collect();
 
             let proof = SinglePartyAggregator::generate_proof(
