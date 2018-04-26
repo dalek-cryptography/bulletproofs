@@ -53,7 +53,7 @@ impl SinglePartyAggregator {
             .unzip();
 
         let (dealer, value_challenge) =
-            dealer.receive_value_commitments(&value_commitments, transcript)?;
+            dealer.receive_value_commitments(&value_commitments)?;
 
         let (parties, poly_commitments): (Vec<_>, Vec<_>) = parties
             .into_iter()
@@ -61,14 +61,14 @@ impl SinglePartyAggregator {
             .unzip();
 
         let (dealer, poly_challenge) =
-            dealer.receive_poly_commitments(&poly_commitments, transcript)?;
+            dealer.receive_poly_commitments(&poly_commitments)?;
 
         let proof_shares: Vec<_> = parties
             .into_iter()
             .map(|p| p.apply_challenge(&poly_challenge))
             .collect();
 
-        let (proof, _) = dealer.receive_shares(&proof_shares, &generators.all(), transcript)?;
+        let (proof, _) = dealer.receive_shares(&proof_shares, &generators.all())?;
 
         Ok(proof)
     }
