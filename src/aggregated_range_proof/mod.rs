@@ -35,7 +35,7 @@ impl SinglePartyAggregator {
         use self::messages::*;
         use self::party::*;
 
-        let dealer = Dealer::new(n, values.len(), transcript)?;
+        let dealer = Dealer::new(generators.all(), n, values.len(), transcript)?;
 
         let parties: Vec<_> = values
             .iter()
@@ -52,23 +52,21 @@ impl SinglePartyAggregator {
             .map(|(j, p)| p.assign_position(j, rng))
             .unzip();
 
-        let (dealer, value_challenge) =
-            dealer.receive_value_commitments(&value_commitments, transcript)?;
+        let (dealer, value_challenge) = dealer.receive_value_commitments(&value_commitments)?;
 
         let (parties, poly_commitments): (Vec<_>, Vec<_>) = parties
             .into_iter()
             .map(|p| p.apply_challenge(&value_challenge, rng))
             .unzip();
 
-        let (dealer, poly_challenge) =
-            dealer.receive_poly_commitments(&poly_commitments, transcript)?;
+        let (dealer, poly_challenge) = dealer.receive_poly_commitments(&poly_commitments)?;
 
         let proof_shares: Vec<_> = parties
             .into_iter()
             .map(|p| p.apply_challenge(&poly_challenge))
             .collect();
 
-        let (proof, _) = dealer.receive_shares(&proof_shares, &generators.all(), transcript)?;
+        let (proof, _) = dealer.receive_shares(&proof_shares)?;
 
         Ok(proof)
     }
