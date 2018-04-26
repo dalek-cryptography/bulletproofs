@@ -76,117 +76,112 @@ impl SinglePartyAggregator {
 
 #[cfg(test)]
 mod tests {
-    use std::iter;
+    use rand::OsRng;
 
-    use rand::{OsRng, Rng};
+    use super::*;
 
-    use curve25519_dalek::scalar::Scalar;
-    use proof_transcript::ProofTranscript;
+    use generators::PedersenGenerators;
 
-    use super::dealer::*;
-    use super::messages::*;
-    use super::party::*;
+    /// Given a bitsize `n`, test the following:
+    ///
+    /// 1. Generate `m` random values and create a proof they are all in range;
+    /// 2. Serialize to wire format;
+    /// 3. Deserialize from wire format;
+    /// 4. Verify the proof.
+    fn singleparty_create_and_verify_helper(n: usize, m: usize) {
+        // Split the test into two scopes, so that it's explicit what
+        // data is shared between the prover and the verifier.
 
-    fn create_multi<R: Rng>(
-        rng: &mut R,
-        values: Vec<u64>,
-        n: usize,
-    ) -> (AggregatedProof, Vec<ProofShareVerifier>) {
-        use generators::{Generators, PedersenGenerators};
+        // Use bincode for serialization
+        use bincode;
 
-        let m = values.len();
+        // Both prover and verifier have access to the generators and the proof
         let generators = Generators::new(PedersenGenerators::default(), n, m);
-        let mut transcript = ProofTranscript::new(b"AggregatedRangeProofTest");
 
-        let parties: Vec<_> = values
-            .iter()
-            .map(|&v| {
-                let v_blinding = Scalar::random(rng);
-                Party::new(v, v_blinding, n, &generators).unwrap()
-            })
-            .collect();
+        // Serialized proof data
+        let proof_bytes: Vec<u8>;
 
-        let dealer = Dealer::new(n, m, &mut transcript).unwrap();
+        // Prover's scope
+        {
+            // 1. Generate the proof
 
-        let (parties, value_commitments): (Vec<_>, Vec<_>) = parties
-            .into_iter()
-            .enumerate()
-            .map(|(j, p)| p.assign_position(j, rng))
-            .unzip();
+            let mut rng = OsRng::new().unwrap();
+            let mut transcript = ProofTranscript::new(b"AggregatedRangeProofTest");
 
-        let (dealer, value_challenge) = dealer
-            .receive_value_commitments(&value_commitments, &mut transcript)
-            .unwrap();
+            // XXX this takes max = 2^{n-1} to avoid problems at n = 64
+            // would be better to use max = 2^n - 1
+            let (min, max) = (0u64, 1 << (n - 1));
+            let values: Vec<u64> = (0..m).map(|_| rng.gen_range(min, max)).collect();
 
-        let (parties, poly_commitments): (Vec<_>, Vec<_>) = parties
-            .into_iter()
-            .map(|p| p.apply_challenge(&value_challenge, rng))
-            .unzip();
+            let proof = SinglePartyAggregator::generate_proof(
+                &generators,
+                &mut transcript,
+                &mut rng,
+                &values,
+                n,
+            ).unwrap();
 
-        let (dealer, poly_challenge) = dealer
-            .receive_poly_commitments(&poly_commitments, &mut transcript)
-            .unwrap();
+            // 2. Serialize
+            proof_bytes = bincode::serialize(&proof).unwrap();
+        }
 
-        let proof_shares: Vec<ProofShare> = parties
-            .into_iter()
-            .map(|p| p.apply_challenge(&poly_challenge))
-            .collect();
+        println!(
+            "Aggregated rangeproof of m={} proofs of n={} bits has size {} bytes",
+            m,
+            n,
+            proof_bytes.len(),
+        );
 
-        dealer
-            .receive_shares(&proof_shares, &generators.all(), &mut transcript)
-            .unwrap()
-    }
+        // Verifier's scope
+        {
+            // 3. Deserialize
+            let proof: AggregatedProof = bincode::deserialize(&proof_bytes).unwrap();
 
-    fn test_u32(m: usize) {
-        let mut rng = OsRng::new().unwrap();
-        let mut transcript = ProofTranscript::new(b"AggregatedRangeProofTest");
+            // 4. Verify with the same customization label as above
+            let mut rng = OsRng::new().unwrap();
+            let mut transcript = ProofTranscript::new(b"AggregatedRangeProofTest");
 
-        let v: Vec<u64> = iter::repeat(())
-            .map(|()| rng.next_u32() as u64)
-            .take(m)
-            .collect();
-        let (proof, share_verifiers) = create_multi(&mut rng, v, 32);
-        assert!(proof.verify(&mut rng, &mut transcript).is_ok());
-        share_verifiers
-            .iter()
-            .map(|sv| assert!(sv.verify_share().is_ok()))
-            .last();
-    }
-
-    fn test_u64(m: usize) {
-        let mut rng = OsRng::new().unwrap();
-        let mut transcript = ProofTranscript::new(b"AggregatedRangeProofTest");
-
-        let v: Vec<u64> = iter::repeat(()).map(|()| rng.next_u64()).take(m).collect();
-        let (proof, share_verifiers) = create_multi(&mut rng, v, 64);
-        assert!(proof.verify(&mut rng, &mut transcript).is_ok());
-        share_verifiers
-            .iter()
-            .map(|sv| assert!(sv.verify_share().is_ok()))
-            .last();
+            assert!(proof.verify(&mut rng, &mut transcript).is_ok());
+        }
     }
 
     #[test]
-    fn one_value() {
-        test_u32(1);
-        test_u64(1);
+    fn create_and_verify_n_32_m_1() {
+        singleparty_create_and_verify_helper(32, 1);
     }
 
     #[test]
-    fn two_values() {
-        test_u32(2);
-        test_u64(2);
+    fn create_and_verify_n_32_m_2() {
+        singleparty_create_and_verify_helper(32, 2);
     }
 
     #[test]
-    fn four_values() {
-        test_u32(4);
-        test_u64(4);
+    fn create_and_verify_n_32_m_4() {
+        singleparty_create_and_verify_helper(32, 4);
     }
 
     #[test]
-    fn eight_values() {
-        test_u32(8);
-        test_u64(8);
+    fn create_and_verify_n_32_m_8() {
+        singleparty_create_and_verify_helper(32, 8);
+    }
+
+    #[test]
+    fn create_and_verify_n_64_m_1() {
+        singleparty_create_and_verify_helper(64, 1);
+    }
+
+    #[test]
+    fn create_and_verify_n_64_m_2() {
+        singleparty_create_and_verify_helper(64, 2);
+    }
+
+    #[test]
+    fn create_and_verify_n_64_m_4() {
+        singleparty_create_and_verify_helper(64, 4);
+    }
+
+    #[test]
+    fn create_and_verify_n_64_m_8() {
+        singleparty_create_and_verify_helper(64, 8);
     }
 }
