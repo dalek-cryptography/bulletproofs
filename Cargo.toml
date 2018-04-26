@@ -19,10 +19,7 @@ rand = "^0.4"
 byteorder = "1.2.1"
 serde = "1"
 serde_derive = "1"
-
-[dependencies.tiny-keccak]
-git = 'https://github.com/chain/tiny-keccak.git'
-rev = '5925f81b3c351440283c3328e2345d982aac0f6e'
+tiny-keccak = "1.4.1"
 
 [dev-dependencies]
 hex = "^0.3"
