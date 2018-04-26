@@ -66,9 +66,7 @@ impl SinglePartyAggregator {
             .map(|p| p.apply_challenge(&poly_challenge))
             .collect();
 
-        let (proof, _) = dealer.receive_shares(&proof_shares)?;
-
-        Ok(proof)
+        dealer.receive_trusted_shares(&proof_shares)
     }
 }
 
