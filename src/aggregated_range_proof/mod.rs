@@ -1,8 +1,78 @@
 #![allow(non_snake_case)]
 
+use rand::Rng;
+
+use curve25519_dalek::scalar::Scalar;
+
+use generators::Generators;
+use proof_transcript::ProofTranscript;
+
 pub mod dealer;
 pub mod messages;
 pub mod party;
+
+pub use self::messages::AggregatedProof;
+
+struct SinglePartyAggregator {}
+
+impl SinglePartyAggregator {
+    /// Create an aggregated rangeproof of multiple values.
+    ///
+    /// This performs the same proof aggregation MPC protocol, but
+    /// with one party playing all roles.
+    ///
+    /// The length of `values` must be a power of 2.
+    ///
+    /// XXX this should allow proving about existing commitments.
+    fn generate_proof<R: Rng>(
+        generators: &Generators,
+        transcript: &mut ProofTranscript,
+        rng: &mut R,
+        values: &[u64],
+        n: usize,
+    ) -> Result<AggregatedProof, &'static str> {
+        use self::dealer::*;
+        use self::messages::*;
+        use self::party::*;
+
+        let dealer = Dealer::new(n, values.len(), transcript)?;
+
+        let parties: Vec<_> = values
+            .iter()
+            .map(|&v| {
+                let v_blinding = Scalar::random(rng);
+                Party::new(v, v_blinding, n, &generators)
+            })
+            // Collect the iterator of Results into a Result<Vec>, then unwrap it
+            .collect::<Result<Vec<_>,_>>()?;
+
+        let (parties, value_commitments): (Vec<_>, Vec<_>) = parties
+            .into_iter()
+            .enumerate()
+            .map(|(j, p)| p.assign_position(j, rng))
+            .unzip();
+
+        let (dealer, value_challenge) =
+            dealer.receive_value_commitments(&value_commitments, transcript)?;
+
+        let (parties, poly_commitments): (Vec<_>, Vec<_>) = parties
+            .into_iter()
+            .map(|p| p.apply_challenge(&value_challenge, rng))
+            .unzip();
+
+        let (dealer, poly_challenge) =
+            dealer.receive_poly_commitments(&poly_commitments, transcript)?;
+
+        let proof_shares: Vec<_> = parties
+            .into_iter()
+            .map(|p| p.apply_challenge(&poly_challenge))
+            .collect();
+
+        let (proof, _) = dealer.receive_shares(&proof_shares, &generators.all(), transcript)?;
+
+        Ok(proof)
+    }
+}
 
 #[cfg(test)]
 mod tests {
