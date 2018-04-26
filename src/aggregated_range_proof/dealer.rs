@@ -1,9 +1,13 @@
+use rand::Rng;
+
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::Identity;
+
 use generators::GeneratorsView;
 use inner_product_proof;
 use proof_transcript::ProofTranscript;
+
 use util;
 
 use super::messages::*;
@@ -25,12 +29,30 @@ impl Dealer {
         if !m.is_power_of_two() {
             return Err("m is not valid: must be a power of 2");
         }
+
+        // At the end of the protocol, the dealer will attempt to
+        // verify the proof, and if it fails, determine which party's
+        // shares were invalid.
+        //
+        // However, verifying the proof requires either knowledge of
+        // all of the challenges, or a copy of the initial transcript
+        // state.
+        //
+        // The dealer has all of the challenges, but using them for
+        // verification would require duplicating the verification
+        // logic.  Instead, we keep a copy of the initial transcript
+        // state.
+        let initial_transcript = transcript.clone();
+
+        // Commit to aggregation parameters
         transcript.commit_u64(n as u64);
         transcript.commit_u64(m as u64);
+
         Ok(DealerAwaitingValueCommitments {
             n,
             m,
             transcript,
+            initial_transcript,
             gens,
         })
     }
@@ -42,6 +64,9 @@ pub struct DealerAwaitingValueCommitments<'a, 'b> {
     n: usize,
     m: usize,
     transcript: &'a mut ProofTranscript,
+    /// The dealer keeps a copy of the initial transcript state, so
+    /// that it can attempt to verify the aggregated proof at the end.
+    initial_transcript: ProofTranscript,
     gens: GeneratorsView<'b>,
 }
 
@@ -79,6 +104,7 @@ impl<'a, 'b> DealerAwaitingValueCommitments<'a, 'b> {
                 n: self.n,
                 m: self.m,
                 transcript: self.transcript,
+                initial_transcript: self.initial_transcript,
                 gens: self.gens,
                 value_challenge: value_challenge.clone(),
             },
@@ -91,6 +117,7 @@ pub struct DealerAwaitingPolyCommitments<'a, 'b> {
     n: usize,
     m: usize,
     transcript: &'a mut ProofTranscript,
+    initial_transcript: ProofTranscript,
     gens: GeneratorsView<'b>,
     value_challenge: ValueChallenge,
 }
@@ -122,6 +149,7 @@ impl<'a, 'b> DealerAwaitingPolyCommitments<'a, 'b> {
                 n: self.n,
                 m: self.m,
                 transcript: self.transcript,
+                initial_transcript: self.initial_transcript,
                 gens: self.gens,
                 value_challenge: self.value_challenge,
                 poly_challenge: poly_challenge.clone(),
@@ -135,29 +163,24 @@ pub struct DealerAwaitingProofShares<'a, 'b> {
     n: usize,
     m: usize,
     transcript: &'a mut ProofTranscript,
+    initial_transcript: ProofTranscript,
     gens: GeneratorsView<'b>,
     value_challenge: ValueChallenge,
     poly_challenge: PolyChallenge,
 }
 
 impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
-    pub fn receive_shares(
-        self,
+    /// Assembles proof shares into an `AggregatedProof`.
+    ///
+    /// Used as a helper function by `receive_trusted_shares` (which
+    /// just hands back the result) and `receive_shares` (which
+    /// validates the proof shares.
+    fn assemble_shares(
+        &mut self,
         proof_shares: &[ProofShare],
-    ) -> Result<(AggregatedProof, Vec<ProofShareVerifier>), &'static str> {
+    ) -> Result<AggregatedProof, &'static str> {
         if self.m != proof_shares.len() {
             return Err("Length of proof shares doesn't match expected length m");
-        }
-
-        let mut share_verifiers = Vec::new();
-        for (j, proof_share) in proof_shares.iter().enumerate() {
-            share_verifiers.push(ProofShareVerifier {
-                proof_share: proof_share.clone(),
-                n: self.n,
-                j: j,
-                value_challenge: self.value_challenge.clone(),
-                poly_challenge: self.poly_challenge.clone(),
-            });
         }
 
         let value_commitments = proof_shares
@@ -221,7 +244,7 @@ impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
             r_vec.clone(),
         );
 
-        let aggregated_proof = AggregatedProof {
+        Ok(AggregatedProof {
             n: self.n,
             value_commitments,
             A,
@@ -232,8 +255,49 @@ impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
             t_x_blinding,
             e_blinding,
             ipp_proof,
-        };
+        })
+    }
 
-        Ok((aggregated_proof, share_verifiers))
+    /// Assemble the final aggregated proof from the given
+    /// `proof_shares`, and validate that all input shares and the
+    /// aggregated proof are well-formed.  If the aggregated proof is
+    /// not well-formed, this function detects which party submitted a
+    /// malformed share and returns that information as part of the
+    /// error.
+    ///
+    /// XXX define error types so we can surface the blame info
+    pub fn receive_shares<R: Rng>(
+        mut self,
+        rng: &mut R,
+        proof_shares: &[ProofShare],
+    ) -> Result<AggregatedProof, &'static str> {
+        let proof = self.assemble_shares(proof_shares)?;
+
+        if proof.verify(rng, &mut self.initial_transcript).is_ok() {
+            return Ok(proof);
+        }
+
+        // XXX check shares
+        return Err("proof failed to verify");
+    }
+
+    /// Assemble the final aggregated proof from the given
+    /// `proof_shares`, but does not validate that they are well-formed.
+    ///
+    /// ## WARNING
+    ///
+    /// This function does **NOT** validate the proof shares.  It is
+    /// suitable for creating aggregated proofs when all parties are
+    /// known by the dealer to be honest (for instance, when there's
+    /// only one party playing all roles).
+    ///
+    /// Otherwise, use `receive_shares`, which validates that all
+    /// shares are well-formed, or else detects which party(ies)
+    /// submitted malformed shares.
+    pub fn receive_trusted_shares(
+        mut self,
+        proof_shares: &[ProofShare],
+    ) -> Result<AggregatedProof, &'static str> {
+        self.assemble_shares(proof_shares)
     }
 }
