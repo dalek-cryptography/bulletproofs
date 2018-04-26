@@ -13,11 +13,11 @@ pub struct Dealer {}
 
 impl Dealer {
     /// Creates a new dealer coordinating `m` parties proving `n`-bit ranges.
-    pub fn new(
+    pub fn new<'a>(
         n: usize,
         m: usize,
-        transcript: &mut ProofTranscript,
-    ) -> Result<DealerAwaitingValueCommitments, &'static str> {
+        transcript: &'a mut ProofTranscript,
+    ) -> Result<DealerAwaitingValueCommitments<'a>, &'static str> {
         if !n.is_power_of_two() || n > 64 {
             return Err("n is not valid: must be a power of 2, and less than or equal to 64");
         }
@@ -26,24 +26,23 @@ impl Dealer {
         }
         transcript.commit_u64(n as u64);
         transcript.commit_u64(m as u64);
-        Ok(DealerAwaitingValueCommitments { n, m })
+        Ok(DealerAwaitingValueCommitments { n, m, transcript })
     }
 }
 
 /// When the dealer is initialized, it only knows the size of the set.
-#[derive(Debug)]
-pub struct DealerAwaitingValueCommitments {
+pub struct DealerAwaitingValueCommitments<'a> {
     n: usize,
     m: usize,
+    transcript: &'a mut ProofTranscript,
 }
 
-impl DealerAwaitingValueCommitments {
+impl<'a> DealerAwaitingValueCommitments<'a> {
     /// Combines commitments and computes challenge variables.
     pub fn receive_value_commitments(
         self,
         value_commitments: &Vec<ValueCommitment>,
-        transcript: &mut ProofTranscript,
-    ) -> Result<(DealerAwaitingPolyCommitments, ValueChallenge), &'static str> {
+    ) -> Result<(DealerAwaitingPolyCommitments<'a>, ValueChallenge), &'static str> {
         if self.m != value_commitments.len() {
             return Err("Length of value commitments doesn't match expected length m");
         }
@@ -53,24 +52,25 @@ impl DealerAwaitingValueCommitments {
 
         for commitment in value_commitments.iter() {
             // Commit each V individually
-            transcript.commit(commitment.V.compress().as_bytes());
+            self.transcript.commit(commitment.V.compress().as_bytes());
 
             // Commit sums of As and Ss.
             A += commitment.A;
             S += commitment.S;
         }
 
-        transcript.commit(A.compress().as_bytes());
-        transcript.commit(S.compress().as_bytes());
+        self.transcript.commit(A.compress().as_bytes());
+        self.transcript.commit(S.compress().as_bytes());
 
-        let y = transcript.challenge_scalar();
-        let z = transcript.challenge_scalar();
+        let y = self.transcript.challenge_scalar();
+        let z = self.transcript.challenge_scalar();
         let value_challenge = ValueChallenge { y, z };
 
         Ok((
             DealerAwaitingPolyCommitments {
                 n: self.n,
                 m: self.m,
+                transcript: self.transcript,
                 value_challenge: value_challenge.clone(),
             },
             value_challenge,
@@ -78,19 +78,18 @@ impl DealerAwaitingValueCommitments {
     }
 }
 
-#[derive(Debug)]
-pub struct DealerAwaitingPolyCommitments {
+pub struct DealerAwaitingPolyCommitments<'a> {
     n: usize,
     m: usize,
+    transcript: &'a mut ProofTranscript,
     value_challenge: ValueChallenge,
 }
 
-impl DealerAwaitingPolyCommitments {
+impl<'a> DealerAwaitingPolyCommitments<'a> {
     pub fn receive_poly_commitments(
         self,
         poly_commitments: &Vec<PolyCommitment>,
-        transcript: &mut ProofTranscript,
-    ) -> Result<(DealerAwaitingProofShares, PolyChallenge), &'static str> {
+    ) -> Result<(DealerAwaitingProofShares<'a>, PolyChallenge), &'static str> {
         if self.m != poly_commitments.len() {
             return Err("Length of poly commitments doesn't match expected length m");
         }
@@ -102,16 +101,17 @@ impl DealerAwaitingPolyCommitments {
             T1 += commitment.T_1;
             T2 += commitment.T_2;
         }
-        transcript.commit(T1.compress().as_bytes());
-        transcript.commit(T2.compress().as_bytes());
+        self.transcript.commit(T1.compress().as_bytes());
+        self.transcript.commit(T2.compress().as_bytes());
 
-        let x = transcript.challenge_scalar();
+        let x = self.transcript.challenge_scalar();
         let poly_challenge = PolyChallenge { x };
 
         Ok((
             DealerAwaitingProofShares {
                 n: self.n,
                 m: self.m,
+                transcript: self.transcript,
                 value_challenge: self.value_challenge,
                 poly_challenge: poly_challenge.clone(),
             },
@@ -120,20 +120,19 @@ impl DealerAwaitingPolyCommitments {
     }
 }
 
-#[derive(Debug)]
-pub struct DealerAwaitingProofShares {
+pub struct DealerAwaitingProofShares<'a> {
     n: usize,
     m: usize,
+    transcript: &'a mut ProofTranscript,
     value_challenge: ValueChallenge,
     poly_challenge: PolyChallenge,
 }
 
-impl DealerAwaitingProofShares {
+impl<'a> DealerAwaitingProofShares<'a> {
     pub fn receive_shares(
         self,
         proof_shares: &Vec<ProofShare>,
         gen: &GeneratorsView,
-        transcript: &mut ProofTranscript,
     ) -> Result<(AggregatedProof, Vec<ProofShareVerifier>), &'static str> {
         if self.m != proof_shares.len() {
             return Err("Length of proof shares doesn't match expected length m");
@@ -183,12 +182,13 @@ impl DealerAwaitingProofShares {
         let e_blinding = proof_shares
             .iter()
             .fold(Scalar::zero(), |acc, ps| acc + ps.e_blinding);
-        transcript.commit(t.as_bytes());
-        transcript.commit(t_x_blinding.as_bytes());
-        transcript.commit(e_blinding.as_bytes());
+
+        self.transcript.commit(t.as_bytes());
+        self.transcript.commit(t_x_blinding.as_bytes());
+        self.transcript.commit(e_blinding.as_bytes());
 
         // Get a challenge value to combine statements for the IPP
-        let w = transcript.challenge_scalar();
+        let w = self.transcript.challenge_scalar();
         let Q = w * gen.pedersen_generators.B;
 
         let l_vec: Vec<Scalar> = proof_shares
@@ -200,7 +200,7 @@ impl DealerAwaitingProofShares {
             .flat_map(|ps| ps.r_vec.clone().into_iter())
             .collect();
         let ipp_proof = inner_product_proof::InnerProductProof::create(
-            transcript,
+            self.transcript,
             &Q,
             util::exp_iter(self.value_challenge.y.invert()),
             gen.G.to_vec(),
