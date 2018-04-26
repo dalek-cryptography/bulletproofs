@@ -21,7 +21,7 @@ mod tests {
         rng: &mut R,
         values: Vec<u64>,
         n: usize,
-    ) -> (Proof, Vec<ProofShareVerifier>) {
+    ) -> (AggregatedProof, Vec<ProofShareVerifier>) {
         use generators::{Generators, PedersenGenerators};
 
         let m = values.len();
