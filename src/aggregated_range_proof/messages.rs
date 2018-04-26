@@ -136,6 +136,7 @@ impl ProofShareVerifier {
     }
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct AggregatedProof {
     pub n: usize,
     /// Commitment to the value
