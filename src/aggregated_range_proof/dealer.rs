@@ -13,11 +13,12 @@ pub struct Dealer {}
 
 impl Dealer {
     /// Creates a new dealer coordinating `m` parties proving `n`-bit ranges.
-    pub fn new<'a>(
+    pub fn new<'a, 'b>(
+        gens: GeneratorsView<'b>,
         n: usize,
         m: usize,
         transcript: &'a mut ProofTranscript,
-    ) -> Result<DealerAwaitingValueCommitments<'a>, &'static str> {
+    ) -> Result<DealerAwaitingValueCommitments<'a, 'b>, &'static str> {
         if !n.is_power_of_two() || n > 64 {
             return Err("n is not valid: must be a power of 2, and less than or equal to 64");
         }
@@ -26,23 +27,30 @@ impl Dealer {
         }
         transcript.commit_u64(n as u64);
         transcript.commit_u64(m as u64);
-        Ok(DealerAwaitingValueCommitments { n, m, transcript })
+        Ok(DealerAwaitingValueCommitments {
+            n,
+            m,
+            transcript,
+            gens,
+        })
     }
 }
 
-/// When the dealer is initialized, it only knows the size of the set.
-pub struct DealerAwaitingValueCommitments<'a> {
+/// The initial dealer state, waiting for the parties to send value
+/// commitments.
+pub struct DealerAwaitingValueCommitments<'a, 'b> {
     n: usize,
     m: usize,
     transcript: &'a mut ProofTranscript,
+    gens: GeneratorsView<'b>,
 }
 
-impl<'a> DealerAwaitingValueCommitments<'a> {
+impl<'a, 'b> DealerAwaitingValueCommitments<'a, 'b> {
     /// Combines commitments and computes challenge variables.
     pub fn receive_value_commitments(
         self,
         value_commitments: &Vec<ValueCommitment>,
-    ) -> Result<(DealerAwaitingPolyCommitments<'a>, ValueChallenge), &'static str> {
+    ) -> Result<(DealerAwaitingPolyCommitments<'a, 'b>, ValueChallenge), &'static str> {
         if self.m != value_commitments.len() {
             return Err("Length of value commitments doesn't match expected length m");
         }
@@ -71,6 +79,7 @@ impl<'a> DealerAwaitingValueCommitments<'a> {
                 n: self.n,
                 m: self.m,
                 transcript: self.transcript,
+                gens: self.gens,
                 value_challenge: value_challenge.clone(),
             },
             value_challenge,
@@ -78,18 +87,19 @@ impl<'a> DealerAwaitingValueCommitments<'a> {
     }
 }
 
-pub struct DealerAwaitingPolyCommitments<'a> {
+pub struct DealerAwaitingPolyCommitments<'a, 'b> {
     n: usize,
     m: usize,
     transcript: &'a mut ProofTranscript,
+    gens: GeneratorsView<'b>,
     value_challenge: ValueChallenge,
 }
 
-impl<'a> DealerAwaitingPolyCommitments<'a> {
+impl<'a, 'b> DealerAwaitingPolyCommitments<'a, 'b> {
     pub fn receive_poly_commitments(
         self,
         poly_commitments: &Vec<PolyCommitment>,
-    ) -> Result<(DealerAwaitingProofShares<'a>, PolyChallenge), &'static str> {
+    ) -> Result<(DealerAwaitingProofShares<'a, 'b>, PolyChallenge), &'static str> {
         if self.m != poly_commitments.len() {
             return Err("Length of poly commitments doesn't match expected length m");
         }
@@ -112,6 +122,7 @@ impl<'a> DealerAwaitingPolyCommitments<'a> {
                 n: self.n,
                 m: self.m,
                 transcript: self.transcript,
+                gens: self.gens,
                 value_challenge: self.value_challenge,
                 poly_challenge: poly_challenge.clone(),
             },
@@ -120,19 +131,19 @@ impl<'a> DealerAwaitingPolyCommitments<'a> {
     }
 }
 
-pub struct DealerAwaitingProofShares<'a> {
+pub struct DealerAwaitingProofShares<'a, 'b> {
     n: usize,
     m: usize,
     transcript: &'a mut ProofTranscript,
+    gens: GeneratorsView<'b>,
     value_challenge: ValueChallenge,
     poly_challenge: PolyChallenge,
 }
 
-impl<'a> DealerAwaitingProofShares<'a> {
+impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
     pub fn receive_shares(
         self,
         proof_shares: &Vec<ProofShare>,
-        gen: &GeneratorsView,
     ) -> Result<(AggregatedProof, Vec<ProofShareVerifier>), &'static str> {
         if self.m != proof_shares.len() {
             return Err("Length of proof shares doesn't match expected length m");
@@ -189,7 +200,7 @@ impl<'a> DealerAwaitingProofShares<'a> {
 
         // Get a challenge value to combine statements for the IPP
         let w = self.transcript.challenge_scalar();
-        let Q = w * gen.pedersen_generators.B;
+        let Q = w * self.gens.pedersen_generators.B;
 
         let l_vec: Vec<Scalar> = proof_shares
             .iter()
@@ -199,12 +210,13 @@ impl<'a> DealerAwaitingProofShares<'a> {
             .iter()
             .flat_map(|ps| ps.r_vec.clone().into_iter())
             .collect();
+
         let ipp_proof = inner_product_proof::InnerProductProof::create(
             self.transcript,
             &Q,
             util::exp_iter(self.value_challenge.y.invert()),
-            gen.G.to_vec(),
-            gen.H.to_vec(),
+            self.gens.G.to_vec(),
+            self.gens.H.to_vec(),
             l_vec.clone(),
             r_vec.clone(),
         );
