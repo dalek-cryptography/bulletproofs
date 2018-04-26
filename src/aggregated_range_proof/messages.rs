@@ -136,7 +136,8 @@ impl ProofShareVerifier {
     }
 }
 
-pub struct Proof {
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct AggregatedProof {
     pub n: usize,
     /// Commitment to the value
     // XXX this should not be included, so that we can prove about existing commitments
@@ -160,7 +161,7 @@ pub struct Proof {
     pub ipp_proof: inner_product_proof::InnerProductProof,
 }
 
-impl Proof {
+impl AggregatedProof {
     pub fn verify<R: Rng>(&self, rng: &mut R, transcript: &mut ProofTranscript) -> Result<(), ()> {
         use generators::{Generators, PedersenGenerators};
 

@@ -134,7 +134,7 @@ impl DealerAwaitingProofShares {
         proof_shares: &Vec<ProofShare>,
         gen: &GeneratorsView,
         transcript: &mut ProofTranscript,
-    ) -> Result<(Proof, Vec<ProofShareVerifier>), &'static str> {
+    ) -> Result<(AggregatedProof, Vec<ProofShareVerifier>), &'static str> {
         if self.m != proof_shares.len() {
             return Err("Length of proof shares doesn't match expected length m");
         }
@@ -209,7 +209,7 @@ impl DealerAwaitingProofShares {
             r_vec.clone(),
         );
 
-        let aggregated_proof = Proof {
+        let aggregated_proof = AggregatedProof {
             n: self.n,
             value_commitments,
             A,
