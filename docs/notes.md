@@ -636,9 +636,9 @@ This can be expressed with additional conditions:
 Proving vectors of statements with a single statement
 -----------------------------------------------------
 
-We want to combine the above three statements into a single statement for party `j`. We will also introduce challenge values \\(y_j\\) and \\(z_j\\) that are unique to party `j`, and use them to help combine the statements. Since these challenge values are independent for each party, we can later merge the per-party combined statements into one statement for all `m` parties.
+We want to combine the above three statements into a single statement for party `j`. We will also introduce challenge values \\(y_j\\) and \\(z_j\\) that are unique to each party `j`, and use them to help combine the statements. Since these challenge values are independent for each party, we can later merge the per-party combined statements into one statement for all `m` parties.
 
-First, we will combine each of the two vector-statements into a single statement using the verifier's choice of challenge value \\(y\\) that is shared across all parties, and offset by \\(y_j = y^{j \cdot n}\\) that is unique to party `j`:
+First, we will combine each of the two vector-statements into a single statement using the verifier's choice of challenge value \\(y\\) that is shared across all parties, and offset by \\(y_j = y^{j \cdot n}\\) that is unique to each party `j`:
 
 \\[
 \begin{aligned}
@@ -649,7 +649,7 @@ First, we will combine each of the two vector-statements into a single statement
 \\]
 
 The three resulting statements can then be combined in the same way,
-using the verifier’s choice of challenge value \\(z\\) that is shared across all parties, and offset by \\(z_j = z^j\\) that is unique to party `j`:
+using the verifier’s choice of challenge value \\(z\\) that is shared across all parties, and offset by \\(z_j = z^j\\) that is unique to each party `j`:
 \\[
 \begin{aligned}
 z^{2} z_j \cdot v 
@@ -679,7 +679,7 @@ The prover chooses vectors of blinding factors
 \\[
 {\mathbf{s}}\_{Lj}, {\mathbf{s}}\_{Rj} \\;{\xleftarrow{\\$}}\\; {\mathbb Z\_p}^{n}
 \\]
-and uses them to construct vector polynomials:
+and uses them to construct blinded vector polynomials:
 \\[
 \begin{aligned}
   {\mathbf{l}}\_j(x) &= ({\mathbf{a}}\_{Lj} + {\mathbf{s}}\_{Lj} x) - z {\mathbf{1}} & \in {\mathbb Z\_p}[x]^{n}  \\\\
@@ -730,7 +730,7 @@ We can do this check using the inner product proof, in the same way the single-v
 Proving that \\(t_0\\) is correct
 ---------------------------------
 
-Proving that \\(t\_{j0}\\) is correct requires first creating commitments to the variables, and then proving the following relation:
+Proving that \\(t\_{j0}\\) is correct requires first creating commitments to the variables, and then proving the following relation (for an explanation of how the commitments are created and how the relation is derived, see the single-value range proof notes):
 
 \\[
 \begin{aligned}
@@ -756,7 +756,7 @@ We can combine the party-specifc values in the following manner:
   T_1 &= \sum_{j=0}^{m-1} T_{j1}\\\\
   T_2 &= \sum_{j=0}^{m-1} T_{j2}\\\\
   \delta(y,z) &= \sum_{j=0}^{m-1} \delta_j(y,z)\\\\
-  &= (z - z^{2}) \cdot {\langle {\mathbf{1}}, {\mathbf{y}}^{n \cdot m} \cdot y_j \rangle} - z^{3} \sum_{j=0}^{m-1} z_j \cdot {\langle {\mathbf{1}}, {\mathbf{2}}^{n \cdot m} \rangle}\\\\
+  &= (z - z^{2}) \cdot {\langle {\mathbf{1}}, {\mathbf{y}}^{n \cdot m} \rangle} - z^{3} \sum_{j=0}^{m-1} z_j \cdot {\langle {\mathbf{1}}, {\mathbf{2}}^{n \cdot m} \rangle}\\\\
 \end{aligned}
 \\]
 
@@ -765,14 +765,23 @@ Now instead of having to do `m` individual checks to prove that \\(t\_{j0}\\) fo
 \\[
 \begin{aligned}
   t(x) B + {\tilde{t}}(x) {\widetilde{B}} \stackrel{?}{=} z^2 \sum_{j=0}^{m-1} z_j V_j + \delta(y,z) B + x T\_{1} + x^{2} T\_{2},\\\\
-  \delta(y,z) = (z - z^{2}) \cdot {\langle {\mathbf{1}}, {\mathbf{y}}^{n \cdot m} \cdot y_j \rangle} - z^{3} \sum_{j=0}^{m-1} z_j \cdot {\langle {\mathbf{1}}, {\mathbf{2}}^{n \cdot m} \rangle}\\\\
+  \delta(y,z) = (z - z^{2}) \cdot {\langle {\mathbf{1}}, {\mathbf{y}}^{n \cdot m} \rangle} - z^{3} \sum_{j=0}^{m-1} z_j \cdot {\langle {\mathbf{1}}, {\mathbf{2}}^{n \cdot m} \rangle}\\\\
+\end{aligned}
+\\]
+
+Since we know that \\(z_j = z^j\\), we can rewrite the equation as follows:
+
+\\[
+\begin{aligned}
+  t(x) B + {\tilde{t}}(x) {\widetilde{B}} \stackrel{?}{=} \sum_{j=0}^{m-1} z^{j+2} V_j + \delta(y,z) B + x T\_{1} + x^{2} T\_{2},\\\\
+  \delta(y,z) = (z - z^{2}) \cdot {\langle {\mathbf{1}}, {\mathbf{y}}^{n \cdot m} \rangle} - \sum_{j=0}^{m-1} z^{j+3} \cdot {\langle {\mathbf{1}}, {\mathbf{2}}^{n \cdot m} \rangle}\\\\
 \end{aligned}
 \\]
 
 Proving that \\({\mathbf{l}}(x)\\), \\({\mathbf{r}}(x)\\) are correct
 ---------------------------------------------------------------------
 
-Proving that \\({\mathbf{l}}\_j(x)\\), \\({\mathbf{r}}\_j(x)\\) are correct requires first creating commitments to the variables, and then proving the following relation:
+Proving that \\({\mathbf{l}}\_j(x)\\), \\({\mathbf{r}}\_j(x)\\) are correct requires first creating commitments to the variables, and then proving the following relation (for an explanation of how the commitments are created and how the relation is derived, see the single-value range proof notes):
 
 \\[
 \begin{aligned}
@@ -782,7 +791,7 @@ Proving that \\({\mathbf{l}}\_j(x)\\), \\({\mathbf{r}}\_j(x)\\) are correct requ
 
 Where \\({\mathbf{G}\_j}\\) is party `j`'s share of the generators \\({\mathbf{G}}\\), or \\({\mathbf{G}\_{[j\cdot n : (j+1)n - 1]}}\\), and \\({\mathbf{H}\_j}\\) is party `j`'s share of the generators \\({\mathbf{H}}\\), or \\({\mathbf{H}\_{[j\cdot n : (j+1)n - 1]}}\\).
 
-If we combine all the statements about \\({\mathbf{l}}\_j(x)\\), \\({\mathbf{r}}\_j(x)\\) from all the `j` parties by adding them together, then we get:
+If we combine all the statements about \\({\mathbf{l}}\_j(x)\\), \\({\mathbf{r}}\_j(x)\\) from all the `m` parties by adding them together, then we get:
 
 \\[
 \begin{aligned}
@@ -796,7 +805,8 @@ We can simplify this expression by making a few observations. We know that:
 \begin{aligned}
   {\mathbf{l}}(x) &= {\mathbf{l}}\_{j=0}(x) || {\mathbf{l}}\_{j=1}(x) || \dots || {\mathbf{l}}\_{j=m-1}(x) \\\\
   {\mathbf{G}} &= {\mathbf{G}}\_{0} || {\mathbf{G}}\_{1} || \dots || {\mathbf{G}}\_{m-1} \\\\
-  y_j &= y^{j \cdot n}
+  y_j &= y^{j \cdot n} \\\\
+  z_j &= z^j
 \end{aligned}
 \\]
 
@@ -808,7 +818,7 @@ Therefore, we can simplify the following statements:
   &= {\langle {\mathbf{l}}(x), {\mathbf{G}} \rangle} \\\\
   \sum_{j=0}^{m-1}{\langle {\mathbf{r}}\_j(x) \circ {\mathbf{y}^{-n}} \cdot y_j^{-1}, {\mathbf{H}}\_j \rangle} &= {\langle {\mathbf{r}}\_{j=0}(x) \circ {\mathbf{y}^{-n}} y_0^{-1} || {\mathbf{r}}\_{j=1}(x) \circ {\mathbf{y}^{-n}} y_1^{-1} || \dots || {\mathbf{r}}\_{j=m-1}(x) \circ {\mathbf{y}^{-n}} y_{m-1}^{-1}, {\mathbf{H}}\_{0} || {\mathbf{H}}\_{1} || \dots || {\mathbf{H}}\_{m-1} \rangle}\\\\
   &= {\langle {\mathbf{r}}\_{j=0}(x) \circ {\mathbf{y}^{-n}} y^{0 \cdot n} || {\mathbf{r}}\_{j=1}(x) \circ {\mathbf{y}^{-n}} y^{-1 \cdot n} || \dots || {\mathbf{r}}\_{j=m-1}(x) \circ {\mathbf{y}^{-n}} y^{-(m-1)\cdot n}, {\mathbf{H}}\_{0} || {\mathbf{H}}\_{1} || \dots || {\mathbf{H}}\_{m-1} \rangle}\\\\
-  &= {\langle  {\mathbf{r}}(x) \circ {\mathbf{y}^{-m \cdot n}}, {\mathbf{H}} \rangle}
+  &= {\langle  {\mathbf{r}}(x) \circ {\mathbf{y}^{-n \cdot m}}, {\mathbf{H}} \rangle}
 \end{aligned}
 \\]
 
@@ -826,7 +836,7 @@ With these observations, we can simplify the combined `m`-party statement about 
 
 \\[
 \begin{aligned}
-  {\langle {\mathbf{l}}(x), {\mathbf{G}} \rangle} + {\langle {\mathbf{r}}(x) \circ {\mathbf{y}^{-n \cdot m}} , {\mathbf{H}} \rangle} \stackrel{?}{=} -{\widetilde{e}} {\widetilde{B}} + A + x S - z{\langle {\mathbf{1}}, {\mathbf{G}} \rangle} + z{\langle {\mathbf{1}}, {\mathbf{H}} \rangle} + \sum_{j=0}^{m-1} {z^{j+2} \cdot {\mathbf{y}^{-n}} y^{-j\cdot n} \circ {\mathbf{2}}^n, {\mathbf{H}\_j} \rangle} 
+  {\langle {\mathbf{l}}(x), {\mathbf{G}} \rangle} + {\langle {\mathbf{r}}(x) \circ {\mathbf{y}^{-n \cdot m}} , {\mathbf{H}} \rangle} \stackrel{?}{=} -{\widetilde{e}} {\widetilde{B}} + A + x S - z{\langle {\mathbf{1}}, {\mathbf{G}} \rangle} + z{\langle {\mathbf{1}}, {\mathbf{H}} \rangle} + \sum_{j=0}^{m-1} {\langle z^{j+2} \cdot {\mathbf{y}^{-n}} y^{-j\cdot n} \circ {\mathbf{2}}^n, {\mathbf{H}\_j} \rangle} 
 \end{aligned}
 \\]
 
