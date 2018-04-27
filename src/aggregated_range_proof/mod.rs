@@ -1,5 +1,7 @@
 #![allow(non_snake_case)]
 
+#![doc(include = "../docs/aggregated-proof-protocol.md")]
+
 use rand::Rng;
 
 use curve25519_dalek::scalar::Scalar;
