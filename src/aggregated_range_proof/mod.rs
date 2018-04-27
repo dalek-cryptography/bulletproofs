@@ -13,7 +13,7 @@ pub mod party;
 
 pub use self::messages::AggregatedProof;
 
-struct SinglePartyAggregator {}
+pub struct SinglePartyAggregator {}
 
 impl SinglePartyAggregator {
     /// Create an aggregated rangeproof of multiple values.
@@ -24,7 +24,7 @@ impl SinglePartyAggregator {
     /// The length of `values` must be a power of 2.
     ///
     /// XXX this should allow proving about existing commitments.
-    fn generate_proof<R: Rng>(
+    pub fn generate_proof<R: Rng>(
         generators: &Generators,
         transcript: &mut ProofTranscript,
         rng: &mut R,
@@ -32,7 +32,6 @@ impl SinglePartyAggregator {
         n: usize,
     ) -> Result<AggregatedProof, &'static str> {
         use self::dealer::*;
-        use self::messages::*;
         use self::party::*;
 
         let dealer = Dealer::new(generators.all(), n, values.len(), transcript)?;
@@ -182,7 +181,6 @@ mod tests {
     #[test]
     fn detect_dishonest_party_during_aggregation() {
         use self::dealer::*;
-        use self::messages::*;
         use self::party::*;
 
         // Simulate four parties, two of which will be dishonest and use a 64-bit value.
