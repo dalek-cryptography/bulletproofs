@@ -273,12 +273,22 @@ impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
     ) -> Result<AggregatedProof, &'static str> {
         let proof = self.assemble_shares(proof_shares)?;
 
+        // See comment in `Dealer::new` for why we use `initial_transcript`
         if proof.verify(rng, &mut self.initial_transcript).is_ok() {
-            return Ok(proof);
+            Ok(proof)
+        } else {
+            // Create a list of bad shares
+            let mut bad_shares = Vec::new();
+            for (j, share) in proof_shares.iter().enumerate() {
+                match share.verify_share(self.n, j, &self.value_challenge, &self.poly_challenge) {
+                    Ok(_) => {}
+                    Err(_) => bad_shares.push(j),
+                }
+            }
+            // XXX pass this upwards
+            println!("bad shares: {:?}", bad_shares);
+            Err("proof failed to verify")
         }
-
-        // XXX check shares
-        return Err("proof failed to verify");
     }
 
     /// Assemble the final aggregated proof from the given
