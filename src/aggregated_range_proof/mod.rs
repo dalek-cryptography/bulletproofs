@@ -185,8 +185,8 @@ mod tests {
         use self::messages::*;
         use self::party::*;
 
-        // Simulate two parties, one of which will be dishonest and use a 64-bit value.
-        let m = 2;
+        // Simulate four parties, two of which will be dishonest and use a 64-bit value.
+        let m = 4;
         let n = 32;
 
         let generators = Generators::new(PedersenGenerators::default(), n, m);
@@ -194,36 +194,50 @@ mod tests {
         let mut rng = OsRng::new().unwrap();
         let mut transcript = ProofTranscript::new(b"AggregatedRangeProofTest");
 
-        // Party 0 is honest and uses a 32-bit value
+        // Parties 0, 2 are honest and use a 32-bit value
         let v0 = rng.next_u32() as u64;
         let v0_blinding = Scalar::random(&mut rng);
         let party0 = Party::new(v0, v0_blinding, n, &generators).unwrap();
 
-        // Party 1 is dishonest and uses a 64-bit value
+        let v2 = rng.next_u32() as u64;
+        let v2_blinding = Scalar::random(&mut rng);
+        let party2 = Party::new(v2, v2_blinding, n, &generators).unwrap();
+
+        // Parties 1, 3 are dishonest and use a 64-bit value
         let v1 = rng.next_u64();
         let v1_blinding = Scalar::random(&mut rng);
         let party1 = Party::new(v1, v1_blinding, n, &generators).unwrap();
+
+        let v3 = rng.next_u64();
+        let v3_blinding = Scalar::random(&mut rng);
+        let party3 = Party::new(v3, v3_blinding, n, &generators).unwrap();
 
         let dealer = Dealer::new(generators.all(), n, m, &mut transcript).unwrap();
 
         let (party0, value_com0) = party0.assign_position(0, &mut rng);
         let (party1, value_com1) = party1.assign_position(1, &mut rng);
+        let (party2, value_com2) = party2.assign_position(2, &mut rng);
+        let (party3, value_com3) = party3.assign_position(3, &mut rng);
 
         let (dealer, value_challenge) = dealer
-            .receive_value_commitments(&[value_com0, value_com1])
+            .receive_value_commitments(&[value_com0, value_com1, value_com2, value_com3])
             .unwrap();
 
         let (party0, poly_com0) = party0.apply_challenge(&value_challenge, &mut rng);
         let (party1, poly_com1) = party1.apply_challenge(&value_challenge, &mut rng);
+        let (party2, poly_com2) = party2.apply_challenge(&value_challenge, &mut rng);
+        let (party3, poly_com3) = party3.apply_challenge(&value_challenge, &mut rng);
 
         let (dealer, poly_challenge) = dealer
-            .receive_poly_commitments(&[poly_com0, poly_com1])
+            .receive_poly_commitments(&[poly_com0, poly_com1, poly_com2, poly_com3])
             .unwrap();
 
         let share0 = party0.apply_challenge(&poly_challenge);
         let share1 = party1.apply_challenge(&poly_challenge);
+        let share2 = party2.apply_challenge(&poly_challenge);
+        let share3 = party3.apply_challenge(&poly_challenge);
 
-        match dealer.receive_shares(&mut rng, &[share0, share1]) {
+        match dealer.receive_shares(&mut rng, &[share0, share1, share2, share3]) {
             Ok(_proof) => {
                 panic!("The proof was malformed, but it was not detected");
             }
