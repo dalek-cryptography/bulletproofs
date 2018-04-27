@@ -120,22 +120,6 @@ impl ProofShare {
     }
 }
 
-pub struct ProofShareVerifier {
-    pub proof_share: ProofShare,
-    pub n: usize,
-    pub j: usize,
-    pub value_challenge: ValueChallenge,
-    pub poly_challenge: PolyChallenge,
-}
-
-impl ProofShareVerifier {
-    /// Returns whether the proof share is valid (Ok) or invalid (Err)
-    pub fn verify_share(&self) -> Result<(), &'static str> {
-        self.proof_share
-            .verify_share(self.n, self.j, &self.value_challenge, &self.poly_challenge)
-    }
-}
-
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct AggregatedProof {
     pub n: usize,
