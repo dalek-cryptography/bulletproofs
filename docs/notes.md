@@ -608,67 +608,73 @@ Aggregated Range Proof
 
 We want to create an aggregated range proof for `m` values (`m` parties) that is more efficient to create and verify than `m` individual range proofs.
 
-The aggregated range proof has the same form as the individual range proof, but differs in that different parties are seperated by different powers of the challenge scalars `y` and `z`.
+The aggregation protocol is a multi-party computation protocol, involving `m` parties and one dealer, where the parties don't reveal their secrets to each other. The parties share their commitments with the dealer, and the dealer generates and returns challenge variables. The parties then share their proof shares with the dealer, and the dealer combines their shares to create an aggregated proof. 
+
+The Bulletproofs paper outlines two versions of multi-party computation aggregation - one with a constant number of rounds but communication that is linear in both `m` and the binary encoding of the range, and one with a logarithmic number of rounds and communication that is only linear in `m`. We chose to implement the first version because the two versions don't differ significantly in proof size, and the first version is less complicated.
+
+For more information on how the aggregation protocol works and is implemented, see the [protocol notes](../aggregated_range_proof/index.html). 
+
+The aggregated range proof has the same form as the individual range proof, in that the provers (the parties) still perform the same calculations to prove that \\(t_0, \mathbf{l}(x), \mathbf{r}(x)\\) are correct and that \\(t(x) = \langle \mathbf{l}(x), \mathbf{r}(x) \rangle \\). The difference is that the challenges values are obtained from the dealer, and that the calculations of different parties are seperated by different powers of the challenge scalars `y` and `z`.
 
 We will explain how one piece of the aggregated proof is generated for party `j`, and then will show how all of the pieces for all of the `m` parties can be combined into one aggregated proof.
 
-Party `j` begins with a secret value \\(v_j\\), and wishes to convince the verifier that \\(v_j \in [0, 2^n)\\) without revealing \\(v_j\\).
+Party `j` begins with a secret value \\(v_{(j)}\\), and wishes to convince the verifier that \\(v_{(j)} \in [0, 2^n)\\) without revealing \\(v_{(j)}\\). We use the notation that the subscript in \\(v_{(j)}\\) denotes the `j`th party's value. 
 
 Proving range statements with bit vectors
 -----------------------------------------
 
-Let \\({\mathbf{a}}\_{Lj}\\) be the vector of bits of \\(v_j\\).
-Then \\(v_j\\) can be represented as:
+Let \\({\mathbf{a}}\_{(j)L}\\) be the vector of bits of \\(v_{(j)}\\).
+Then \\(v_{(j)}\\) can be represented as:
 \\[
 \begin{aligned}
-  v_j &= {\langle {\mathbf{a}}\_{Lj}, {\mathbf{2}}^{n} \rangle}
+  v_{(j)} &= {\langle {\mathbf{a}}\_{(j)L}, {\mathbf{2}}^{n} \rangle}
 \end{aligned}
 \\]
-We need \\({\mathbf{a}}\_{Lj}\\) to be a vector of integers \\(\\{0,1\\}\\).
+We need \\({\mathbf{a}}\_{(j)L}\\) to be a vector of integers \\(\\{0,1\\}\\).
 This can be expressed with additional conditions:
 \\[
 \begin{aligned}
-  {\mathbf{a}}\_{Lj} \circ {\mathbf{a}}\_{Rj} &= {\mathbf{0}} \\\\
-  ({\mathbf{a}}\_{Lj} - {\mathbf{1}}) - {\mathbf{a}}\_{Rj} &= {\mathbf{0}}
+  {\mathbf{a}}\_{(j)L} \circ {\mathbf{a}}\_{(j)R} &= {\mathbf{0}} \\\\
+  ({\mathbf{a}}\_{(j)L} - {\mathbf{1}}) - {\mathbf{a}}\_{(j)R} &= {\mathbf{0}}
 \end{aligned}
 \\]
 
 Proving vectors of statements with a single statement
 -----------------------------------------------------
 
-We want to combine the above three statements into a single statement for party `j`. We will also introduce challenge values \\(y_j\\) and \\(z_j\\) that are unique to each party `j`, and use them to help combine the statements. Since these challenge values are independent for each party, we can later merge the per-party combined statements into one statement for all `m` parties.
+We want to combine the above three statements into a single statement for party `j`. We will also introduce challenge values \\(\mathbf{y}^n\_{(j)}\\) and \\(z_{(j)}\\) that are unique to each party `j`, and use them to help combine the statements. Since these challenge values are independent for each party, we can later merge the per-party combined statements into one statement for all `m` parties.
 
-First, we will combine each of the two vector-statements into a single statement using the verifier's choice of challenge value \\(y\\) that is shared across all parties, and offset by \\(y_j = y^{j \cdot n}\\) that is unique to each party `j`:
+First, we will combine each of the two vector-statements into a single statement using the verifier's choice of challenge value \\(y\\) that is shared across all parties, and offset by \\(\mathbf{y}^n\_{(j)} = \mathbf{y}^{n \cdot m}\_{[j \cdot n : (j+1) \cdot n - 1]} = \mathbf{y}^n \cdot y^{j \cdot n} \\) that is unique to each party `j`:
 
 \\[
 \begin{aligned}
-  {\langle {\mathbf{a}}\_{Lj}, {\mathbf{2}}^{n} \rangle} &= v \\\\
-  {\langle {\mathbf{a}}\_{Lj} - {\mathbf{1}} - {\mathbf{a}}\_{Rj}, {\mathbf{y}}^{n} \cdot y_j \rangle} &= 0 \\\\
-  {\langle {\mathbf{a}}\_{Lj}, {\mathbf{a}}\_{Rj} \circ {\mathbf{y}}^{n} \cdot y_j \rangle} &= 0
+  {\langle {\mathbf{a}}\_{(j)L}, {\mathbf{2}}^{n} \rangle} &= v \\\\
+  {\langle {\mathbf{a}}\_{(j)L} - {\mathbf{1}} - {\mathbf{a}}\_{(j)R}, {\mathbf{y}}^{n}\_{(j)} \rangle} &= 0 \\\\
+  {\langle {\mathbf{a}}\_{(j)L}, {\mathbf{a}}\_{(j)R} \circ {\mathbf{y}}^{n}\_{(j)} \rangle} &= 0
 \end{aligned}
 \\]
 
 The three resulting statements can then be combined in the same way,
-using the verifier’s choice of challenge value \\(z\\) that is shared across all parties, and offset by \\(z_j = z^j\\) that is unique to each party `j`:
+using the verifier’s choice of challenge value \\(z\\) that is shared across all parties, and offset by \\(z\_{(j)}  = z^j\\) that is unique to each party `j`:
 \\[
 \begin{aligned}
-z^{2} z_j \cdot v 
+z^{2} z\_{(j)}  \cdot v 
 &= 
-   z^{2} z_j \cdot {\langle {\mathbf{a}}\_{Lj}, {\mathbf{2}}^{n} \rangle} \\\\
-     &+ z \cdot {\langle {\mathbf{a}}\_{Lj} - {\mathbf{1}} - {\mathbf{a}}\_{Rj}, {\mathbf{y}}^{n} \cdot y_j \rangle} \\\\
-         &+   {\langle {\mathbf{a}}\_{Lj}, {\mathbf{a}}\_{Rj} \circ {\mathbf{y}}^{n} \cdot y_j \rangle} 
+   z^{2} z\_{(j)}  \cdot {\langle {\mathbf{a}}\_{(j)L}, {\mathbf{2}}^{n} \rangle} \\\\
+     &+ z \cdot {\langle {\mathbf{a}}\_{(j)L} - {\mathbf{1}} - {\mathbf{a}}\_{(j)R}, {\mathbf{y}}^{n}\_{(j)}  \rangle} \\\\
+         &+   {\langle {\mathbf{a}}\_{(j)L}, {\mathbf{a}}\_{(j)R} \circ {\mathbf{y}}^{n}\_{(j)} \rangle} 
 \end{aligned}
 \\]
 
 Combining inner products
 ------------------------
 
-We combine the terms in the last statement into a single inner product, using the same technique as in the single-value range proof. We will not reproduce the math here, only the end result:
+We combine the terms in the last statement into a single inner product, using the same technique as in the single-value range proof. We will not reproduce the math here since it is the same as in the [combining inner products](index.html#combining-inner-products) step of the single-value proof. Here is the end result:
 
 \\[
 \begin{aligned}
- \delta_j(y,z) &= (z - z^{2}) \cdot {\langle {\mathbf{1}}, {\mathbf{y}}^{n} \cdot y_j \rangle} - z^{3} z_j \cdot {\langle {\mathbf{1}}, {\mathbf{2}}^{n} \rangle}\\\\
- z^{2}z_j \cdot v + \delta_j(y,z) &= {\langle {\mathbf{a}}\_{Lj} - z {\mathbf{1}}, {\mathbf{y}}^{n} \cdot y_j \circ ({\mathbf{a}}\_{Rj} + z {\mathbf{1}}) + z^{2} z_j \cdot {\mathbf{2}}^{n} \rangle}
+ \delta_{(j)}(y,z) &= (z - z^{2}) \cdot {\langle {\mathbf{1}}, {\mathbf{y}}^{n}\_{(j)} \rangle} - z^{3} z_{(j)} \cdot {\langle {\mathbf{1}}, {\mathbf{2}}^{n} \rangle}\\\\
+ z^{2}z_{(j)} \cdot v + \delta_{(j)}(y,z) &= {\langle {\mathbf{a}}\_{(j)L} - z {\mathbf{1}}, {\mathbf{y}}^{n}\_{(j)} \circ ({\mathbf{a}}\_{(j)R} + z {\mathbf{1}}) + z^{2} z_{(j)} \cdot {\mathbf{2}}^{n} \rangle}
 \end{aligned} 
 \\]
 
@@ -677,13 +683,13 @@ Blinding the inner product
 
 The prover chooses vectors of blinding factors
 \\[
-{\mathbf{s}}\_{Lj}, {\mathbf{s}}\_{Rj} \\;{\xleftarrow{\\$}}\\; {\mathbb Z\_p}^{n}
+{\mathbf{s}}\_{(j)L}, {\mathbf{s}}\_{(j)R} \\;{\xleftarrow{\\$}}\\; {\mathbb Z\_p}^{n}
 \\]
 and uses them to construct blinded vector polynomials:
 \\[
 \begin{aligned}
-  {\mathbf{l}}\_j(x) &= ({\mathbf{a}}\_{Lj} + {\mathbf{s}}\_{Lj} x) - z {\mathbf{1}} & \in {\mathbb Z\_p}[x]^{n}  \\\\
-  {\mathbf{r}}\_j(x) &= {\mathbf{y}}^{n} \cdot y_j \circ \left( ({\mathbf{a}}\_{Rj} + {\mathbf{s}}\_{Rj} x\right)  + z {\mathbf{1}}) + z^{2} z_j {\mathbf{2}}^{n} &\in {\mathbb Z\_p}[x]^{n} 
+  {\mathbf{l}}\_j(x) &= ({\mathbf{a}}\_{(j)L} + {\mathbf{s}}\_{Lj} x) - z {\mathbf{1}} & \in {\mathbb Z\_p}[x]^{n}  \\\\
+  {\mathbf{r}}\_j(x) &= {\mathbf{y}}^{n} \cdot y_j \circ \left( ({\mathbf{a}}\_{(j)R} + {\mathbf{s}}\_{Rj} x\right)  + z {\mathbf{1}}) + z^{2} z_j {\mathbf{2}}^{n} &\in {\mathbb Z\_p}[x]^{n} 
 \end{aligned}
 \\]
 The vector polynomials \\({\mathbf{l}}\_j(x)\\) and \\({\mathbf{r}}\_j(x)\\) are related to \\(t(x)\\) by the following equations:
@@ -692,7 +698,7 @@ The vector polynomials \\({\mathbf{l}}\_j(x)\\) and \\({\mathbf{r}}\_j(x)\\) are
   t_j(x) &= {\langle {\mathbf{l}}\_j(x), {\mathbf{r}}\_j(x) \rangle} \\\\
   &= t\_{j0} + t\_{j1} x + t\_{j2} x^{2} \\\\
   t\_{j0} &= {\langle {\mathbf{l}}\_{j0}, {\mathbf{r}}\_{j0} \rangle} \\\\
-  &= {\langle {\mathbf{a}}\_{Lj} - z {\mathbf{1}}, {\mathbf{y}}^{n} \cdot y_j \circ ({\mathbf{a}}\_{Rj} + z {\mathbf{1}}) + z^{2} z_j \cdot {\mathbf{2}}^{n} \rangle} \\\\
+  &= {\langle {\mathbf{a}}\_{(j)L} - z {\mathbf{1}}, {\mathbf{y}}^{n} \cdot y_j \circ ({\mathbf{a}}\_{(j)R} + z {\mathbf{1}}) + z^{2} z_j \cdot {\mathbf{2}}^{n} \rangle} \\\\
   t\_{j1} &= {\langle {\mathbf{l}}\_{j1}, {\mathbf{r}}\_{j0} \rangle} + {\langle {\mathbf{l}}\_{j0}, {\mathbf{r}}\_{j1} \rangle} \\\\
   t\_{j2} &= {\langle {\mathbf{l}}\_{j1}, {\mathbf{r}}\_{j1} \rangle} \\\\
 \end{aligned}
@@ -734,7 +740,7 @@ Proving that \\(t\_{j0}\\) is correct requires first creating commitments to the
 
 \\[
 \begin{aligned}
-  t_j(x) B + {\tilde{t}}\_j(x) {\widetilde{B}} \stackrel{?}{=} z^2 z_j V_j + \delta_j(y,z) B + x T\_{j1} + x^{2} T\_{j2}\\\\
+  t_j(x) B + {\tilde{t}}\_j(x) {\widetilde{B}} \stackrel{?}{=} z^2 z_j V_{(j)} + \delta_j(y,z) B + x T\_{j1} + x^{2} T\_{j2}\\\\
   \delta_j(y,z) = (z - z^{2}) \cdot {\langle {\mathbf{1}}, {\mathbf{y}}^{n} \cdot y_j \rangle} - z^{3} z_j \cdot {\langle {\mathbf{1}}, {\mathbf{2}}^{n} \rangle}
 \end{aligned}
 \\]
@@ -743,7 +749,7 @@ If we combine all of the statements about \\(t\_{j0}\\) from all of the `j` part
 
 \\[
 \begin{aligned}
-  \sum_{j=0}^{m-1}t_j(x) B + \sum_{j=0}^{m-1}{\tilde{t}}\_j(x) {\widetilde{B}} \stackrel{?}{=} z^2 \sum_{j=0}^{m-1} z_j V_j + \sum_{j=0}^{m-1} \delta_j(y,z) B + x \sum_{j=0}^{m-1} T\_{j1} + x^{2} \sum_{j=0}^{m-1} T\_{j2}
+  \sum_{j=0}^{m-1}t_j(x) B + \sum_{j=0}^{m-1}{\tilde{t}}\_j(x) {\widetilde{B}} \stackrel{?}{=} z^2 \sum_{j=0}^{m-1} z_j V_{(j)} + \sum_{j=0}^{m-1} \delta_j(y,z) B + x \sum_{j=0}^{m-1} T\_{j1} + x^{2} \sum_{j=0}^{m-1} T\_{j2}
 \end{aligned}
 \\]
 
@@ -764,7 +770,7 @@ Now instead of having to do `m` individual checks to prove that \\(t\_{j0}\\) fo
 
 \\[
 \begin{aligned}
-  t(x) B + {\tilde{t}}(x) {\widetilde{B}} \stackrel{?}{=} z^2 \sum_{j=0}^{m-1} z_j V_j + \delta(y,z) B + x T\_{1} + x^{2} T\_{2},\\\\
+  t(x) B + {\tilde{t}}(x) {\widetilde{B}} \stackrel{?}{=} z^2 \sum_{j=0}^{m-1} z_j V_{(j)} + \delta(y,z) B + x T\_{1} + x^{2} T\_{2},\\\\
   \delta(y,z) = (z - z^{2}) \cdot {\langle {\mathbf{1}}, {\mathbf{y}}^{n \cdot m} \rangle} - z^{3} \sum_{j=0}^{m-1} z_j \cdot {\langle {\mathbf{1}}, {\mathbf{2}}^{n \cdot m} \rangle}\\\\
 \end{aligned}
 \\]
@@ -773,7 +779,7 @@ Since we know that \\(z_j = z^j\\), we can rewrite the equation as follows:
 
 \\[
 \begin{aligned}
-  t(x) B + {\tilde{t}}(x) {\widetilde{B}} \stackrel{?}{=} \sum_{j=0}^{m-1} z^{j+2} V_j + \delta(y,z) B + x T\_{1} + x^{2} T\_{2},\\\\
+  t(x) B + {\tilde{t}}(x) {\widetilde{B}} \stackrel{?}{=} \sum_{j=0}^{m-1} z^{j+2} V_{(j)} + \delta(y,z) B + x T\_{1} + x^{2} T\_{2},\\\\
   \delta(y,z) = (z - z^{2}) \cdot {\langle {\mathbf{1}}, {\mathbf{y}}^{n \cdot m} \rangle} - \sum_{j=0}^{m-1} z^{j+3} \cdot {\langle {\mathbf{1}}, {\mathbf{2}}^{n \cdot m} \rangle}\\\\
 \end{aligned}
 \\]
