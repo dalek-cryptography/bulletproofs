@@ -11,10 +11,10 @@
 extern crate byteorder;
 extern crate curve25519_dalek;
 extern crate rand;
+extern crate rayon;
 extern crate sha2;
 extern crate subtle;
 extern crate tiny_keccak;
-extern crate rayon;
 
 #[macro_use]
 extern crate serde_derive;
