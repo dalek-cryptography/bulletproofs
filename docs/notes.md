@@ -642,9 +642,10 @@ This can be expressed with additional conditions:
 Proving vectors of statements with a single statement
 -----------------------------------------------------
 
-We want to combine the above three statements into a single statement for party `j`. We will also introduce challenge values \\(\mathbf{y}^n\_{(j)}\\) and \\(z_{(j)}\\) that are unique to each party `j`, and use them to help combine the statements. Since these challenge values are independent for each party, we can later merge the per-party combined statements into one statement for all `m` parties.
+We want to combine the above three statements into a single statement for party `j`, as we do in the [proving vectors of statements](index.html#proving-vectors-of-statements-with-a-single-statement) step of the single-value range proof. We will additionally introduce challenge values \\(\mathbf{y}^n\_{(j)}\\) and \\(z_{(j)}\\) that are unique to each party `j`. Since these challenge values are independent for each party, we can later merge the per-party combined statements into one statement for all `m` parties.
 
-First, we will combine each of the two vector-statements into a single statement using the verifier's choice of challenge value \\(y\\) that is shared across all parties, and offset by \\(\mathbf{y}^n\_{(j)} = \mathbf{y}^{n \cdot m}\_{[j \cdot n : (j+1) \cdot n - 1]} = \mathbf{y}^n \cdot y^{j \cdot n} \\) that is unique to each party `j`:
+First, we will combine each of the two vector-statements into a single statement using the verifier's choice of challenge value \\(y\\) that is shared across all parties
+, and offset by vector \\(\mathbf{y}^n\_{(j)} = \mathbf{y}^{n \cdot m}\_{[j \cdot n : (j+1) \cdot n - 1]} \\), a length `n` slice into vector \\(\mathbf{y}^{n \cdot m}\\) that is unique to each party `j`:
 
 \\[
 \begin{aligned}
@@ -655,7 +656,7 @@ First, we will combine each of the two vector-statements into a single statement
 \\]
 
 The three resulting statements can then be combined in the same way,
-using the verifier’s choice of challenge value \\(z\\) that is shared across all parties, and offset by \\(z\_{(j)}  = z^j\\) that is unique to each party `j`:
+using the verifier’s choice of challenge value \\(z\\) that is shared across all parties, and offset by scalar \\(z\_{(j)}  = z^j\\) that is unique to each party `j`:
 \\[
 \begin{aligned}
 z^{2} z\_{(j)}  \cdot v 
@@ -681,26 +682,12 @@ We combine the terms in the last statement into a single inner product, using th
 Blinding the inner product
 --------------------------
 
-The prover chooses vectors of blinding factors
-\\[
-{\mathbf{s}}\_{(j)L}, {\mathbf{s}}\_{(j)R} \\;{\xleftarrow{\\$}}\\; {\mathbb Z\_p}^{n}
-\\]
-and uses them to construct blinded vector polynomials:
+The prover chooses vectors of blinding factors \\( \mathbf{s}\_{(j)L}, {\mathbf{s}}\_{(j)R} \\), and uses them to construct the blinded vector polynomials \\(\mathbf{l}\_{(j)}(x), \mathbf{r}\_{(j)}(x)\\). We will not reproduce the steps or the explanation here since it is the same as in the [blinding the inner product](index.html#blinding-the-inner-product) step of the single-value proof. Here are the final equations for the vector polynomials:
+
 \\[
 \begin{aligned}
-  {\mathbf{l}}\_j(x) &= ({\mathbf{a}}\_{(j)L} + {\mathbf{s}}\_{Lj} x) - z {\mathbf{1}} & \in {\mathbb Z\_p}[x]^{n}  \\\\
-  {\mathbf{r}}\_j(x) &= {\mathbf{y}}^{n} \cdot y_j \circ \left( ({\mathbf{a}}\_{(j)R} + {\mathbf{s}}\_{Rj} x\right)  + z {\mathbf{1}}) + z^{2} z_j {\mathbf{2}}^{n} &\in {\mathbb Z\_p}[x]^{n} 
-\end{aligned}
-\\]
-The vector polynomials \\({\mathbf{l}}\_j(x)\\) and \\({\mathbf{r}}\_j(x)\\) are related to \\(t(x)\\) by the following equations:
-\\[
-\begin{aligned}
-  t_j(x) &= {\langle {\mathbf{l}}\_j(x), {\mathbf{r}}\_j(x) \rangle} \\\\
-  &= t\_{j0} + t\_{j1} x + t\_{j2} x^{2} \\\\
-  t\_{j0} &= {\langle {\mathbf{l}}\_{j0}, {\mathbf{r}}\_{j0} \rangle} \\\\
-  &= {\langle {\mathbf{a}}\_{(j)L} - z {\mathbf{1}}, {\mathbf{y}}^{n} \cdot y_j \circ ({\mathbf{a}}\_{(j)R} + z {\mathbf{1}}) + z^{2} z_j \cdot {\mathbf{2}}^{n} \rangle} \\\\
-  t\_{j1} &= {\langle {\mathbf{l}}\_{j1}, {\mathbf{r}}\_{j0} \rangle} + {\langle {\mathbf{l}}\_{j0}, {\mathbf{r}}\_{j1} \rangle} \\\\
-  t\_{j2} &= {\langle {\mathbf{l}}\_{j1}, {\mathbf{r}}\_{j1} \rangle} \\\\
+  {\mathbf{l}}\_{(j)}(x) &= ({\mathbf{a}}\_{(j)L} + {\mathbf{s}}\_{(j)L} x) - z {\mathbf{1}} & \in {\mathbb Z\_p}[x]^{n}  \\\\
+  {\mathbf{r}}\_{(j)}(x) &= {\mathbf{y}}^{n}\_{(j)} \circ \left( ({\mathbf{a}}\_{(j)R} + {\mathbf{s}}\_{(j)R} x\right)  + z {\mathbf{1}}) + z^{2} z_{(j)} {\mathbf{2}}^{n} &\in {\mathbb Z\_p}[x]^{n} 
 \end{aligned}
 \\]
 
@@ -708,20 +695,20 @@ Proving that \\(t(x)\\) is correct
 ----------------------------------
 
 Proving that \\(t\_j(x)\\) is correct means proving that
-\\({\mathbf{l}}\_j(x)\\), \\({\mathbf{r}}\_j(x)\\) are correctly formed, and that
-\\(t_j(x) = {\langle {\mathbf{l}}\_j(x), {\mathbf{r}}\_j(x) \rangle}\\).
+\\({\mathbf{l}}\_{(j)}(x)\\), \\({\mathbf{r}}\_{(j)}(x)\\) are correctly formed, and that
+\\(t\_{(j)}(x) = {\langle {\mathbf{l}}\_{(j)}(x), {\mathbf{r}}\_{(j)}(x) \rangle}\\).
 
-We can combine the statements about \\(t_j(x)\\), \\({\mathbf{l}}\_j(x)\\), and \\({\mathbf{r}}\_j(x)\\) from all `m` parties in the following manner:
+We can combine the statements about \\(t\_{(j)}(x)\\), \\({\mathbf{l}}\_{(j)}(x)\\), and \\({\mathbf{r}}\_{(j)}(x)\\) from all `m` parties in the following manner:
 
 \\[
 \begin{aligned}
-  t(x) &= \sum_{j=0}^{m-1} t_j(x)\\\\
-  {\mathbf{l}}(x) &= {\mathbf{l}}\_{j=0}(x) || {\mathbf{l}}\_{j=1}(x) || \dots || {\mathbf{l}}\_{j=m-1}(x) \\\\
-  {\mathbf{r}}(x) &= {\mathbf{r}}\_{j=0}(x) || {\mathbf{r}}\_{j=1}(x) || \dots || {\mathbf{r}}\_{j=m-1}(x) \\\\
+  t(x) &= \sum_{j=0}^{m-1} t\_{(j)}(x)\\\\
+  {\mathbf{l}}(x) &= {\mathbf{l}}\_{(0)}(x) || {\mathbf{l}}\_{(1)}(x) || \dots || {\mathbf{l}}\_{(m-1)}(x) \\\\
+  {\mathbf{r}}(x) &= {\mathbf{r}}\_{(0)}(x) || {\mathbf{r}}\_{(1)}(x) || \dots || {\mathbf{r}}\_{(m-1)}(x) \\\\
 \end{aligned}
 \\]
 
-We can add the \\(t_j(x)\\) values together to create \\(t(x)\\) because each \\(t_j(x)\\) is calculated using the \\(y_j\\) and \\(z_j\\) challenge variables that are unique to each party `j`, so all of the \\(t_j(x)\\) values will be offset from one another.
+We can add the \\(t_j(x)\\) values together to create \\(t(x)\\) because each \\(t_j(x)\\) is calculated using the \\(\mathbf{y}^n\_{(j)}\\) and \\(z\_{(j)}\\) challenge variables that are unique to each party `j`, so all of the \\(t\_{(j)}(x)\\) values will be offset from one another.
 
 Now instead of having to do `m` individual checks to prove that \\(t_j(x)\\), \\({\mathbf{l}}\_j(x)\\), and \\({\mathbf{r}}\_j(x)\\) for all parties `j` are correct, we can do the verification with one check:
 
@@ -731,21 +718,21 @@ Now instead of having to do `m` individual checks to prove that \\(t_j(x)\\), \\
 \end{aligned}
 \\]
 
-We can do this check using the inner product proof, in the same way the single-value range proof uses the inner product proof.
+We can do this check using the [inner product proof](index.html#inner-product-proof), in the same way the single-value range proof uses the inner product proof.
 
 Proving that \\(t_0\\) is correct
 ---------------------------------
 
-Proving that \\(t\_{j0}\\) is correct requires first creating commitments to the variables, and then proving the following relation (for an explanation of how the commitments are created and how the relation is derived, see the single-value range proof notes):
+Proving that \\(t\_{(j)0}\\) is correct requires first creating commitments to the variables, and then proving a relation over the commitments. For an explanation of how the commitments are created and how the relation is derived, see the [proving that \\(t_0\\) is correct](index.html#proving-that-t_0-is-correct) step of the single-value range proof. The relation over the commitments to prove is:
 
 \\[
 \begin{aligned}
-  t_j(x) B + {\tilde{t}}\_j(x) {\widetilde{B}} \stackrel{?}{=} z^2 z_j V_{(j)} + \delta_j(y,z) B + x T\_{j1} + x^{2} T\_{j2}\\\\
-  \delta_j(y,z) = (z - z^{2}) \cdot {\langle {\mathbf{1}}, {\mathbf{y}}^{n} \cdot y_j \rangle} - z^{3} z_j \cdot {\langle {\mathbf{1}}, {\mathbf{2}}^{n} \rangle}
+  t\_{(j)}(x) B + {\tilde{t}}\_{(j)}(x) {\widetilde{B}} \stackrel{?}{=} z^2 z\_{(j)} V_{(j)} + \delta\_{(j)}(y,z) B + x T\_{(j)1} + x^{2} T\_{(j)2}\\\\
+  \delta\_{(j)}(y,z) = (z - z^{2}) \cdot {\langle {\mathbf{1}}, {\mathbf{y}}^{n}\_{(j)} \rangle} - z^{3} z\_{(j)} \cdot {\langle {\mathbf{1}}, {\mathbf{2}}^{n} \rangle}
 \end{aligned}
 \\]
 
-If we combine all of the statements about \\(t\_{j0}\\) from all of the `j` parties by adding them together, then we get:
+If we combine all of the statements about \\(t\_{(j)0}\\) from all of the `j` parties by adding them together, then we get:
 
 \\[
 \begin{aligned}
@@ -753,29 +740,45 @@ If we combine all of the statements about \\(t\_{j0}\\) from all of the `j` part
 \end{aligned}
 \\]
 
-We can combine the party-specifc values in the following manner:
+We can combine the values and commitments by summing them directly. We can do this instead of having to take a linear combination, because each party's values and commitments are already offset by the values \\(\mathbf{y}^n\_{(j)}\\) and \\(z_{(j)}\\) that are unique to that party.
 
 \\[
 \begin{aligned}
-  t(x) &= \sum_{j=0}^{m-1} t_j(x)\\\\
-  {\tilde{t}}(x) &= \sum_{j=0}^{m-1}{\tilde{t}}\_j(x)\\\\
-  T_1 &= \sum_{j=0}^{m-1} T_{j1}\\\\
-  T_2 &= \sum_{j=0}^{m-1} T_{j2}\\\\
-  \delta(y,z) &= \sum_{j=0}^{m-1} \delta_j(y,z)\\\\
-  &= (z - z^{2}) \cdot {\langle {\mathbf{1}}, {\mathbf{y}}^{n \cdot m} \rangle} - z^{3} \sum_{j=0}^{m-1} z_j \cdot {\langle {\mathbf{1}}, {\mathbf{2}}^{n \cdot m} \rangle}\\\\
+  t(x) &= \sum_{j=0}^{m-1} t\_{(j)}(x)\\\\
+  {\tilde{t}}(x) &= \sum_{j=0}^{m-1}{\tilde{t}}\_{(j)}(x)\\\\
+  T_1 &= \sum_{j=0}^{m-1} T_{(j)1}\\\\
+  T_2 &= \sum_{j=0}^{m-1} T_{(j)2}\\\\
+  \delta(y,z) &= \sum_{j=0}^{m-1} \delta\_{(j)}(y,z)\\\\
+  &= (z - z^{2}) \cdot \sum_{j=0}^{m-1} {\langle {\mathbf{1}}, {\mathbf{y}}^{n}\_{(j)} \rangle} - z^{3} \sum_{j=0}^{m-1} z\_{(j)} \cdot {\langle {\mathbf{1}}, {\mathbf{2}}^{n \cdot m} \rangle}\\\\
 \end{aligned}
 \\]
 
-Now instead of having to do `m` individual checks to prove that \\(t\_{j0}\\) for all parties `j` are correct, we can do the verification with one check using the combined values:
+Since we know that \\(\mathbf{y}^n\_{(j)} = \mathbf{y}^{n \cdot m}\_{[j \cdot n : (j+1) \cdot n - 1]} \\), we can simplify \\(\delta(y, z)\\):
 
 \\[
 \begin{aligned}
-  t(x) B + {\tilde{t}}(x) {\widetilde{B}} \stackrel{?}{=} z^2 \sum_{j=0}^{m-1} z_j V_{(j)} + \delta(y,z) B + x T\_{1} + x^{2} T\_{2},\\\\
-  \delta(y,z) = (z - z^{2}) \cdot {\langle {\mathbf{1}}, {\mathbf{y}}^{n \cdot m} \rangle} - z^{3} \sum_{j=0}^{m-1} z_j \cdot {\langle {\mathbf{1}}, {\mathbf{2}}^{n \cdot m} \rangle}\\\\
+  \delta(y, z) &= (z - z^{2}) \cdot \sum_{j=0}^{m-1} {\langle {\mathbf{1}}, {\mathbf{y}}^{n}\_{(j)} \rangle} - z^{3} \sum_{j=0}^{m-1} z\_{(j)} \cdot {\langle {\mathbf{1}}, {\mathbf{2}}^{n \cdot m} \rangle}\\\\
+  &= (z - z^{2}) \cdot (
+    {\langle {\mathbf{1}}, \mathbf{y}^{n \cdot m}\_{[0 : n - 1]} \rangle + 
+    \langle {\mathbf{1}}, \mathbf{y}^{n \cdot m}\_{[n : 2 \cdot n - 1]} \rangle + 
+    \dots +
+    \langle {\mathbf{1}}, \mathbf{y}^{n \cdot m}\_{[m \cdot n : (m+1) \cdot n - 1]} \rangle}) -
+  z^{3} \sum_{j=0}^{m-1} z\_{(j)} \cdot {\langle {\mathbf{1}}, {\mathbf{2}}^{n \cdot m} \rangle} \\\\
+  &= (z - z^{2}) \cdot {\langle {\mathbf{1}}, \mathbf{y}^{n \cdot m} \rangle} - z^{3} \sum_{j=0}^{m-1} z\_{(j)} \cdot {\langle {\mathbf{1}}, {\mathbf{2}}^{n \cdot m} \rangle} \\\\
 \end{aligned}
 \\]
 
-Since we know that \\(z_j = z^j\\), we can rewrite the equation as follows:
+
+Now instead of having to do `m` individual checks to prove that \\(t\_{(j)0}\\) for all parties `j` are correct, we can do the verification with one check using the combined values:
+
+\\[
+\begin{aligned}
+  t(x) B + {\tilde{t}}(x) {\widetilde{B}} \stackrel{?}{=} z^2 \sum_{j=0}^{m-1} z\_{(j)} V_{(j)} + \delta(y,z) B + x T\_{1} + x^{2} T\_{2},\\\\
+  \delta(y,z) = (z - z^{2}) \cdot {\langle {\mathbf{1}}, {\mathbf{y}}^{n \cdot m} \rangle} - z^{3} \sum_{j=0}^{m-1} z\_{(j)} \cdot {\langle {\mathbf{1}}, {\mathbf{2}}^{n \cdot m} \rangle}\\\\
+\end{aligned}
+\\]
+
+Since we know that \\(z\_{(j)} = z^j\\), we can rewrite the equation as follows:
 
 \\[
 \begin{aligned}
