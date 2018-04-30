@@ -127,6 +127,7 @@ fn create_aggregated_rangeproof_helper(n: usize, c: &mut Criterion) {
 
             let (min, max) = (0u64, ((1u128 << n) - 1) as u64);
             let values: Vec<u64> = (0..m).map(|_| rng.gen_range(min, max)).collect();
+            let blindings: Vec<Scalar> = (0..m).map(|_| Scalar::random(&mut rng)).collect();
 
             b.iter(|| {
                 // Each proof creation requires a clean transcript.
@@ -137,6 +138,7 @@ fn create_aggregated_rangeproof_helper(n: usize, c: &mut Criterion) {
                     &mut transcript,
                     &mut rng,
                     &values,
+                    &blindings,
                     n,
                 )
             })
@@ -166,6 +168,7 @@ fn verify_aggregated_rangeproof_helper(n: usize, c: &mut Criterion) {
 
             let (min, max) = (0u64, ((1u128 << n) - 1) as u64);
             let values: Vec<u64> = (0..m).map(|_| rng.gen_range(min, max)).collect();
+            let blindings: Vec<Scalar> = (0..m).map(|_| Scalar::random(&mut rng)).collect();
 
             let mut transcript = ProofTranscript::new(b"AggregateRangeProofBenchmark");
             let proof = SinglePartyAggregator::generate_proof(
@@ -173,14 +176,30 @@ fn verify_aggregated_rangeproof_helper(n: usize, c: &mut Criterion) {
                 &mut transcript,
                 &mut rng,
                 &values,
+                &blindings,
                 n,
             ).unwrap();
+
+            // XXX would be nice to have some convenience API for this
+            let pg = &generators.all().pedersen_generators;
+            let value_commitments: Vec<_> = values
+                .iter()
+                .zip(blindings.iter())
+                .map(|(&v, &v_blinding)| pg.commit(Scalar::from_u64(v), v_blinding))
+                .collect();
 
             b.iter(|| {
                 // Each proof creation requires a clean transcript.
                 let mut transcript = ProofTranscript::new(b"AggregateRangeProofBenchmark");
 
-                proof.verify(&mut rng, &mut transcript)
+                proof.verify(
+                    &value_commitments,
+                    generators.all(),
+                    &mut transcript,
+                    &mut rng,
+                    n,
+                    m,
+                )
             });
         },
         &AGGREGATION_SIZES,
