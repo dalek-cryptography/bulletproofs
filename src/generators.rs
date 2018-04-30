@@ -21,7 +21,9 @@
 
 // XXX we should use Sha3 everywhere
 
+use curve25519_dalek::ristretto;
 use curve25519_dalek::ristretto::RistrettoPoint;
+use curve25519_dalek::scalar::Scalar;
 use sha2::{Digest, Sha512};
 
 /// The `GeneratorsChain` creates an arbitrary-long sequence of orthogonal generators.
@@ -66,10 +68,8 @@ pub struct Generators {
     pub n: usize,
     /// Number of values or parties
     pub m: usize,
-    /// Main base of a Pedersen commitment
-    B: RistrettoPoint,
-    /// Base for the blinding factor in a Pedersen commitment
-    B_blinding: RistrettoPoint,
+    /// Bases for Pedersen commitments
+    pedersen_generators: PedersenGenerators,
     /// Per-bit generators for the bit values
     G: Vec<RistrettoPoint>,
     /// Per-bit generators for the bit blinding factors
@@ -77,52 +77,66 @@ pub struct Generators {
 }
 
 /// Represents a view into `Generators` relevant to a specific range proof.
+#[derive(Copy, Clone)]
 pub struct GeneratorsView<'a> {
-    /// Main base of a Pedersen commitment
-    pub B: &'a RistrettoPoint,
-    /// Base for the blinding factor in a Pedersen commitment
-    pub B_blinding: &'a RistrettoPoint,
+    /// Bases for Pedersen commitments
+    pub pedersen_generators: &'a PedersenGenerators,
     /// Per-bit generators for the bit values
     pub G: &'a [RistrettoPoint],
     /// Per-bit generators for the bit blinding factors
     pub H: &'a [RistrettoPoint],
 }
 
-/// Entry point for producing a pair of base points for Pedersen commitments.
-pub struct PedersenGenerators(RistrettoPoint, RistrettoPoint);
+/// Represents a pair of base points for Pedersen commitments.
+#[derive(Copy, Clone)]
+pub struct PedersenGenerators {
+    /// Base for the committed value
+    pub B: RistrettoPoint,
+
+    /// Base for the blinding factor
+    pub B_blinding: RistrettoPoint,
+}
 
 impl PedersenGenerators {
-    /// Constructs a pair of pedersen generators
+    /// Constructs a pair of Pedersen generators
     /// from a pair of generators provided by the user.
-    pub fn new(A: RistrettoPoint, B: RistrettoPoint) -> Self {
-        PedersenGenerators(A,B)
+    pub fn new(B: RistrettoPoint, B_blinding: RistrettoPoint) -> Self {
+        PedersenGenerators { B, B_blinding }
+    }
+
+    /// Creates a Pedersen commitment using the value scalar and a blinding factor.
+    pub fn commit(&self, value: Scalar, blinding: Scalar) -> RistrettoPoint {
+        ristretto::multiscalar_mul(&[value, blinding], &[self.B, self.B_blinding])
     }
 }
 
 impl Default for PedersenGenerators {
     fn default() -> Self {
-        PedersenGenerators(
-            GeneratorsChain::new(b"Bulletproofs.Generators.B").next().unwrap(),
-            GeneratorsChain::new(b"Bulletproofs.Generators.B_blinding").next().unwrap()
-        )
+        PedersenGenerators {
+            B: GeneratorsChain::new(b"Bulletproofs.Generators.B")
+                .next()
+                .unwrap(),
+            B_blinding: GeneratorsChain::new(b"Bulletproofs.Generators.B_blinding")
+                .next()
+                .unwrap(),
+        }
     }
 }
 
 impl Generators {
     /// Creates generators for `m` range proofs of `n` bits each.
     pub fn new(pedersen_generators: PedersenGenerators, n: usize, m: usize) -> Self {
-        let G = GeneratorsChain::new(pedersen_generators.0.compress().as_bytes())
+        let G = GeneratorsChain::new(pedersen_generators.B.compress().as_bytes())
             .take(n * m)
             .collect();
-        let H = GeneratorsChain::new(pedersen_generators.1.compress().as_bytes())
+        let H = GeneratorsChain::new(pedersen_generators.B_blinding.compress().as_bytes())
             .take(n * m)
             .collect();
 
         Generators {
             n,
             m,
-            B: pedersen_generators.0,
-            B_blinding: pedersen_generators.1,
+            pedersen_generators: pedersen_generators,
             G,
             H,
         }
@@ -131,8 +145,7 @@ impl Generators {
     /// Returns a view into the entirety of the generators.
     pub fn all(&self) -> GeneratorsView {
         GeneratorsView {
-            B: &self.B,
-            B_blinding: &self.B_blinding,
+            pedersen_generators: &self.pedersen_generators,
             G: &self.G[..],
             H: &self.H[..],
         }
@@ -144,8 +157,7 @@ impl Generators {
         let lower = self.n * j;
         let upper = self.n * (j + 1);
         GeneratorsView {
-            B: &self.B,
-            B_blinding: &self.B_blinding,
+            pedersen_generators: &self.pedersen_generators,
             G: &self.G[lower..upper],
             H: &self.H[lower..upper],
         }

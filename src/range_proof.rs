@@ -1,4 +1,5 @@
 #![allow(non_snake_case)]
+#![deny(missing_docs)]
 
 #![doc(include = "../docs/range-proof-protocol.md")]
 
@@ -6,14 +7,12 @@ use rand::Rng;
 
 use std::iter;
 
-use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::ristretto;
-use curve25519_dalek::traits::IsIdentity;
+use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
+use curve25519_dalek::traits::IsIdentity;
 
-// XXX rename this maybe ?? at least `inner_product_proof::Proof` is too long.
-// maybe `use inner_product_proof::IPProof` would be better?
-use inner_product_proof;
+use inner_product_proof::InnerProductProof;
 
 use proof_transcript::ProofTranscript;
 
@@ -21,17 +20,9 @@ use util;
 
 use generators::GeneratorsView;
 
-struct PolyDeg3(Scalar, Scalar, Scalar);
-
-struct VecPoly2(Vec<Scalar>, Vec<Scalar>);
-
 /// The `RangeProof` struct represents a single range proof.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct RangeProof {
-    /// Commitment to the value
-    // XXX this should not be included, so that we can prove about existing commitments
-    // included for now so that it's easier to test
-    V: RistrettoPoint,
     /// Commitment to the bits of the value
     A: RistrettoPoint,
     /// Commitment to the blinding factors
@@ -47,11 +38,27 @@ pub struct RangeProof {
     /// Blinding factor for the synthetic commitment to the inner-product arguments
     e_blinding: Scalar,
     /// Proof data for the inner-product argument.
-    ipp_proof: inner_product_proof::Proof,
+    ipp_proof: InnerProductProof,
 }
 
 impl RangeProof {
-    /// Create a rangeproof.
+    /// Create a rangeproof for a given pair of value `v` and
+    /// blinding scalar `v_blinding`.
+    ///
+    /// Usage:
+    /// ```ascii
+    /// let n = 64;
+    /// let generators = Generators::new(PedersenGenerators::default(), n, 1);
+    /// let mut transcript = ProofTranscript::new(b"RangeproofTest");
+    /// let proof = RangeProof::generate_proof(
+    ///     generators.share(0),
+    ///     &mut transcript,
+    ///     &mut rng,
+    ///     n,
+    ///     v,
+    ///     &v_blinding,
+    /// );
+    /// ```
     pub fn generate_proof<R: Rng>(
         generators: GeneratorsView,
         transcript: &mut ProofTranscript,
@@ -62,20 +69,22 @@ impl RangeProof {
     ) -> RangeProof {
         use subtle::{Choice, ConditionallyAssignable};
 
-        let B = generators.B;
-        let B_blinding = generators.B_blinding;
+        // Commit the range size to domain-separate from rangeproofs of different lengths.
+        transcript.commit_u64(n as u64);
 
         // Create copies of G, H, so we can pass them to the
         // (consuming) IPP API later.
         let G = generators.G.to_vec();
         let H = generators.H.to_vec();
 
-        let V = ristretto::multiscalar_mul(&[Scalar::from_u64(v), *v_blinding], &[*B, *B_blinding]);
+        let V = generators
+            .pedersen_generators
+            .commit(Scalar::from_u64(v), *v_blinding);
 
         let a_blinding = Scalar::random(rng);
 
         // Compute A = <a_L, G> + <a_R, H> + a_blinding * B_blinding.
-        let mut A = B_blinding * a_blinding;
+        let mut A = generators.pedersen_generators.B_blinding * a_blinding;
         for i in 0..n {
             // If v_i = 0, we add a_L[i] * G[i] + a_R[i] * H[i] = - H[i]
             // If v_i = 1, we add a_L[i] * G[i] + a_R[i] * H[i] =   G[i]
@@ -92,7 +101,9 @@ impl RangeProof {
         // Compute S = <s_L, G> + <s_R, H> + s_blinding * B_blinding.
         let S = ristretto::multiscalar_mul(
             iter::once(&s_blinding).chain(s_L.iter()).chain(s_R.iter()),
-            iter::once(B_blinding).chain(G.iter()).chain(H.iter()),
+            iter::once(&generators.pedersen_generators.B_blinding)
+                .chain(G.iter())
+                .chain(H.iter()),
         );
 
         // Commit to V, A, S and get challenges y, z
@@ -104,8 +115,8 @@ impl RangeProof {
         let zz = z * z;
 
         // Compute l, r
-        let mut l_poly = VecPoly2::zero(n);
-        let mut r_poly = VecPoly2::zero(n);
+        let mut l_poly = util::VecPoly1::zero(n);
+        let mut r_poly = util::VecPoly1::zero(n);
         let mut exp_y = Scalar::one(); // start at y^0 = 1
         let mut exp_2 = Scalar::one(); // start at 2^0 = 1
 
@@ -128,8 +139,12 @@ impl RangeProof {
         // Form commitments T_1, T_2 to t.1, t.2
         let t_1_blinding = Scalar::random(rng);
         let t_2_blinding = Scalar::random(rng);
-        let T_1 = ristretto::multiscalar_mul(&[t_poly.1, t_1_blinding], &[*B, *B_blinding]);
-        let T_2 = ristretto::multiscalar_mul(&[t_poly.2, t_2_blinding], &[*B, *B_blinding]);
+        let T_1 = generators
+            .pedersen_generators
+            .commit(t_poly.1, t_1_blinding);
+        let T_2 = generators
+            .pedersen_generators
+            .commit(t_poly.2, t_2_blinding);
 
         // Commit to T_1, T_2 to get the challenge point x
         transcript.commit(T_1.compress().as_bytes());
@@ -137,7 +152,7 @@ impl RangeProof {
         let x = transcript.challenge_scalar();
 
         // Evaluate t at x and run the IPP
-        let t_x = t_poly.0 + x * (t_poly.1 + x * t_poly.2);
+        let t_x = t_poly.eval(x);
         let t_x_blinding = zz * v_blinding + x * (t_1_blinding + x * t_2_blinding);
         let e_blinding = a_blinding + x * s_blinding;
 
@@ -147,10 +162,10 @@ impl RangeProof {
 
         // Get a challenge value to combine statements for the IPP
         let w = transcript.challenge_scalar();
-        let Q = w * B;
+        let Q = w * generators.pedersen_generators.B;
 
         // Generate the IPP proof
-        let ipp_proof = inner_product_proof::Proof::create(
+        let ipp_proof = InnerProductProof::create(
             transcript,
             &Q,
             util::exp_iter(y.invert()),
@@ -161,7 +176,6 @@ impl RangeProof {
         );
 
         RangeProof {
-            V,
             A,
             S,
             T_1,
@@ -173,8 +187,24 @@ impl RangeProof {
         }
     }
 
+    /// Verifies a rangeproof for a given value commitment \\(V\\).
+    ///
+    /// Usage:
+    /// ```ascii
+    /// let n = 64;
+    /// let generators = Generators::new(PedersenGenerators::default(), n, 1);
+    /// let mut transcript = ProofTranscript::new(b"RangeproofTest");
+    /// proof.verify(
+    ///     &V,
+    ///     generators.share(0),
+    ///     &mut transcript,
+    ///     &mut OsRng::new().unwrap(),
+    ///     n
+    /// );
+    /// ```
     pub fn verify<R: Rng>(
         &self,
+        V: &RistrettoPoint,
         gens: GeneratorsView,
         transcript: &mut ProofTranscript,
         rng: &mut R,
@@ -183,7 +213,8 @@ impl RangeProof {
         // First, replay the "interactive" protocol using the proof
         // data to recompute all challenges.
 
-        transcript.commit(self.V.compress().as_bytes());
+        transcript.commit_u64(n as u64);
+        transcript.commit(V.compress().as_bytes());
         transcript.commit(self.A.compress().as_bytes());
         transcript.commit(self.S.compress().as_bytes());
 
@@ -234,11 +265,11 @@ impl RangeProof {
                 .chain(x_inv_sq.iter().cloned()),
             iter::once(&self.A)
                 .chain(iter::once(&self.S))
-                .chain(iter::once(&self.V))
+                .chain(iter::once(V))
                 .chain(iter::once(&self.T_1))
                 .chain(iter::once(&self.T_2))
-                .chain(iter::once(gens.B))
-                .chain(iter::once(gens.B_blinding))
+                .chain(iter::once(&gens.pedersen_generators.B))
+                .chain(iter::once(&gens.pedersen_generators.B_blinding))
                 .chain(gens.G.iter())
                 .chain(gens.H.iter())
                 .chain(self.ipp_proof.L_vec.iter())
@@ -272,37 +303,6 @@ fn delta(n: usize, y: &Scalar, z: &Scalar) -> Scalar {
     let zz = z * z;
 
     (z - zz) * sum_of_powers_of_y - z * zz * sum_of_powers_of_2
-}
-
-impl VecPoly2 {
-    pub fn zero(n: usize) -> VecPoly2 {
-        VecPoly2(vec![Scalar::zero(); n], vec![Scalar::zero(); n])
-    }
-
-    pub fn inner_product(&self, rhs: &VecPoly2) -> PolyDeg3 {
-        // Uses Karatsuba's method
-        let l = self;
-        let r = rhs;
-
-        let t0 = util::inner_product(&l.0, &r.0);
-        let t2 = util::inner_product(&l.1, &r.1);
-
-        let l0_plus_l1 = util::add_vec(&l.0, &l.1);
-        let r0_plus_r1 = util::add_vec(&r.0, &r.1);
-
-        let t1 = util::inner_product(&l0_plus_l1, &r0_plus_r1) - t0 - t2;
-
-        PolyDeg3(t0, t1, t2)
-    }
-
-    pub fn eval(&self, x: Scalar) -> Vec<Scalar> {
-        let n = self.0.len();
-        let mut out = vec![Scalar::zero(); n];
-        for i in 0..n {
-            out[i] += self.0[i] + self.1[i] * x;
-        }
-        out
-    }
 }
 
 #[cfg(test)]
@@ -350,11 +350,12 @@ mod tests {
         use bincode;
 
         // Both prover and verifier have access to the generators and the proof
-        use generators::{PedersenGenerators,Generators};
+        use generators::{Generators, PedersenGenerators};
         let generators = Generators::new(PedersenGenerators::default(), n, 1);
 
         // Serialized proof data
         let proof_bytes: Vec<u8>;
+        let value_commitment: RistrettoPoint;
 
         // Prover's scope
         {
@@ -376,6 +377,10 @@ mod tests {
 
             // 2. Serialize
             proof_bytes = bincode::serialize(&range_proof).unwrap();
+
+            let gens = generators.share(0);
+            value_commitment = gens.pedersen_generators
+                .commit(Scalar::from_u64(v), v_blinding);
         }
 
         println!(
@@ -394,7 +399,13 @@ mod tests {
             let mut transcript = ProofTranscript::new(b"RangeproofTest");
             assert!(
                 range_proof
-                    .verify(generators.share(0), &mut transcript, &mut rng, n)
+                    .verify(
+                        &value_commitment,
+                        generators.share(0),
+                        &mut transcript,
+                        &mut rng,
+                        n
+                    )
                     .is_ok()
             );
 
@@ -402,7 +413,13 @@ mod tests {
             let mut transcript = ProofTranscript::new(b"");
             assert!(
                 range_proof
-                    .verify(generators.share(0), &mut transcript, &mut rng, n)
+                    .verify(
+                        &value_commitment,
+                        generators.share(0),
+                        &mut transcript,
+                        &mut rng,
+                        n
+                    )
                     .is_err()
             );
         }

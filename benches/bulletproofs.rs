@@ -10,9 +10,9 @@ extern crate curve25519_dalek;
 use curve25519_dalek::scalar::Scalar;
 
 extern crate ristretto_bulletproofs;
-use ristretto_bulletproofs::{PedersenGenerators, Generators};
 use ristretto_bulletproofs::ProofTranscript;
 use ristretto_bulletproofs::RangeProof;
+use ristretto_bulletproofs::{Generators, PedersenGenerators};
 
 fn bench_create_helper(n: usize, c: &mut Criterion) {
     c.bench_function(&format!("create_rangeproof_n_{}", n), move |b| {
@@ -40,12 +40,15 @@ fn bench_create_helper(n: usize, c: &mut Criterion) {
 
 fn bench_verify_helper(n: usize, c: &mut Criterion) {
     c.bench_function(&format!("verify_rangeproof_n_{}", n), move |b| {
-        let generators = Generators::new(PedersenGenerators::default(), n, 1);
+        let pg = PedersenGenerators::default();
+        let generators = Generators::new(pg.clone(), n, 1);
         let mut rng = OsRng::new().unwrap();
 
         let mut transcript = ProofTranscript::new(b"RangeproofTest");
         let v: u64 = rng.gen_range(0, (1 << (n - 1)) - 1);
         let v_blinding = Scalar::random(&mut rng);
+
+        let vc = pg.commit(Scalar::from_u64(v), v_blinding);
 
         let rp = RangeProof::generate_proof(
             generators.share(0),
@@ -60,7 +63,7 @@ fn bench_verify_helper(n: usize, c: &mut Criterion) {
             // Each verification requires a clean transcript.
             let mut transcript = ProofTranscript::new(b"RangeproofTest");
 
-            rp.verify(generators.share(0), &mut transcript, &mut rng, n)
+            rp.verify(&vc, generators.share(0), &mut transcript, &mut rng, n)
         });
     });
 }
@@ -109,4 +112,97 @@ criterion_group!{
     targets = verify_rp_8, verify_rp_16, verify_rp_32, verify_rp_64
 }
 
-criterion_main!(create_rp, verify_rp);
+static AGGREGATION_SIZES: [usize; 6] = [1, 2, 4, 8, 16, 32];
+
+fn create_aggregated_rangeproof_helper(n: usize, c: &mut Criterion) {
+    use ristretto_bulletproofs::aggregated_range_proof::SinglePartyAggregator;
+
+    let label = format!("Aggregated {}-bit rangeproof creation", n);
+
+    c.bench_function_over_inputs(
+        &label,
+        move |b, &&m| {
+            let generators = Generators::new(PedersenGenerators::default(), n, m);
+            let mut rng = OsRng::new().unwrap();
+
+            let (min, max) = (0u64, ((1u128 << n) - 1) as u64);
+            let values: Vec<u64> = (0..m).map(|_| rng.gen_range(min, max)).collect();
+
+            b.iter(|| {
+                // Each proof creation requires a clean transcript.
+                let mut transcript = ProofTranscript::new(b"AggregateRangeProofBenchmark");
+
+                SinglePartyAggregator::generate_proof(
+                    &generators,
+                    &mut transcript,
+                    &mut rng,
+                    &values,
+                    n,
+                )
+            })
+        },
+        &AGGREGATION_SIZES,
+    );
+}
+
+fn create_aggregated_rangeproof_n_32(c: &mut Criterion) {
+    create_aggregated_rangeproof_helper(32, c);
+}
+
+fn create_aggregated_rangeproof_n_64(c: &mut Criterion) {
+    create_aggregated_rangeproof_helper(64, c);
+}
+
+fn verify_aggregated_rangeproof_helper(n: usize, c: &mut Criterion) {
+    use ristretto_bulletproofs::aggregated_range_proof::SinglePartyAggregator;
+
+    let label = format!("Aggregated {}-bit rangeproof verification", n);
+
+    c.bench_function_over_inputs(
+        &label,
+        move |b, &&m| {
+            let generators = Generators::new(PedersenGenerators::default(), n, m);
+            let mut rng = OsRng::new().unwrap();
+
+            let (min, max) = (0u64, ((1u128 << n) - 1) as u64);
+            let values: Vec<u64> = (0..m).map(|_| rng.gen_range(min, max)).collect();
+
+            let mut transcript = ProofTranscript::new(b"AggregateRangeProofBenchmark");
+            let proof = SinglePartyAggregator::generate_proof(
+                &generators,
+                &mut transcript,
+                &mut rng,
+                &values,
+                n,
+            ).unwrap();
+
+            b.iter(|| {
+                // Each proof creation requires a clean transcript.
+                let mut transcript = ProofTranscript::new(b"AggregateRangeProofBenchmark");
+
+                proof.verify(&mut rng, &mut transcript)
+            });
+        },
+        &AGGREGATION_SIZES,
+    );
+}
+
+fn verify_aggregated_rangeproof_n_32(c: &mut Criterion) {
+    verify_aggregated_rangeproof_helper(32, c);
+}
+
+fn verify_aggregated_rangeproof_n_64(c: &mut Criterion) {
+    verify_aggregated_rangeproof_helper(64, c);
+}
+
+criterion_group!{
+    name = aggregate_rp;
+    config = Criterion::default();
+    targets =
+    create_aggregated_rangeproof_n_32,
+    create_aggregated_rangeproof_n_64,
+    verify_aggregated_rangeproof_n_32,
+    verify_aggregated_rangeproof_n_64
+}
+
+criterion_main!(create_rp, verify_rp, aggregate_rp);

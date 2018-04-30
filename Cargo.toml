@@ -1,7 +1,15 @@
 [package]
 name = "ristretto-bulletproofs"
 version = "0.1.0"
-authors = ["Cathie <cathie@chain.com>, Henry <hdevalence@chain.com>, Oleg <oleg@chain.com>"]
+authors = ["Cathie Yun <cathie@chain.com>", 
+           "Henry de Valence <hdevalence@hdevalence.ca>",
+           "Oleg Andreev <oleganza@gmail.com>"]
+readme = "README.md"
+license = "MIT"
+repository = "https://github.com/chain/ristretto-bulletproofs"
+categories = ["cryptography"]
+keywords = ["cryptography", "ristretto", "zero-knowledge", "bulletproofs"]
+description = "A pure-Rust implementation of Bulletproofs using Ristretto"
 
 [dependencies]
 curve25519-dalek = { version = "^0.16", features = ["serde", "nightly"] }
@@ -12,10 +20,7 @@ rayon = "1.0"
 byteorder = "1.2.1"
 serde = "1"
 serde_derive = "1"
-
-[dependencies.tiny-keccak]
-git = 'https://github.com/chain/tiny-keccak.git'
-rev = '5925f81b3c351440283c3328e2345d982aac0f6e'
+tiny-keccak = "1.4.1"
 
 [dev-dependencies]
 hex = "^0.3"
@@ -24,7 +29,6 @@ bincode = "1"
 
 [features]
 yolocrypto = ["curve25519-dalek/yolocrypto"]
-std = ["curve25519-dalek/std"]
 
 [[bench]]
 name = "bulletproofs"
