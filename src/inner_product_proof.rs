@@ -2,27 +2,27 @@
 
 #![doc(include = "../docs/inner-product-protocol.md")]
 
-use std::iter;
 use std::borrow::Borrow;
+use std::iter;
 
-use curve25519_dalek::ristretto::RistrettoPoint;
-use curve25519_dalek::ristretto;
-use curve25519_dalek::scalar::Scalar;
 use rayon::prelude::*;
 use rayon;
+
+use curve25519_dalek::ristretto;
+use curve25519_dalek::ristretto::RistrettoPoint;
+use curve25519_dalek::scalar::Scalar;
+
 use proof_transcript::ProofTranscript;
 
-use util;
-
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct Proof {
+pub struct InnerProductProof {
     pub(crate) L_vec: Vec<RistrettoPoint>,
     pub(crate) R_vec: Vec<RistrettoPoint>,
     pub(crate) a: Scalar,
     pub(crate) b: Scalar,
 }
 
-impl Proof {
+impl InnerProductProof {
     /// Create an inner-product proof.
     ///
     /// The proof is created with respect to the bases \\(G\\), \\(H'\\),
@@ -39,7 +39,7 @@ impl Proof {
         mut H_vec: Vec<RistrettoPoint>,
         mut a_vec: Vec<Scalar>,
         mut b_vec: Vec<Scalar>,
-    ) -> Proof
+    ) -> InnerProductProof
     where
         I: IntoIterator,
         I::Item: Borrow<Scalar>,
@@ -78,13 +78,13 @@ impl Proof {
             let (H_L, H_R) = H.split_at_mut(n);
 
             let (L,R) = rayon::join(|| {
-                let c_L = util::inner_product(&a_L, &b_R);
+                let c_L = inner_product(&a_L, &b_R);
                 ristretto::vartime::multiscalar_mul(
                     a_L.iter().chain(b_R.iter()).chain(iter::once(&c_L)),
                     G_R.iter().chain(H_L.iter()).chain(iter::once(Q)),
                 )
             }, || {
-                let c_R = util::inner_product(&a_R, &b_L);
+                let c_R = inner_product(&a_R, &b_L);
                 ristretto::vartime::multiscalar_mul(
                     a_R.iter().chain(b_L.iter()).chain(iter::once(&c_R)),
                     G_L.iter().chain(H_R.iter()).chain(iter::once(Q)),
@@ -97,24 +97,24 @@ impl Proof {
             verifier.commit(L.compress().as_bytes());
             verifier.commit(R.compress().as_bytes());
 
-            let x = verifier.challenge_scalar();
-            let x_inv = x.invert();
+            let u = verifier.challenge_scalar();
+            let u_inv = u.invert();
 
             for i in 0..n {
-                a_L[i] = a_L[i] * x + x_inv * a_R[i];
-                b_L[i] = b_L[i] * x_inv + x * b_R[i];
+                a_L[i] = a_L[i] * u + u_inv * a_R[i];
+                b_L[i] = b_L[i] * u_inv + u * b_R[i];
             }
             // Parallelized calculation of each index of the vectors G and H.
-            // G_L[i] = G_L[i] * x_inv + G_R[i] * x (for all i)
+            // G_L[i] = G_L[i] * u_inv + G_R[i] * u (for all i)
             G_L.par_iter_mut().zip(G_R.par_iter())
                 .for_each(|(G_L_i, G_R_i)| {
-                    *G_L_i = ristretto::vartime::multiscalar_mul(&[x_inv, x], &[*G_L_i, *G_R_i]);
+                    *G_L_i = ristretto::vartime::multiscalar_mul(&[u_inv, u], &[*G_L_i, *G_R_i]);
                     }
                 );
-            // H_L[i] = H_L[i] * x + H_R[i] * x_inv (for all i)
+            // H_L[i] = H_L[i] * u + H_R[i] * u_inv (for all i)
             H_L.par_iter_mut().zip(H_R.par_iter())
                 .for_each(|(H_L_i, H_R_i)| {
-                    *H_L_i = ristretto::vartime::multiscalar_mul(&[x, x_inv], &[*H_L_i, *H_R_i]);
+                    *H_L_i = ristretto::vartime::multiscalar_mul(&[u, u_inv], &[*H_L_i, *H_R_i]);
                     }
                 );
 
@@ -124,7 +124,7 @@ impl Proof {
             H = H_L;
         }
 
-        return Proof {
+        return InnerProductProof {
             L_vec: L_vec,
             R_vec: R_vec,
             a: a[0],
@@ -152,12 +152,12 @@ impl Proof {
             challenges.push(transcript.challenge_scalar());
         }
 
-        // 2. Compute 1/(x_k...x_1) and 1/x_k, ..., 1/x_1
+        // 2. Compute 1/(u_k...u_1) and 1/u_k, ..., 1/u_1
 
         let mut challenges_inv = challenges.clone();
         let allinv = Scalar::batch_invert(&mut challenges_inv);
 
-        // 3. Compute x_i^2 and (1/x_i)^2
+        // 3. Compute u_i^2 and (1/u_i)^2
 
         for i in 0..lg_n {
             // XXX missing square fn upstream
@@ -174,10 +174,10 @@ impl Proof {
         for i in 1..n {
             let lg_i = (32 - 1 - (i as u32).leading_zeros()) as usize;
             let k = 1 << lg_i;
-            // The challenges are stored in "creation order" as [x_k,...,x_1],
-            // so x_{lg(i)+1} = is indexed by (lg_n-1) - lg_i
-            let x_lg_i_sq = challenges_sq[(lg_n - 1) - lg_i];
-            s.push(s[i - k] * x_lg_i_sq);
+            // The challenges are stored in "creation order" as [u_k,...,u_1],
+            // so u_{lg(i)+1} = is indexed by (lg_n-1) - lg_i
+            let u_lg_i_sq = challenges_sq[(lg_n - 1) - lg_i];
+            s.push(s[i - k] * u_lg_i_sq);
         }
 
         (challenges_sq, challenges_inv_sq, s)
@@ -201,7 +201,7 @@ impl Proof {
         I: IntoIterator,
         I::Item: Borrow<Scalar>,
     {
-        let (x_sq, x_inv_sq, s) = self.verification_scalars(transcript);
+        let (u_sq, u_inv_sq, s) = self.verification_scalars(transcript);
 
         let a_times_s = s.iter().map(|s_i| self.a * s_i);
 
@@ -213,15 +213,15 @@ impl Proof {
             .zip(inv_s)
             .map(|(h_i, s_i_inv)| (self.b * s_i_inv) * h_i.borrow());
 
-        let neg_x_sq = x_sq.iter().map(|xi| -xi);
-        let neg_x_inv_sq = x_inv_sq.iter().map(|xi| -xi);
+        let neg_u_sq = u_sq.iter().map(|ui| -ui);
+        let neg_u_inv_sq = u_inv_sq.iter().map(|ui| -ui);
 
         let expect_P = ristretto::vartime::multiscalar_mul(
             iter::once(self.a * self.b)
                 .chain(a_times_s)
                 .chain(h_times_b_div_s)
-                .chain(neg_x_sq)
-                .chain(neg_x_inv_sq),
+                .chain(neg_u_sq)
+                .chain(neg_u_inv_sq),
             iter::once(Q)
                 .chain(G.iter())
                 .chain(H.iter())
@@ -237,17 +237,34 @@ impl Proof {
     }
 }
 
+/// Computes an inner product of two vectors
+/// \\[
+///    {\langle {\mathbf{a}}, {\mathbf{b}} \rangle} = \sum\_{i=0}^{n-1} a\_i \cdot b\_i.
+/// \\]
+/// Panics if the lengths of \\(\mathbf{a}\\) and \\(\mathbf{b}\\) are not equal.
+pub fn inner_product(a: &[Scalar], b: &[Scalar]) -> Scalar {
+    let mut out = Scalar::zero();
+    if a.len() != b.len() {
+        panic!("inner_product(a,b): lengths of vectors do not match");
+    }
+    for i in 0..a.len() {
+        out += a[i] * b[i];
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     use rand::OsRng;
     use sha2::Sha512;
+    use util;
 
     fn test_helper_create(n: usize) {
         let mut rng = OsRng::new().unwrap();
 
-        use generators::{PedersenGenerators,Generators};
+        use generators::{Generators, PedersenGenerators};
         let gens = Generators::new(PedersenGenerators::default(), n, 1);
         let G = gens.share(0).G.to_vec();
         let H = gens.share(0).H.to_vec();
@@ -258,7 +275,7 @@ mod tests {
         // a and b are the vectors for which we want to prove c = <a,b>
         let a: Vec<_> = (0..n).map(|_| Scalar::random(&mut rng)).collect();
         let b: Vec<_> = (0..n).map(|_| Scalar::random(&mut rng)).collect();
-        let c = util::inner_product(&a, &b);
+        let c = inner_product(&a, &b);
 
         // y_inv is (the inverse of) a random challenge
         let y_inv = Scalar::random(&mut rng);
@@ -278,7 +295,7 @@ mod tests {
         );
 
         let mut verifier = ProofTranscript::new(b"innerproducttest");
-        let proof = Proof::create(
+        let proof = InnerProductProof::create(
             &mut verifier,
             &Q,
             util::exp_iter(y_inv),
@@ -319,5 +336,22 @@ mod tests {
     #[test]
     fn make_ipp_64() {
         test_helper_create(64);
+    }
+
+    #[test]
+    fn test_inner_product() {
+        let a = vec![
+            Scalar::from_u64(1),
+            Scalar::from_u64(2),
+            Scalar::from_u64(3),
+            Scalar::from_u64(4),
+        ];
+        let b = vec![
+            Scalar::from_u64(2),
+            Scalar::from_u64(3),
+            Scalar::from_u64(4),
+            Scalar::from_u64(5),
+        ];
+        assert_eq!(Scalar::from_u64(40), inner_product(&a, &b));
     }
 }

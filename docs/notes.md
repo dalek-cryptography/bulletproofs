@@ -114,17 +114,31 @@ the verifier.
 Proving range statements with bit vectors
 -----------------------------------------
 
-Write the bits of \\(v\\) as \\({\mathbf{a}}\\). If \\({\mathbf{2}}^{n}\\) is the
-vector \\((1,2,4,\ldots,2^{n-1})\\) of powers of \\(2\\), then
+Let \\({\mathbf{a}}\\) be the vector of bits of \\(v\\).
+Then \\(v\\) can be represented as an inner product of bits \\({\mathbf{a}}\\)
+and powers of two \\({\mathbf{2}}^{n} = (1,2,4,\ldots,2^{n-1})\\):
+\\[
+\begin{aligned}
+  v &= {\langle {\mathbf{a}}, {\mathbf{2}}^{n} \rangle}  \\\\
+    &= a_{0}\cdot 2^0 + \dots + a_{n-1}\cdot 2^{n-1}.
+\end{aligned}
+\\]
+We need \\({\mathbf{a}}\\) to be a vector of integers \\(\\{0,1\\}\\).
+This can be expressed with an additional condition
+\\[
+{\mathbf{a}} \circ ({\mathbf{a}} - {\mathbf{1}}) = {\mathbf{0}},
+\\]
+where \\({\mathbf{x}} \circ {\mathbf{y}}\\) denotes the entry-wise multiplication of two vectors.
+The result of multiplication can be all-zero if and only if every bit is actually \\(0\\) or[^1] \\(1\\).
+
+As a result of representing value in binary, the range condition \\(v \in [0, 2^{n})\\)
+is equivalent to the pair of conditions
 \\[
 \begin{aligned}
   {\langle {\mathbf{a}}, {\mathbf{2}}^{n} \rangle} &= v,  \\\\
-  {\mathbf{a}} \circ ({\mathbf{a}} - {\mathbf{1}}) &= {\mathbf{0}}^{n} .
+  {\mathbf{a}} \circ ({\mathbf{a}} - {\mathbf{1}}) &= {\mathbf{0}}.
 \end{aligned}
 \\]
-Here \\({\mathbf{x}} \circ {\mathbf{y}}\\) denotes the entry-wise
-multiplication of two vectors.
-Together, these conditions imply the range condition.
 We will
 eventually need to make separate commitments to the vectors
 \\({\mathbf{a}}\\) and \\({\mathbf{a}} - {\mathbf{1}}\\), so we set
@@ -138,13 +152,21 @@ eventually need to make separate commitments to the vectors
 \end{aligned}
 \\]
 
+[^1]: Generally, condition \\(x=0 \vee y=0\\) can be expressed as \\(x \cdot y = 0\\),
+as the product can be zero if and only if at least one of the terms is zero.
+This trick allows implementing logical `OR` with any number of terms.
+
+
 Proving vectors of statements with a single statement
 -----------------------------------------------------
 
 The statements above are statements about vectors, or equivalently, a
-vector of statements about each entry. Now, we want to combine these
-into a single statement. Since \\({\mathbf{b}} = {\mathbf{0}}\\) if and only
-if \\({\langle {\mathbf{b}}, {\mathbf{y}}^{n} \rangle} = 0\\) for every \\(y\\),
+vector of statements about each entry. We want to combine all of these
+into a single statement.
+
+First, we will combine each of the two vector-statements into a single statement.
+Since \\({\mathbf{b}} = {\mathbf{0}}\\) if and only
+if[^2] \\({\langle {\mathbf{b}}, {\mathbf{y}}^{n} \rangle} = 0\\) for every \\(y\\),
 the statements above are implied by
 \\[
 \begin{aligned}
@@ -153,8 +175,10 @@ the statements above are implied by
   {\langle {\mathbf{a}}\_{L}, {\mathbf{a}}\_{R} \circ {\mathbf{y}}^{n} \rangle} &= 0
 \end{aligned}
 \\]
-for the verifier’s choice of a challenge value \\(y\\). These statements can
-then be combined in the same way, using the verifier’s choice of \\(z\\):
+for the verifier’s choice of a challenge value \\(y\\).
+
+The three resulting statements can then be combined in the same way,
+using the verifier’s choice of \\(z\\):
 \\[
 \begin{aligned}
 z^{2} v 
@@ -164,6 +188,13 @@ z^{2} v
          +   {\langle {\mathbf{a}}\_{L}, {\mathbf{a}}\_{R} \circ {\mathbf{y}}^{n} \rangle} 
 \end{aligned}
 \\]
+
+[^2]: This is because the polynomial in terms of \\(y\\) is zero at every point
+if and only if every term of it is zero. The verifier is going to sample
+a random \\(y\\) after the prover commits to all the values forming the terms of
+that polynomial, making the probability that the prover cheated negligible.
+This trick allows implementing logical `AND` with any number of terms.
+
 
 Combining inner-products
 ------------------------
@@ -315,14 +346,14 @@ The commitments \\(V\\), \\(T\_{1}\\), \\(T\_{2}\\) are related to each other an
     +                        &\quad &  \quad &  +                          & \quad &  \quad &  +             & \quad &  \quad& +                             &\quad & \quad & +   \\\\
   {\tilde{t}}(x) {\widetilde{B}} &\quad &= \quad & z^2 {\widetilde{v}} {\widetilde{B}} & \quad &+ \quad & 0 {\widetilde{B}}  & \quad &+ \quad& x {\tilde{t}}\_{1} {\widetilde{B}} &\quad &+\quad & x^{2} {\tilde{t}}\_{2} {\widetilde{B}} \\\\
     \shortparallel           &\quad &  \quad & \shortparallel              & \quad &  \quad & \shortparallel & \quad &  \quad& \shortparallel                &\quad & \quad & \shortparallel   \\\\
-                 &\quad &= \quad & z V                         & \quad &+ \quad & \delta(y,z) B  & \quad &+ \quad& x T\_{1}                       &\quad &+\quad & x^{2} T\_{2}
+                 &\quad &= \quad & z^2 V                         & \quad &+ \quad & \delta(y,z) B  & \quad &+ \quad& x T\_{1}                       &\quad &+\quad & x^{2} T\_{2}
 \end{aligned}
 \\]
 Notice that the sum of each column is a commitment to the variable in the top
 row using the blinding factor in the second row.
 The sum of all of the columns is
 \\(t(x) B + {\tilde{t}}(x) {\widetilde{B}}\\), a commitment to the value
-of \\(t\\) at the point \\(x\\), using the synthetic blinding factor[^1]
+of \\(t\\) at the point \\(x\\), using the synthetic blinding factor[^3]
 \\[
   {\tilde{t}}(x) = z^{2} {\tilde{v}} + x {\tilde{t}}\_{1} + x^{2} {\tilde{t}}\_{2}.
 \\]
@@ -334,7 +365,7 @@ bottom row of the diagram to check consistency:
   t(x) B + {\tilde{t}}(x) {\widetilde{B}} \stackrel{?}{=} z^2 V + \delta(y,z) B + x T\_{1} + x^{2} T\_{2}.
 \\]
 
-[^1]: The blinding factor is synthetic in the sense that it is
+[^3]: The blinding factor is synthetic in the sense that it is
     synthesized from the blinding factors of the other commitments.
 
 Proving that \\({\mathbf{l}}(x)\\), \\({\mathbf{r}}(x)\\) are correct
@@ -457,7 +488,7 @@ for the following relation:
     c &{}={}&& {\langle {\mathbf{a}}, {\mathbf{b}} \rangle}
 \end{aligned}
 \\]
-Let’s compress these two statements into one equation using an
+Let’s combine these two statements into one equation using an
 indeterminate variable \\(w \in {\mathbb Z\_{p}^{\times}}\\) and multiplying the
 second equation by an orthogonal generator
 \\(B \in {\mathbb G}\\):

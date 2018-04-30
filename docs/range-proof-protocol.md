@@ -178,8 +178,8 @@ Finally, verifier groups all scalars per each point and performs a single multis
                       + & \quad (-{\widetilde{e}} - c{\tilde{t}}(x)) \cdot \widetilde{B} \\\\
                       + & \quad {\langle {-z\mathbf{1} - a\mathbf{s}}, {\mathbf{G}} \rangle}\\\\
                       + & \quad {\langle {z\mathbf{1} + {\mathbf{y}}^{-n} \circ (z^2\mathbf{2}^n - b/{\mathbf{s}})}, {\mathbf{H}} \rangle}\\\\
-                      + & \quad {\langle [x_{1}^2,    \dots, x_{k}^2    ], [L_1, \dots, L_{k}] \rangle}\\\\
-                      + & \quad {\langle [x_{1}^{-2}, \dots, x_{k}^{-2} ], [R_1, \dots, R_{k}] \rangle}
+                      + & \quad {\langle [u_{1}^2,    \dots, u_{k}^2    ], [L_1, \dots, L_{k}] \rangle}\\\\
+                      + & \quad {\langle [u_{1}^{-2}, \dots, u_{k}^{-2} ], [R_1, \dots, R_{k}] \rangle}
 \end{aligned}
 \\] where \\(1/{\mathbf{s}}\\) are inverses of \\(\mathbf{s}\\), computed as a reversed list of \\(\mathbf{s}\\).
 
