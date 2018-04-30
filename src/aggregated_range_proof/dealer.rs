@@ -183,10 +183,6 @@ impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
             return Err("Length of proof shares doesn't match expected length m");
         }
 
-        let value_commitments = proof_shares
-            .iter()
-            .map(|ps| ps.value_commitment.V)
-            .collect();
         let A = proof_shares
             .iter()
             .fold(RistrettoPoint::identity(), |A, ps| {
@@ -245,8 +241,6 @@ impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
         );
 
         Ok(AggregatedProof {
-            n: self.n,
-            value_commitments,
             A,
             S,
             T_1,
@@ -273,8 +267,25 @@ impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
     ) -> Result<AggregatedProof, &'static str> {
         let proof = self.assemble_shares(proof_shares)?;
 
+        // XXX if we change the proof verification API to use
+        // iterators we can do it with ZeRo-CoSt-AbStRaCtIonS
+        let value_commitments: Vec<_> = proof_shares
+            .iter()
+            .map(|ps| ps.value_commitment.V)
+            .collect();
+
         // See comment in `Dealer::new` for why we use `initial_transcript`
-        if proof.verify(rng, &mut self.initial_transcript).is_ok() {
+        if proof
+            .verify(
+                &value_commitments,
+                self.gens,
+                &mut self.initial_transcript,
+                rng,
+                self.n,
+                self.m,
+            )
+            .is_ok()
+        {
             Ok(proof)
         } else {
             // Create a list of bad shares

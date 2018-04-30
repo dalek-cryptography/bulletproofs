@@ -22,24 +22,27 @@ impl SinglePartyAggregator {
     /// with one party playing all roles.
     ///
     /// The length of `values` must be a power of 2.
-    ///
-    /// XXX this should allow proving about existing commitments.
     pub fn generate_proof<R: Rng>(
         generators: &Generators,
         transcript: &mut ProofTranscript,
         rng: &mut R,
         values: &[u64],
+        blindings: &[Scalar],
         n: usize,
     ) -> Result<AggregatedProof, &'static str> {
         use self::dealer::*;
         use self::party::*;
 
+        if values.len() != blindings.len() {
+            return Err("mismatched values and blindings len");
+        }
+
         let dealer = Dealer::new(generators.all(), n, values.len(), transcript)?;
 
         let parties: Vec<_> = values
             .iter()
-            .map(|&v| {
-                let v_blinding = Scalar::random(rng);
+            .zip(blindings.iter())
+            .map(|(&v, &v_blinding)| {
                 Party::new(v, v_blinding, n, &generators)
             })
             // Collect the iterator of Results into a Result<Vec>, then unwrap it
@@ -73,9 +76,11 @@ impl SinglePartyAggregator {
 mod tests {
     use rand::OsRng;
 
-    use super::*;
+    use curve25519_dalek::ristretto::RistrettoPoint;
 
     use generators::PedersenGenerators;
+
+    use super::*;
 
     /// Given a bitsize `n`, test the following:
     ///
@@ -95,6 +100,7 @@ mod tests {
 
         // Serialized proof data
         let proof_bytes: Vec<u8>;
+        let value_commitments: Vec<RistrettoPoint>;
 
         // Prover's scope
         {
@@ -105,17 +111,28 @@ mod tests {
 
             let (min, max) = (0u64, ((1u128 << n) - 1) as u64);
             let values: Vec<u64> = (0..m).map(|_| rng.gen_range(min, max)).collect();
+            let blindings: Vec<Scalar> = (0..m).map(|_| Scalar::random(&mut rng)).collect();
 
             let proof = SinglePartyAggregator::generate_proof(
                 &generators,
                 &mut transcript,
                 &mut rng,
                 &values,
+                &blindings,
                 n,
             ).unwrap();
 
             // 2. Serialize
             proof_bytes = bincode::serialize(&proof).unwrap();
+
+            let pg = &generators.all().pedersen_generators;
+
+            // XXX would be nice to have some convenience API for this
+            value_commitments = values
+                .iter()
+                .zip(blindings.iter())
+                .map(|(&v, &v_blinding)| pg.commit(Scalar::from_u64(v), v_blinding))
+                .collect();
         }
 
         println!(
@@ -134,7 +151,18 @@ mod tests {
             let mut rng = OsRng::new().unwrap();
             let mut transcript = ProofTranscript::new(b"AggregatedRangeProofTest");
 
-            assert!(proof.verify(&mut rng, &mut transcript).is_ok());
+            assert!(
+                proof
+                    .verify(
+                        &value_commitments,
+                        generators.all(),
+                        &mut transcript,
+                        &mut rng,
+                        n,
+                        m
+                    )
+                    .is_ok()
+            );
         }
     }
 
