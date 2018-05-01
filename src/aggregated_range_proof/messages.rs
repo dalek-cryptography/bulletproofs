@@ -9,9 +9,6 @@ use util;
 
 #[derive(Serialize, Deserialize, Copy, Clone, Debug)]
 pub struct ValueCommitment {
-    /// XXX when we change the aggregation API to allow proving about
-    /// preexisting commitments, this should go away (and just be an
-    /// input to the dealer), but until then it should be here.
     pub V: RistrettoPoint,
     pub A: RistrettoPoint,
     pub S: RistrettoPoint,
