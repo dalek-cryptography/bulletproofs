@@ -170,8 +170,8 @@ impl ProofTranscript {
             self.hash.pad();
             self.hash.fill_block();
             self.write_offset = 0;
-            room = self.rate - 1;
             input = &input[room..];
+            room = self.rate - 1;
         }
         self.hash.absorb(input);
         self.write_offset += input.len(); // could end up == (rate-1)
