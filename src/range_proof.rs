@@ -1,6 +1,5 @@
 #![allow(non_snake_case)]
 #![deny(missing_docs)]
-
 #![doc(include = "../docs/range-proof-protocol.md")]
 
 use rand::Rng;
@@ -24,21 +23,21 @@ use generators::GeneratorsView;
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct RangeProof {
     /// Commitment to the bits of the value
-    A: RistrettoPoint,
+    pub(crate) A: RistrettoPoint,
     /// Commitment to the blinding factors
-    S: RistrettoPoint,
+    pub(crate) S: RistrettoPoint,
     /// Commitment to the \\(t_1\\) coefficient of \\( t(x) \\)
-    T_1: RistrettoPoint,
+    pub(crate) T_1: RistrettoPoint,
     /// Commitment to the \\(t_2\\) coefficient of \\( t(x) \\)
-    T_2: RistrettoPoint,
+    pub(crate) T_2: RistrettoPoint,
     /// Evaluation of the polynomial \\(t(x)\\) at the challenge point \\(x\\)
-    t_x: Scalar,
+    pub(crate) t_x: Scalar,
     /// Blinding factor for the synthetic commitment to \\(t(x)\\)
-    t_x_blinding: Scalar,
+    pub(crate) t_x_blinding: Scalar,
     /// Blinding factor for the synthetic commitment to the inner-product arguments
-    e_blinding: Scalar,
+    pub(crate) e_blinding: Scalar,
     /// Proof data for the inner-product argument.
-    ipp_proof: InnerProductProof,
+    pub(crate) ipp_proof: InnerProductProof,
 }
 
 impl RangeProof {
@@ -70,7 +69,9 @@ impl RangeProof {
         use subtle::{Choice, ConditionallyAssignable};
 
         // Commit the range size to domain-separate from rangeproofs of different lengths.
+        // Also commit the aggregation size (m = 1).
         transcript.commit_u64(n as u64);
+        transcript.commit_u64(1u64);
 
         // Create copies of G, H, so we can pass them to the
         // (consuming) IPP API later.
@@ -189,20 +190,10 @@ impl RangeProof {
 
     /// Verifies a rangeproof for a given value commitment \\(V\\).
     ///
-    /// Usage:
-    /// ```ascii
-    /// let n = 64;
-    /// let generators = Generators::new(PedersenGenerators::default(), n, 1);
-    /// let mut transcript = ProofTranscript::new(b"RangeproofTest");
-    /// proof.verify(
-    ///     &V,
-    ///     generators.share(0),
-    ///     &mut transcript,
-    ///     &mut OsRng::new().unwrap(),
-    ///     n
-    /// );
-    /// ```
-    pub fn verify<R: Rng>(
+    /// This is a convenience wrapper around `verify` for the `m=1` case.
+    ///
+    /// XXX add doctests
+    pub fn verify_single<R: Rng>(
         &self,
         V: &RistrettoPoint,
         gens: GeneratorsView,
@@ -210,11 +201,30 @@ impl RangeProof {
         rng: &mut R,
         n: usize,
     ) -> Result<(), ()> {
+        self.verify(&[*V], gens, transcript, rng, n, 1)
+    }
+
+    /// Verifies an aggregated rangeproof for the given value commitments.
+    ///
+    /// XXX add doctests
+    pub fn verify<R: Rng>(
+        &self,
+        value_commitments: &[RistrettoPoint],
+        gens: GeneratorsView,
+        transcript: &mut ProofTranscript,
+        rng: &mut R,
+        n: usize,
+        m: usize,
+    ) -> Result<(), ()> {
         // First, replay the "interactive" protocol using the proof
         // data to recompute all challenges.
 
         transcript.commit_u64(n as u64);
-        transcript.commit(V.compress().as_bytes());
+        transcript.commit_u64(m as u64);
+
+        for V in value_commitments.iter() {
+            transcript.commit(V.compress().as_bytes());
+        }
         transcript.commit(self.A.compress().as_bytes());
         transcript.commit(self.S.compress().as_bytes());
 
@@ -243,33 +253,41 @@ impl RangeProof {
         let a = self.ipp_proof.a;
         let b = self.ipp_proof.b;
 
+        // Construct concat_z_and_2, an iterator of the values of
+        // z^0 * \vec(2)^n || z^1 * \vec(2)^n || ... || z^(m-1) * \vec(2)^n
+        let powers_of_2: Vec<Scalar> = util::exp_iter(Scalar::from_u64(2)).take(n).collect();
+        let powers_of_z = util::exp_iter(z).take(m);
+        let concat_z_and_2 =
+            powers_of_z.flat_map(|exp_z| powers_of_2.iter().map(move |exp_2| exp_2 * exp_z));
+
         let g = s.iter().map(|s_i| minus_z - a * s_i);
         let h = s_inv
-            .zip(util::exp_iter(Scalar::from_u64(2)))
             .zip(util::exp_iter(y.invert()))
-            .map(|((s_i_inv, exp_2), exp_y_inv)| z + exp_y_inv * (zz * exp_2 - b * s_i_inv));
+            .zip(concat_z_and_2)
+            .map(|((s_i_inv, exp_y_inv), z_and_2)| z + exp_y_inv * (zz * z_and_2 - b * s_i_inv));
+
+        let value_commitment_scalars = util::exp_iter(z).take(m).map(|z_exp| c * zz * z_exp);
+        let basepoint_scalar = w * (self.t_x - a * b) + c * (delta(n, m, &y, &z) - self.t_x);
 
         let mega_check = ristretto::vartime::multiscalar_mul(
             iter::once(Scalar::one())
                 .chain(iter::once(x))
-                .chain(iter::once(c * zz))
+                .chain(value_commitment_scalars)
                 .chain(iter::once(c * x))
                 .chain(iter::once(c * x * x))
-                .chain(iter::once(
-                    w * (self.t_x - a * b) + c * (delta(n, &y, &z) - self.t_x),
-                ))
                 .chain(iter::once(-self.e_blinding - c * self.t_x_blinding))
+                .chain(iter::once(basepoint_scalar))
                 .chain(g)
                 .chain(h)
                 .chain(x_sq.iter().cloned())
                 .chain(x_inv_sq.iter().cloned()),
             iter::once(&self.A)
                 .chain(iter::once(&self.S))
-                .chain(iter::once(V))
+                .chain(value_commitments.iter())
                 .chain(iter::once(&self.T_1))
                 .chain(iter::once(&self.T_2))
-                .chain(iter::once(&gens.pedersen_generators.B))
                 .chain(iter::once(&gens.pedersen_generators.B_blinding))
+                .chain(iter::once(&gens.pedersen_generators.B))
                 .chain(gens.G.iter())
                 .chain(gens.H.iter())
                 .chain(self.ipp_proof.L_vec.iter())
@@ -286,23 +304,14 @@ impl RangeProof {
 
 /// Compute
 /// \\[
-/// \delta(y,z) = (z - z^{2}) \langle 1, {\mathbf{y}}^{n} \rangle + z^{3} \langle \mathbf{1}, {\mathbf{2}}^{n} \rangle
+/// \delta(y,z) = (z - z^{2}) \langle 1, {\mathbf{y}}^{nm} \rangle + z^{3} \langle \mathbf{1}, {\mathbf{2}}^{nm} \rangle
 /// \\]
-fn delta(n: usize, y: &Scalar, z: &Scalar) -> Scalar {
-    let two = Scalar::from_u64(2);
+fn delta(n: usize, m: usize, y: &Scalar, z: &Scalar) -> Scalar {
+    let sum_y = util::sum_of_powers(y, n * m);
+    let sum_2 = util::sum_of_powers(&Scalar::from_u64(2), n);
+    let sum_z = util::sum_of_powers(z, m);
 
-    // XXX this could be more efficient, esp for powers of 2
-    let sum_of_powers_of_y = util::exp_iter(*y)
-        .take(n)
-        .fold(Scalar::zero(), |acc, x| acc + x);
-
-    let sum_of_powers_of_2 = util::exp_iter(two)
-        .take(n)
-        .fold(Scalar::zero(), |acc, x| acc + x);
-
-    let zz = z * z;
-
-    (z - zz) * sum_of_powers_of_y - z * zz * sum_of_powers_of_2
+    (z - z * z) * sum_y - z * z * z * sum_2 * sum_z
 }
 
 #[cfg(test)]
@@ -333,7 +342,7 @@ mod tests {
             exp_2 = exp_2 + exp_2; // 2^i -> 2^(i+1)
         }
 
-        assert_eq!(power_g, delta(n, &y, &z),);
+        assert_eq!(power_g, delta(n, 1, &y, &z),);
     }
 
     /// Given a bitsize `n`, test the full trip:
@@ -399,7 +408,7 @@ mod tests {
             let mut transcript = ProofTranscript::new(b"RangeproofTest");
             assert!(
                 range_proof
-                    .verify(
+                    .verify_single(
                         &value_commitment,
                         generators.share(0),
                         &mut transcript,
@@ -413,7 +422,7 @@ mod tests {
             let mut transcript = ProofTranscript::new(b"");
             assert!(
                 range_proof
-                    .verify(
+                    .verify_single(
                         &value_commitment,
                         generators.share(0),
                         &mut transcript,

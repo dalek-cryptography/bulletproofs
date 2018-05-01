@@ -63,7 +63,7 @@ fn bench_verify_helper(n: usize, c: &mut Criterion) {
             // Each verification requires a clean transcript.
             let mut transcript = ProofTranscript::new(b"RangeproofTest");
 
-            rp.verify(&vc, generators.share(0), &mut transcript, &mut rng, n)
+            rp.verify_single(&vc, generators.share(0), &mut transcript, &mut rng, n)
         });
     });
 }
