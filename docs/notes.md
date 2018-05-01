@@ -623,17 +623,11 @@ Party `j` begins with a secret value \\(v_{(j)}\\), and wishes to convince the v
 Proving range statements with bit vectors
 -----------------------------------------
 
-Let \\({\mathbf{a}}\_{(j)L}\\) be the vector of bits of \\(v_{(j)}\\).
-Then \\(v_{(j)}\\) can be represented as:
+We want to make statements about \\(v_{(j)}\\) using its bit vector representation, where the statements will be true if and only if \\(v_{(j)}\\) is actually in the expected range. We will not reproduce the steps or explanation here since it is the same as in the [proving range statements with bit vectors](index.html#proving-range-statements-with-bit-vectors) step of the single-value range proof. Here are the final statements for party `j`:
+
 \\[
 \begin{aligned}
-  v_{(j)} &= {\langle {\mathbf{a}}\_{(j)L}, {\mathbf{2}}^{n} \rangle}
-\end{aligned}
-\\]
-We need \\({\mathbf{a}}\_{(j)L}\\) to be a vector of integers \\(\\{0,1\\}\\).
-This can be expressed with additional conditions:
-\\[
-\begin{aligned}
+  {\langle {\mathbf{a}}\_{(j)L}, {\mathbf{2}}^{n} \rangle} &= v_{(j)} \\\\
   {\mathbf{a}}\_{(j)L} \circ {\mathbf{a}}\_{(j)R} &= {\mathbf{0}} \\\\
   ({\mathbf{a}}\_{(j)L} - {\mathbf{1}}) - {\mathbf{a}}\_{(j)R} &= {\mathbf{0}}
 \end{aligned}
@@ -649,7 +643,7 @@ First, we will combine each of the two vector-statements into a single statement
 
 \\[
 \begin{aligned}
-  {\langle {\mathbf{a}}\_{(j)L}, {\mathbf{2}}^{n} \rangle} &= v \\\\
+  {\langle {\mathbf{a}}\_{(j)L}, {\mathbf{2}}^{n} \rangle} &= v_{(j)} \\\\
   {\langle {\mathbf{a}}\_{(j)L} - {\mathbf{1}} - {\mathbf{a}}\_{(j)R}, {\mathbf{y}}^{n}\_{(j)} \rangle} &= 0 \\\\
   {\langle {\mathbf{a}}\_{(j)L}, {\mathbf{a}}\_{(j)R} \circ {\mathbf{y}}^{n}\_{(j)} \rangle} &= 0
 \end{aligned}
@@ -659,7 +653,7 @@ The three resulting statements can then be combined in the same way,
 using the verifier’s choice of challenge value \\(z\\) that is shared across all parties, and offset by scalar \\(z\_{(j)}  = z^j\\) that is unique to each party `j`:
 \\[
 \begin{aligned}
-z^{2} z\_{(j)}  \cdot v 
+z^{2} z\_{(j)}  \cdot v_{(j)} 
 &= 
    z^{2} z\_{(j)}  \cdot {\langle {\mathbf{a}}\_{(j)L}, {\mathbf{2}}^{n} \rangle} \\\\
      &+ z \cdot {\langle {\mathbf{a}}\_{(j)L} - {\mathbf{1}} - {\mathbf{a}}\_{(j)R}, {\mathbf{y}}^{n}\_{(j)}  \rangle} \\\\
@@ -675,7 +669,7 @@ We combine the terms in the preceding statement into a single inner product, usi
 \\[
 \begin{aligned}
  \delta_{(j)}(y,z) &= (z - z^{2}) \cdot {\langle {\mathbf{1}}, {\mathbf{y}}^{n}\_{(j)} \rangle} - z^{3} z_{(j)} \cdot {\langle {\mathbf{1}}, {\mathbf{2}}^{n} \rangle}\\\\
- z^{2}z_{(j)} \cdot v + \delta_{(j)}(y,z) &= {\langle {\mathbf{a}}\_{(j)L} - z {\mathbf{1}}, {\mathbf{y}}^{n}\_{(j)} \circ ({\mathbf{a}}\_{(j)R} + z {\mathbf{1}}) + z^{2} z_{(j)} \cdot {\mathbf{2}}^{n} \rangle}
+ z^{2}z_{(j)} \cdot v_{(j)} + \delta_{(j)}(y,z) &= {\langle {\mathbf{a}}\_{(j)L} - z {\mathbf{1}}, {\mathbf{y}}^{n}\_{(j)} \circ ({\mathbf{a}}\_{(j)R} + z {\mathbf{1}}) + z^{2} z_{(j)} \cdot {\mathbf{2}}^{n} \rangle}
 \end{aligned} 
 \\]
 
@@ -854,7 +848,7 @@ With these observations, we can simplify the combined `m`-party statement about 
 
 \\[
 \begin{aligned}
-  {\langle {\mathbf{l}}(x), {\mathbf{G}} \rangle} + {\langle {\mathbf{r}}(x) \circ {\mathbf{y}^{-n \cdot m}} , {\mathbf{H}} \rangle} \stackrel{?}{=} -{\widetilde{e}} {\widetilde{B}} + A + x S - z{\langle {\mathbf{1}}, {\mathbf{G}} \rangle} + z{\langle {\mathbf{1}}, {\mathbf{H}} \rangle} + \sum_{j=0}^{m-1} {\langle z^{j+2} \cdot (\mathbf{y}^{n \cdot m}\_{[j \cdot n : (j+1) \cdot n - 1]})^{-1} \circ {\mathbf{2}}^n, {\mathbf{H}}\_{(j)} \rangle} 
+  {\langle {\mathbf{l}}(x), {\mathbf{G}} \rangle} + {\langle {\mathbf{r}}(x) \circ {\mathbf{y}^{-n \cdot m}} , {\mathbf{H}} \rangle} \stackrel{?}{=} -{\widetilde{e}} {\widetilde{B}} + A + x S - z{\langle {\mathbf{1}}, {\mathbf{G}} \rangle} + z{\langle {\mathbf{1}}, {\mathbf{H}} \rangle} + \sum_{j=0}^{m-1} {\langle z^{j+2} \cdot (\mathbf{y}^{n \cdot m}\_{[j \cdot n : (j+1) \cdot n - 1]})^{-1} \circ {\mathbf{2}}^n, {\mathbf{H}}\_{[j \cdot n : (j+1) \cdot n - 1]} \rangle} 
 \end{aligned}
 \\]
 
