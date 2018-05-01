@@ -708,7 +708,7 @@ We can combine the statements about \\(t\_{(j)}(x)\\), \\({\mathbf{l}}\_{(j)}(x)
 \end{aligned}
 \\]
 
-We can add the \\(t_{(j)}(x)\\) values together to create \\(t(x)\\) because each \\(t_{(j)}(x)\\) is calculated using the \\(\mathbf{y}^n\_{(j)}\\) and \\(z\_{(j)}\\) challenge variables that are unique to each party `j`, so all of the \\(t\_{(j)}(x)\\) values will be offset from one another.
+We can add the \\(t_{(j)}(x)\\) values together to create \\(t(x)\\) instead of taking a linear combination of \\(t_{(j)}(x)\\) values, because each \\(t_{(j)}(x)\\) is calculated with the \\(\mathbf{y}^n\_{(j)}\\) and \\(z_{(j)}\\) challenge variables that are unique to that party`j`, so all of the \\(t_{(j)}(x)\\) values will be offset from one another.
 
 Now instead of having to do `m` individual checks to prove that \\(t_{(j)}(x)\\), \\({\mathbf{l}}\_{(j)}(x)\\), and \\({\mathbf{r}}\_{(j)}(x)\\) for all parties `j` are correct, we can do the verification with one check:
 
