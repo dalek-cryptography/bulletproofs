@@ -6,9 +6,9 @@ use curve25519_dalek::ristretto::{self, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::IsIdentity;
 
+use generators::GeneratorsView;
 use inner_product_proof::{self, InnerProductProof};
 use proof_transcript::ProofTranscript;
-use generators::GeneratorsView;
 use util;
 
 #[derive(Serialize, Deserialize, Copy, Clone, Debug)]
