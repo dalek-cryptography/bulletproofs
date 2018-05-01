@@ -1,16 +1,21 @@
-use curve25519_dalek::ristretto::RistrettoPoint;
-use curve25519_dalek::scalar::Scalar;
-use inner_product_proof;
-
-use curve25519_dalek::ristretto;
-use curve25519_dalek::traits::IsIdentity;
-use proof_transcript::ProofTranscript;
-use rand::Rng;
 use std::iter;
+
+use rand::Rng;
+
+use curve25519_dalek::ristretto::{self, RistrettoPoint};
+use curve25519_dalek::scalar::Scalar;
+use curve25519_dalek::traits::IsIdentity;
+
+use inner_product_proof::{self, InnerProductProof};
+use proof_transcript::ProofTranscript;
+use generators::GeneratorsView;
 use util;
 
 #[derive(Serialize, Deserialize, Copy, Clone, Debug)]
 pub struct ValueCommitment {
+    /// XXX when we change the aggregation API to allow proving about
+    /// preexisting commitments, this should go away (and just be an
+    /// input to the dealer), but until then it should be here.
     pub V: RistrettoPoint,
     pub A: RistrettoPoint,
     pub S: RistrettoPoint,
@@ -120,29 +125,8 @@ impl ProofShare {
     }
 }
 
-pub struct ProofShareVerifier {
-    pub proof_share: ProofShare,
-    pub n: usize,
-    pub j: usize,
-    pub value_challenge: ValueChallenge,
-    pub poly_challenge: PolyChallenge,
-}
-
-impl ProofShareVerifier {
-    /// Returns whether the proof share is valid (Ok) or invalid (Err)
-    pub fn verify_share(&self) -> Result<(), &'static str> {
-        self.proof_share
-            .verify_share(self.n, self.j, &self.value_challenge, &self.poly_challenge)
-    }
-}
-
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct AggregatedProof {
-    pub n: usize,
-    /// Commitment to the value
-    // XXX this should not be included, so that we can prove about existing commitments
-    // included for now so that it's easier to test
-    pub value_commitments: Vec<RistrettoPoint>,
     /// Commitment to the bits of the value
     pub A: RistrettoPoint,
     /// Commitment to the blinding factors
@@ -158,23 +142,23 @@ pub struct AggregatedProof {
     /// Blinding factor for the synthetic commitment to the inner-product arguments
     pub e_blinding: Scalar,
     /// Proof data for the inner-product argument.
-    pub ipp_proof: inner_product_proof::InnerProductProof,
+    pub ipp_proof: InnerProductProof,
 }
 
 impl AggregatedProof {
-    pub fn verify<R: Rng>(&self, rng: &mut R, transcript: &mut ProofTranscript) -> Result<(), ()> {
-        use generators::{Generators, PedersenGenerators};
-
-        let n = self.n;
-        let m = self.value_commitments.len();
-
-        let generators = Generators::new(PedersenGenerators::default(), n, m);
-        let gen = generators.all();
-
+    pub fn verify<R: Rng>(
+        &self,
+        value_commitments: &[RistrettoPoint],
+        gens: GeneratorsView,
+        transcript: &mut ProofTranscript,
+        rng: &mut R,
+        n: usize,
+        m: usize,
+    ) -> Result<(), ()> {
         transcript.commit_u64(n as u64);
         transcript.commit_u64(m as u64);
 
-        for V in self.value_commitments.iter() {
+        for V in value_commitments.iter() {
             transcript.commit(V.compress().as_bytes());
         }
         transcript.commit(self.A.compress().as_bytes());
@@ -237,13 +221,13 @@ impl AggregatedProof {
                 .chain(x_inv_sq.iter().cloned()),
             iter::once(&self.A)
                 .chain(iter::once(&self.S))
-                .chain(self.value_commitments.iter())
+                .chain(value_commitments.iter())
                 .chain(iter::once(&self.T_1))
                 .chain(iter::once(&self.T_2))
-                .chain(iter::once(&gen.pedersen_generators.B_blinding))
-                .chain(iter::once(&gen.pedersen_generators.B))
-                .chain(gen.G.iter())
-                .chain(gen.H.iter())
+                .chain(iter::once(&gens.pedersen_generators.B_blinding))
+                .chain(iter::once(&gens.pedersen_generators.B))
+                .chain(gens.G.iter())
+                .chain(gens.H.iter())
                 .chain(self.ipp_proof.L_vec.iter())
                 .chain(self.ipp_proof.R_vec.iter()),
         );
