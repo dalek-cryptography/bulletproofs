@@ -1,5 +1,4 @@
 #![allow(non_snake_case)]
-#![deny(missing_docs)]
 #![doc(include = "../docs/range-proof-protocol.md")]
 
 use rand::Rng;
@@ -15,6 +14,12 @@ use generators::{Generators, GeneratorsView};
 use inner_product_proof::InnerProductProof;
 use proof_transcript::ProofTranscript;
 use util;
+
+// Modules for MPC protocol
+
+pub mod dealer;
+pub mod messages;
+pub mod party;
 
 /// The `RangeProof` struct represents a single range proof.
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -64,8 +69,8 @@ impl RangeProof {
         blindings: &[Scalar],
         n: usize,
     ) -> Result<RangeProof, &'static str> {
-        use aggregated_range_proof::dealer::*;
-        use aggregated_range_proof::party::*;
+        use self::dealer::*;
+        use self::party::*;
 
         if values.len() != blindings.len() {
             return Err("mismatched values and blindings len");
@@ -390,8 +395,8 @@ mod tests {
 
     #[test]
     fn detect_dishonest_party_during_aggregation() {
-        use aggregated_range_proof::dealer::*;
-        use aggregated_range_proof::party::*;
+        use self::dealer::*;
+        use self::party::*;
 
         // Simulate four parties, two of which will be dishonest and use a 64-bit value.
         let m = 4;
