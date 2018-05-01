@@ -824,9 +824,17 @@ Therefore, we can simplify the following statements:
 
 \\[
 \begin{aligned}
-  \sum_{j=0}^{m-1}{\langle {\mathbf{l}}\_{(j)}(x), {\mathbf{G}\_{(j)}} \rangle} &= {\langle {\mathbf{l}}\_{(0)}(x) || {\mathbf{l}}\_{(1)}(x) || \dots || {\mathbf{l}}\_{(m-1)}(x), {\mathbf{G}}\_{(0)} || {\mathbf{G}}\_{(1)} || \dots || {\mathbf{G}}\_{(m-1)} \rangle} \\\\
+  \sum_{j=0}^{m-1}{\langle {\mathbf{l}}\_{(j)}(x), {\mathbf{G}\_{(j)}} \rangle} &= {\langle {\mathbf{l}}\_{(0)}(x), {\mathbf{G}}\_{(0)} \rangle} + 
+    {\langle {\mathbf{l}}\_{(1)}(x), {\mathbf{G}}\_{(1)} \rangle} + 
+    \dots + 
+    {\langle {\mathbf{l}}\_{(m-1)}(x), {\mathbf{G}}\_{(m-1)} \rangle}\\\\
+  &= {\langle {\mathbf{l}}\_{(0)}(x) || {\mathbf{l}}\_{(1)}(x) || \dots || {\mathbf{l}}\_{(m-1)}(x), {\mathbf{G}}\_{(0)} || {\mathbf{G}}\_{(1)} || \dots || {\mathbf{G}}\_{(m-1)} \rangle} \\\\
   &= {\langle {\mathbf{l}}(x), {\mathbf{G}} \rangle} \\\\
-  \sum_{j=0}^{m-1}{\langle {\mathbf{r}}\_{(j)}(x) \circ (\mathbf{y}^{n}\_{(j)})^{-1}, {\mathbf{H}}\_{(j)} \rangle} &= {\langle {\mathbf{r}}\_{(0)}(x) \circ (\mathbf{y}^{n}\_{(0)})^{-1} || {\mathbf{r}}\_{(1)}(x) \circ (\mathbf{y}^{n}\_{(1)})^{-1} || \dots || {\mathbf{r}}\_{(m-1)}(x) \circ (\mathbf{y}^{n}\_{(m-1)})^{-1}, {\mathbf{H}}\_{(0)} || {\mathbf{H}}\_{(1)} || \dots || {\mathbf{H}}\_{(m-1)}  \rangle}\\\\
+  \sum_{j=0}^{m-1}{\langle {\mathbf{r}}\_{(j)}(x) \circ (\mathbf{y}^{n}\_{(j)})^{-1}, {\mathbf{H}}\_{(j)} \rangle} &= {\langle {\mathbf{r}}\_{(0)}(x) \circ (\mathbf{y}^{n}\_{(0)})^{-1}, {\mathbf{H}}\_{(0)} \rangle} + 
+    {\langle {\mathbf{r}}\_{(1)}(x) \circ (\mathbf{y}^{n}\_{(1)})^{-1}, {\mathbf{H}}\_{(1)} \rangle} + 
+    \dots + 
+    {\langle {\mathbf{r}}\_{(m-1)}(x) \circ (\mathbf{y}^{n}\_{(m-1)})^{-1}, {\mathbf{H}}\_{(m-1)} \rangle} \\\\
+  &= {\langle {\mathbf{r}}\_{(0)}(x) \circ (\mathbf{y}^{n}\_{(0)})^{-1} || {\mathbf{r}}\_{(1)}(x) \circ (\mathbf{y}^{n}\_{(1)})^{-1} || \dots || {\mathbf{r}}\_{(m-1)}(x) \circ (\mathbf{y}^{n}\_{(m-1)})^{-1}, {\mathbf{H}}\_{(0)} || {\mathbf{H}}\_{(1)} || \dots || {\mathbf{H}}\_{(m-1)}  \rangle}\\\\
   &= {\langle {\mathbf{r}}\_{(0)}(x) \circ (\mathbf{y}^{n \cdot m}\_{[0 : n - 1]})^{-1} || {\mathbf{r}}\_{(1)}(x) \circ (\mathbf{y}^{n \cdot m}\_{[ n : 2 \cdot n - 1]})^{-1} || \dots || {\mathbf{r}}\_{(m-1)}(x) \circ (\mathbf{y}^{n \cdot m}\_{[(m-1) \cdot n : m \cdot n - 1]})^{-1}, {\mathbf{H}}\_{(0)} || {\mathbf{H}}\_{(1)} || \dots || {\mathbf{H}}\_{(m-1)}  \rangle}\\\\
   &= {\langle  {\mathbf{r}}(x) \circ {\mathbf{y}^{-n \cdot m}}, {\mathbf{H}} \rangle}
 \end{aligned}
