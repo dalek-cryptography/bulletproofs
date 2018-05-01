@@ -11,13 +11,10 @@ use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::IsIdentity;
 
+use generators::{Generators, GeneratorsView};
 use inner_product_proof::InnerProductProof;
-
 use proof_transcript::ProofTranscript;
-
 use util;
-
-use generators::GeneratorsView;
 
 /// The `RangeProof` struct represents a single range proof.
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -44,148 +41,68 @@ impl RangeProof {
     /// Create a rangeproof for a given pair of value `v` and
     /// blinding scalar `v_blinding`.
     ///
-    /// Usage:
-    /// ```ascii
-    /// let n = 64;
-    /// let generators = Generators::new(PedersenGenerators::default(), n, 1);
-    /// let mut transcript = ProofTranscript::new(b"RangeproofTest");
-    /// let proof = RangeProof::generate_proof(
-    ///     generators.share(0),
-    ///     &mut transcript,
-    ///     &mut rng,
-    ///     n,
-    ///     v,
-    ///     &v_blinding,
-    /// );
-    /// ```
-    pub fn generate_proof<R: Rng>(
-        generators: GeneratorsView,
+    /// XXX add doctests
+    pub fn prove_multiple_single<R: Rng>(
+        generators: &Generators,
         transcript: &mut ProofTranscript,
         rng: &mut R,
-        n: usize,
         v: u64,
         v_blinding: &Scalar,
-    ) -> RangeProof {
-        use subtle::{Choice, ConditionallyAssignable};
+        n: usize,
+    ) -> Result<RangeProof, &'static str> {
+        RangeProof::prove_multiple(generators, transcript, rng, &[v], &[*v_blinding], n)
+    }
 
-        // Commit the range size to domain-separate from rangeproofs of different lengths.
-        // Also commit the aggregation size (m = 1).
-        transcript.commit_u64(n as u64);
-        transcript.commit_u64(1u64);
+    /// Create a rangeproof for a set of values.
+    ///
+    /// XXX add doctests
+    pub fn prove_multiple<R: Rng>(
+        generators: &Generators,
+        transcript: &mut ProofTranscript,
+        rng: &mut R,
+        values: &[u64],
+        blindings: &[Scalar],
+        n: usize,
+    ) -> Result<RangeProof, &'static str> {
+        use aggregated_range_proof::dealer::*;
+        use aggregated_range_proof::party::*;
 
-        // Create copies of G, H, so we can pass them to the
-        // (consuming) IPP API later.
-        let G = generators.G.to_vec();
-        let H = generators.H.to_vec();
-
-        let V = generators
-            .pedersen_generators
-            .commit(Scalar::from_u64(v), *v_blinding);
-
-        let a_blinding = Scalar::random(rng);
-
-        // Compute A = <a_L, G> + <a_R, H> + a_blinding * B_blinding.
-        let mut A = generators.pedersen_generators.B_blinding * a_blinding;
-        for i in 0..n {
-            // If v_i = 0, we add a_L[i] * G[i] + a_R[i] * H[i] = - H[i]
-            // If v_i = 1, we add a_L[i] * G[i] + a_R[i] * H[i] =   G[i]
-            let v_i = Choice::from(((v >> i) & 1) as u8);
-            let mut point = -H[i];
-            point.conditional_assign(&G[i], v_i);
-            A += point;
+        if values.len() != blindings.len() {
+            return Err("mismatched values and blindings len");
         }
 
-        let s_blinding = Scalar::random(rng);
-        let s_L: Vec<_> = (0..n).map(|_| Scalar::random(rng)).collect();
-        let s_R: Vec<_> = (0..n).map(|_| Scalar::random(rng)).collect();
+        let dealer = Dealer::new(generators.all(), n, values.len(), transcript)?;
 
-        // Compute S = <s_L, G> + <s_R, H> + s_blinding * B_blinding.
-        let S = ristretto::multiscalar_mul(
-            iter::once(&s_blinding).chain(s_L.iter()).chain(s_R.iter()),
-            iter::once(&generators.pedersen_generators.B_blinding)
-                .chain(G.iter())
-                .chain(H.iter()),
-        );
+        let parties: Vec<_> = values
+            .iter()
+            .zip(blindings.iter())
+            .map(|(&v, &v_blinding)| {
+                Party::new(v, v_blinding, n, &generators)
+            })
+            // Collect the iterator of Results into a Result<Vec>, then unwrap it
+            .collect::<Result<Vec<_>,_>>()?;
 
-        // Commit to V, A, S and get challenges y, z
-        transcript.commit(V.compress().as_bytes());
-        transcript.commit(A.compress().as_bytes());
-        transcript.commit(S.compress().as_bytes());
-        let y = transcript.challenge_scalar();
-        let z = transcript.challenge_scalar();
-        let zz = z * z;
+        let (parties, value_commitments): (Vec<_>, Vec<_>) = parties
+            .into_iter()
+            .enumerate()
+            .map(|(j, p)| p.assign_position(j, rng))
+            .unzip();
 
-        // Compute l, r
-        let mut l_poly = util::VecPoly1::zero(n);
-        let mut r_poly = util::VecPoly1::zero(n);
-        let mut exp_y = Scalar::one(); // start at y^0 = 1
-        let mut exp_2 = Scalar::one(); // start at 2^0 = 1
+        let (dealer, value_challenge) = dealer.receive_value_commitments(&value_commitments)?;
 
-        for i in 0..n {
-            let a_L_i = Scalar::from_u64((v >> i) & 1);
-            let a_R_i = a_L_i - Scalar::one();
+        let (parties, poly_commitments): (Vec<_>, Vec<_>) = parties
+            .into_iter()
+            .map(|p| p.apply_challenge(&value_challenge, rng))
+            .unzip();
 
-            l_poly.0[i] = a_L_i - z;
-            l_poly.1[i] = s_L[i];
-            r_poly.0[i] = exp_y * (a_R_i + z) + zz * exp_2;
-            r_poly.1[i] = exp_y * s_R[i];
+        let (dealer, poly_challenge) = dealer.receive_poly_commitments(&poly_commitments)?;
 
-            exp_y *= y; // y^i -> y^(i+1)
-            exp_2 += exp_2; // 2^i -> 2^(i+1)
-        }
+        let proof_shares: Vec<_> = parties
+            .into_iter()
+            .map(|p| p.apply_challenge(&poly_challenge))
+            .collect();
 
-        // Compute t(x) = <l(x),r(x)>
-        let t_poly = l_poly.inner_product(&r_poly);
-
-        // Form commitments T_1, T_2 to t.1, t.2
-        let t_1_blinding = Scalar::random(rng);
-        let t_2_blinding = Scalar::random(rng);
-        let T_1 = generators
-            .pedersen_generators
-            .commit(t_poly.1, t_1_blinding);
-        let T_2 = generators
-            .pedersen_generators
-            .commit(t_poly.2, t_2_blinding);
-
-        // Commit to T_1, T_2 to get the challenge point x
-        transcript.commit(T_1.compress().as_bytes());
-        transcript.commit(T_2.compress().as_bytes());
-        let x = transcript.challenge_scalar();
-
-        // Evaluate t at x and run the IPP
-        let t_x = t_poly.eval(x);
-        let t_x_blinding = zz * v_blinding + x * (t_1_blinding + x * t_2_blinding);
-        let e_blinding = a_blinding + x * s_blinding;
-
-        transcript.commit(t_x.as_bytes());
-        transcript.commit(t_x_blinding.as_bytes());
-        transcript.commit(e_blinding.as_bytes());
-
-        // Get a challenge value to combine statements for the IPP
-        let w = transcript.challenge_scalar();
-        let Q = w * generators.pedersen_generators.B;
-
-        // Generate the IPP proof
-        let ipp_proof = InnerProductProof::create(
-            transcript,
-            &Q,
-            util::exp_iter(y.invert()),
-            G,
-            H,
-            l_poly.eval(x),
-            r_poly.eval(x),
-        );
-
-        RangeProof {
-            A,
-            S,
-            T_1,
-            T_2,
-            t_x,
-            t_x_blinding,
-            e_blinding,
-            ipp_proof,
-        }
+        dealer.receive_trusted_shares(&proof_shares)
     }
 
     /// Verifies a rangeproof for a given value commitment \\(V\\).
@@ -319,6 +236,8 @@ mod tests {
     use super::*;
     use rand::OsRng;
 
+    use generators::PedersenGenerators;
+
     #[test]
     fn test_delta() {
         let mut rng = OsRng::new().unwrap();
@@ -345,13 +264,13 @@ mod tests {
         assert_eq!(power_g, delta(n, 1, &y, &z),);
     }
 
-    /// Given a bitsize `n`, test the full trip:
+    /// Given a bitsize `n`, test the following:
     ///
-    /// 1. Generate a random value and create a proof that it's in range;
+    /// 1. Generate `m` random values and create a proof they are all in range;
     /// 2. Serialize to wire format;
     /// 3. Deserialize from wire format;
     /// 4. Verify the proof.
-    fn create_and_verify_helper(n: usize) {
+    fn singleparty_create_and_verify_helper(n: usize, m: usize) {
         // Split the test into two scopes, so that it's explicit what
         // data is shared between the prover and the verifier.
 
@@ -359,98 +278,181 @@ mod tests {
         use bincode;
 
         // Both prover and verifier have access to the generators and the proof
-        use generators::{Generators, PedersenGenerators};
-        let generators = Generators::new(PedersenGenerators::default(), n, 1);
+        let generators = Generators::new(PedersenGenerators::default(), n, m);
 
         // Serialized proof data
         let proof_bytes: Vec<u8>;
-        let value_commitment: RistrettoPoint;
+        let value_commitments: Vec<RistrettoPoint>;
 
         // Prover's scope
         {
-            // Use a customization label for testing proofs
-            let mut transcript = ProofTranscript::new(b"RangeproofTest");
+            // 1. Generate the proof
+
             let mut rng = OsRng::new().unwrap();
+            let mut transcript = ProofTranscript::new(b"AggregatedRangeProofTest");
 
-            let v: u64 = rng.gen_range(0, (1 << (n - 1)) - 1);
-            let v_blinding = Scalar::random(&mut rng);
+            let (min, max) = (0u64, ((1u128 << n) - 1) as u64);
+            let values: Vec<u64> = (0..m).map(|_| rng.gen_range(min, max)).collect();
+            let blindings: Vec<Scalar> = (0..m).map(|_| Scalar::random(&mut rng)).collect();
 
-            let range_proof = RangeProof::generate_proof(
-                generators.share(0),
+            let proof = RangeProof::prove_multiple(
+                &generators,
                 &mut transcript,
                 &mut rng,
+                &values,
+                &blindings,
                 n,
-                v,
-                &v_blinding,
-            );
+            ).unwrap();
 
             // 2. Serialize
-            proof_bytes = bincode::serialize(&range_proof).unwrap();
+            proof_bytes = bincode::serialize(&proof).unwrap();
 
-            let gens = generators.share(0);
-            value_commitment = gens.pedersen_generators
-                .commit(Scalar::from_u64(v), v_blinding);
+            let pg = &generators.all().pedersen_generators;
+
+            // XXX would be nice to have some convenience API for this
+            value_commitments = values
+                .iter()
+                .zip(blindings.iter())
+                .map(|(&v, &v_blinding)| pg.commit(Scalar::from_u64(v), v_blinding))
+                .collect();
         }
 
         println!(
-            "Rangeproof with {} bits has size {} bytes",
+            "Aggregated rangeproof of m={} proofs of n={} bits has size {} bytes",
+            m,
             n,
-            proof_bytes.len()
+            proof_bytes.len(),
         );
 
         // Verifier's scope
         {
             // 3. Deserialize
-            let range_proof: RangeProof = bincode::deserialize(&proof_bytes).unwrap();
-            let mut rng = OsRng::new().unwrap();
+            let proof: RangeProof = bincode::deserialize(&proof_bytes).unwrap();
 
-            // 4. Use the same customization label as above to verify
-            let mut transcript = ProofTranscript::new(b"RangeproofTest");
+            // 4. Verify with the same customization label as above
+            let mut rng = OsRng::new().unwrap();
+            let mut transcript = ProofTranscript::new(b"AggregatedRangeProofTest");
+
             assert!(
-                range_proof
-                    .verify_single(
-                        &value_commitment,
-                        generators.share(0),
+                proof
+                    .verify(
+                        &value_commitments,
+                        generators.all(),
                         &mut transcript,
                         &mut rng,
-                        n
+                        n,
+                        m
                     )
                     .is_ok()
-            );
-
-            // Verification with a different label fails
-            let mut transcript = ProofTranscript::new(b"");
-            assert!(
-                range_proof
-                    .verify_single(
-                        &value_commitment,
-                        generators.share(0),
-                        &mut transcript,
-                        &mut rng,
-                        n
-                    )
-                    .is_err()
             );
         }
     }
 
     #[test]
-    fn create_and_verify_8() {
-        create_and_verify_helper(8);
+    fn create_and_verify_n_32_m_1() {
+        singleparty_create_and_verify_helper(32, 1);
     }
 
     #[test]
-    fn create_and_verify_16() {
-        create_and_verify_helper(16);
+    fn create_and_verify_n_32_m_2() {
+        singleparty_create_and_verify_helper(32, 2);
     }
 
     #[test]
-    fn create_and_verify_32() {
-        create_and_verify_helper(32);
+    fn create_and_verify_n_32_m_4() {
+        singleparty_create_and_verify_helper(32, 4);
     }
 
     #[test]
-    fn create_and_verify_64() {
-        create_and_verify_helper(64);
+    fn create_and_verify_n_32_m_8() {
+        singleparty_create_and_verify_helper(32, 8);
+    }
+
+    #[test]
+    fn create_and_verify_n_64_m_1() {
+        singleparty_create_and_verify_helper(64, 1);
+    }
+
+    #[test]
+    fn create_and_verify_n_64_m_2() {
+        singleparty_create_and_verify_helper(64, 2);
+    }
+
+    #[test]
+    fn create_and_verify_n_64_m_4() {
+        singleparty_create_and_verify_helper(64, 4);
+    }
+
+    #[test]
+    fn create_and_verify_n_64_m_8() {
+        singleparty_create_and_verify_helper(64, 8);
+    }
+
+    #[test]
+    fn detect_dishonest_party_during_aggregation() {
+        use aggregated_range_proof::dealer::*;
+        use aggregated_range_proof::party::*;
+
+        // Simulate four parties, two of which will be dishonest and use a 64-bit value.
+        let m = 4;
+        let n = 32;
+
+        let generators = Generators::new(PedersenGenerators::default(), n, m);
+
+        let mut rng = OsRng::new().unwrap();
+        let mut transcript = ProofTranscript::new(b"AggregatedRangeProofTest");
+
+        // Parties 0, 2 are honest and use a 32-bit value
+        let v0 = rng.next_u32() as u64;
+        let v0_blinding = Scalar::random(&mut rng);
+        let party0 = Party::new(v0, v0_blinding, n, &generators).unwrap();
+
+        let v2 = rng.next_u32() as u64;
+        let v2_blinding = Scalar::random(&mut rng);
+        let party2 = Party::new(v2, v2_blinding, n, &generators).unwrap();
+
+        // Parties 1, 3 are dishonest and use a 64-bit value
+        let v1 = rng.next_u64();
+        let v1_blinding = Scalar::random(&mut rng);
+        let party1 = Party::new(v1, v1_blinding, n, &generators).unwrap();
+
+        let v3 = rng.next_u64();
+        let v3_blinding = Scalar::random(&mut rng);
+        let party3 = Party::new(v3, v3_blinding, n, &generators).unwrap();
+
+        let dealer = Dealer::new(generators.all(), n, m, &mut transcript).unwrap();
+
+        let (party0, value_com0) = party0.assign_position(0, &mut rng);
+        let (party1, value_com1) = party1.assign_position(1, &mut rng);
+        let (party2, value_com2) = party2.assign_position(2, &mut rng);
+        let (party3, value_com3) = party3.assign_position(3, &mut rng);
+
+        let (dealer, value_challenge) = dealer
+            .receive_value_commitments(&[value_com0, value_com1, value_com2, value_com3])
+            .unwrap();
+
+        let (party0, poly_com0) = party0.apply_challenge(&value_challenge, &mut rng);
+        let (party1, poly_com1) = party1.apply_challenge(&value_challenge, &mut rng);
+        let (party2, poly_com2) = party2.apply_challenge(&value_challenge, &mut rng);
+        let (party3, poly_com3) = party3.apply_challenge(&value_challenge, &mut rng);
+
+        let (dealer, poly_challenge) = dealer
+            .receive_poly_commitments(&[poly_com0, poly_com1, poly_com2, poly_com3])
+            .unwrap();
+
+        let share0 = party0.apply_challenge(&poly_challenge);
+        let share1 = party1.apply_challenge(&poly_challenge);
+        let share2 = party2.apply_challenge(&poly_challenge);
+        let share3 = party3.apply_challenge(&poly_challenge);
+
+        match dealer.receive_shares(&mut rng, &[share0, share1, share2, share3]) {
+            Ok(_proof) => {
+                panic!("The proof was malformed, but it was not detected");
+            }
+            Err(e) => {
+                // XXX when we have error types, check that it was party 1 that did it
+                assert_eq!(e, "proof failed to verify");
+            }
+        }
     }
 }
