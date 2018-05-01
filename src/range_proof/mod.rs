@@ -25,21 +25,21 @@ pub mod party;
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct RangeProof {
     /// Commitment to the bits of the value
-    pub(crate) A: RistrettoPoint,
+    A: RistrettoPoint,
     /// Commitment to the blinding factors
-    pub(crate) S: RistrettoPoint,
+    S: RistrettoPoint,
     /// Commitment to the \\(t_1\\) coefficient of \\( t(x) \\)
-    pub(crate) T_1: RistrettoPoint,
+    T_1: RistrettoPoint,
     /// Commitment to the \\(t_2\\) coefficient of \\( t(x) \\)
-    pub(crate) T_2: RistrettoPoint,
+    T_2: RistrettoPoint,
     /// Evaluation of the polynomial \\(t(x)\\) at the challenge point \\(x\\)
-    pub(crate) t_x: Scalar,
+    t_x: Scalar,
     /// Blinding factor for the synthetic commitment to \\(t(x)\\)
-    pub(crate) t_x_blinding: Scalar,
+    t_x_blinding: Scalar,
     /// Blinding factor for the synthetic commitment to the inner-product arguments
-    pub(crate) e_blinding: Scalar,
+    e_blinding: Scalar,
     /// Proof data for the inner-product argument.
-    pub(crate) ipp_proof: InnerProductProof,
+    ipp_proof: InnerProductProof,
 }
 
 impl RangeProof {
