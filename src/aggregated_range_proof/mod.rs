@@ -6,12 +6,11 @@ use curve25519_dalek::scalar::Scalar;
 
 use generators::Generators;
 use proof_transcript::ProofTranscript;
+use range_proof::RangeProof;
 
 pub mod dealer;
 pub mod messages;
 pub mod party;
-
-pub use self::messages::AggregatedProof;
 
 pub struct SinglePartyAggregator {}
 
@@ -29,7 +28,7 @@ impl SinglePartyAggregator {
         values: &[u64],
         blindings: &[Scalar],
         n: usize,
-    ) -> Result<AggregatedProof, &'static str> {
+    ) -> Result<RangeProof, &'static str> {
         use self::dealer::*;
         use self::party::*;
 
@@ -145,7 +144,7 @@ mod tests {
         // Verifier's scope
         {
             // 3. Deserialize
-            let proof: AggregatedProof = bincode::deserialize(&proof_bytes).unwrap();
+            let proof: RangeProof = bincode::deserialize(&proof_bytes).unwrap();
 
             // 4. Verify with the same customization label as above
             let mut rng = OsRng::new().unwrap();
