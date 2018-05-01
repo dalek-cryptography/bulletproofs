@@ -107,10 +107,10 @@ pub fn scalar_exp_vartime(x: &Scalar, mut n: u64) -> Scalar {
 }
 
 /// Computes the sum of all the powers of \\(x\\) \\(S(n) = (x^0 + \dots + x^{n-1})\\)
-/// using \\(O(\lg n)\\) multiplications and additions. Length \\(n\\) is not considered secret
-/// and algorithm is fastest when \\(n\\) is the power of two.
+/// using \\(O(\lg n)\\) multiplications. Length \\(n\\) is not considered secret
+/// and algorithm is fastest when \\(n\\) is the power of two (\\(2\lg n + 1\\) multiplications).
 ///
-/// ### Algorithm overview
+/// ### Algorithm description
 ///
 /// First, let \\(n\\) be a power of two.
 /// Then, we can divide the polynomial in two halves like so:
@@ -131,9 +131,26 @@ pub fn scalar_exp_vartime(x: &Scalar, mut n: u64) -> Scalar {
 /// s_i     &= s_{i-1} + x^{2^{i-1}} s_{i-1}
 /// \end{aligned}
 /// \\]
-/// This representation allows us to square \\(x\\) only \\(\lg n\\) times.
+/// This representation allows us to do only \\(2 \cdot \lg n\\) multiplications:
+/// squaring \\(x\\) and multiplying it by \\(s_{i-1}\\) at each iteration.
 ///
-/// Lets apply this to \\(n\\) which is not a power of two (\\(2^{k-1} < n < 2^k\\)) which can be represented in binary using
+/// Lets apply this to \\(n\\) which is not a power of two. The intuition behind the generalized
+/// algorithm is to combine all intermediate power-of-two-degree polynomials corresponding to the 
+/// bits of \\(n\\) that are equal to 1.
+///
+/// 1. Represent \\(n\\) in binary.
+/// 2. For each bit which is set (from the lowest to the highest):
+///    1. Compute a corresponding power-of-two-degree polynomial using the above algorithm.
+///       Since we can reuse all intermediate polynomials, this adds no overhead to computing
+///       a polynomial for the highest bit.
+///    2. Multiply the polynomial by the next power of \\(x\\), relative to the degree of the
+///       already computed result. This effectively _offsets_ the polynomial to a correct range of
+///       powers, so it can be added directly with the rest.
+///       The next power of \\(x\\) is computed along all the intermediate polynomials,
+///       by multiplying it by power-of-two power of \\(x\\) computed in step 2.1.
+///    3. Add to the result.
+///
+/// (\\(2^{k-1} < n < 2^k\\)) which can be represented in binary using
 /// bits \\(b_i\\) in \\(\\{0,1\\}\\):
 /// \\[
 /// n = b_0 2^0 + \dots + b_{k-1} 2^{k-1}
@@ -155,16 +172,16 @@ pub fn scalar_exp_vartime(x: &Scalar, mut n: u64) -> Scalar {
 /// \\]
 pub fn sum_of_powers(x: &Scalar, mut n: usize) -> Scalar {
     let mut result = Scalar::zero();
-    let mut f = Scalar::one(); // power of x to offset subsequent polynomials based on lower bits of n.
-    let mut s = Scalar::one(); // power-of-two polynomial: 1, 1+x, 1+x+x^2+x^3, ...
-    let mut p = *x; // x, x^2, x^4, ..., x^{2^i}
+    let mut f = Scalar::one(); // next-power-of-x to offset subsequent polynomials based on preceding bits of n.
+    let mut s = Scalar::one(); // power-of-two polynomials: (1, 1+x, 1+x+x^2+x^3, 1+...+x^7, , 1+...+x^15, ...)
+    let mut p = *x; // power-of-two powers of x: (x, x^2, x^4, ..., x^{2^i})
     while n > 0 {
         // take a bit from n
         let bit = n & 1;
         n = n >> 1;
         
         if bit == 1 {
-            // bits of `n` are not secret, so it's okay to be vartime because of `n` value.
+            // `n` is not secret, so it's okay to be vartime on bits of `n`.
             result += f * s;
             if n > 0 { // avoid multiplication if no bits left
                 f = f * p;
