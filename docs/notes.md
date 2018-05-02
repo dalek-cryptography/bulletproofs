@@ -627,6 +627,10 @@ We use pythonic notation to denote slices of vectors, such that \\(\mathbf{G}\_{
 
 \\({\mathbf{G}\_{(j)}}\\) is party \\(j\\)'s share of the generators \\({\mathbf{G}}\\), or \\({\mathbf{G}\_{[j\cdot n : (j+1)n]}}\\), and \\({\mathbf{H}'\_{(j)}}\\) is party \\(j\\)'s share of the generators \\({\mathbf{H}'}\\), or \\({\mathbf{H}'\_{[j\cdot n : (j+1)n]}}\\).
 
+\\(z_{(j)}\\) is a scalar offset that is unique to each party \\(j\\), and is defined by \\(z_{(j)} = z^j\\). \\(\mathbf{y}^n\_{(j)}\\) is a length \\(n\\) vector offset that is unique to each party \\(j\\). It is a slice into vector \\(\mathbf{y}^{n \cdot m}\\), and is defined by \\(\mathbf{y}^n\_{(j)} = \mathbf{y}^{n \cdot m}\_{[j \cdot n : (j+1) \cdot n]} \\)
+
+
+
 Proving range statements with bit vectors
 -----------------------------------------
 
@@ -645,10 +649,9 @@ We want to make statements about \\(v_{(j)}\\) using its bit vector representati
 Proving vectors of statements with a single statement
 -----------------------------------------------------
 
-We want to combine the above three statements into a single statement for party \\(j\\), as in the [proving vectors of statements](index.html#proving-vectors-of-statements-with-a-single-statement) step of the single-value range proof. We will additionally introduce challenge values \\(\mathbf{y}^n\_{(j)}\\) and \\(z_{(j)}\\) that are unique to each party \\(j\\). Since these challenge values are independent for each party, we can later merge the per-party combined statements into one statement for all \\(m\\) parties.
+We want to combine the above three statements into a single statement for party \\(j\\), as in the [proving vectors of statements](index.html#proving-vectors-of-statements-with-a-single-statement) step of the single-value range proof. We will additionally use offsets \\(\mathbf{y}^n\_{(j)}\\) and \\(z_{(j)}\\) that are unique to each party \\(j\\). Since these challenge values are independent for each party, we can later merge the per-party combined statements into one statement for all \\(m\\) parties.
 
-First, we will combine each of the two vector-statements into a single statement using the verifier's choice of challenge value \\(y\\) that is shared across all parties
-, and offset by vector \\(\mathbf{y}^n\_{(j)} = \mathbf{y}^{n \cdot m}\_{[j \cdot n : (j+1) \cdot n]} \\), a length \\(n\\) slice into vector \\(\mathbf{y}^{n \cdot m}\\) that is unique to each party \\(j\\):
+First, we will combine each of the two vector-statements into a single statement using the verifier's choice of challenge value \\(y\\) that is shared across all parties, and offset by vector \\(\mathbf{y}^n\_{(j)}\\):
 
 \\[
 \begin{aligned}
@@ -659,7 +662,7 @@ First, we will combine each of the two vector-statements into a single statement
 \\]
 
 The three resulting statements can then be combined in the same way,
-using the verifier’s choice of challenge value \\(z\\) that is shared across all parties, and offset by scalar \\(z\_{(j)}  = z^j\\) that is unique to each party \\(j\\):
+using the verifier’s choice of challenge value \\(z\\) that is shared across all parties, and offset by scalar \\(z\_{(j)} \\) :
 \\[
 \begin{aligned}
 z^{2} z\_{(j)}  \cdot v_{(j)} 
@@ -711,7 +714,7 @@ We can combine the statements about \\(t\_{(j)}(x)\\), \\({\mathbf{l}}\_{(j)}(x)
 \end{aligned}
 \\]
 
-We can add the \\(t_{(j)}(x)\\) values together to create \\(t(x)\\) instead of taking a random linear combination of \\(t_{(j)}(x)\\) values, because each \\(t_{(j)}(x)\\) is calculated with the \\(\mathbf{y}^n\_{(j)}\\) and \\(z_{(j)}\\) challenge variables that are unique to that party\\(j\\), so all of the \\(t_{(j)}(x)\\) values will be offset from one another.
+We can add the \\(t_{(j)}(x)\\) values together to create \\(t(x)\\) instead of taking a random linear combination of \\(t_{(j)}(x)\\) values, because each \\(t_{(j)}(x)\\) is calculated with the \\(\mathbf{y}^n\_{(j)}\\) and \\(z_{(j)}\\) challenge variables that are unique to that party \\(j\\), so all of the \\(t_{(j)}(x)\\) values will be offset from one another.
 
 Now instead of having to do \\(m\\) individual checks to prove that \\(t_{(j)}(x)\\), \\({\mathbf{l}}\_{(j)}(x)\\), and \\({\mathbf{r}}\_{(j)}(x)\\) for all parties \\(j\\) are correct, we can do the verification with one check:
 
