@@ -1,5 +1,4 @@
 #![allow(non_snake_case)]
-#![deny(missing_docs)]
 #![doc(include = "../docs/range-proof-protocol.md")]
 
 use rand::Rng;
@@ -16,25 +15,31 @@ use inner_product_proof::InnerProductProof;
 use proof_transcript::ProofTranscript;
 use util;
 
+// Modules for MPC protocol
+
+pub mod dealer;
+pub mod messages;
+pub mod party;
+
 /// The `RangeProof` struct represents a single range proof.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct RangeProof {
     /// Commitment to the bits of the value
-    pub(crate) A: RistrettoPoint,
+    A: RistrettoPoint,
     /// Commitment to the blinding factors
-    pub(crate) S: RistrettoPoint,
+    S: RistrettoPoint,
     /// Commitment to the \\(t_1\\) coefficient of \\( t(x) \\)
-    pub(crate) T_1: RistrettoPoint,
+    T_1: RistrettoPoint,
     /// Commitment to the \\(t_2\\) coefficient of \\( t(x) \\)
-    pub(crate) T_2: RistrettoPoint,
+    T_2: RistrettoPoint,
     /// Evaluation of the polynomial \\(t(x)\\) at the challenge point \\(x\\)
-    pub(crate) t_x: Scalar,
+    t_x: Scalar,
     /// Blinding factor for the synthetic commitment to \\(t(x)\\)
-    pub(crate) t_x_blinding: Scalar,
+    t_x_blinding: Scalar,
     /// Blinding factor for the synthetic commitment to the inner-product arguments
-    pub(crate) e_blinding: Scalar,
+    e_blinding: Scalar,
     /// Proof data for the inner-product argument.
-    pub(crate) ipp_proof: InnerProductProof,
+    ipp_proof: InnerProductProof,
 }
 
 impl RangeProof {
@@ -42,7 +47,7 @@ impl RangeProof {
     /// blinding scalar `v_blinding`.
     ///
     /// XXX add doctests
-    pub fn prove_multiple_single<R: Rng>(
+    pub fn prove_single<R: Rng>(
         generators: &Generators,
         transcript: &mut ProofTranscript,
         rng: &mut R,
@@ -64,8 +69,8 @@ impl RangeProof {
         blindings: &[Scalar],
         n: usize,
     ) -> Result<RangeProof, &'static str> {
-        use aggregated_range_proof::dealer::*;
-        use aggregated_range_proof::party::*;
+        use self::dealer::*;
+        use self::party::*;
 
         if values.len() != blindings.len() {
             return Err("mismatched values and blindings len");
@@ -118,7 +123,7 @@ impl RangeProof {
         rng: &mut R,
         n: usize,
     ) -> Result<(), ()> {
-        self.verify(&[*V], gens, transcript, rng, n, 1)
+        self.verify(&[*V], gens, transcript, rng, n)
     }
 
     /// Verifies an aggregated rangeproof for the given value commitments.
@@ -131,10 +136,11 @@ impl RangeProof {
         transcript: &mut ProofTranscript,
         rng: &mut R,
         n: usize,
-        m: usize,
     ) -> Result<(), ()> {
         // First, replay the "interactive" protocol using the proof
         // data to recompute all challenges.
+
+        let m = value_commitments.len();
 
         transcript.commit_u64(n as u64);
         transcript.commit_u64(m as u64);
@@ -341,7 +347,6 @@ mod tests {
                         &mut transcript,
                         &mut rng,
                         n,
-                        m
                     )
                     .is_ok()
             );
@@ -390,8 +395,8 @@ mod tests {
 
     #[test]
     fn detect_dishonest_party_during_aggregation() {
-        use aggregated_range_proof::dealer::*;
-        use aggregated_range_proof::party::*;
+        use self::dealer::*;
+        use self::party::*;
 
         // Simulate four parties, two of which will be dishonest and use a 64-bit value.
         let m = 4;
