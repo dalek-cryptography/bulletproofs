@@ -627,9 +627,9 @@ We want to make statements about \\(v_{(j)}\\) using its bit vector representati
 
 \\[
 \begin{aligned}
-  {\langle {\mathbf{a}}\_{(j)L}, {\mathbf{2}}^{n} \rangle} &= v_{(j)} \\\\
-  {\mathbf{a}}\_{(j)L} \circ {\mathbf{a}}\_{(j)R} &= {\mathbf{0}} \\\\
-  ({\mathbf{a}}\_{(j)L} - {\mathbf{1}}) - {\mathbf{a}}\_{(j)R} &= {\mathbf{0}}
+  {\langle {\mathbf{a}}\_{L, (j)}, {\mathbf{2}}^{n} \rangle} &= v_{(j)} \\\\
+  {\mathbf{a}}\_{L, (j)} \circ {\mathbf{a}}\_{R, (j)} &= {\mathbf{0}} \\\\
+  ({\mathbf{a}}\_{L, (j)} - {\mathbf{1}}) - {\mathbf{a}}\_{R, (j)} &= {\mathbf{0}}
 \end{aligned}
 \\]
 
@@ -643,9 +643,9 @@ First, we will combine each of the two vector-statements into a single statement
 
 \\[
 \begin{aligned}
-  {\langle {\mathbf{a}}\_{(j)L}, {\mathbf{2}}^{n} \rangle} &= v_{(j)} \\\\
-  {\langle {\mathbf{a}}\_{(j)L} - {\mathbf{1}} - {\mathbf{a}}\_{(j)R}, {\mathbf{y}}^{n}\_{(j)} \rangle} &= 0 \\\\
-  {\langle {\mathbf{a}}\_{(j)L}, {\mathbf{a}}\_{(j)R} \circ {\mathbf{y}}^{n}\_{(j)} \rangle} &= 0
+  {\langle {\mathbf{a}}\_{L, (j)}, {\mathbf{2}}^{n} \rangle} &= v_{(j)} \\\\
+  {\langle {\mathbf{a}}\_{L, (j)} - {\mathbf{1}} - {\mathbf{a}}\_{R, (j)}, {\mathbf{y}}^{n}\_{(j)} \rangle} &= 0 \\\\
+  {\langle {\mathbf{a}}\_{L, (j)}, {\mathbf{a}}\_{R, (j)} \circ {\mathbf{y}}^{n}\_{(j)} \rangle} &= 0
 \end{aligned}
 \\]
 
@@ -655,9 +655,9 @@ using the verifier’s choice of challenge value \\(z\\) that is shared across a
 \begin{aligned}
 z^{2} z\_{(j)}  \cdot v_{(j)} 
 &= 
-   z^{2} z\_{(j)}  \cdot {\langle {\mathbf{a}}\_{(j)L}, {\mathbf{2}}^{n} \rangle} \\\\
-     &+ z \cdot {\langle {\mathbf{a}}\_{(j)L} - {\mathbf{1}} - {\mathbf{a}}\_{(j)R}, {\mathbf{y}}^{n}\_{(j)}  \rangle} \\\\
-         &+   {\langle {\mathbf{a}}\_{(j)L}, {\mathbf{a}}\_{(j)R} \circ {\mathbf{y}}^{n}\_{(j)} \rangle} 
+   z^{2} z\_{(j)}  \cdot {\langle {\mathbf{a}}\_{L, (j)}, {\mathbf{2}}^{n} \rangle} \\\\
+     &+ z \cdot {\langle {\mathbf{a}}\_{L, (j)} - {\mathbf{1}} - {\mathbf{a}}\_{R, (j)}, {\mathbf{y}}^{n}\_{(j)}  \rangle} \\\\
+         &+   {\langle {\mathbf{a}}\_{L, (j)}, {\mathbf{a}}\_{R, (j)} \circ {\mathbf{y}}^{n}\_{(j)} \rangle} 
 \end{aligned}
 \\]
 
@@ -669,19 +669,19 @@ We combine the terms in the preceding statement into a single inner product, usi
 \\[
 \begin{aligned}
  \delta_{(j)}(y,z) &= (z - z^{2}) \cdot {\langle {\mathbf{1}}, {\mathbf{y}}^{n}\_{(j)} \rangle} - z^{3} z_{(j)} \cdot {\langle {\mathbf{1}}, {\mathbf{2}}^{n} \rangle}\\\\
- z^{2}z_{(j)} \cdot v_{(j)} + \delta_{(j)}(y,z) &= {\langle {\mathbf{a}}\_{(j)L} - z {\mathbf{1}}, {\mathbf{y}}^{n}\_{(j)} \circ ({\mathbf{a}}\_{(j)R} + z {\mathbf{1}}) + z^{2} z_{(j)} \cdot {\mathbf{2}}^{n} \rangle}
+ z^{2}z_{(j)} \cdot v_{(j)} + \delta_{(j)}(y,z) &= {\langle {\mathbf{a}}\_{L, (j)} - z {\mathbf{1}}, {\mathbf{y}}^{n}\_{(j)} \circ ({\mathbf{a}}\_{R, (j)} + z {\mathbf{1}}) + z^{2} z_{(j)} \cdot {\mathbf{2}}^{n} \rangle}
 \end{aligned} 
 \\]
 
 Blinding the inner product
 --------------------------
 
-The prover chooses vectors of blinding factors \\( \mathbf{s}\_{(j)L}, {\mathbf{s}}\_{(j)R} \\), and uses them to construct the blinded vector polynomials \\(\mathbf{l}\_{(j)}(x), \mathbf{r}\_{(j)}(x)\\). We will not reproduce the steps or the explanation here since it is the same as in the [blinding the inner product](index.html#blinding-the-inner-product) step of the single-value proof. Here are the final equations for the vector polynomials:
+The prover chooses vectors of blinding factors \\( \mathbf{s}\_{L, (j)}, {\mathbf{s}}\_{R, (j)} \\), and uses them to construct the blinded vector polynomials \\(\mathbf{l}\_{(j)}(x), \mathbf{r}\_{(j)}(x)\\). We will not reproduce the steps or the explanation here since it is the same as in the [blinding the inner product](index.html#blinding-the-inner-product) step of the single-value proof. Here are the final equations for the vector polynomials:
 
 \\[
 \begin{aligned}
-  {\mathbf{l}}\_{(j)}(x) &= ({\mathbf{a}}\_{(j)L} + {\mathbf{s}}\_{(j)L} x) - z {\mathbf{1}} & \in {\mathbb Z\_p}[x]^{n}  \\\\
-  {\mathbf{r}}\_{(j)}(x) &= {\mathbf{y}}^{n}\_{(j)} \circ \left( ({\mathbf{a}}\_{(j)R} + {\mathbf{s}}\_{(j)R} x\right)  + z {\mathbf{1}}) + z^{2} z_{(j)} {\mathbf{2}}^{n} &\in {\mathbb Z\_p}[x]^{n} 
+  {\mathbf{l}}\_{(j)}(x) &= ({\mathbf{a}}\_{L, (j)} + {\mathbf{s}}\_{L, (j)} x) - z {\mathbf{1}} & \in {\mathbb Z\_p}[x]^{n}  \\\\
+  {\mathbf{r}}\_{(j)}(x) &= {\mathbf{y}}^{n}\_{(j)} \circ \left( ({\mathbf{a}}\_{R, (j)} + {\mathbf{s}}\_{R, (j)} x\right)  + z {\mathbf{1}}) + z^{2} z_{(j)} {\mathbf{2}}^{n} &\in {\mathbb Z\_p}[x]^{n} 
 \end{aligned}
 \\]
 
@@ -721,7 +721,7 @@ Proving that \\(t\_{(j)0}\\) is correct requires first creating commitments to t
 
 \\[
 \begin{aligned}
-  t\_{(j)}(x) B + {\tilde{t}}\_{(j)}(x) {\widetilde{B}} \stackrel{?}{=} z^2 z\_{(j)} V_{(j)} + \delta\_{(j)}(y,z) B + x T\_{(j)1} + x^{2} T\_{(j)2}\\\\
+  t\_{(j)}(x) B + {\tilde{t}}\_{(j)}(x) {\widetilde{B}} \stackrel{?}{=} z^2 z\_{(j)} V_{(j)} + \delta\_{(j)}(y,z) B + x T\_{1, (j)} + x^{2} T\_{2, (j)}\\\\
   \delta\_{(j)}(y,z) = (z - z^{2}) \cdot {\langle {\mathbf{1}}, {\mathbf{y}}^{n}\_{(j)} \rangle} - z^{3} z\_{(j)} \cdot {\langle {\mathbf{1}}, {\mathbf{2}}^{n} \rangle}
 \end{aligned}
 \\]
@@ -730,7 +730,7 @@ If we combine all of the statements about \\(t\_{(j)0}\\) from all of the \\(j\\
 
 \\[
 \begin{aligned}
-  \sum_{j=0}^{m-1}t_{(j)}(x) B + \sum_{j=0}^{m-1}{\tilde{t}}\_{(j)}(x) {\widetilde{B}} \stackrel{?}{=} z^2 \sum_{j=0}^{m-1} z_{(j)} V_{(j)} + \sum_{j=0}^{m-1} \delta_{(j)}(y,z) B + x \sum_{j=0}^{m-1} T\_{(j)1} + x^{2} \sum_{j=0}^{m-1} T\_{(j)2}
+  \sum_{j=0}^{m-1}t_{(j)}(x) B + \sum_{j=0}^{m-1}{\tilde{t}}\_{(j)}(x) {\widetilde{B}} \stackrel{?}{=} z^2 \sum_{j=0}^{m-1} z_{(j)} V_{(j)} + \sum_{j=0}^{m-1} \delta_{(j)}(y,z) B + x \sum_{j=0}^{m-1} T\_{1, (j)} + x^{2} \sum_{j=0}^{m-1} T\_{2, (j)}
 \end{aligned}
 \\]
 
@@ -740,8 +740,8 @@ We can combine the values and commitments by summing them directly. We can do th
 \begin{aligned}
   t(x) &= \sum_{j=0}^{m-1} t\_{(j)}(x)\\\\
   {\tilde{t}}(x) &= \sum_{j=0}^{m-1}{\tilde{t}}\_{(j)}(x)\\\\
-  T_1 &= \sum_{j=0}^{m-1} T_{(j)1}\\\\
-  T_2 &= \sum_{j=0}^{m-1} T_{(j)2}\\\\
+  T_1 &= \sum_{j=0}^{m-1} T_{1, (j)}\\\\
+  T_2 &= \sum_{j=0}^{m-1} T_{2, (j)}\\\\
   \delta(y,z) &= \sum_{j=0}^{m-1} \delta\_{(j)}(y,z)\\\\
   &= (z - z^{2}) \cdot \sum_{j=0}^{m-1} {\langle {\mathbf{1}}, {\mathbf{y}}^{n}\_{(j)} \rangle} - z^{3} \sum_{j=0}^{m-1} z\_{(j)} \cdot {\langle {\mathbf{1}}, {\mathbf{2}}^{n \cdot m} \rangle}\\\\
 \end{aligned}
