@@ -704,7 +704,7 @@ We can combine the statements about \\(t\_{(j)}(x)\\), \\({\mathbf{l}}\_{(j)}(x)
 \end{aligned}
 \\]
 
-We can add the \\(t_{(j)}(x)\\) values together to create \\(t(x)\\) instead of taking a linear combination of \\(t_{(j)}(x)\\) values, because each \\(t_{(j)}(x)\\) is calculated with the \\(\mathbf{y}^n\_{(j)}\\) and \\(z_{(j)}\\) challenge variables that are unique to that party\\(j\\), so all of the \\(t_{(j)}(x)\\) values will be offset from one another.
+We can add the \\(t_{(j)}(x)\\) values together to create \\(t(x)\\) instead of taking a random linear combination of \\(t_{(j)}(x)\\) values, because each \\(t_{(j)}(x)\\) is calculated with the \\(\mathbf{y}^n\_{(j)}\\) and \\(z_{(j)}\\) challenge variables that are unique to that party\\(j\\), so all of the \\(t_{(j)}(x)\\) values will be offset from one another.
 
 Now instead of having to do \\(m\\) individual checks to prove that \\(t_{(j)}(x)\\), \\({\mathbf{l}}\_{(j)}(x)\\), and \\({\mathbf{r}}\_{(j)}(x)\\) for all parties \\(j\\) are correct, we can do the verification with one check:
 
@@ -719,7 +719,7 @@ We can do this check using the [inner product proof](index.html#inner-product-pr
 Proving that \\(t_0\\) is correct
 ---------------------------------
 
-Proving that \\(t\_{0, (j)}\\) is correct requires first creating commitments to the variables, and then proving a relation over the commitments. For an explanation of how the commitments are created and how the relation is derived, see the [proving that \\(t_0\\) is correct](index.html#proving-that-t_0-is-correct) step of the single-value range proof. The relation over the commitments to prove is:
+Proving that \\(t\_{0, (j)}\\) is correct requires first creating commitments to the variables, and then proving a relation over the commitments. For an explanation of how the commitments are created and how the relation is derived, see the [proving that \\(t_0\\) is correct](index.html#proving-that-t_0-is-correct) step of the single-value range proof. The statement each party wants to prove is:
 
 \\[
 \begin{aligned}
@@ -736,7 +736,7 @@ If we combine all of the statements about \\(t\_{0, (j)}\\) from all of the \\(j
 \end{aligned}
 \\]
 
-We can combine the values and commitments by summing them directly. We can do this instead of having to take a linear combination, because each party's values and commitments are already offset by the values \\(\mathbf{y}^n\_{(j)}\\) and \\(z_{(j)}\\) that are unique to that party.
+We can combine the values and commitments by summing them directly. We can do this instead of having to take a random linear combination, because each party's values and commitments are already offset by the values \\(\mathbf{y}^n\_{(j)}\\) and \\(z_{(j)}\\) that are unique to that party.
 
 \\[
 \begin{aligned}
@@ -745,7 +745,14 @@ We can combine the values and commitments by summing them directly. We can do th
   T_1 &= \sum_{j=0}^{m-1} T_{1, (j)}\\\\
   T_2 &= \sum_{j=0}^{m-1} T_{2, (j)}\\\\
   \delta(y,z) &= \sum_{j=0}^{m-1} \delta\_{(j)}(y,z)\\\\
-  &= (z - z^{2}) \cdot \sum_{j=0}^{m-1} {\langle {\mathbf{1}}, {\mathbf{y}}^{n}\_{(j)} \rangle} - z^{3} \sum_{j=0}^{m-1} z\_{(j)} \cdot {\langle {\mathbf{1}}, {\mathbf{2}}^{n \cdot m} \rangle}\\\\
+\end{aligned}
+\\]
+
+We can plug the equation for \\(\delta_{(j)}(y,z)\\) into the calculation for \\(\delta(y,z)\\):
+
+\\[
+\begin{aligned}
+  \delta(y, z) &= (z - z^{2}) \cdot \sum_{j=0}^{m-1} {\langle {\mathbf{1}}, {\mathbf{y}}^{n}\_{(j)} \rangle} - z^{3} \sum_{j=0}^{m-1} z\_{(j)} \cdot {\langle {\mathbf{1}}, {\mathbf{2}}^{n \cdot m} \rangle}\\\\
 \end{aligned}
 \\]
 
@@ -785,7 +792,7 @@ Since we know that \\(z\_{(j)} = z^j\\), we can rewrite the equation as follows:
 Proving that \\({\mathbf{l}}(x)\\), \\({\mathbf{r}}(x)\\) are correct
 ---------------------------------------------------------------------
 
-Proving that \\({\mathbf{l}}\_{(j)}(x)\\), \\({\mathbf{r}}\_{(j)}(x)\\) are correct requires first creating commitments to the variables, and then proving a relation over the commitments. For an explanation of how the commitments are created and how the relation is derived, see the [proving that \\({\mathbf{l}}(x)\\), \\({\mathbf{r}}(x)\\) are correct](index.html#proving-that-mathbflx-mathbfrx-are-correct) step of the single-value range proof. The relation over the commitments to prove is:
+Proving that \\({\mathbf{l}}\_{(j)}(x)\\), \\({\mathbf{r}}\_{(j)}(x)\\) are correct requires first creating commitments to the variables, and then proving a relation over the commitments. For an explanation of how the commitments are created and how the relation is derived, see the [proving that \\({\mathbf{l}}(x)\\), \\({\mathbf{r}}(x)\\) are correct](index.html#proving-that-mathbflx-mathbfrx-are-correct) step of the single-value range proof. The statement that each party wants to prove is:
 
 \\[
 \begin{aligned}
