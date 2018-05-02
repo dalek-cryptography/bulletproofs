@@ -606,24 +606,24 @@ additional and final step involves sending a pair of scalars
 Aggregated Range Proof
 ======================
 
-We want to create an aggregated range proof for `m` values that is more efficient to create and verify than `m` individual range proofs.
+We want to create an aggregated range proof for \\(m\\) values that is more efficient to create and verify than \\(m\\) individual range proofs.
 
-The aggregation protocol is a multi-party computation protocol, involving `m` parties (one party per value) and one dealer, where the parties don't reveal their secrets to each other. The parties share their commitments with the dealer, and the dealer generates and returns challenge variables. The parties then share their proof shares with the dealer, and the dealer combines their shares to create an aggregated proof. 
+The aggregation protocol is a multi-party computation protocol, involving \\(m\\) parties (one party per value) and one dealer, where the parties don't reveal their secrets to each other. The parties share their commitments with the dealer, and the dealer generates and returns challenge variables. The parties then share their proof shares with the dealer, and the dealer combines their shares to create an aggregated proof. 
 
-The Bulletproofs paper outlines two versions of multi-party computation aggregation - one with a constant number of rounds but communication that is linear in both `m` and the binary encoding of the range, and one with a logarithmic number of rounds and communication that is only linear in `m`. We chose to implement the first version because the two versions don't differ significantly in proof size, and the first version is more straightforward.
+The Bulletproofs paper outlines two versions of multi-party computation aggregation - one with a constant number of rounds but communication that is linear in both \\(m\\) and the binary encoding of the range, and one with a logarithmic number of rounds and communication that is only linear in \\(m\\). We chose to implement the first version because the two versions don't differ significantly in proof size, and the first version is more straightforward.
 
 For more information on how the aggregation protocol works and is implemented, see the [protocol notes](../aggregated_range_proof/index.html). 
 
 The aggregated range proof has the same form as the individual range proof, in that the provers (the parties) still perform the same calculations to prove that \\(t(x) = \langle \mathbf{l}(x), \mathbf{r}(x) \rangle \\) and that \\(t_0, \mathbf{l}(x), \mathbf{r}(x)\\) are correct. The difference is that the challenge values are obtained from the dealer, which generates them by combining commitments from all the parties, and that the calculations of different parties are seperated by different powers of the challenge scalars \\(y\\) and \\(z\\).
 
-We will explain how one piece of the aggregated proof is generated for party `j`, and then will show how all of the pieces for all of the `m` parties can be combined into one aggregated proof.
+We will explain how one piece of the aggregated proof is generated for party \\(j\\), and then will show how all of the pieces for all of the \\(m\\) parties can be combined into one aggregated proof.
 
-Party `j` begins with a secret value \\(v_{(j)}\\), and wishes to convince the verifier that \\(v_{(j)} \in [0, 2^n)\\) without revealing \\(v_{(j)}\\). We use the notation that the subscript \\({(j)}\\) denotes the `j`th party's value. 
+Party \\(j\\) begins with a secret value \\(v_{(j)}\\), and wishes to convince the verifier that \\(v_{(j)} \in [0, 2^n)\\) without revealing \\(v_{(j)}\\). We use the notation that the subscript \\({(j)}\\) denotes the \\(j\\)th party's value. 
 
 Proving range statements with bit vectors
 -----------------------------------------
 
-We want to make statements about \\(v_{(j)}\\) using its bit vector representation, where the statements will be true if and only if \\(v_{(j)}\\) is actually in the expected range. We will not reproduce the steps or explanation here since it is the same as in the [proving range statements with bit vectors](index.html#proving-range-statements-with-bit-vectors) step of the single-value range proof. Here are the final statements for party `j`:
+We want to make statements about \\(v_{(j)}\\) using its bit vector representation, where the statements will be true if and only if \\(v_{(j)}\\) is actually in the expected range. We will not reproduce the steps or explanation here since it is the same as in the [proving range statements with bit vectors](index.html#proving-range-statements-with-bit-vectors) step of the single-value range proof. Here are the final statements for party \\(j\\):
 
 \\[
 \begin{aligned}
@@ -636,10 +636,10 @@ We want to make statements about \\(v_{(j)}\\) using its bit vector representati
 Proving vectors of statements with a single statement
 -----------------------------------------------------
 
-We want to combine the above three statements into a single statement for party `j`, as in the [proving vectors of statements](index.html#proving-vectors-of-statements-with-a-single-statement) step of the single-value range proof. We will additionally introduce challenge values \\(\mathbf{y}^n\_{(j)}\\) and \\(z_{(j)}\\) that are unique to each party `j`. Since these challenge values are independent for each party, we can later merge the per-party combined statements into one statement for all `m` parties.
+We want to combine the above three statements into a single statement for party \\(j\\), as in the [proving vectors of statements](index.html#proving-vectors-of-statements-with-a-single-statement) step of the single-value range proof. We will additionally introduce challenge values \\(\mathbf{y}^n\_{(j)}\\) and \\(z_{(j)}\\) that are unique to each party \\(j\\). Since these challenge values are independent for each party, we can later merge the per-party combined statements into one statement for all \\(m\\) parties.
 
 First, we will combine each of the two vector-statements into a single statement using the verifier's choice of challenge value \\(y\\) that is shared across all parties
-, and offset by vector \\(\mathbf{y}^n\_{(j)} = \mathbf{y}^{n \cdot m}\_{[j \cdot n : (j+1) \cdot n - 1]} \\), a length `n` slice into vector \\(\mathbf{y}^{n \cdot m}\\) that is unique to each party `j`:
+, and offset by vector \\(\mathbf{y}^n\_{(j)} = \mathbf{y}^{n \cdot m}\_{[j \cdot n : (j+1) \cdot n - 1]} \\), a length \\(n\\) slice into vector \\(\mathbf{y}^{n \cdot m}\\) that is unique to each party \\(j\\):
 
 \\[
 \begin{aligned}
@@ -650,7 +650,7 @@ First, we will combine each of the two vector-statements into a single statement
 \\]
 
 The three resulting statements can then be combined in the same way,
-using the verifier’s choice of challenge value \\(z\\) that is shared across all parties, and offset by scalar \\(z\_{(j)}  = z^j\\) that is unique to each party `j`:
+using the verifier’s choice of challenge value \\(z\\) that is shared across all parties, and offset by scalar \\(z\_{(j)}  = z^j\\) that is unique to each party \\(j\\):
 \\[
 \begin{aligned}
 z^{2} z\_{(j)}  \cdot v_{(j)} 
@@ -692,7 +692,7 @@ Proving that \\(t\_{(j)}(x)\\) is correct means proving that
 \\({\mathbf{l}}\_{(j)}(x)\\), \\({\mathbf{r}}\_{(j)}(x)\\) are correctly formed, and that
 \\(t\_{(j)}(x) = {\langle {\mathbf{l}}\_{(j)}(x), {\mathbf{r}}\_{(j)}(x) \rangle}\\).
 
-We can combine the statements about \\(t\_{(j)}(x)\\), \\({\mathbf{l}}\_{(j)}(x)\\), and \\({\mathbf{r}}\_{(j)}(x)\\) from all `m` parties in the following manner:
+We can combine the statements about \\(t\_{(j)}(x)\\), \\({\mathbf{l}}\_{(j)}(x)\\), and \\({\mathbf{r}}\_{(j)}(x)\\) from all \\(m\\) parties in the following manner:
 
 \\[
 \begin{aligned}
@@ -702,9 +702,9 @@ We can combine the statements about \\(t\_{(j)}(x)\\), \\({\mathbf{l}}\_{(j)}(x)
 \end{aligned}
 \\]
 
-We can add the \\(t_{(j)}(x)\\) values together to create \\(t(x)\\) instead of taking a linear combination of \\(t_{(j)}(x)\\) values, because each \\(t_{(j)}(x)\\) is calculated with the \\(\mathbf{y}^n\_{(j)}\\) and \\(z_{(j)}\\) challenge variables that are unique to that party`j`, so all of the \\(t_{(j)}(x)\\) values will be offset from one another.
+We can add the \\(t_{(j)}(x)\\) values together to create \\(t(x)\\) instead of taking a linear combination of \\(t_{(j)}(x)\\) values, because each \\(t_{(j)}(x)\\) is calculated with the \\(\mathbf{y}^n\_{(j)}\\) and \\(z_{(j)}\\) challenge variables that are unique to that party\\(j\\), so all of the \\(t_{(j)}(x)\\) values will be offset from one another.
 
-Now instead of having to do `m` individual checks to prove that \\(t_{(j)}(x)\\), \\({\mathbf{l}}\_{(j)}(x)\\), and \\({\mathbf{r}}\_{(j)}(x)\\) for all parties `j` are correct, we can do the verification with one check:
+Now instead of having to do \\(m\\) individual checks to prove that \\(t_{(j)}(x)\\), \\({\mathbf{l}}\_{(j)}(x)\\), and \\({\mathbf{r}}\_{(j)}(x)\\) for all parties \\(j\\) are correct, we can do the verification with one check:
 
 \\[
 \begin{aligned}
@@ -726,7 +726,7 @@ Proving that \\(t\_{(j)0}\\) is correct requires first creating commitments to t
 \end{aligned}
 \\]
 
-If we combine all of the statements about \\(t\_{(j)0}\\) from all of the `j` parties by adding them together, then we get:
+If we combine all of the statements about \\(t\_{(j)0}\\) from all of the \\(j\\) parties by adding them together, then we get:
 
 \\[
 \begin{aligned}
@@ -762,7 +762,7 @@ Since we know that \\(\mathbf{y}^n\_{(j)} = \mathbf{y}^{n \cdot m}\_{[j \cdot n 
 \\]
 
 
-Now instead of having to do `m` individual checks to prove that \\(t\_{(j)0}\\) for all parties `j` are correct, we can do the verification with one check using the combined values:
+Now instead of having to do \\(m\\) individual checks to prove that \\(t\_{(j)0}\\) for all parties \\(j\\) are correct, we can do the verification with one check using the combined values:
 
 \\[
 \begin{aligned}
@@ -791,9 +791,9 @@ Proving that \\({\mathbf{l}}\_{(j)}(x)\\), \\({\mathbf{r}}\_{(j)}(x)\\) are corr
 \end{aligned}
 \\]
 
-\\({\mathbf{G}\_{(j)}}\\) is party `j`'s share of the generators \\({\mathbf{G}}\\), or \\({\mathbf{G}\_{[j\cdot n : (j+1)n - 1]}}\\), and \\({\mathbf{H}\_{(j)}}\\) is party `j`'s share of the generators \\({\mathbf{H}}\\), or \\({\mathbf{H}\_{[j\cdot n : (j+1)n - 1]}}\\).
+\\({\mathbf{G}\_{(j)}}\\) is party \\(j\\)'s share of the generators \\({\mathbf{G}}\\), or \\({\mathbf{G}\_{[j\cdot n : (j+1)n - 1]}}\\), and \\({\mathbf{H}\_{(j)}}\\) is party \\(j\\)'s share of the generators \\({\mathbf{H}}\\), or \\({\mathbf{H}\_{[j\cdot n : (j+1)n - 1]}}\\).
 
-If we combine all of the statements about \\({\mathbf{l}}(x)\\), \\({\mathbf{r}}(x)\\) from all the `j` parties by adding them together, then we get:
+If we combine all of the statements about \\({\mathbf{l}}(x)\\), \\({\mathbf{r}}(x)\\) from all the \\(j\\) parties by adding them together, then we get:
 
 \\[
 \begin{aligned}
@@ -834,7 +834,7 @@ Therefore, we can simplify the following statements:
 \end{aligned}
 \\]
 
-We can combine the values and commitments from all the `m` parties by summing them directly:
+We can combine the values and commitments from all the \\(m\\) parties by summing them directly:
 
 \\[
 \begin{aligned}
@@ -844,7 +844,7 @@ We can combine the values and commitments from all the `m` parties by summing th
 \end{aligned}
 \\]
 
-With these observations, we can simplify the combined `m`-party statement about \\({\mathbf{l}}(x)\\) and \\({\mathbf{r}}(x)\\) into:
+With these observations, we can simplify the combined \\(m\\)-party statement about \\({\mathbf{l}}(x)\\) and \\({\mathbf{r}}(x)\\) into:
 
 \\[
 \begin{aligned}
