@@ -796,17 +796,22 @@ Proving that \\({\mathbf{l}}\_{(j)}(x)\\), \\({\mathbf{r}}\_{(j)}(x)\\) are corr
 
 \\[
 \begin{aligned}
-  {\langle {\mathbf{l}}\_{(j)}(x), {\mathbf{G}\_{(j)}} \rangle} + {\langle {\mathbf{r}}\_{(j)}(x) \circ (\mathbf{y}^{n}\_{(j)})^{-1}, {\mathbf{H}}\_{(j)} \rangle} \stackrel{?}{=} -{\widetilde{e}\_{(j)}} {\widetilde{B}} + A_{(j)} + x S_{(j)} - z{\langle {\mathbf{1}}, {\mathbf{G}\_{(j)}} \rangle} + {\langle z {\mathbf{1}} + z^2 z_{(j)} \cdot (\mathbf{y}^{n}\_{(j)})^{-1} \circ {\mathbf{2}}^n, {\mathbf{H}\_{(j)}} \rangle} 
+  {\langle {\mathbf{l}}\_{(j)}(x), {\mathbf{G}\_{(j)}} \rangle} + {\langle {\mathbf{r}}\_{(j)}(x), {\mathbf{H}'}\_{(j)} \rangle} \stackrel{?}{=} -{\widetilde{e}\_{(j)}} {\widetilde{B}} + A_{(j)} + x S_{(j)} - z{\langle {\mathbf{1}}, {\mathbf{G}\_{(j)}} \rangle} + {\langle z \mathbf{y}^{n}\_{(j)}  + z^2 z_{(j)} {\mathbf{2}}^n, {\mathbf{H}'}\_{(j)} \rangle} 
 \end{aligned}
 \\]
 
-\\({\mathbf{G}\_{(j)}}\\) is party \\(j\\)'s share of the generators \\({\mathbf{G}}\\), or \\({\mathbf{G}\_{[j\cdot n : (j+1)n - 1]}}\\), and \\({\mathbf{H}\_{(j)}}\\) is party \\(j\\)'s share of the generators \\({\mathbf{H}}\\), or \\({\mathbf{H}\_{[j\cdot n : (j+1)n - 1]}}\\).
+\\({\mathbf{G}\_{(j)}}\\) is party \\(j\\)'s share of the generators \\({\mathbf{G}}\\), or \\({\mathbf{G}\_{[j\cdot n : (j+1)n - 1]}}\\), and \\({\mathbf{H}'\_{(j)}}\\) is party \\(j\\)'s share of the generators \\({\mathbf{H}'}\\), or \\({\mathbf{H}'\_{[j\cdot n : (j+1)n - 1]}}\\).
 
 If we combine all of the statements about \\({\mathbf{l}}(x)\\), \\({\mathbf{r}}(x)\\) from all the \\(j\\) parties by adding them together, then we get:
 
 \\[
 \begin{aligned}
-  \sum_{j=0}^{m-1}{\langle {\mathbf{l}}\_{(j)}(x), {\mathbf{G}\_{(j)}} \rangle} + \sum_{j=0}^{m-1}{\langle {\mathbf{r}}\_{(j)}(x) \circ (\mathbf{y}^{n}\_{(j)})^{-1}, {\mathbf{H}}\_{(j)} \rangle} \stackrel{?}{=} -\sum_{j=0}^{m-1}{\widetilde{e}\_{(j)}} {\widetilde{B}} + \sum_{j=0}^{m-1}A_{(j)} + x \sum_{j=0}^{m-1}S_{(j)} - z \sum_{j=0}^{m-1}{\langle {\mathbf{1}}, {\mathbf{G}\_{(j)}} \rangle} + \sum_{j=0}^{m-1}{\langle z {\mathbf{1}} + z^2 z_{(j)} \cdot (\mathbf{y}^{n}\_{(j)})^{-1} \circ {\mathbf{2}}^n, {\mathbf{H}\_{(j)}} \rangle}
+  \sum_{j=0}^{m-1}{\langle {\mathbf{l}}\_{(j)}(x), {\mathbf{G}\_{(j)}} \rangle} + 
+  \sum_{j=0}^{m-1}{\langle {\mathbf{r}}\_{(j)}(x), {\mathbf{H}'}\_{(j)} \rangle} \stackrel{?}{=} 
+  -\sum_{j=0}^{m-1}{\widetilde{e}\_{(j)}} {\widetilde{B}} + 
+  \sum_{j=0}^{m-1}A_{(j)} + x \sum_{j=0}^{m-1}S_{(j)} - 
+  z \sum_{j=0}^{m-1}{\langle {\mathbf{1}}, {\mathbf{G}\_{(j)}} \rangle} + 
+  \sum_{j=0}^{m-1}{\langle z {\mathbf{y}^n_{(j)}} + z^2 z_{(j)} {\mathbf{2}}^n, {\mathbf{H}'\_{(j)}} \rangle}
 \end{aligned}
 \\]
 
@@ -817,7 +822,7 @@ We can simplify this expression by making a few observations. We know that:
   {\mathbf{l}}(x) &= {\mathbf{l}}\_{(0)}(x) || {\mathbf{l}}\_{(1)}(x) || \dots || {\mathbf{l}}\_{(m-1)}(x) \\\\
   {\mathbf{r}}(x) &= {\mathbf{r}}\_{(0)}(x) || {\mathbf{r}}\_{(1)}(x) || \dots || {\mathbf{r}}\_{(m-1)}(x) \\\\
   {\mathbf{G}} &= {\mathbf{G}}\_{(0)} || {\mathbf{G}}\_{(1)} || \dots || {\mathbf{G}}\_{(m-1)} \\\\
-  {\mathbf{H}} &= {\mathbf{H}}\_{(0)} || {\mathbf{H}}\_{(1)} || \dots || {\mathbf{H}}\_{(m-1)} \\\\
+  {\mathbf{H}'} &= {\mathbf{H}'}\_{(0)} || {\mathbf{H}'}\_{(1)} || \dots || {\mathbf{H}'}\_{(m-1)} \\\\
   \mathbf{y}^n\_{(j)} &= \mathbf{y}^{n \cdot m}\_{[j \cdot n : (j+1) \cdot n - 1]} \\\\
   z_{(j)} &= z^j
 \end{aligned}
@@ -833,13 +838,13 @@ Therefore, we can simplify the following statements:
     {\langle {\mathbf{l}}\_{(m-1)}(x), {\mathbf{G}}\_{(m-1)} \rangle}\\\\
   &= {\langle {\mathbf{l}}\_{(0)}(x) || {\mathbf{l}}\_{(1)}(x) || \dots || {\mathbf{l}}\_{(m-1)}(x), {\mathbf{G}}\_{(0)} || {\mathbf{G}}\_{(1)} || \dots || {\mathbf{G}}\_{(m-1)} \rangle} \\\\
   &= {\langle {\mathbf{l}}(x), {\mathbf{G}} \rangle} \\\\
-  \sum_{j=0}^{m-1}{\langle {\mathbf{r}}\_{(j)}(x) \circ (\mathbf{y}^{n}\_{(j)})^{-1}, {\mathbf{H}}\_{(j)} \rangle} &= {\langle {\mathbf{r}}\_{(0)}(x) \circ (\mathbf{y}^{n}\_{(0)})^{-1}, {\mathbf{H}}\_{(0)} \rangle} + 
-    {\langle {\mathbf{r}}\_{(1)}(x) \circ (\mathbf{y}^{n}\_{(1)})^{-1}, {\mathbf{H}}\_{(1)} \rangle} + 
+  \sum_{j=0}^{m-1}{\langle {\mathbf{r}}\_{(j)}(x), {\mathbf{H}'}\_{(j)} \rangle} 
+  &= {\langle {\mathbf{r}}\_{(0)}(x), {\mathbf{H}'}\_{(0)} \rangle} + 
+    {\langle {\mathbf{r}}\_{(1)}(x), {\mathbf{H}'}\_{(1)} \rangle} + 
     \dots + 
-    {\langle {\mathbf{r}}\_{(m-1)}(x) \circ (\mathbf{y}^{n}\_{(m-1)})^{-1}, {\mathbf{H}}\_{(m-1)} \rangle} \\\\
-  &= {\langle {\mathbf{r}}\_{(0)}(x) \circ (\mathbf{y}^{n}\_{(0)})^{-1} || {\mathbf{r}}\_{(1)}(x) \circ (\mathbf{y}^{n}\_{(1)})^{-1} || \dots || {\mathbf{r}}\_{(m-1)}(x) \circ (\mathbf{y}^{n}\_{(m-1)})^{-1}, {\mathbf{H}}\_{(0)} || {\mathbf{H}}\_{(1)} || \dots || {\mathbf{H}}\_{(m-1)}  \rangle}\\\\
-  &= {\langle {\mathbf{r}}\_{(0)}(x) \circ (\mathbf{y}^{n \cdot m}\_{[0 : n - 1]})^{-1} || {\mathbf{r}}\_{(1)}(x) \circ (\mathbf{y}^{n \cdot m}\_{[ n : 2 \cdot n - 1]})^{-1} || \dots || {\mathbf{r}}\_{(m-1)}(x) \circ (\mathbf{y}^{n \cdot m}\_{[(m-1) \cdot n : m \cdot n - 1]})^{-1}, {\mathbf{H}}\_{(0)} || {\mathbf{H}}\_{(1)} || \dots || {\mathbf{H}}\_{(m-1)}  \rangle}\\\\
-  &= {\langle  {\mathbf{r}}(x) \circ {\mathbf{y}^{-n \cdot m}}, {\mathbf{H}} \rangle}
+    {\langle {\mathbf{r}}\_{(m-1)}(x), {\mathbf{H}'}\_{(m-1)} \rangle} \\\\
+  &= {\langle {\mathbf{r}}\_{(0)}(x) || {\mathbf{r}}\_{(1)}(x) || \dots || {\mathbf{r}}\_{(m-1)}(x), {\mathbf{H}'}\_{(0)} || {\mathbf{H}'}\_{(1)} || \dots || {\mathbf{H}'}\_{(m-1)}  \rangle}\\\\
+  &= {\langle  {\mathbf{r}}(x), {\mathbf{H}'} \rangle}
 \end{aligned}
 \\]
 
@@ -857,7 +862,7 @@ With these observations, we can simplify the combined \\(m\\)-party statement ab
 
 \\[
 \begin{aligned}
-  {\langle {\mathbf{l}}(x), {\mathbf{G}} \rangle} + {\langle {\mathbf{r}}(x) \circ {\mathbf{y}^{-n \cdot m}} , {\mathbf{H}} \rangle} \stackrel{?}{=} -{\widetilde{e}} {\widetilde{B}} + A + x S - z{\langle {\mathbf{1}}, {\mathbf{G}} \rangle} + z{\langle {\mathbf{1}}, {\mathbf{H}} \rangle} + \sum_{j=0}^{m-1} {\langle z^{j+2} \cdot (\mathbf{y}^{n \cdot m}\_{[j \cdot n : (j+1) \cdot n - 1]})^{-1} \circ {\mathbf{2}}^n, {\mathbf{H}}\_{[j \cdot n : (j+1) \cdot n - 1]} \rangle} 
+  {\langle {\mathbf{l}}(x), {\mathbf{G}} \rangle} + {\langle {\mathbf{r}}(x), {\mathbf{H}'} \rangle} \stackrel{?}{=} -{\widetilde{e}} {\widetilde{B}} + A + x S - z{\langle {\mathbf{1}}, {\mathbf{G}} \rangle} + z{\langle {\mathbf{y}^{n \cdot m}}, {\mathbf{H}'} \rangle} + \sum_{j=0}^{m-1} {\langle z^{j+2} \cdot {\mathbf{2}}^n, {\mathbf{H}'}\_{[j \cdot n : (j+1) \cdot n - 1]} \rangle} 
 \end{aligned}
 \\]
 
