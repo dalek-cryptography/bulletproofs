@@ -7,6 +7,7 @@ use curve25519_dalek::traits::Identity;
 use generators::GeneratorsView;
 use inner_product_proof;
 use proof_transcript::ProofTranscript;
+use range_proof::RangeProof;
 
 use util;
 
@@ -170,15 +171,12 @@ pub struct DealerAwaitingProofShares<'a, 'b> {
 }
 
 impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
-    /// Assembles proof shares into an `AggregatedProof`.
+    /// Assembles proof shares into an `RangeProof`.
     ///
     /// Used as a helper function by `receive_trusted_shares` (which
     /// just hands back the result) and `receive_shares` (which
     /// validates the proof shares.
-    fn assemble_shares(
-        &mut self,
-        proof_shares: &[ProofShare],
-    ) -> Result<AggregatedProof, &'static str> {
+    fn assemble_shares(&mut self, proof_shares: &[ProofShare]) -> Result<RangeProof, &'static str> {
         if self.m != proof_shares.len() {
             return Err("Length of proof shares doesn't match expected length m");
         }
@@ -240,7 +238,7 @@ impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
             r_vec.clone(),
         );
 
-        Ok(AggregatedProof {
+        Ok(RangeProof {
             A,
             S,
             T_1,
@@ -264,7 +262,7 @@ impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
         mut self,
         rng: &mut R,
         proof_shares: &[ProofShare],
-    ) -> Result<AggregatedProof, &'static str> {
+    ) -> Result<RangeProof, &'static str> {
         let proof = self.assemble_shares(proof_shares)?;
 
         // XXX if we change the proof verification API to use
@@ -318,7 +316,7 @@ impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
     pub fn receive_trusted_shares(
         mut self,
         proof_shares: &[ProofShare],
-    ) -> Result<AggregatedProof, &'static str> {
+    ) -> Result<RangeProof, &'static str> {
         self.assemble_shares(proof_shares)
     }
 }
