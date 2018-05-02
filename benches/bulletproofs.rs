@@ -104,7 +104,6 @@ fn verify_aggregated_rangeproof_helper(n: usize, c: &mut Criterion) {
                     &mut transcript,
                     &mut rng,
                     n,
-                    m,
                 )
             });
         },

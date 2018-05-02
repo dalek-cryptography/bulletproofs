@@ -280,7 +280,6 @@ impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
                 &mut self.initial_transcript,
                 rng,
                 self.n,
-                self.m,
             )
             .is_ok()
         {

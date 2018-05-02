@@ -47,7 +47,7 @@ impl RangeProof {
     /// blinding scalar `v_blinding`.
     ///
     /// XXX add doctests
-    pub fn prove_multiple_single<R: Rng>(
+    pub fn prove_single<R: Rng>(
         generators: &Generators,
         transcript: &mut ProofTranscript,
         rng: &mut R,
@@ -123,7 +123,7 @@ impl RangeProof {
         rng: &mut R,
         n: usize,
     ) -> Result<(), ()> {
-        self.verify(&[*V], gens, transcript, rng, n, 1)
+        self.verify(&[*V], gens, transcript, rng, n)
     }
 
     /// Verifies an aggregated rangeproof for the given value commitments.
@@ -136,10 +136,11 @@ impl RangeProof {
         transcript: &mut ProofTranscript,
         rng: &mut R,
         n: usize,
-        m: usize,
     ) -> Result<(), ()> {
         // First, replay the "interactive" protocol using the proof
         // data to recompute all challenges.
+
+        let m = value_commitments.len();
 
         transcript.commit_u64(n as u64);
         transcript.commit_u64(m as u64);
@@ -346,7 +347,6 @@ mod tests {
                         &mut transcript,
                         &mut rng,
                         n,
-                        m
                     )
                     .is_ok()
             );
