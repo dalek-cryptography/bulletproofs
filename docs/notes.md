@@ -606,11 +606,11 @@ additional and final step involves sending a pair of scalars
 Aggregated Range Proof
 ======================
 
-We want to create an aggregated range proof for \\(m\\) values that is more efficient to create and verify than \\(m\\) individual range proofs.
+We want to take advantage of the logarithmic size of the inner-product protocol, by creating an aggregated range proof for \\(m\\) values that is smaller than \\(m\\) individual range proofs.
 
 The aggregation protocol is a multi-party computation protocol, involving \\(m\\) parties (one party per value) and one dealer, where the parties don't reveal their secrets to each other. The parties share their commitments with the dealer, and the dealer generates and returns challenge variables. The parties then share their proof shares with the dealer, and the dealer combines their shares to create an aggregated proof. 
 
-The Bulletproofs paper outlines two versions of multi-party computation aggregation - one with a constant number of rounds but communication that is linear in both \\(m\\) and the binary encoding of the range, and one with a logarithmic number of rounds and communication that is only linear in \\(m\\). We chose to implement the first version because the two versions don't differ significantly in proof size, and the first version is more straightforward.
+The Bulletproofs paper outlines two versions of multi-party computation aggregation. In the first approach, the inner-product proof is performed by the dealer, which requires sending the vectors used for the inner-product to the dealer. In the second approach, the inner-product proof is performed using multi-party computation, which sends less data but requires one round for each iteration of the inner-product protocol. We chose to implement the first approach because it requires fewer round trips between parties, which outweighed the slight message size savings of the second approach. 
 
 For more information on how the aggregation protocol works and is implemented, see the [protocol notes](../aggregated_range_proof/index.html). 
 
