@@ -618,7 +618,9 @@ The aggregated range proof has the same form as the individual range proof, in t
 
 We will explain how one piece of the aggregated proof is generated for party \\(j\\), and then will show how all of the pieces for all of the \\(m\\) parties can be combined into one aggregated proof.
 
-Party \\(j\\) begins with a secret value \\(v_{(j)}\\), and wishes to convince the verifier that \\(v_{(j)} \in [0, 2^n)\\) without revealing \\(v_{(j)}\\). We use the notation that the subscript \\({(j)}\\) denotes the \\(j\\)th party's value. 
+Let's introduce some notation to help with the explanation of the aggregated proof. The subscript \\({(j)}\\) denotes the \\(j\\)th party's value. For instance, \\(v_{(j)}\\) is the \\(v\\) value of the \\(j\\)th party; \\( \mathbf{a}\_{L, (j)}\\) is the \\( \mathbf{a}\_L \\) vector of the \\(j\\)th party; \\(\mathbf{l}\_{(0)}(x)\\) is the \\(\mathbf{l}(x)\\) polynomial of party \\(0\\).
+
+Party \\(j\\) begins with a secret value \\(v_{(j)}\\), and wishes to convince the verifier that \\(v_{(j)} \in [0, 2^n)\\) without revealing \\(v_{(j)}\\). 
 
 Proving range statements with bit vectors
 -----------------------------------------
@@ -717,7 +719,7 @@ We can do this check using the [inner product proof](index.html#inner-product-pr
 Proving that \\(t_0\\) is correct
 ---------------------------------
 
-Proving that \\(t\_{(j)0}\\) is correct requires first creating commitments to the variables, and then proving a relation over the commitments. For an explanation of how the commitments are created and how the relation is derived, see the [proving that \\(t_0\\) is correct](index.html#proving-that-t_0-is-correct) step of the single-value range proof. The relation over the commitments to prove is:
+Proving that \\(t\_{0, (j)}\\) is correct requires first creating commitments to the variables, and then proving a relation over the commitments. For an explanation of how the commitments are created and how the relation is derived, see the [proving that \\(t_0\\) is correct](index.html#proving-that-t_0-is-correct) step of the single-value range proof. The relation over the commitments to prove is:
 
 \\[
 \begin{aligned}
@@ -726,7 +728,7 @@ Proving that \\(t\_{(j)0}\\) is correct requires first creating commitments to t
 \end{aligned}
 \\]
 
-If we combine all of the statements about \\(t\_{(j)0}\\) from all of the \\(j\\) parties by adding them together, then we get:
+If we combine all of the statements about \\(t\_{0, (j)}\\) from all of the \\(j\\) parties by adding them together, then we get:
 
 \\[
 \begin{aligned}
@@ -762,7 +764,7 @@ Since we know that \\(\mathbf{y}^n\_{(j)} = \mathbf{y}^{n \cdot m}\_{[j \cdot n 
 \\]
 
 
-Now instead of having to do \\(m\\) individual checks to prove that \\(t\_{(j)0}\\) for all parties \\(j\\) are correct, we can do the verification with one check using the combined values:
+Now instead of having to do \\(m\\) individual checks to prove that \\(t\_{0, (j)}\\) for all parties \\(j\\) are correct, we can do the verification with one check using the combined values:
 
 \\[
 \begin{aligned}
