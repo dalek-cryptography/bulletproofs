@@ -219,7 +219,7 @@ The goal of the verifier is to check two equations:
 The verifier combines two equations in one by sampling a random factor \\(c \\; {\xleftarrow{\\$}} \\; {\mathbb Z\_p}\\),
 multiplying the first equation by \\(c\\), and adding it with the second equation.
 
-Finally, verifier groups all scalars per each point and performs a single multiscalar multiplication:
+Finally, verifier groups all scalars by each point and performs a single multiscalar multiplication:
 
 \\[
 \begin{aligned}
@@ -240,7 +240,7 @@ Finally, verifier groups all scalars per each point and performs a single multis
 Individual share validation
 ---------------------------
 
-If the dealer is aggregating `ProofShare`s from \\(m\\) parties, and if one of those parties is faulty (or malicious) and creates an invalid `ProofShare`, then the `AggregatedProof` that the dealer creates will also be invalid. Therefore, it is helpful to be able to check the validity of an individual `ProofShare`, in order to determine if a party is at fault and if so, to block it.
+If the dealer is aggregating a proof across \\(m\\) parties, and if one of those parties is faulty (or malicious) and creates an invalid `ProofShare`, then the `AggregatedProof` that the dealer creates will also be invalid. Therefore, it is helpful to be able to check the validity of an individual `ProofShare`, in order to determine if a party is at fault and if so, to block it.
 
 The math for checking `ProofShare` validity is very similar to checking `AggregatedProof` validity, but does not require combining values from multiple parties. The goal of checking `ProofShare` validity is to verify three equations:
 
@@ -285,16 +285,16 @@ If we rewrite the check as a comparison with the identity point, and plug in the
 \end{aligned}
 \\]
 
-The dealer combines equations `2` and `3` into one by sampling a random factor \\(c \\; {\xleftarrow{\\$}} \\; {\mathbb Z\_p}\\),
-multiplying equation `2` by \\(c\\), and adding it with equation `3`. Finally, the dealer groups all scalars per each point and performs a single multiscalar multiplication:
+The dealer can combine equations `2` and `3` into one by sampling a random factor \\(c \\; {\xleftarrow{\\$}} \\; {\mathbb Z\_p}\\),
+multiplying equation `2` by \\(c\\), and adding it with equation `3`. Finally, the dealer groups all scalars by each point and performs a single multiscalar multiplication:
 
 \\[
 \begin{aligned}
 0 \quad \stackrel{?}{=} & \quad 1       \cdot A_{(j)} \\\\
                       + & \quad x       \cdot S_{(j)} \\\\
-                      + & \quad (-{\widetilde{e}} - c{\tilde{t}}(x)) \cdot \widetilde{B} \\\\
-                      + & \quad c \big(\delta(y,z) - t(x)\big) \cdot B\\\\
-                      + & \quad cz^{2+j}    \cdot V_{(j)} \\\\
+                      + & \quad (-{\widetilde{e}\_{(j)}} - c{\tilde{t}}\_{(j)}(x)) \cdot \widetilde{B} \\\\
+                      + & \quad c \big(\delta_{(j)}(y,z) - t_{(j)}(x)\big) \cdot B\\\\
+                      + & \quad cz^{j+2}    \cdot V_{(j)} \\\\
                       + & \quad cx      \cdot T_{1, (j)} \\\\
                       + & \quad cx^2    \cdot T_{2, (j)} \\\\
                       + & \quad {\langle {- \mathbf{l}\_{(j)}(x)} -z\mathbf{1}, {\mathbf{G}\_{(j)}} \rangle}\\\\
