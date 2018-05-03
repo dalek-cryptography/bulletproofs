@@ -20,10 +20,10 @@ use util;
 /// `RangeProof::verify_batch` function.
 pub struct Verification {
 	/// Number of commitments in the aggregated proof
-	m: usize,
+	pub m: usize,
 
 	/// Size of the range in bits
-	n: usize,
+	pub n: usize,
 
 	/// Pair of scalars multiplying pedersen bases `B`, `B_blinding`.
 	pedersen_base_scalars: (Scalar, Scalar),
@@ -41,6 +41,19 @@ pub struct Verification {
 
  	/// List of dynamic bases for the corresponding scalars.
  	dynamic_bases: Vec<RistrettoPoint>,
+
+    /// Internal flag that prevents accidentally dropping
+    /// this struct without properly verifying it first.
+    verified: bool,
+}
+
+impl Drop for Verification {
+    fn drop(&mut self) {
+        if !self.verified {
+            panic!("Deferred range proof Verification was not explicitly \
+                    verified using `RangeProof::verify_batch`!");
+        }
+    }
 }
 
 impl RangeProof {
@@ -133,7 +146,8 @@ impl RangeProof {
                 .chain(self.ipp_proof.L_vec.iter())
                 .chain(self.ipp_proof.R_vec.iter())
                 .cloned()
-                .collect()
+                .collect(),
+            verified: false
         }
     }
 
@@ -142,11 +156,13 @@ impl RangeProof {
     /// Proofs may use different ranges (`n`) or different number of aggregated commitments (`m`).
     /// You must provide big enough view into generators (`gens`) that covers
     /// the biggest proof
-    pub fn verify_batch<R: Rng, V: Borrow<Verification>>(
-    	batch: &[V],
-    	gens: GeneratorsView,
+    pub fn verify_batch<R: Rng, B: AsMut<[Verification]>>(
+        mut batch: B,
+        gens: GeneratorsView,
     	rng: &mut R
     ) -> Result<(), &'static str> {
+        let batch = batch.as_mut();
+
     	// we will special-case the first item to avoid unnecessary multiplication,
     	// so lets check that we have at least one item.
 		if batch.len() == 0 {
@@ -154,27 +170,28 @@ impl RangeProof {
 		}
 
         // Make sure we have enough static generators
-        let n = batch.iter().map(|v| v.borrow().n).max().unwrap_or(0);
-        let m = batch.iter().map(|v| v.borrow().m).max().unwrap_or(0);
+        let n = batch.iter().map(|v| v.n).max().unwrap_or(0);
+        let m = batch.iter().map(|v| v.m).max().unwrap_or(0);
         if gens.G.len() < (n * m) {
         	return Err("The generators view does not have enough generators for the largest proof")
         }
 
         // First statement is used without a random factor
-        let mut pedersen_base_scalars: (Scalar, Scalar) = batch[0].borrow().pedersen_base_scalars;
-        let mut g_scalars: Vec<Scalar> = batch[0].borrow().g_scalars.clone();
-        let mut h_scalars: Vec<Scalar> = batch[0].borrow().h_scalars.clone();
+        batch[0].verified = true;
+        let mut pedersen_base_scalars: (Scalar, Scalar) = batch[0].pedersen_base_scalars;
+        let mut g_scalars: Vec<Scalar> = batch[0].g_scalars.clone();
+        let mut h_scalars: Vec<Scalar> = batch[0].h_scalars.clone();
         
         // pad static scalars to the largest proof
         g_scalars.resize(n*m, Scalar::zero());
         h_scalars.resize(n*m, Scalar::zero());
 
-        let mut dynamic_base_scalars: Vec<Scalar> = batch[0].borrow().dynamic_base_scalars.clone();
-        let mut dynamic_bases: Vec<RistrettoPoint> = batch[0].borrow().dynamic_bases.clone();
+        let mut dynamic_base_scalars: Vec<Scalar> = batch[0].dynamic_base_scalars.clone();
+        let mut dynamic_bases: Vec<RistrettoPoint> = batch[0].dynamic_bases.clone();
         
         // Other statements are added with a random factor per statement
-        for borrowable_verification in &batch[1..] {
-        	let verification = borrowable_verification.borrow();
+        for verification in &mut batch[1..] {
+            verification.verified = true;
             let batch_challenge = Scalar::random(rng);
 
             pedersen_base_scalars.0 += batch_challenge*verification.pedersen_base_scalars.0;

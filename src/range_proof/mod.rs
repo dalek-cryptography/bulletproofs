@@ -135,7 +135,7 @@ impl RangeProof {
         n: usize,
     ) -> Result<(), &'static str> {
         RangeProof::verify_batch(
-            &[self.prepare_verification(value_commitments, transcript, rng, n)],
+            [self.prepare_verification(value_commitments, transcript, rng, n)],
             gens, 
             rng
         )
@@ -206,8 +206,6 @@ mod tests {
         let mut rng = OsRng::new().unwrap();
         let transcript = ProofTranscript::new(b"AggregatedRangeProofTest");
 
-        let max_n = nm.iter().map(|(n,_)| *n).max().unwrap_or(0);
-        let max_m = nm.iter().map(|(_,m)| *m).max().unwrap_or(0);
         let verifications = nm.iter().map(|(n,m)| {
             let (p, vc) = singleparty_create_helper(*n,*m);
             bincode::deserialize::<RangeProof>(&p)
@@ -220,11 +218,14 @@ mod tests {
                 )
         }).collect::<Vec<_>>();
 
+        let max_n = verifications.iter().map(|v| v.n).max().unwrap_or(0);
+        let max_m = verifications.iter().map(|v| v.m).max().unwrap_or(0);
+
         let generators = Generators::new(PedersenGenerators::default(), max_n, max_m);
 
         assert!(
             RangeProof::verify_batch(
-                verifications.as_slice(), 
+                verifications,
                 generators.all(),
                 &mut rng
             ).is_ok()
