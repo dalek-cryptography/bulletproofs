@@ -181,26 +181,22 @@ The goal of the verifier is to check two equations:
 
 1. First, verify the constant term of the polynomial \\(t(x)\\) (see [notes](../notes/index.html#proving-that-t_0-is-correct-1)):
 
-\\[
-\begin{aligned}
-  t(x) B + {\tilde{t}}(x) {\widetilde{B}} \stackrel{?}{=} \sum_{j=0}^{m-1} z^{j+2} V_{(j)} + \delta(y,z) B + x T\_{1} + x^{2} T\_{2},\\\\
-  \delta(y,z) = (z - z^{2}) \cdot {\langle {\mathbf{1}}, {\mathbf{y}}^{n \cdot m} \rangle} - \sum_{j=0}^{m-1} z^{j+3} \cdot {\langle {\mathbf{1}}, {\mathbf{2}}^{n \cdot m} \rangle}\\\\
-\end{aligned}
-\\]
+  \\[
+  \begin{aligned}
+    t(x) B + {\tilde{t}}(x) {\widetilde{B}} \stackrel{?}{=} \sum_{j=0}^{m-1} z^{j+2} V_{(j)} + \delta(y,z) B + x T\_{1} + x^{2} T\_{2},\\\\
+    \delta(y,z) = (z - z^{2}) \cdot {\langle {\mathbf{1}}, {\mathbf{y}}^{n \cdot m} \rangle} - \sum_{j=0}^{m-1} z^{j+3} \cdot {\langle {\mathbf{1}}, {\mathbf{2}}^{n \cdot m} \rangle}\\\\
+  \end{aligned}
+  \\]
 
-  Rewriting the check as a comparison with the identity point, we have:
+  If we rewrite the check as a comparison with the identity point, we get:
   \\[
   0 \stackrel{?}{=} \sum_{j=0}^{m-1} z^{j+2} V_{(j)} + \delta(y,z) B + x T\_{1} + x^{2} T\_{2} - t(x) B - {\tilde{t}}(x) {\widetilde{B}}.
   \\]
 
-
-stopped conversion here
-
-
 2. Second, verify the inner product argument for the vectors \\(\mathbf{l}(x), \mathbf{r}(x)\\) that form the \\(t(x)\\) (see [inner-product protocol](../inner_product_proof/index.html#verification-equation))
   
   \\[
-  P' \overset ? = {\langle a \cdot {\mathbf{s}}, {\mathbf{G}} \rangle} + {\langle {\mathbf{y}^{-n}} \circ (b /{\mathbf{s}}), {\mathbf{H}} \rangle} + abQ - \sum\_{j=1}^{k} \left( L\_{j} u\_{j}^{2} + u\_{j}^{-2} R\_{j} \right).
+  P' \overset ? = {\langle a \cdot {\mathbf{s}}, {\mathbf{G}} \rangle} + {\langle {\mathbf{y}^{-n \cdot m}} \circ (b /{\mathbf{s}}), {\mathbf{H}} \rangle} + abQ - \sum\_{j=1}^{k} \left( L\_{j} u\_{j}^{2} + u\_{j}^{-2} R\_{j} \right).
   \\]
 
   Rewriting as a comparison with the identity point and expanding \\(Q = wB\\) and \\(P' = P + t(x) wB\\) as [needed for transition to the inner-product protocol](../notes/index.html#inner-product-proof):
@@ -208,12 +204,19 @@ stopped conversion here
   \\[
   0 \overset ? = P + t(x) wB - {\langle a \cdot {\mathbf{s}}, {\mathbf{G}} \rangle} - {\langle {\mathbf{y}^{-n}} \circ (b /{\mathbf{s}}), {\mathbf{H}} \rangle} - abwB + \sum\_{j=1}^{k} \left( L\_{j} u\_{j}^{2} + u\_{j}^{-2} R\_{j} \right),
   \\]
-  where the [definition](../notes/index.html#proving-that-mathbflx-mathbfrx-are-correct) of \\(P\\) is:
-  \\[
-  P  = -{\widetilde{e}} {\widetilde{B}} + A + x S + {\langle z {\mathbf{1}} + z^2 {\mathbf{y}^{-n}} \circ {\mathbf{2}}^n, {\mathbf{H}} \rangle} - z{\langle {\mathbf{1}}, {\mathbf{G}} \rangle}.
+  where the [definition](../notes/index.html#proving-that-mathbflx-mathbfrx-are-correct-1) of \\(P\\) is:
+
+\\[
+\begin{aligned}
+  P &= -{\widetilde{e}} {\widetilde{B}} + A + x S - z{\langle {\mathbf{1}}, {\mathbf{G}} \rangle} + z{\langle {\mathbf{y}}^{n \cdot m}, {\mathbf{H}'} \rangle} + \sum_{j=0}^{m-1} {\langle z^{j+2} \cdot {\mathbf{2}}^n, {\mathbf{H}'}\_{[j \cdot n : (j+1) \cdot n]} \rangle}  \\\\
+  &= -{\widetilde{e}} {\widetilde{B}} + A + x S - z{\langle {\mathbf{1}}, {\mathbf{G}} \rangle} + z{\langle {\mathbf{1}}, {\mathbf{H}} \rangle} + \sum_{j=0}^{m-1} {\langle z^{j+2} \cdot {\mathbf{2}}^n \circ {\mathbf{y}}^{n \cdot m}\_{[j \cdot n : (j+1) \cdot n]}, {\mathbf{H}}\_{[j \cdot n : (j+1) \cdot n]} \rangle}\\\\
+  &= -{\widetilde{e}} {\widetilde{B}} + A + x S - z{\langle {\mathbf{1}}, {\mathbf{G}} \rangle} + z{\langle {\mathbf{1}}, {\mathbf{H}} \rangle} + {\langle {{\mathbf{y}}^{-n \cdot m} \circ z^2 (z^0 \mathbf{2}^n || z^1 \mathbf{2}^n || \dots || z^{m-1} \mathbf{2}^n)}, {\mathbf{H}} \rangle}
+\end{aligned}
 \\]
 
-Verifier combines two equations in one by sampling a random factor \\(c \\; {\xleftarrow{\\$}} \\; {\mathbb Z\_p}\\),
+
+
+The verifier combines two equations in one by sampling a random factor \\(c \\; {\xleftarrow{\\$}} \\; {\mathbb Z\_p}\\),
 multiplying the first equation by \\(c\\), and adding it with the second equation.
 
 Finally, verifier groups all scalars per each point and performs a single multiscalar multiplication over \\((7 + 2n + 2k)\\) points:
@@ -222,13 +225,13 @@ Finally, verifier groups all scalars per each point and performs a single multis
 \begin{aligned}
 0 \quad \stackrel{?}{=} & \quad 1       \cdot A \\\\
                       + & \quad x       \cdot S \\\\
-                      + & \quad cz^2    \cdot V \\\\
+                      + & \quad cz^2    \cdot V_{(0)} + cz^3 \cdot V_{(1)} + \dots + cz^{m+1} \cdot V_{(m-1)} \\\\
                       + & \quad cx      \cdot T_1 \\\\
                       + & \quad cx^2    \cdot T_2 \\\\
                       + & \quad \Big(w \big(t(x) - ab\big) + c \big(\delta(y,z) - t(x)\big) \Big) \cdot B\\\\
                       + & \quad (-{\widetilde{e}} - c{\tilde{t}}(x)) \cdot \widetilde{B} \\\\
                       + & \quad {\langle {-z\mathbf{1} - a\mathbf{s}}, {\mathbf{G}} \rangle}\\\\
-                      + & \quad {\langle {z\mathbf{1} + {\mathbf{y}}^{-n} \circ (z^2\mathbf{2}^n - b/{\mathbf{s}})}, {\mathbf{H}} \rangle}\\\\
+                      + & \quad {\langle {z\mathbf{1} + {\mathbf{y}}^{-n \cdot m} \circ (z^2 (z^0 \mathbf{2}^n || z^1 \mathbf{2}^n || \dots || z^{m-1} \mathbf{2}^n) - b/{\mathbf{s}})}, {\mathbf{H}} \rangle}\\\\
                       + & \quad {\langle [u_{1}^2,    \dots, u_{k}^2    ], [L_1, \dots, L_{k}] \rangle}\\\\
                       + & \quad {\langle [u_{1}^{-2}, \dots, u_{k}^{-2} ], [R_1, \dots, R_{k}] \rangle}
 \end{aligned}
