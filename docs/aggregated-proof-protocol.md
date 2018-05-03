@@ -62,7 +62,7 @@ Using their secret vectors and the challenges \\(y, z\\) from `ValueChallenge`, 
   {\mathbf{r}}\_{(j)}(x) &= {\mathbf{r}}\_{0, (j)} + {\mathbf{r}}\_{1, (j)} x \\\\
   {\mathbf{l}}\_{0, (j)} &\gets {\mathbf{a}}\_{L, (j)} - z {\mathbf{1}} \\\\
   {\mathbf{l}}\_{1, (j)} &\gets {\mathbf{s}}\_{L, (j)} \\\\
-  {\mathbf{r}}\_{0, (j)} &\gets {\mathbf{y}}^{n}\_{(j)} \circ ({\mathbf{a}}\_{R, (j)}   + z {\mathbf{1}}) + z^{2} {\mathbf{2}}^{n} \\\\
+  {\mathbf{r}}\_{0, (j)} &\gets {\mathbf{y}}^{n}\_{(j)} \circ ({\mathbf{a}}\_{R, (j)}   + z {\mathbf{1}}) + z^{2} z_{(j)}{\mathbf{2}}^{n} \\\\
   {\mathbf{r}}\_{1, (j)} &\gets {\mathbf{y}}^{n}\_{(j)} \circ {\mathbf{s}}\_{R, (j)}
 \end{aligned}
 \\]
