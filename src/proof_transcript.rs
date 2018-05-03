@@ -79,7 +79,7 @@ impl ProofTranscript {
         let mut ro = ProofTranscript {
             // NOTE: if you change the security parameter, also change the rate below
             hash: Keccak::new_shake128(),
-            rate: 1600/8 - (2*128/8), // 168 bytes
+            rate: 1600 / 8 - (2 * 128 / 8), // 168 bytes
             write_offset: 0,
         };
         // We will bump the version prefix each time we
@@ -287,7 +287,6 @@ mod tests {
             }
         }
     }
-
 
     #[test]
     fn outputs_are_disambiguated_by_length_prefix() {
