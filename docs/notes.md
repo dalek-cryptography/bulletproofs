@@ -827,12 +827,16 @@ We can simplify this expression by making a few observations. We know that:
 
 \\[
 \begin{aligned}
-  {\mathbf{l}}(x) &= {\mathbf{l}}\_{(0)}(x) || {\mathbf{l}}\_{(1)}(x) || \dots || {\mathbf{l}}\_{(m-1)}(x) \\\\
-  {\mathbf{r}}(x) &= {\mathbf{r}}\_{(0)}(x) || {\mathbf{r}}\_{(1)}(x) || \dots || {\mathbf{r}}\_{(m-1)}(x) \\\\
-  {\mathbf{G}} &= {\mathbf{G}}\_{(0)} || {\mathbf{G}}\_{(1)} || \dots || {\mathbf{G}}\_{(m-1)} \\\\
-  {\mathbf{H}'} &= {\mathbf{H}'}\_{(0)} || {\mathbf{H}'}\_{(1)} || \dots || {\mathbf{H}'}\_{(m-1)} \\\\
+  &{\mathbf{l}}(x)     &{}&=&{}& {\mathbf{l}}\_{(0)}(x) & {} &||& {} & {\mathbf{l}}\_{(1)}(x) & {} &||& {} & \dots & {} &||& {} & {\mathbf{l}}\_{(m-1)}(x) \\\\
+  &{\mathbf{r}}(x)     &{}&=&{}& {\mathbf{r}}\_{(0)}(x) & {} &||& {} & {\mathbf{r}}\_{(1)}(x) & {} &||& {} & \dots & {} &||& {} & {\mathbf{r}}\_{(m-1)}(x) \\\\
+  &{\mathbf{G}}        &{}&=&{}& {\mathbf{G}}\_{(0)}    & {} &||& {} & {\mathbf{G}}\_{(1)}    & {} &||& {} & \dots & {} &||& {} & {\mathbf{G}}\_{(m-1)} \\\\
+  &{\mathbf{H}'}       &{}&=&{}& {\mathbf{H}'}\_{(0)}   & {} &||& {} & {\mathbf{H}'}\_{(1)}   & {} &||& {} & \dots & {} &||& {} & {\mathbf{H}'}\_{(m-1)} 
+\end{aligned}
+\\]
+\\[
+\begin{aligned}
   \mathbf{y}^n\_{(j)} &= \mathbf{y}^{n \cdot m}\_{[j \cdot n : (j+1) \cdot n]} \\\\
-  z_{(j)} &= z^j
+  z_{(j)}             &= z^j
 \end{aligned}
 \\]
 
