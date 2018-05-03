@@ -219,7 +219,7 @@ The goal of the verifier is to check two equations:
 The verifier combines two equations in one by sampling a random factor \\(c \\; {\xleftarrow{\\$}} \\; {\mathbb Z\_p}\\),
 multiplying the first equation by \\(c\\), and adding it with the second equation.
 
-Finally, verifier groups all scalars per each point and performs a single multiscalar multiplication over \\((7 + 2n + 2k)\\) points:
+Finally, verifier groups all scalars per each point and performs a single multiscalar multiplication:
 
 \\[
 \begin{aligned}
@@ -237,8 +237,67 @@ Finally, verifier groups all scalars per each point and performs a single multis
 \end{aligned}
 \\] where \\(1/{\mathbf{s}}\\) are inverses of \\(\mathbf{s}\\), computed as a reversed list of \\(\mathbf{s}\\).
 
+Individual share validation
+---------------------------
+
+If the dealer is aggregating `ProofShare`s from \\(m\\) parties, and if one of those parties is faulty (or malicious) and creates an invalid `ProofShare`, then the `AggregatedProof` that the dealer creates will also be invalid. Therefore, it is helpful to be able to check the validity of an individual `ProofShare`, in order to determine if a party is at fault and if so, to block it.
+
+The math for checking `ProofShare` validity is very similar to checking `AggregatedProof` validity, but does not require combining values from multiple parties. The goal of checking `ProofShare` validity is to verify three equations:
+
+1. Verify that \\(\langle \mathbf{l}\_{(j)}(x), \mathbf{r}\_{(j)}(x) \rangle = t_{(j)}(x)\\)
+
+The dealer can perform this check by simply taking the inner product of \\(\mathbf{l}\_{(j)}(x)\\) and \\( \mathbf{r}\_{(j)}(x)\\) and verifying that it is equal to \\(t_{(j)}(x)\\). Note that the dealer is not creating a proof, and thus the proof compactness of the inner product protocol is not a benefit in this situation, so it is sufficient to just perform an inner product multiplication.
+
+2. Verify the constant term of the polynomial \\(t_{(j)}(x)\\)
+
+The dealer wants to check if this statement is correct: 
+  \\[
+  \begin{aligned}
+    t\_{(j)}(x) B + {\tilde{t}}\_{(j)}(x) {\widetilde{B}} \stackrel{?}{=} z^{2} z\_{(j)} V_{(j)} + \delta(y,z)\_{(j)} B + x T\_{1, (j)} + x^{2} T\_{2, (j)},\\\\
+    \delta\_{(j)}(y,z) = (z - z^{2}) \cdot {\langle {\mathbf{1}}, {\mathbf{y}}^{n}\_{(j)} \rangle} - z^{3} z\_{(j)} \cdot {\langle {\mathbf{1}}, {\mathbf{2}}^{n} \rangle}\\\\
+  \end{aligned}
+  \\]
+
+  If we rewrite the check as a comparison with the identity point, and plug in the definitions \\(z_{(j)} = z^j\\) and \\({\mathbf{y}}^{n}\_{(j)} = {\mathbf{y}}^{n \cdot m}\_{[j\cdot n : (j+1) \cdot n]} = {\mathbf{y}}^n y^{j \cdot n}\\), we get:
+
+  \\[
+  \begin{aligned}
+    0 \stackrel{?}{=} z^{j+2} V_{(j)} + \delta(y,z)\_{(j)} B + x T\_{1, (j)} + x^{2} T\_{2, (j)} - t\_{(j)}(x) B - {\tilde{t}}\_{(j)}(x) {\widetilde{B}},\\\\
+    \delta\_{(j)}(y,z) = (z - z^{2}) \cdot {\langle {\mathbf{1}}, {\mathbf{y}}^n \cdot y^{j \cdot n} \rangle} - z^{j+3} \cdot {\langle {\mathbf{1}}, {\mathbf{2}}^{n} \rangle}\\\\
+  \end{aligned}
+  \\]
 
 
+3. Prove that \\( \mathbf{l}\_{(j)}(x), \mathbf{r}\_{(j)}(x) \\) are correct
 
+The dealer wants to check if this statement is correct: 
+\\[
+\begin{aligned}
+	A_{(j)} + xS_{(j)} - z{\langle {\mathbf{1}}, {\mathbf{G}}\_{(j)} \rangle} + z{\langle {\mathbf{1}}, {\mathbf{H}}\_{(j)} \rangle} + {\langle z^{2} z_{(j)} (\mathbf{y}^{n}\_{(j)})^{-1} \circ {\mathbf{2}}^n, {\mathbf{H}}\_{(j)} \rangle} \stackrel{?}{=} {\widetilde{e}}\_{(j)} {\widetilde{B}} + {\langle \mathbf{l}\_{(j)}(x), {\mathbf{G}}\_{(j)} \rangle} + {\langle \mathbf{r}\_{(j)}(x) \circ (\mathbf{y}^{n}\_{(j)})^{-1}, {\mathbf{H}}\_{(j)} \rangle}
+\end{aligned}
+\\]
 
+If we rewrite the check as a comparison with the identity point, and plug in the definitions \\(z_{(j)} = z^j\\) and \\({\mathbf{y}}^{n}\_{(j)} = {\mathbf{y}}^{n \cdot m}\_{[j\cdot n : (j+1) \cdot n]} = {\mathbf{y}}^n y^{j \cdot n}\\), we get:
 
+\\[
+\begin{aligned}
+	0 \stackrel{?}{=}A_{(j)} + xS_{(j)} - z{\langle {\mathbf{1}}, {\mathbf{G}}\_{(j)} \rangle} + z{\langle {\mathbf{1}}, {\mathbf{H}}\_{(j)} \rangle} + {\langle z^{j+2} \cdot \mathbf{y}^{-n} y^{-j \cdot n} \circ {\mathbf{2}}^n, {\mathbf{H}}\_{(j)} \rangle} - {\widetilde{e}}\_{(j)} {\widetilde{B}} - {\langle \mathbf{l}\_{(j)}(x), {\mathbf{G}}\_{(j)} \rangle} - {\langle \mathbf{r}\_{(j)}(x) \circ \mathbf{y}^{-n} y^{-j \cdot n} , {\mathbf{H}}\_{(j)} \rangle}
+\end{aligned}
+\\]
+
+The dealer combines equations `2` and `3` into one by sampling a random factor \\(c \\; {\xleftarrow{\\$}} \\; {\mathbb Z\_p}\\),
+multiplying equation `2` by \\(c\\), and adding it with equation `3`. Finally, the dealer groups all scalars per each point and performs a single multiscalar multiplication:
+
+\\[
+\begin{aligned}
+0 \quad \stackrel{?}{=} & \quad 1       \cdot A_{(j)} \\\\
+                      + & \quad x       \cdot S_{(j)} \\\\
+                      + & \quad (-{\widetilde{e}} - c{\tilde{t}}(x)) \cdot \widetilde{B} \\\\
+                      + & \quad c \big(\delta(y,z) - t(x)\big) \cdot B\\\\
+                      + & \quad cz^{2+j}    \cdot V_{(j)} \\\\
+                      + & \quad cx      \cdot T_{1, (j)} \\\\
+                      + & \quad cx^2    \cdot T_{2, (j)} \\\\
+                      + & \quad {\langle {- \mathbf{l}\_{(j)}(x)} -z\mathbf{1}, {\mathbf{G}\_{(j)}} \rangle}\\\\
+                      + & \quad {\langle {- \mathbf{r}\_{(j)}(x)} \circ \mathbf{y}^{-n} y^{-j \cdot n} + z\mathbf{1} + z^{j+2} \cdot \mathbf{y}^{-n} y^{-j \cdot n} \circ {\mathbf{2}}^n, {\mathbf{H}}\_{(j)} \rangle}\\\\
+\end{aligned}
+\\]
