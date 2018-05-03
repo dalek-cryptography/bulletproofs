@@ -3,9 +3,9 @@ The `aggregated_range_proof` module contains an API for producing a proof that m
 Aggregated proof protocol
 =========================
 
-This is a documentation for the internal implementation of an aggregated range proof. You may find the introduction to all the pieces of the protocol in the [notes](../notes/index.html) module.
+This is a documentation for the internal implementation of the aggregated range proof. You may find the introduction to all the pieces of the range proof protocol in the [notes](../notes/index.html) module.
 
-The aggregated range proof is a zero-knowledge proof of the following relation
+The aggregated range proof is a zero-knowledge proof of the following relation:
 \\[
 \operatorname{ZK-PK}\left\\{
   v_{(j)} \in {\mathbb Z\_p}
@@ -18,13 +18,13 @@ for \\(m\\) values \\(v_{(j)}\\), where \\(n\\) and \\(m\\) are both a power of 
 API overview
 ------------
 
-In the aggregated proof case, the prover can be broken down into \\(m\\) individual parties, and one dealer that coordinates messages and provides challenges.
+The prover is composed of \\(m\\) individual parties and one dealer that coordinates messages and provides challenges.
 
-First, parties are instantiated with their secret values and the range they are expected to be in. The dealer assigns a unique index \\(j\\) to each party.
+First, parties are instantiated with their secret values and the range for the range proof. The dealer assigns a unique index \\(j\\) to each party.
 
-Next, each party commits to its secret value, bits and blinding factors via \\(V_{(j)}, A_{(j)}, S_{(j)}\\) as `ValueCommitment` and sends `ValueCommitment` to the dealer. The dealer receives and combines all of the `ValueCommitment`s from all of the parties, generates challenges \\(y,z\\) as `ValueChallenge`, and sends `ValueChallenge` to all of the parties.
+Next, each party commits to its secret value, bits, and blinding factors via \\(V_{(j)}, A_{(j)}, S_{(j)}\\) as `ValueCommitment` and sends `ValueCommitment` to the dealer. The dealer receives and combines all of the `ValueCommitment`s from all of the parties, generates challenges \\(y,z\\) as `ValueChallenge`, and sends `ValueChallenge` to all of the parties.
 
-Then, each party commits to the resulting polynomials \\(T_{(j)1}, T_{(j)2}\\) as `PolyCommitment` and sends `PolyCommitment` to the dealer. The dealer receives and combines all of the `PolyCommitment`s from all of the parties, generates challenge \\(x\\) as `PolyChallenge`, and sends `PolyChallenge` to all of the parties.
+Then, each party commits to the resulting polynomials \\(T_{1, (j)}, T_{2, (j)}\\) as `PolyCommitment` and sends `PolyCommitment` to the dealer. The dealer receives and combines all of the `PolyCommitment`s from all of the parties, generates challenge \\(x\\) as `PolyChallenge`, and sends `PolyChallenge` to all of the parties.
 
 Finally, each party evaluates their polynomial at \\(x\\) and returns the result as `ProofShare` to the dealer. The dealer combines all \\(m\\) proof shares and returns the aggregated range proof, `AggregatedProof`.
 
@@ -33,16 +33,16 @@ Finally, each party evaluates their polynomial at \\(x\\) and returns the result
 Prover's algorithm
 ------------------
 
-The protocol begins with each party \\(j\\) computing three commitments: to the value \\(v_{(j)}\\), to the bits of that value \\(\mathbf{a}\_{(j)L}, \mathbf{a}\_{(j)R}\\), and to the per-bit blinding factors \\(\mathbf{s}\_{(j)L}, \mathbf{s}\_{(j)R}\\).
+The protocol begins with each party \\(j\\) computing three commitments: to the value \\(v_{(j)}\\), to the bits of that value \\(\mathbf{a}\_{L, (j)}, \mathbf{a}\_{R, (j)}\\), and to the per-bit blinding factors \\(\mathbf{s}\_{L, (j)}, \mathbf{s}\_{R, (j)}\\).
 
 \\[
 \begin{aligned}
 V_{(j)} &\gets \operatorname{Com}(v_{(j)}, {\widetilde{v}\_{(j)}})                   && = v\_{(j)} \cdot B + {\widetilde{v}\_{(j)}} \cdot {\widetilde{B}} \\\\
-A_{(j)} &\gets \operatorname{Com}({\mathbf{a}}\_{(j)L}, {\mathbf{a}}\_{(j)R}) && = {\langle {\mathbf{a}}\_{(j)L}, {\mathbf{G}\_{(j)}} \rangle} + {\langle {\mathbf{a}}\_{(j)R}, {\mathbf{H}\_{(j)}} \rangle} + {\widetilde{a}\_{(j)}} {\widetilde{B}} \\\\
-S_{(j)} &\gets \operatorname{Com}({\mathbf{s}}\_{(j)L}, {\mathbf{s}}\_{(j)R}) && = {\langle {\mathbf{s}}\_{(j)L}, {\mathbf{G}\_{(j)}} \rangle} + {\langle {\mathbf{s}}\_{(j)R}, {\mathbf{H}\_{(j)}} \rangle} + {\widetilde{s}\_{(j)}} {\widetilde{B}} \\\\
+A_{(j)} &\gets \operatorname{Com}({\mathbf{a}}\_{L, (j)}, {\mathbf{a}}\_{R, (j)}) && = {\langle {\mathbf{a}}\_{L, (j)}, {\mathbf{G}\_{(j)}} \rangle} + {\langle {\mathbf{a}}\_{R, (j)}, {\mathbf{H}\_{(j)}} \rangle} + {\widetilde{a}\_{(j)}} {\widetilde{B}} \\\\
+S_{(j)} &\gets \operatorname{Com}({\mathbf{s}}\_{L, (j)}, {\mathbf{s}}\_{R, (j)}) && = {\langle {\mathbf{s}}\_{L, (j)}, {\mathbf{G}\_{(j)}} \rangle} + {\langle {\mathbf{s}}\_{R, (j)}, {\mathbf{H}\_{(j)}} \rangle} + {\widetilde{s}\_{(j)}} {\widetilde{B}} \\\\
 \end{aligned}
 \\] where \\(\widetilde{v}\_{(j)}, \widetilde{a}\_{(j)}, \widetilde{s}\_{(j)}\\) are sampled randomly
-from \\({\mathbb Z\_p}\\) and \\(\mathbf{s}\_{(j)L}, \mathbf{s}\_{(j)R}\\) are sampled randomly from \\({\mathbb Z\_p}^{n}\\).
+from \\({\mathbb Z\_p}\\) and \\(\mathbf{s}\_{L, (j)}, \mathbf{s}\_{R, (j)}\\) are sampled randomly from \\({\mathbb Z\_p}^{n}\\).
 
 The parties all send their \\(V_{(j)}\\), \\(A_{(j)}\\), and \\(S_{(j)}\\) values to the dealer as `ValueCommitment`. The dealer adds each \\(V_{(j)}\\) value to the protocol transcript, in order. The dealer then computes \\(A\\) and \\(S\\) as follows:
 
@@ -58,42 +58,42 @@ The dealer adds \\(A\\) and \\(S\\) to the protocol transcript and obtains chall
 Using their secret vectors and the challenges \\(y, z\\) from `ValueChallenge`, each party constructs vector polynomials:
 \\[
 \begin{aligned}
-  {\mathbf{l}}\_{(j)}(x) &= {\mathbf{l}}\_{(j)0} + {\mathbf{l}}\_{(j)1} x \\\\
-  {\mathbf{r}}\_{(j)}(x) &= {\mathbf{r}}\_{(j)0} + {\mathbf{r}}\_{(j)1} x \\\\
-  {\mathbf{l}}\_{(j)0} &\gets {\mathbf{a}}\_{(j)L} - z {\mathbf{1}} \\\\
-  {\mathbf{l}}\_{(j)1} &\gets {\mathbf{s}}\_{(j)L} \\\\
-  {\mathbf{r}}\_{(j)0} &\gets {\mathbf{y}}^{n}\_{(j)} \circ ({\mathbf{a}}\_{(j)R}   + z {\mathbf{1}}) + z^{2} {\mathbf{2}}^{n} \\\\
-  {\mathbf{r}}\_{(j)1} &\gets {\mathbf{y}}^{n}\_{(j)} \circ {\mathbf{s}}\_{(j)R}
+  {\mathbf{l}}\_{(j)}(x) &= {\mathbf{l}}\_{0, (j)} + {\mathbf{l}}\_{1, (j)} x \\\\
+  {\mathbf{r}}\_{(j)}(x) &= {\mathbf{r}}\_{0, (j)} + {\mathbf{r}}\_{1, (j)} x \\\\
+  {\mathbf{l}}\_{0, (j)} &\gets {\mathbf{a}}\_{L, (j)} - z {\mathbf{1}} \\\\
+  {\mathbf{l}}\_{1, (j)} &\gets {\mathbf{s}}\_{L, (j)} \\\\
+  {\mathbf{r}}\_{0, (j)} &\gets {\mathbf{y}}^{n}\_{(j)} \circ ({\mathbf{a}}\_{R, (j)}   + z {\mathbf{1}}) + z^{2} {\mathbf{2}}^{n} \\\\
+  {\mathbf{r}}\_{1, (j)} &\gets {\mathbf{y}}^{n}\_{(j)} \circ {\mathbf{s}}\_{R, (j)}
 \end{aligned}
 \\]
 
 The inner product of the above vector polynomials is:
 \\[
-  t\_{(j)}(x) = {\langle {\mathbf{l}}\_{(j)}(x), {\mathbf{r}}\_{(j)}(x) \rangle} = t\_{(j)0} + t\_{(j)1} x + t\_{(j)2} x^{2}, 
+  t\_{(j)}(x) = {\langle {\mathbf{l}}\_{(j)}(x), {\mathbf{r}}\_{(j)}(x) \rangle} = t\_{0, (j)} + t\_{1, (j)} x + t\_{2, (j)} x^{2}, 
 \\]
 
 The prover uses Karatsuba’s method to compute the coefficients of that polynomial as follows:
 \\[
 \begin{aligned}
-  t\_{(j)0} &\gets {\langle {\mathbf{l}}\_{(j)0}, {\mathbf{r}}\_{(j)0} \rangle},  \\\\
-  t\_{(j)2} &\gets {\langle {\mathbf{l}}\_{(j)1}, {\mathbf{r}}\_{(j)1} \rangle},  \\\\
-  t\_{(j)1} &\gets {\langle {\mathbf{l}}\_{(j)0}+ {\mathbf{l}}\_{(j)1}, {\mathbf{r}}\_{(j)0} + {\mathbf{r}}\_{(j)1} \rangle} - t\_{(j)0} - t\_{(j)2} 
+  t\_{0, (j)} &\gets {\langle {\mathbf{l}}\_{0, (j)}, {\mathbf{r}}\_{0, (j)} \rangle},  \\\\
+  t\_{2, (j)} &\gets {\langle {\mathbf{l}}\_{1, (j)}, {\mathbf{r}}\_{1, (j)} \rangle},  \\\\
+  t\_{1, (j)} &\gets {\langle {\mathbf{l}}\_{0, (j)}+ {\mathbf{l}}\_{1, (j)}, {\mathbf{r}}\_{0, (j)} + {\mathbf{r}}\_{1, (j)} \rangle} - t\_{0, (j)} - t\_{2, (j)} 
 \end{aligned}
 \\]
 
-The prover commits to the terms \\(t\_{(j)1}, t\_{(j)2}\\):
+The prover commits to the terms \\(t\_{1, (j)}, t\_{2, (j)}\\):
 \\[
 \begin{aligned}
-T\_{(j)1} &\gets \operatorname{Com}(t\_{(j)1}, {\tilde{t}\_{(j1}})  && = t\_{(j)1} \cdot B + {\tilde{t}\_{(j)1}} \cdot {\widetilde{B}} \\\\
-T\_{(j)2} &\gets \operatorname{Com}(t\_{(j)2}, {\tilde{t}\_{(j)2}})  && = t\_{(j)2} \cdot B + {\tilde{t}\_{(j)2}} \cdot {\widetilde{B}}
+T\_{1, (j)} &\gets \operatorname{Com}(t\_{1, (j)}, {\tilde{t}\_{(j1}})  && = t\_{1, (j)} \cdot B + {\tilde{t}\_{1, (j)}} \cdot {\widetilde{B}} \\\\
+T\_{2, (j)} &\gets \operatorname{Com}(t\_{2, (j)}, {\tilde{t}\_{2, (j)}})  && = t\_{2, (j)} \cdot B + {\tilde{t}\_{2, (j)}} \cdot {\widetilde{B}}
 \end{aligned}
-\\] where \\(\tilde{t}\_{(j)1}, \tilde{t}\_{(j)2}\\) are sampled randomly from \\({\mathbb Z\_p}\\).
+\\] where \\(\tilde{t}\_{1, (j)}, \tilde{t}\_{2, (j)}\\) are sampled randomly from \\({\mathbb Z\_p}\\).
 
-The parties all send their \\(T_{(j)1}\\) and \\(T_{(j)2}\\) values to the dealer as `PolyCommitment`. The dealer then computes \\(T_1\\) and \\(T_2\\) as follows:
+The parties all send their \\(T_{1, (j)}\\) and \\(T_{2, (j)}\\) values to the dealer as `PolyCommitment`. The dealer then computes \\(T_1\\) and \\(T_2\\) as follows:
 \\[
 \begin{aligned}
-	T_1 &= \sum_{j=0}^{m-1} T_{(j)1} \\\\
-	T_2 &= \sum_{j=0}^{m-1} T_{(j)2} \\\\
+	T_1 &= \sum_{j=0}^{m-1} T_{1, (j)} \\\\
+	T_2 &= \sum_{j=0}^{m-1} T_{2, (j)} \\\\
 \end{aligned}
 \\]
 
@@ -103,16 +103,16 @@ Each party uses \\(x\\) to evaluate their polynomials \\(\mathbf{l}\_{(j)}(x), \
 
 \\[
 \begin{aligned}
-  \mathbf{l}\_{(j)}  &\gets  {\mathbf{l}}\_{(j)0} + {\mathbf{l}}\_{(j)1} x\\\\
-  \mathbf{r}\_{(j)}  &\gets  {\mathbf{r}}\_{(j)0} + {\mathbf{r}}\_{(j)1} x\\\\
-  t\_{(j)}(x)        &\gets  t\_{(j)0} + t\_{(j)1} x + t\_{(j)2} x^{2}
+  \mathbf{l}\_{(j)}  &\gets  {\mathbf{l}}\_{0, (j)} + {\mathbf{l}}\_{1, (j)} x\\\\
+  \mathbf{r}\_{(j)}  &\gets  {\mathbf{r}}\_{0, (j)} + {\mathbf{r}}\_{1, (j)} x\\\\
+  t\_{(j)}(x)        &\gets  t\_{0, (j)} + t\_{1, (j)} x + t\_{2, (j)} x^{2}
 \end{aligned}
 \\]
 
 Next, each party computes their synthetic blinding factors:
 \\[
 \begin{aligned}
-  {\tilde{t}}\_{(j)}(x) &\gets z^{2} {\tilde{v}}\_{(j)} + x {\tilde{t}}\_{(j)1} + x^{2} {\tilde{t}}\_{(j)2} \\\\
+  {\tilde{t}}\_{(j)}(x) &\gets z^{2} {\tilde{v}}\_{(j)} + x {\tilde{t}}\_{1, (j)} + x^{2} {\tilde{t}}\_{2, (j)} \\\\
    \tilde{e}\_{(j)}     &\gets {\widetilde{a}}\_{(j)}   + x {\widetilde{s}}\_{(j)}
 \end{aligned}
 \\]
