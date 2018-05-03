@@ -15,32 +15,32 @@ use proof_transcript::ProofTranscript;
 use range_proof::RangeProof;
 use util;
 
-/// Represents a deferred computation to verify a single rangeproof. 
+/// Represents a deferred computation to verify a single rangeproof.
 /// Multiple instances can be verified more efficient as a batch using
 /// `RangeProof::verify_batch` function.
 pub struct Verification {
-	/// Number of commitments in the aggregated proof
-	pub m: usize,
+    /// Number of commitments in the aggregated proof
+    pub m: usize,
 
-	/// Size of the range in bits
-	pub n: usize,
+    /// Size of the range in bits
+    pub n: usize,
 
-	/// Pair of scalars multiplying pedersen bases `B`, `B_blinding`.
-	pedersen_base_scalars: (Scalar, Scalar),
+    /// Pair of scalars multiplying pedersen bases `B`, `B_blinding`.
+    pedersen_base_scalars: (Scalar, Scalar),
 
-	/// List of scalars for `n*m` `G` bases. These are separated from `h_scalars`
-	/// so we can easily pad them when verifying proofs with different `m`s.
-	g_scalars: Vec<Scalar>,
+    /// List of scalars for `n*m` `G` bases. These are separated from `h_scalars`
+    /// so we can easily pad them when verifying proofs with different `m`s.
+    g_scalars: Vec<Scalar>,
 
-	/// List of scalars for `n*m` `H` bases. These are separated from `g_scalars`
-	/// so we can easily pad them when verifying proofs with different `m`s.
- 	h_scalars: Vec<Scalar>,
+    /// List of scalars for `n*m` `H` bases. These are separated from `g_scalars`
+    /// so we can easily pad them when verifying proofs with different `m`s.
+    h_scalars: Vec<Scalar>,
 
- 	/// List of scalars for any number of dynamic bases.
- 	dynamic_base_scalars: Vec<Scalar>,
+    /// List of scalars for any number of dynamic bases.
+    dynamic_base_scalars: Vec<Scalar>,
 
- 	/// List of dynamic bases for the corresponding scalars.
- 	dynamic_bases: Vec<RistrettoPoint>,
+    /// List of dynamic bases for the corresponding scalars.
+    dynamic_bases: Vec<RistrettoPoint>,
 
     /// Internal flag that prevents accidentally dropping
     /// this struct without properly verifying it first.
@@ -50,14 +50,15 @@ pub struct Verification {
 impl Drop for Verification {
     fn drop(&mut self) {
         if !self.verified {
-            panic!("Deferred range proof Verification was not explicitly \
-                    verified using `RangeProof::verify_batch`!");
+            panic!(
+                "Deferred range proof Verification was not explicitly \
+                    verified using `RangeProof::verify_batch`!"
+            );
         }
     }
 }
 
 impl RangeProof {
-
     /// Prepares a `Verification` struct
     /// that can be combined with others in a batch.
     pub fn prepare_verification<R: Rng>(
@@ -117,7 +118,9 @@ impl RangeProof {
         let h = s_inv
             .zip(util::exp_iter(y.invert()))
             .zip(concat_z_and_2)
-            .map(|((s_i_inv, exp_y_inv), z_and_2)| z + exp_y_inv * (zz * z_and_2 - b * s_i_inv));
+            .map(|((s_i_inv, exp_y_inv), z_and_2)| {
+                z + exp_y_inv * (zz * z_and_2 - b * s_i_inv)
+            });
 
         let value_commitment_scalars = util::exp_iter(z).take(m).map(|z_exp| c * zz * z_exp);
         let basepoint_scalar = w * (self.t_x - a * b) + c * (delta(n, m, &y, &z) - self.t_x);
@@ -128,8 +131,7 @@ impl RangeProof {
             pedersen_base_scalars: (basepoint_scalar, -self.e_blinding - c * self.t_x_blinding),
             g_scalars: g.collect(),
             h_scalars: h.collect(),
-            dynamic_base_scalars:
-                iter::once(Scalar::one())
+            dynamic_base_scalars: iter::once(Scalar::one())
                 .chain(iter::once(x))
                 .chain(value_commitment_scalars)
                 .chain(iter::once(c * x))
@@ -137,8 +139,7 @@ impl RangeProof {
                 .chain(x_sq.iter().cloned())
                 .chain(x_inv_sq.iter().cloned())
                 .collect(),
-            dynamic_bases:
-                iter::once(&self.A)
+            dynamic_bases: iter::once(&self.A)
                 .chain(iter::once(&self.S))
                 .chain(value_commitments.iter())
                 .chain(iter::once(&self.T_1))
@@ -147,7 +148,7 @@ impl RangeProof {
                 .chain(self.ipp_proof.R_vec.iter())
                 .cloned()
                 .collect(),
-            verified: false
+            verified: false,
         }
     }
 
@@ -159,21 +160,23 @@ impl RangeProof {
     pub fn verify_batch<R: Rng, B: AsMut<[Verification]>>(
         mut batch: B,
         gens: GeneratorsView,
-    	rng: &mut R
+        rng: &mut R,
     ) -> Result<(), &'static str> {
         let batch = batch.as_mut();
 
-    	// we will special-case the first item to avoid unnecessary multiplication,
-    	// so lets check that we have at least one item.
-		if batch.len() == 0 {
-			return Ok(())
-		}
+        // we will special-case the first item to avoid unnecessary multiplication,
+        // so lets check that we have at least one item.
+        if batch.len() == 0 {
+            return Ok(());
+        }
 
         // Make sure we have enough static generators
         let n = batch.iter().map(|v| v.n).max().unwrap_or(0);
         let m = batch.iter().map(|v| v.m).max().unwrap_or(0);
         if gens.G.len() < (n * m) {
-        	return Err("The generators view does not have enough generators for the largest proof")
+            return Err(
+                "The generators view does not have enough generators for the largest proof",
+            );
         }
 
         // First statement is used without a random factor
@@ -181,59 +184,63 @@ impl RangeProof {
         let mut pedersen_base_scalars: (Scalar, Scalar) = batch[0].pedersen_base_scalars;
         let mut g_scalars: Vec<Scalar> = batch[0].g_scalars.clone();
         let mut h_scalars: Vec<Scalar> = batch[0].h_scalars.clone();
-        
+
         // pad static scalars to the largest proof
-        g_scalars.resize(n*m, Scalar::zero());
-        h_scalars.resize(n*m, Scalar::zero());
+        g_scalars.resize(n * m, Scalar::zero());
+        h_scalars.resize(n * m, Scalar::zero());
 
         let mut dynamic_base_scalars: Vec<Scalar> = batch[0].dynamic_base_scalars.clone();
         let mut dynamic_bases: Vec<RistrettoPoint> = batch[0].dynamic_bases.clone();
-        
+
         // Other statements are added with a random factor per statement
         for verification in &mut batch[1..] {
             verification.verified = true;
             let batch_challenge = Scalar::random(rng);
 
-            pedersen_base_scalars.0 += batch_challenge*verification.pedersen_base_scalars.0;
-            pedersen_base_scalars.1 += batch_challenge*verification.pedersen_base_scalars.1;
+            pedersen_base_scalars.0 += batch_challenge * verification.pedersen_base_scalars.0;
+            pedersen_base_scalars.1 += batch_challenge * verification.pedersen_base_scalars.1;
 
             // Note: this loop may be shorter than the total amount of scalars if `m < max({m})`
             for (i, s) in verification.g_scalars.iter().enumerate() {
-                g_scalars[i] += batch_challenge*s;
+                g_scalars[i] += batch_challenge * s;
             }
             for (i, s) in verification.h_scalars.iter().enumerate() {
-                h_scalars[i] += batch_challenge*s;
+                h_scalars[i] += batch_challenge * s;
             }
 
-            dynamic_base_scalars = dynamic_base_scalars.iter()
+            dynamic_base_scalars = dynamic_base_scalars
+                .iter()
                 .cloned()
-                .chain(verification.dynamic_base_scalars.iter().map(|s| batch_challenge*s ))
+                .chain(verification.dynamic_base_scalars.iter().map(|s| {
+                    batch_challenge * s
+                }))
                 .collect();
 
-            dynamic_bases = dynamic_bases.iter()
+            dynamic_bases = dynamic_bases
+                .iter()
                 .chain(verification.dynamic_bases.iter())
                 .cloned()
                 .collect();
         }
 
- 		let mega_check = ristretto::vartime::multiscalar_mul(
- 			iter::once(&pedersen_base_scalars.0)
- 				.chain(iter::once(&pedersen_base_scalars.1))
- 				.chain(g_scalars.iter())
- 				.chain(h_scalars.iter())
- 				.chain(dynamic_base_scalars.iter()),
- 			iter::once(&gens.pedersen_generators.B)
- 				.chain(iter::once(&gens.pedersen_generators.B_blinding))
- 				.chain(gens.G.iter())
- 				.chain(gens.H.iter())
- 				.chain(dynamic_bases.iter())
- 		);
+        let mega_check = ristretto::vartime::multiscalar_mul(
+            iter::once(&pedersen_base_scalars.0)
+                .chain(iter::once(&pedersen_base_scalars.1))
+                .chain(g_scalars.iter())
+                .chain(h_scalars.iter())
+                .chain(dynamic_base_scalars.iter()),
+            iter::once(&gens.pedersen_generators.B)
+                .chain(iter::once(&gens.pedersen_generators.B_blinding))
+                .chain(gens.G.iter())
+                .chain(gens.H.iter())
+                .chain(dynamic_bases.iter()),
+        );
 
- 		if mega_check.is_identity() {
- 			Ok(())
- 		} else {
- 			Err("Batch verification failed")
- 		}
+        if mega_check.is_identity() {
+            Ok(())
+        } else {
+            Err("Batch verification failed")
+        }
     }
 }
 
