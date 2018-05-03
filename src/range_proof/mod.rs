@@ -198,6 +198,40 @@ mod tests {
         }
     }
 
+    /// Generates and verifies a number of proofs in a batch
+    /// with the given pairs of `n,m` parameters (range in bits, number of commitments).
+    fn batch_verify_helper(nm: &[(usize, usize)]) {
+        use bincode;
+
+        let mut rng = OsRng::new().unwrap();
+        let transcript = ProofTranscript::new(b"AggregatedRangeProofTest");
+
+        let max_n = nm.iter().map(|(n,_)| *n).max().unwrap_or(0);
+        let max_m = nm.iter().map(|(_,m)| *m).max().unwrap_or(0);
+        let verifications = nm.iter().map(|(n,m)| {
+            let (p, vc) = singleparty_create_helper(*n,*m);
+            bincode::deserialize::<RangeProof>(&p)
+                .unwrap()
+                .prepare_verification(
+                    &vc,
+                    &mut transcript.clone(),
+                    &mut rng,
+                    *n
+                )
+        }).collect::<Vec<_>>();
+
+        let generators = Generators::new(PedersenGenerators::default(), max_n, max_m);
+
+        assert!(
+            RangeProof::verify_batch(
+                verifications.as_slice(), 
+                generators.all(),
+                &mut rng
+            ).is_ok()
+        );
+    }
+
+
     /// Generates a `n`-bit rangeproof for `m` commitments.
     /// Returns serialized proof and the list of commitments.
     fn singleparty_create_helper(n: usize, m: usize) -> (Vec<u8>, Vec<RistrettoPoint>) {
@@ -289,109 +323,25 @@ mod tests {
 
     #[test]
     fn batch_verify_n_32_m_1() {
-        use bincode;
-
-        let mut rng = OsRng::new().unwrap();
-        let transcript = ProofTranscript::new(b"AggregatedRangeProofTest");
-
-        let n = 32;
-        let m = 1;
-        let (p1, vc1) = singleparty_create_helper(n,m);
-        let (p2, vc2) = singleparty_create_helper(n,m);
-        let (p3, vc3) = singleparty_create_helper(n,m);
-
-        let ver1 = bincode::deserialize::<RangeProof>(&p1).unwrap().prepare_verification(&vc1, &mut transcript.clone(), &mut rng, n);
-        let ver2 = bincode::deserialize::<RangeProof>(&p2).unwrap().prepare_verification(&vc2, &mut transcript.clone(), &mut rng, n);
-        let ver3 = bincode::deserialize::<RangeProof>(&p3).unwrap().prepare_verification(&vc3, &mut transcript.clone(), &mut rng, n);
-
-        let generators = Generators::new(PedersenGenerators::default(), n, m);
-
-        assert!(
-            RangeProof::verify_batch(
-                &[ver1, ver2, ver3], 
-                generators.all(),
-                &mut rng
-            ).is_ok()
-        );
+        batch_verify_helper(&[(32, 1)]);
+        batch_verify_helper(&[(32, 1), (32, 1)]);
+        batch_verify_helper(&[(32, 1), (32, 1), (32, 1)]);
     }
 
     #[test]
     fn batch_verify_n_64_m_differ() {
-        use bincode;
-
-        let mut rng = OsRng::new().unwrap();
-        let transcript = ProofTranscript::new(b"AggregatedRangeProofTest");
-
-        let n = 64;
-        let (p1, vc1) = singleparty_create_helper(n,1);
-        let (p2, vc2) = singleparty_create_helper(n,2);
-        let (p3, vc3) = singleparty_create_helper(n,4);
-
-        let ver1 = bincode::deserialize::<RangeProof>(&p1).unwrap().prepare_verification(&vc1, &mut transcript.clone(), &mut rng, n);
-        let ver2 = bincode::deserialize::<RangeProof>(&p2).unwrap().prepare_verification(&vc2, &mut transcript.clone(), &mut rng, n);
-        let ver3 = bincode::deserialize::<RangeProof>(&p3).unwrap().prepare_verification(&vc3, &mut transcript.clone(), &mut rng, n);
-
-        let generators = Generators::new(PedersenGenerators::default(), n, 4);
-
-        assert!(
-            RangeProof::verify_batch(
-                &[ver1, ver2, ver3], 
-                generators.all(),
-                &mut rng
-            ).is_ok()
-        );
+        batch_verify_helper(&[(32, 1), (32, 2)]);
+        batch_verify_helper(&[(32, 1), (32, 2), (32, 4)]);
     }
 
     #[test]
     fn batch_verify_n_differ_m_differ_total_64() {
-        use bincode;
-
-        let mut rng = OsRng::new().unwrap();
-        let transcript = ProofTranscript::new(b"AggregatedRangeProofTest");
-
-        let (p1, vc1) = singleparty_create_helper(64,1);
-        let (p2, vc2) = singleparty_create_helper(32,2);
-        let (p3, vc3) = singleparty_create_helper(16,4);
-
-        let ver1 = bincode::deserialize::<RangeProof>(&p1).unwrap().prepare_verification(&vc1, &mut transcript.clone(), &mut rng, 64);
-        let ver2 = bincode::deserialize::<RangeProof>(&p2).unwrap().prepare_verification(&vc2, &mut transcript.clone(), &mut rng, 32);
-        let ver3 = bincode::deserialize::<RangeProof>(&p3).unwrap().prepare_verification(&vc3, &mut transcript.clone(), &mut rng, 16);
-
-        let generators = Generators::new(PedersenGenerators::default(), 64, 4);
-
-        assert!(
-            RangeProof::verify_batch(
-                &[ver1, ver2, ver3], 
-                generators.all(),
-                &mut rng
-            ).is_ok()
-        );
+        batch_verify_helper(&[(64, 1), (32, 2), (16,4)]);
     }
 
     #[test]
     fn batch_verify_n_differ_m_differ_total_256() {
-        use bincode;
-
-        let mut rng = OsRng::new().unwrap();
-        let transcript = ProofTranscript::new(b"AggregatedRangeProofTest");
-
-        let (p1, vc1) = singleparty_create_helper(16,1);
-        let (p2, vc2) = singleparty_create_helper(32,2);
-        let (p3, vc3) = singleparty_create_helper(64,4);
-
-        let ver1 = bincode::deserialize::<RangeProof>(&p1).unwrap().prepare_verification(&vc1, &mut transcript.clone(), &mut rng, 16);
-        let ver2 = bincode::deserialize::<RangeProof>(&p2).unwrap().prepare_verification(&vc2, &mut transcript.clone(), &mut rng, 32);
-        let ver3 = bincode::deserialize::<RangeProof>(&p3).unwrap().prepare_verification(&vc3, &mut transcript.clone(), &mut rng, 64);
-
-        let generators = Generators::new(PedersenGenerators::default(), 64, 4);
-
-        assert!(
-            RangeProof::verify_batch(
-                &[ver1, ver2, ver3], 
-                generators.all(),
-                &mut rng
-            ).is_ok()
-        );
+        batch_verify_helper(&[(16, 1), (32, 2), (64,4)]);
     }
 
     #[test]
