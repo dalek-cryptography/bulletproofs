@@ -166,42 +166,7 @@ mod tests {
         // Both prover and verifier have access to the generators and the proof
         let generators = Generators::new(PedersenGenerators::default(), n, m);
 
-        // Serialized proof data
-        let proof_bytes: Vec<u8>;
-        let value_commitments: Vec<RistrettoPoint>;
-
-        // Prover's scope
-        {
-            // 1. Generate the proof
-
-            let mut rng = OsRng::new().unwrap();
-            let mut transcript = ProofTranscript::new(b"AggregatedRangeProofTest");
-
-            let (min, max) = (0u64, ((1u128 << n) - 1) as u64);
-            let values: Vec<u64> = (0..m).map(|_| rng.gen_range(min, max)).collect();
-            let blindings: Vec<Scalar> = (0..m).map(|_| Scalar::random(&mut rng)).collect();
-
-            let proof = RangeProof::prove_multiple(
-                &generators,
-                &mut transcript,
-                &mut rng,
-                &values,
-                &blindings,
-                n,
-            ).unwrap();
-
-            // 2. Serialize
-            proof_bytes = bincode::serialize(&proof).unwrap();
-
-            let pg = &generators.all().pedersen_generators;
-
-            // XXX would be nice to have some convenience API for this
-            value_commitments = values
-                .iter()
-                .zip(blindings.iter())
-                .map(|(&v, &v_blinding)| pg.commit(Scalar::from_u64(v), v_blinding))
-                .collect();
-        }
+        let (proof_bytes, value_commitments) = singleparty_create_helper(n,m);
 
         println!(
             "Aggregated rangeproof of m={} proofs of n={} bits has size {} bytes",
@@ -231,6 +196,55 @@ mod tests {
                     .is_ok()
             );
         }
+    }
+
+    /// Generates a `n`-bit rangeproof for `m` commitments.
+    /// Returns serialized proof and the list of commitments.
+    fn singleparty_create_helper(n: usize, m: usize) -> (Vec<u8>, Vec<RistrettoPoint>) {
+        // Split the test into two scopes, so that it's explicit what
+        // data is shared between the prover and the verifier.
+
+        // Use bincode for serialization
+        use bincode;
+
+        // Both prover and verifier have access to the generators and the proof
+        let generators = Generators::new(PedersenGenerators::default(), n, m);
+
+        // Serialized proof data
+        let proof_bytes: Vec<u8>;
+        let value_commitments: Vec<RistrettoPoint>;
+
+        // 1. Generate the proof
+
+        let mut rng = OsRng::new().unwrap();
+        let mut transcript = ProofTranscript::new(b"AggregatedRangeProofTest");
+
+        let (min, max) = (0u64, ((1u128 << n) - 1) as u64);
+        let values: Vec<u64> = (0..m).map(|_| rng.gen_range(min, max)).collect();
+        let blindings: Vec<Scalar> = (0..m).map(|_| Scalar::random(&mut rng)).collect();
+
+        let proof = RangeProof::prove_multiple(
+            &generators,
+            &mut transcript,
+            &mut rng,
+            &values,
+            &blindings,
+            n,
+        ).unwrap();
+
+        // 2. Serialize
+        proof_bytes = bincode::serialize(&proof).unwrap();
+
+        let pg = &generators.all().pedersen_generators;
+
+        // XXX would be nice to have some convenience API for this
+        value_commitments = values
+            .iter()
+            .zip(blindings.iter())
+            .map(|(&v, &v_blinding)| pg.commit(Scalar::from_u64(v), v_blinding))
+            .collect();
+
+        (proof_bytes, value_commitments)
     }
 
     #[test]
@@ -271,6 +285,113 @@ mod tests {
     #[test]
     fn create_and_verify_n_64_m_8() {
         singleparty_create_and_verify_helper(64, 8);
+    }
+
+    #[test]
+    fn batch_verify_n_32_m_1() {
+        use bincode;
+
+        let mut rng = OsRng::new().unwrap();
+        let transcript = ProofTranscript::new(b"AggregatedRangeProofTest");
+
+        let n = 32;
+        let m = 1;
+        let (p1, vc1) = singleparty_create_helper(n,m);
+        let (p2, vc2) = singleparty_create_helper(n,m);
+        let (p3, vc3) = singleparty_create_helper(n,m);
+
+        let ver1 = bincode::deserialize::<RangeProof>(&p1).unwrap().prepare_verification(&vc1, &mut transcript.clone(), &mut rng, n);
+        let ver2 = bincode::deserialize::<RangeProof>(&p2).unwrap().prepare_verification(&vc2, &mut transcript.clone(), &mut rng, n);
+        let ver3 = bincode::deserialize::<RangeProof>(&p3).unwrap().prepare_verification(&vc3, &mut transcript.clone(), &mut rng, n);
+
+        let generators = Generators::new(PedersenGenerators::default(), n, m);
+
+        assert!(
+            RangeProof::verify_batch(
+                &[ver1, ver2, ver3], 
+                generators.all(),
+                &mut rng
+            ).is_ok()
+        );
+    }
+
+    #[test]
+    fn batch_verify_n_64_m_differ() {
+        use bincode;
+
+        let mut rng = OsRng::new().unwrap();
+        let transcript = ProofTranscript::new(b"AggregatedRangeProofTest");
+
+        let n = 64;
+        let (p1, vc1) = singleparty_create_helper(n,1);
+        let (p2, vc2) = singleparty_create_helper(n,2);
+        let (p3, vc3) = singleparty_create_helper(n,4);
+
+        let ver1 = bincode::deserialize::<RangeProof>(&p1).unwrap().prepare_verification(&vc1, &mut transcript.clone(), &mut rng, n);
+        let ver2 = bincode::deserialize::<RangeProof>(&p2).unwrap().prepare_verification(&vc2, &mut transcript.clone(), &mut rng, n);
+        let ver3 = bincode::deserialize::<RangeProof>(&p3).unwrap().prepare_verification(&vc3, &mut transcript.clone(), &mut rng, n);
+
+        let generators = Generators::new(PedersenGenerators::default(), n, 4);
+
+        assert!(
+            RangeProof::verify_batch(
+                &[ver1, ver2, ver3], 
+                generators.all(),
+                &mut rng
+            ).is_ok()
+        );
+    }
+
+    #[test]
+    fn batch_verify_n_differ_m_differ_total_64() {
+        use bincode;
+
+        let mut rng = OsRng::new().unwrap();
+        let transcript = ProofTranscript::new(b"AggregatedRangeProofTest");
+
+        let (p1, vc1) = singleparty_create_helper(64,1);
+        let (p2, vc2) = singleparty_create_helper(32,2);
+        let (p3, vc3) = singleparty_create_helper(16,4);
+
+        let ver1 = bincode::deserialize::<RangeProof>(&p1).unwrap().prepare_verification(&vc1, &mut transcript.clone(), &mut rng, 64);
+        let ver2 = bincode::deserialize::<RangeProof>(&p2).unwrap().prepare_verification(&vc2, &mut transcript.clone(), &mut rng, 32);
+        let ver3 = bincode::deserialize::<RangeProof>(&p3).unwrap().prepare_verification(&vc3, &mut transcript.clone(), &mut rng, 16);
+
+        let generators = Generators::new(PedersenGenerators::default(), 64, 4);
+
+        assert!(
+            RangeProof::verify_batch(
+                &[ver1, ver2, ver3], 
+                generators.all(),
+                &mut rng
+            ).is_ok()
+        );
+    }
+
+    #[test]
+    fn batch_verify_n_differ_m_differ_total_256() {
+        use bincode;
+
+        let mut rng = OsRng::new().unwrap();
+        let transcript = ProofTranscript::new(b"AggregatedRangeProofTest");
+
+        let (p1, vc1) = singleparty_create_helper(16,1);
+        let (p2, vc2) = singleparty_create_helper(32,2);
+        let (p3, vc3) = singleparty_create_helper(64,4);
+
+        let ver1 = bincode::deserialize::<RangeProof>(&p1).unwrap().prepare_verification(&vc1, &mut transcript.clone(), &mut rng, 16);
+        let ver2 = bincode::deserialize::<RangeProof>(&p2).unwrap().prepare_verification(&vc2, &mut transcript.clone(), &mut rng, 32);
+        let ver3 = bincode::deserialize::<RangeProof>(&p3).unwrap().prepare_verification(&vc3, &mut transcript.clone(), &mut rng, 64);
+
+        let generators = Generators::new(PedersenGenerators::default(), 64, 4);
+
+        assert!(
+            RangeProof::verify_batch(
+                &[ver1, ver2, ver3], 
+                generators.all(),
+                &mut rng
+            ).is_ok()
+        );
     }
 
     #[test]
