@@ -139,10 +139,9 @@ impl RangeProof {
 
     /// Verifies multiple range proofs at once.
     /// If any range proof is invalid, the whole batch is invalid.
-    /// All proofs must use the same range of `n` bits, 
-    /// but are allowed to have different number of proven values.
+    /// Proofs may use different ranges (`n`) or different number of aggregated commitments (`m`).
     /// You must provide big enough view into generators (`gens`) that covers
-    /// the biggest proof.
+    /// the biggest proof
     pub fn verify_batch<R: Rng, V: Borrow<Verification>>(
     	batch: &[V],
     	gens: GeneratorsView,
@@ -154,14 +153,8 @@ impl RangeProof {
 			return Ok(())
 		}
 
-		let n = batch[0].borrow().n;
-
-        // Make sure all proofs use the same range
-        if batch.iter().any(|v| v.borrow().n != n) {
-            return Err("Inconsistent range size `n` for all proofs in a batch")
-        }
-
         // Make sure we have enough static generators
+        let n = batch.iter().map(|v| v.borrow().n).max().unwrap_or(0);
         let m = batch.iter().map(|v| v.borrow().m).max().unwrap_or(0);
         if gens.G.len() < (n * m) {
         	return Err("The generators view does not have enough generators for the largest proof")
@@ -175,7 +168,7 @@ impl RangeProof {
         // pad static scalars to the largest proof
         g_scalars.resize(n*m, Scalar::zero());
         h_scalars.resize(n*m, Scalar::zero());
-        
+
         let mut dynamic_base_scalars: Vec<Scalar> = batch[0].borrow().dynamic_base_scalars.clone();
         let mut dynamic_bases: Vec<RistrettoPoint> = batch[0].borrow().dynamic_bases.clone();
         
@@ -184,18 +177,16 @@ impl RangeProof {
         	let verification = borrowable_verification.borrow();
             let batch_challenge = Scalar::random(rng);
 
-            pedersen_base_scalars.0 = pedersen_base_scalars.0 + batch_challenge*verification.pedersen_base_scalars.0;
-            pedersen_base_scalars.1 = pedersen_base_scalars.1 + batch_challenge*verification.pedersen_base_scalars.1;
+            pedersen_base_scalars.0 += batch_challenge*verification.pedersen_base_scalars.0;
+            pedersen_base_scalars.1 += batch_challenge*verification.pedersen_base_scalars.1;
 
-            g_scalars = g_scalars.iter()
-                    .zip(verification.g_scalars.iter())
-                    .map(|(total, s)| total + batch_challenge*s )
-                    .collect();
-
-			h_scalars = h_scalars.iter()
-                    .zip(verification.h_scalars.iter())
-                    .map(|(total, s)| total + batch_challenge*s )
-                    .collect();
+            // Note: this loop may be shorter than the total amount of scalars if `m < max({m})`
+            for (i, s) in verification.g_scalars.iter().enumerate() {
+                g_scalars[i] += batch_challenge*s;
+            }
+            for (i, s) in verification.h_scalars.iter().enumerate() {
+                h_scalars[i] += batch_challenge*s;
+            }
 
             dynamic_base_scalars = dynamic_base_scalars.iter()
                 .cloned()
