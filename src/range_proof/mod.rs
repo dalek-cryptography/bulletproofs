@@ -135,9 +135,11 @@ impl RangeProof {
         n: usize,
     ) -> Result<(), &'static str> {
         RangeProof::verify_batch(
-            [self.prepare_verification(value_commitments, transcript, rng, n)],
-            gens, 
-            rng
+            [
+                self.prepare_verification(value_commitments, transcript, rng, n),
+            ],
+            gens,
+            rng,
         )
     }
 }
@@ -166,7 +168,7 @@ mod tests {
         // Both prover and verifier have access to the generators and the proof
         let generators = Generators::new(PedersenGenerators::default(), n, m);
 
-        let (proof_bytes, value_commitments) = singleparty_create_helper(n,m);
+        let (proof_bytes, value_commitments) = singleparty_create_helper(n, m);
 
         println!(
             "Aggregated rangeproof of m={} proofs of n={} bits has size {} bytes",
@@ -206,30 +208,21 @@ mod tests {
         let mut rng = OsRng::new().unwrap();
         let transcript = ProofTranscript::new(b"AggregatedRangeProofTest");
 
-        let verifications = nm.iter().map(|(n,m)| {
-            let (p, vc) = singleparty_create_helper(*n,*m);
-            bincode::deserialize::<RangeProof>(&p)
-                .unwrap()
-                .prepare_verification(
-                    &vc,
-                    &mut transcript.clone(),
-                    &mut rng,
-                    *n
-                )
-        }).collect::<Vec<_>>();
+        let verifications = nm.iter()
+            .map(|(n, m)| {
+                let (p, vc) = singleparty_create_helper(*n, *m);
+                bincode::deserialize::<RangeProof>(&p)
+                    .unwrap()
+                    .prepare_verification(&vc, &mut transcript.clone(), &mut rng, *n)
+            })
+            .collect::<Vec<_>>();
 
         let max_n = verifications.iter().map(|v| v.n).max().unwrap_or(0);
         let max_m = verifications.iter().map(|v| v.m).max().unwrap_or(0);
 
         let generators = Generators::new(PedersenGenerators::default(), max_n, max_m);
 
-        assert!(
-            RangeProof::verify_batch(
-                verifications,
-                generators.all(),
-                &mut rng
-            ).is_ok()
-        );
+        assert!(RangeProof::verify_batch(verifications, generators.all(), &mut rng).is_ok());
     }
 
 
@@ -276,7 +269,9 @@ mod tests {
         value_commitments = values
             .iter()
             .zip(blindings.iter())
-            .map(|(&v, &v_blinding)| pg.commit(Scalar::from_u64(v), v_blinding))
+            .map(|(&v, &v_blinding)| {
+                pg.commit(Scalar::from_u64(v), v_blinding)
+            })
             .collect();
 
         (proof_bytes, value_commitments)
@@ -337,12 +332,12 @@ mod tests {
 
     #[test]
     fn batch_verify_n_differ_m_differ_total_64() {
-        batch_verify_helper(&[(64, 1), (32, 2), (16,4)]);
+        batch_verify_helper(&[(64, 1), (32, 2), (16, 4)]);
     }
 
     #[test]
     fn batch_verify_n_differ_m_differ_total_256() {
-        batch_verify_helper(&[(16, 1), (32, 2), (64,4)]);
+        batch_verify_helper(&[(16, 1), (32, 2), (64, 4)]);
     }
 
     #[test]
