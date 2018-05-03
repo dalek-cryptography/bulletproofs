@@ -28,7 +28,6 @@ mod util;
 
 #[doc(include = "../docs/notes.md")]
 mod notes {}
-pub mod aggregated_range_proof;
 mod generators;
 mod inner_product_proof;
 mod proof_transcript;
@@ -37,3 +36,10 @@ mod range_proof;
 pub use generators::{Generators, GeneratorsView, PedersenGenerators};
 pub use proof_transcript::ProofTranscript;
 pub use range_proof::RangeProof;
+
+/// API for performing the aggregate-proving multiparty computation protocol.
+pub mod aggregation {
+    pub use range_proof::dealer;
+    pub use range_proof::messages;
+    pub use range_proof::party;
+}
