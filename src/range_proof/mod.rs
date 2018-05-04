@@ -105,7 +105,8 @@ impl RangeProof {
         let proof_shares: Vec<_> = parties
             .into_iter()
             .map(|p| p.apply_challenge(&poly_challenge))
-            .collect();
+            // Collect the iterator of Results into a Result<Vec>, then unwrap it
+            .collect::<Result<Vec<_>,_>>()?;
 
         dealer.receive_trusted_shares(&proof_shares)
     }
@@ -445,10 +446,10 @@ mod tests {
             .receive_poly_commitments(&[poly_com0, poly_com1, poly_com2, poly_com3])
             .unwrap();
 
-        let share0 = party0.apply_challenge(&poly_challenge);
-        let share1 = party1.apply_challenge(&poly_challenge);
-        let share2 = party2.apply_challenge(&poly_challenge);
-        let share3 = party3.apply_challenge(&poly_challenge);
+        let share0 = party0.apply_challenge(&poly_challenge).unwrap();
+        let share1 = party1.apply_challenge(&poly_challenge).unwrap();
+        let share2 = party2.apply_challenge(&poly_challenge).unwrap();
+        let share3 = party3.apply_challenge(&poly_challenge).unwrap();
 
         match dealer.receive_shares(&mut rng, &[share0, share1, share2, share3]) {
             Ok(_proof) => {
@@ -459,5 +460,48 @@ mod tests {
                 assert_eq!(e, "proof failed to verify");
             }
         }
+    }
+
+    #[test]
+    fn detect_dishonest_dealer_during_aggregation() {
+        use self::dealer::*;
+        use self::party::*;
+
+        // Simulate one party
+        let m = 1;
+        let n = 32;
+
+        let generators = Generators::new(PedersenGenerators::default(), n, m);
+
+        let mut rng = OsRng::new().unwrap();
+        let mut transcript = ProofTranscript::new(b"AggregatedRangeProofTest");
+
+        let v0 = rng.next_u32() as u64;
+        let v0_blinding = Scalar::random(&mut rng);
+        let party0 = Party::new(v0, v0_blinding, n, &generators).unwrap();
+
+        let dealer = Dealer::new(generators.all(), n, m, &mut transcript).unwrap();
+
+        // Now do the protocol flow as normal....
+
+        let (party0, value_com0) = party0.assign_position(0, &mut rng);
+
+        let (dealer, value_challenge) = dealer
+            .receive_value_commitments(&[value_com0])
+            .unwrap();
+
+        let (party0, poly_com0) = party0.apply_challenge(&value_challenge, &mut rng);
+
+        let (_dealer, mut poly_challenge) = dealer
+            .receive_poly_commitments(&[poly_com0])
+            .unwrap();
+
+        // But now simulate a malicious dealer choosing x = 0
+        poly_challenge.x = Scalar::zero();
+
+        let maybe_share0 = party0.apply_challenge(&poly_challenge);
+
+        // XXX when we have error types, check finer info than "was error"
+        assert!(maybe_share0.is_err());
     }
 }
