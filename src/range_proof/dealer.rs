@@ -7,6 +7,7 @@ use curve25519_dalek::traits::Identity;
 use generators::GeneratorsView;
 use inner_product_proof;
 use proof_transcript::ProofTranscript;
+use range_proof::RangeProof;
 
 use util;
 
@@ -170,23 +171,16 @@ pub struct DealerAwaitingProofShares<'a, 'b> {
 }
 
 impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
-    /// Assembles proof shares into an `AggregatedProof`.
+    /// Assembles proof shares into an `RangeProof`.
     ///
     /// Used as a helper function by `receive_trusted_shares` (which
     /// just hands back the result) and `receive_shares` (which
     /// validates the proof shares.
-    fn assemble_shares(
-        &mut self,
-        proof_shares: &[ProofShare],
-    ) -> Result<AggregatedProof, &'static str> {
+    fn assemble_shares(&mut self, proof_shares: &[ProofShare]) -> Result<RangeProof, &'static str> {
         if self.m != proof_shares.len() {
             return Err("Length of proof shares doesn't match expected length m");
         }
 
-        let value_commitments = proof_shares
-            .iter()
-            .map(|ps| ps.value_commitment.V)
-            .collect();
         let A = proof_shares
             .iter()
             .fold(RistrettoPoint::identity(), |A, ps| {
@@ -244,9 +238,7 @@ impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
             r_vec.clone(),
         );
 
-        Ok(AggregatedProof {
-            n: self.n,
-            value_commitments,
+        Ok(RangeProof {
             A,
             S,
             T_1,
@@ -270,11 +262,27 @@ impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
         mut self,
         rng: &mut R,
         proof_shares: &[ProofShare],
-    ) -> Result<AggregatedProof, &'static str> {
+    ) -> Result<RangeProof, &'static str> {
         let proof = self.assemble_shares(proof_shares)?;
 
+        // XXX if we change the proof verification API to use
+        // iterators we can do it with ZeRo-CoSt-AbStRaCtIonS
+        let value_commitments: Vec<_> = proof_shares
+            .iter()
+            .map(|ps| ps.value_commitment.V)
+            .collect();
+
         // See comment in `Dealer::new` for why we use `initial_transcript`
-        if proof.verify(rng, &mut self.initial_transcript).is_ok() {
+        if proof
+            .verify(
+                &value_commitments,
+                self.gens,
+                &mut self.initial_transcript,
+                rng,
+                self.n,
+            )
+            .is_ok()
+        {
             Ok(proof)
         } else {
             // Create a list of bad shares
@@ -307,7 +315,7 @@ impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
     pub fn receive_trusted_shares(
         mut self,
         proof_shares: &[ProofShare],
-    ) -> Result<AggregatedProof, &'static str> {
+    ) -> Result<RangeProof, &'static str> {
         self.assemble_shares(proof_shares)
     }
 }
