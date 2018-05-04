@@ -196,7 +196,12 @@ pub struct PartyAwaitingPolyChallenge {
 }
 
 impl PartyAwaitingPolyChallenge {
-    pub fn apply_challenge(self, pc: &PolyChallenge) -> ProofShare {
+    pub fn apply_challenge(self, pc: &PolyChallenge) -> Result<ProofShare, &'static str> {
+        // Prevent a malicious dealer from annihilating the blinding factors:
+        if pc.x == Scalar::zero() {
+            return Err("Poly challenge was zero, which would leak secrets, bailing out");
+        }
+
         let t_blinding_poly = util::Poly2(
             self.z * self.z * self.offset_z * self.v_blinding,
             self.t_1_blinding,
@@ -209,7 +214,7 @@ impl PartyAwaitingPolyChallenge {
         let l_vec = self.l_poly.eval(pc.x);
         let r_vec = self.r_poly.eval(pc.x);
 
-        ProofShare {
+        Ok(ProofShare {
             value_commitment: self.value_commitment,
             poly_commitment: self.poly_commitment,
             t_x_blinding,
@@ -217,6 +222,6 @@ impl PartyAwaitingPolyChallenge {
             e_blinding,
             l_vec,
             r_vec,
-        }
+        })
     }
 }
