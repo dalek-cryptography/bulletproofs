@@ -163,19 +163,15 @@ impl RangeProof {
     P: Borrow<RangeProof>,
     V: AsRef<[RistrettoPoint]>
     {
-        println!("Verifying batch!");
         let mut nm: usize = 0;
         let mut dyn_bases_count:usize = 0;
         let batch = proofs.into_iter().map(|(p, vcs, n)| {
             let m = vcs.as_ref().len();
             let v = p.borrow().prepare_verification(n, vcs, &mut transcript.clone(), rng);
             dyn_bases_count += m /*V*/ + 4 /*A,S,T1,T2*/ + 2*p.borrow().ipp_proof.L_vec.len() /*{L,R}*/;
-            println!("Current nm = {:?}, n,m = {:?},{:?}", nm, n, m);
             nm = nm.max(n*m);
             v
         }).collect::<Vec<_>>(); // we need to collect here so that nm and dyn_bases_count are computed.
-
-        println!("Batch size = {:?}", batch.len());
 
         if gens.G.len() < nm {
             return Err(
@@ -190,9 +186,6 @@ impl RangeProof {
 
         let mut dynamic_base_scalars: Vec<Scalar> = Vec::with_capacity(dyn_bases_count);
         let mut dynamic_bases: Vec<RistrettoPoint> = Vec::with_capacity(dyn_bases_count);
-
-        println!("Static scalars = {:?}", nm);
-        println!("Dynamic scalars = {:?}", dyn_bases_count);
 
         // All statements are added up. Each scalar in each statement
         // already has a challenge pre-multiplied in `prepare_verification`.
@@ -221,8 +214,8 @@ impl RangeProof {
                 .chain(dynamic_base_scalars.iter()),
             iter::once(&gens.pedersen_generators.B)
                 .chain(iter::once(&gens.pedersen_generators.B_blinding))
-                .chain(gens.G.iter())
-                .chain(gens.H.iter())
+                .chain(gens.G.iter().take(nm))
+                .chain(gens.H.iter().take(nm))
                 .chain(dynamic_bases.iter()),
         );
 
@@ -587,6 +580,11 @@ mod tests {
     #[test]
     fn batch_verify_n_differ_m_differ_total_64() {
         batch_verify_helper(&[(64, 1), (32, 2), (16, 4)]);
+    }
+
+    #[test]
+    fn batch_verify_mvp_failure() {
+        batch_verify_helper(&[(4,1),(2,2)]);
     }
 
     #[test]
