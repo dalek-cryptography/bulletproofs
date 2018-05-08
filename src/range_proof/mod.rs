@@ -375,6 +375,32 @@ mod tests {
 
     use generators::PedersenGenerators;
 
+    #[test]
+    fn test_delta() {
+        let mut rng = OsRng::new().unwrap();
+        let y = Scalar::random(&mut rng);
+        let z = Scalar::random(&mut rng);
+
+        // Choose n = 256 to ensure we overflow the group order during
+        // the computation, to check that that's done correctly
+        let n = 256;
+
+        // code copied from previous implementation
+        let z2 = z * z;
+        let z3 = z2 * z;
+        let mut power_g = Scalar::zero();
+        let mut exp_y = Scalar::one(); // start at y^0 = 1
+        let mut exp_2 = Scalar::one(); // start at 2^0 = 1
+        for _ in 0..n {
+            power_g += (z - z2) * exp_y - z3 * exp_2;
+
+            exp_y = exp_y * y; // y^i -> y^(i+1)
+            exp_2 = exp_2 + exp_2; // 2^i -> 2^(i+1)
+        }
+
+        assert_eq!(power_g, delta(n, 1, &y, &z),);
+    }
+
     /// Given a bitsize `n`, test the following:
     ///
     /// 1. Generate `m` random values and create a proof they are all in range;
@@ -670,31 +696,5 @@ mod tests {
 
         // XXX when we have error types, check finer info than "was error"
         assert!(maybe_share0.is_err());
-    }
-
-    #[test]
-    fn test_delta() {
-        let mut rng = OsRng::new().unwrap();
-        let y = Scalar::random(&mut rng);
-        let z = Scalar::random(&mut rng);
-
-        // Choose n = 256 to ensure we overflow the group order during
-        // the computation, to check that that's done correctly
-        let n = 256;
-
-        // code copied from previous implementation
-        let z2 = z * z;
-        let z3 = z2 * z;
-        let mut power_g = Scalar::zero();
-        let mut exp_y = Scalar::one(); // start at y^0 = 1
-        let mut exp_2 = Scalar::one(); // start at 2^0 = 1
-        for _ in 0..n {
-            power_g += (z - z2) * exp_y - z3 * exp_2;
-
-            exp_y = exp_y * y; // y^i -> y^(i+1)
-            exp_2 = exp_2 + exp_2; // 2^i -> 2^(i+1)
-        }
-
-        assert_eq!(power_g, delta(n, 1, &y, &z),);
     }
 }
