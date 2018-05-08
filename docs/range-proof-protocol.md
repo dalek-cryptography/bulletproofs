@@ -15,18 +15,10 @@ The aggregated range proof is a zero-knowledge proof of the following relation:
 
 where \\(n\\) and \\(m\\) are both a power of \\(2\\).
 
-Party and Dealer state machines
--------------------------------
-
-There are multiple ways to implement the party and dealer interactions described in the [API for the aggregated multiparty computation protocol](../aggregation/index.html#api-for-the-aggregated-multiparty-computation-protocol). One way is to model the parties and dealers as mutable objects, with a function for each step of the protocol, which mutates the party or dealer state. However, one problem with this model is that it is easy to use incorrectly - to call the functions out of order, or forget to call a function, or to call a function more than once. This deviation from the protocol could result in invalid proofs, and opens up the user to potential vulnerabilities such as replay attacks - when a malicious dealer tricks a party into doing multiple evaluations with different challenges, in order to factor out the party's blinding factors and learn about its secrets.
-
-We wanted a foolproof model that would prevent users from performing any step other than the correct next step of the protocol. We treated each party and dealer as a state machine, and modeled each party and dealer state as a distinct type. We used move semantics to ensure that a previous state is consumed as it transitions to the next state. For instance, the [`PartyAwaitingValueChallenge`](../aggregation/party/struct.PartyAwaitingValueChallenge.html) type has a function [`PartyAwaitingValueChallenge::apply_challenge`](../aggregation/party/struct.PartyAwaitingValueChallenge.html#method.apply_challenge), which receives a [`ValueChallenge`](aggregation/messages/struct.ValueChallenge.html) and returns an object of the next type in the protocol ([`PartyAwaitingPolyChallenge`](../aggregation/party/struct.PartyAwaitingPolyChallenge.html)) and a commitment ([`PolyCommitment`](..aggregation/messages/struct.PolyCommitment.html)), and consumes its own state.
-
-Due to the type system, we have a guarantee that one step of the protocol can't be performed twice, since the first function call for that step would consume the object, and therefore the function would not be able to be called on that object another time. This ensures that the implementation is invulnerable to replay attacks. We also have a guarantee that the user can't perform steps out of order or skip steps, since it is impossible to call a function on an object that is not of the correct corresponding type. 
-
-
 Party and Dealer's algorithm
 ----------------------------
+
+To create the aggregated range proof, \\(m\\) individual parties which each have a secret value \\(v_{(j)}\\)exchange messages with one dealer, without revealing their secrets. You may find more information on how the parties and dealers are implemented in [aggregated protocol notes](../aggregation/index.html#api-for-the-aggregated-multiparty-computation-protocol).
 
 The protocol begins with each party \\(j\\) computing three commitments: to the value \\(v_{(j)}\\), to the bits of that value \\(\mathbf{a}\_{L, (j)}, \mathbf{a}\_{R, (j)}\\), and to the per-bit blinding factors \\(\mathbf{s}\_{L, (j)}, \mathbf{s}\_{R, (j)}\\).
 
