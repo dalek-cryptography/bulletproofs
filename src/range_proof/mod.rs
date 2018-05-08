@@ -464,10 +464,11 @@ mod tests {
                 (proof, vc, *n)
             });
 
-        let max_n = nm.iter().map(|(n,_)| *n).max().unwrap_or(0);
-        let max_m = nm.iter().map(|(_,m)| *m).max().unwrap_or(0);
+        let max_nm = nm.iter().map(|(n,m)| n * m).max().unwrap_or(0);
 
-        let generators = Generators::new(PedersenGenerators::default(), max_n, max_m);
+        // hackish split of `n*m` into `n*m, 1` because we do not want
+        // to compute more 8 generators for the case such as ((4,1),(2,2)).
+        let generators = Generators::new(PedersenGenerators::default(), max_nm, 1);
 
         assert!(RangeProof::verify_batch(inputs, generators.all(), &mut transcript, &mut rng).is_ok());
     }
@@ -580,11 +581,6 @@ mod tests {
     #[test]
     fn batch_verify_n_differ_m_differ_total_64() {
         batch_verify_helper(&[(64, 1), (32, 2), (16, 4)]);
-    }
-
-    #[test]
-    fn batch_verify_mvp_failure() {
-        batch_verify_helper(&[(4,1),(2,2)]);
     }
 
     #[test]
