@@ -124,6 +124,9 @@ impl InnerProductProof {
         transcript: &mut ProofTranscript,
     ) -> (Vec<Scalar>, Vec<Scalar>, Vec<Scalar>) {
         let lg_n = self.L_vec.len();
+        // XXX FIXME: we need to pass in `n` explicitly and assert that lg_n == lg(n)
+        // This is necessary for avoiding DoS when a short log(n) vector
+        // causes the O(n) memory usage in the last loop.
         let n = 1 << lg_n;
 
         // 1. Recompute x_k,...,x_1 based on the proof transcript
