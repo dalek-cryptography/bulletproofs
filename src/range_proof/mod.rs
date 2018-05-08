@@ -228,7 +228,7 @@ impl RangeProof {
 
 /// Compute
 /// \\[
-/// \delta(y,z) = (z - z^{2}) \langle 1, {\mathbf{y}}^{nm} \rangle + z^{3} \langle \mathbf{1}, {\mathbf{2}}^{nm} \rangle
+/// \delta(y,z) = (z - z^{2}) \langle \mathbf{1}, {\mathbf{y}}^{n \cdot m} \rangle - \sum_{j=0}^{m-1} z^{j+3} \cdot \langle \mathbf{1}, {\mathbf{2}}^{n \cdot m} \rangle
 /// \\]
 fn delta(n: usize, m: usize, y: &Scalar, z: &Scalar) -> Scalar {
     let sum_y = util::sum_of_powers(y, n * m);

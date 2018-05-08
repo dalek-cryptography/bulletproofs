@@ -1,3 +1,9 @@
+//! The `party` module contains the API for the party state while the party is 
+//! engaging in an aggregated multiparty computation protocol. 
+//!
+//! For more explanation of how the `dealer`, `party`, and `messages` modules orchestrate the protocol execution, see
+//! [the API for the aggregated multiparty computation protocol](../aggregation/index.html#api-for-the-aggregated-multiparty-computation-protocol). 
+
 use curve25519_dalek::ristretto;
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
