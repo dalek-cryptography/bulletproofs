@@ -139,8 +139,7 @@ impl RangeProof {
         n: usize,
     ) -> Result<(), &'static str> {
         RangeProof::verify_batch(
-            iter::once((self, value_commitments)),
-            n,
+            iter::once((self, value_commitments, n)),
             gens,
             transcript,
             rng,
@@ -153,29 +152,32 @@ impl RangeProof {
     /// You must provide big enough view into generators (`gens`) that covers
     /// the biggest proof
     pub fn verify_batch<'a,'b,I,R,P,V>(
-        proofs: I, 
-        n: usize,
+        proofs: I,
         gens: GeneratorsView, // must have enough points to cover max(m*n)
         transcript: &mut ProofTranscript,
         rng: &mut R
     ) -> Result<(), &'static str> 
     where
     R: Rng,
-    I: IntoIterator<Item = (P, V)>,
+    I: IntoIterator<Item = (P, V, usize)>,
     P: Borrow<RangeProof>,
     V: AsRef<[RistrettoPoint]>
     {
-        let mut m: usize = 0;
+        println!("Verifying batch!");
+        let mut nm: usize = 0;
         let mut dyn_bases_count:usize = 0;
-        let batch = proofs.into_iter().map(|(p, vcs)| {
-            let m_curr = vcs.as_ref().len();
+        let batch = proofs.into_iter().map(|(p, vcs, n)| {
+            let m = vcs.as_ref().len();
             let v = p.borrow().prepare_verification(n, vcs, &mut transcript.clone(), rng);
-            dyn_bases_count += m_curr /*V*/ + 4 /*A,S,T1,T2*/ + 2*p.borrow().ipp_proof.L_vec.len();
-            m = m.max(m_curr);
+            dyn_bases_count += m /*V*/ + 4 /*A,S,T1,T2*/ + 2*p.borrow().ipp_proof.L_vec.len() /*{L,R}*/;
+            println!("Current nm = {:?}, n,m = {:?},{:?}", nm, n, m);
+            nm = nm.max(n*m);
             v
-        }).collect::<Vec<_>>();
+        }).collect::<Vec<_>>(); // we need to collect here so that nm and dyn_bases_count are computed.
 
-        if gens.G.len() < (n * m) {
+        println!("Batch size = {:?}", batch.len());
+
+        if gens.G.len() < nm {
             return Err(
                 "The generators view does not have enough generators for the largest proof",
             );
@@ -183,19 +185,23 @@ impl RangeProof {
 
         // First statement is used without a random factor
         let mut pedersen_base_scalars: (Scalar, Scalar) = (Scalar::zero(), Scalar::zero());
-        let mut g_scalars: Vec<Scalar> = iter::repeat(Scalar::zero()).take(n*m).collect();
-        let mut h_scalars: Vec<Scalar> = iter::repeat(Scalar::zero()).take(n*m).collect();
+        let mut g_scalars: Vec<Scalar> = iter::repeat(Scalar::zero()).take(nm).collect();
+        let mut h_scalars: Vec<Scalar> = iter::repeat(Scalar::zero()).take(nm).collect();
 
         let mut dynamic_base_scalars: Vec<Scalar> = Vec::with_capacity(dyn_bases_count);
         let mut dynamic_bases: Vec<RistrettoPoint> = Vec::with_capacity(dyn_bases_count);
 
-        // Other statements are added with a random factor per statement
+        println!("Static scalars = {:?}", nm);
+        println!("Dynamic scalars = {:?}", dyn_bases_count);
+
+        // All statements are added up. Each scalar in each statement
+        // already has a challenge pre-multiplied in `prepare_verification`.
         for verification in batch {
 
             pedersen_base_scalars.0 += verification.pedersen_base_scalars.0;
             pedersen_base_scalars.1 += verification.pedersen_base_scalars.1;
 
-            // Note: this loop may be shorter than the total amount of scalars if `m < max({m})`
+            // Note: these loops may be shorter than the total amount of scalars if `n*m < max({n*m})`
             for (i, s) in verification.g_scalars.iter().enumerate() {
                 g_scalars[i] += s;
             }
@@ -229,6 +235,7 @@ impl RangeProof {
 
     /// Prepares a `Verification` struct
     /// that can be combined with others in a batch.
+    /// Note: all scalars are pre-multiplied by a random challenge.
     fn prepare_verification<R, V>(
         &self,
         n: usize,
@@ -461,7 +468,7 @@ mod tests {
             .map(|(n, m)| {
                 let (p, vc) = singleparty_create_helper(*n, *m);
                 let proof = bincode::deserialize::<RangeProof>(&p).unwrap();
-                (proof, vc)
+                (proof, vc, *n)
             });
 
         let max_n = nm.iter().map(|(n,_)| *n).max().unwrap_or(0);
@@ -469,7 +476,7 @@ mod tests {
 
         let generators = Generators::new(PedersenGenerators::default(), max_n, max_m);
 
-        assert!(RangeProof::verify_batch(inputs, max_n, generators.all(), &mut transcript, &mut rng).is_ok());
+        assert!(RangeProof::verify_batch(inputs, generators.all(), &mut transcript, &mut rng).is_ok());
     }
 
 
