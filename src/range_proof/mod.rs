@@ -164,14 +164,12 @@ impl RangeProof {
     V: AsRef<[RistrettoPoint]>
     {
         let mut nm: usize = 0;
-        let mut dyn_bases_count:usize = 0;
         let batch = proofs.into_iter().map(|(p, vcs, n)| {
             let m = vcs.as_ref().len();
             let v = p.borrow().prepare_verification(n, vcs, &mut transcript.clone(), rng);
-            dyn_bases_count += m /*V*/ + 4 /*A,S,T1,T2*/ + 2*p.borrow().ipp_proof.L_vec.len() /*{L,R}*/;
             nm = nm.max(n*m);
             v
-        }).collect::<Vec<_>>(); // we need to collect here so that nm and dyn_bases_count are computed.
+        }).collect::<Vec<_>>();
 
         if gens.G.len() < nm {
             return Err(
@@ -184,12 +182,16 @@ impl RangeProof {
         let mut g_scalars: Vec<Scalar> = iter::repeat(Scalar::zero()).take(nm).collect();
         let mut h_scalars: Vec<Scalar> = iter::repeat(Scalar::zero()).take(nm).collect();
 
-        let mut dynamic_base_scalars: Vec<Scalar> = Vec::with_capacity(dyn_bases_count);
-        let mut dynamic_bases: Vec<RistrettoPoint> = Vec::with_capacity(dyn_bases_count);
+        let dynamic_base_scalars = batch.iter().flat_map(|v| {
+            v.dynamic_base_scalars.iter()
+        });
+        let dynamic_bases = batch.iter().flat_map(|v| {
+            v.dynamic_bases.iter()
+        });
 
         // All statements are added up. Each scalar in each statement
         // already has a challenge pre-multiplied in `prepare_verification`.
-        for verification in batch {
+        for verification in &batch {
 
             pedersen_base_scalars.0 += verification.pedersen_base_scalars.0;
             pedersen_base_scalars.1 += verification.pedersen_base_scalars.1;
@@ -201,9 +203,6 @@ impl RangeProof {
             for (i, s) in verification.h_scalars.iter().enumerate() {
                 h_scalars[i] += s;
             }
-
-            dynamic_base_scalars.extend(verification.dynamic_base_scalars);
-            dynamic_bases.extend(verification.dynamic_bases);
         }
 
         let mega_check = ristretto::vartime::multiscalar_mul(
@@ -211,12 +210,12 @@ impl RangeProof {
                 .chain(iter::once(&pedersen_base_scalars.1))
                 .chain(g_scalars.iter())
                 .chain(h_scalars.iter())
-                .chain(dynamic_base_scalars.iter()),
+                .chain(dynamic_base_scalars),
             iter::once(&gens.pedersen_generators.B)
                 .chain(iter::once(&gens.pedersen_generators.B_blinding))
                 .chain(gens.G.iter().take(nm))
                 .chain(gens.H.iter().take(nm))
-                .chain(dynamic_bases.iter()),
+                .chain(dynamic_bases),
         );
 
         if mega_check.is_identity() {
