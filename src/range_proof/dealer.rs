@@ -1,3 +1,9 @@
+//! The `dealer` module contains the API for the dealer state while the dealer is 
+//! engaging in an aggregated multiparty computation protocol. 
+//!
+//! For more explanation of how the `dealer`, `party`, and `messages` modules orchestrate the protocol execution, see
+//! [the API for the aggregated multiparty computation protocol](../aggregation/index.html#api-for-the-aggregated-multiparty-computation-protocol). 
+
 use rand::Rng;
 
 use curve25519_dalek::ristretto::RistrettoPoint;

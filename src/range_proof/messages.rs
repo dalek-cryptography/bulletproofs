@@ -1,3 +1,9 @@
+//! The `messages` module contains the API for the messages passed between the parties and the dealer
+//! in an aggregated multiparty computation protocol. 
+//! 
+//! For more explanation of how the `dealer`, `party`, and `messages` modules orchestrate the protocol execution, see
+//! [the API for the aggregated multiparty computation protocol](../aggregation/index.html#api-for-the-aggregated-multiparty-computation-protocol). 
+
 use std::iter;
 
 use curve25519_dalek::ristretto::{self, RistrettoPoint};

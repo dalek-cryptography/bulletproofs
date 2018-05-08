@@ -37,7 +37,7 @@ pub use generators::{Generators, GeneratorsView, PedersenGenerators};
 pub use proof_transcript::ProofTranscript;
 pub use range_proof::RangeProof;
 
-/// API for performing the aggregate-proving multiparty computation protocol.
+#[doc(include = "../docs/aggregation-api.md")]
 pub mod aggregation {
     pub use range_proof::dealer;
     pub use range_proof::messages;
