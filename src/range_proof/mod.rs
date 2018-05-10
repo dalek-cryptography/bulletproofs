@@ -90,23 +90,23 @@ impl RangeProof {
         let (parties, value_commitments): (Vec<_>, Vec<_>) = parties
             .into_iter()
             .enumerate()
-            .map(|(j, p)| p.assign_position(j, rng))
+            .map(|(j, p)| p.assign_position(j, rng).unwrap())
             .unzip();
 
         let (dealer, value_challenge) = dealer.receive_value_commitments(&value_commitments)?;
 
         let (parties, poly_commitments): (Vec<_>, Vec<_>) = parties
             .into_iter()
-            .map(|p| p.apply_challenge(&value_challenge, rng))
+            .map(|p| p.apply_value_challenge(&value_challenge, rng).unwrap())
             .unzip();
 
         let (dealer, poly_challenge) = dealer.receive_poly_commitments(&poly_commitments)?;
 
         let proof_shares: Vec<_> = parties
             .into_iter()
-            .map(|p| p.apply_challenge(&poly_challenge))
+            .map(|p| p.apply_poly_challenge(&poly_challenge).unwrap())
             // Collect the iterator of Results into a Result<Vec>, then unwrap it
-            .collect::<Result<Vec<_>,_>>()?;
+            .collect();
 
         dealer.receive_trusted_shares(&proof_shares)
     }
@@ -428,28 +428,28 @@ mod tests {
 
         let dealer = Dealer::new(generators.all(), n, m, &mut transcript).unwrap();
 
-        let (party0, value_com0) = party0.assign_position(0, &mut rng);
-        let (party1, value_com1) = party1.assign_position(1, &mut rng);
-        let (party2, value_com2) = party2.assign_position(2, &mut rng);
-        let (party3, value_com3) = party3.assign_position(3, &mut rng);
+        let (party0, value_com0) = party0.assign_position(0, &mut rng).unwrap();
+        let (party1, value_com1) = party1.assign_position(1, &mut rng).unwrap();
+        let (party2, value_com2) = party2.assign_position(2, &mut rng).unwrap();
+        let (party3, value_com3) = party3.assign_position(3, &mut rng).unwrap();
 
         let (dealer, value_challenge) = dealer
             .receive_value_commitments(&[value_com0, value_com1, value_com2, value_com3])
             .unwrap();
 
-        let (party0, poly_com0) = party0.apply_challenge(&value_challenge, &mut rng);
-        let (party1, poly_com1) = party1.apply_challenge(&value_challenge, &mut rng);
-        let (party2, poly_com2) = party2.apply_challenge(&value_challenge, &mut rng);
-        let (party3, poly_com3) = party3.apply_challenge(&value_challenge, &mut rng);
+        let (party0, poly_com0) = party0.apply_value_challenge(&value_challenge, &mut rng).unwrap();
+        let (party1, poly_com1) = party1.apply_value_challenge(&value_challenge, &mut rng).unwrap();
+        let (party2, poly_com2) = party2.apply_value_challenge(&value_challenge, &mut rng).unwrap();
+        let (party3, poly_com3) = party3.apply_value_challenge(&value_challenge, &mut rng).unwrap();
 
         let (dealer, poly_challenge) = dealer
             .receive_poly_commitments(&[poly_com0, poly_com1, poly_com2, poly_com3])
             .unwrap();
 
-        let share0 = party0.apply_challenge(&poly_challenge).unwrap();
-        let share1 = party1.apply_challenge(&poly_challenge).unwrap();
-        let share2 = party2.apply_challenge(&poly_challenge).unwrap();
-        let share3 = party3.apply_challenge(&poly_challenge).unwrap();
+        let share0 = party0.apply_poly_challenge(&poly_challenge).unwrap();
+        let share1 = party1.apply_poly_challenge(&poly_challenge).unwrap();
+        let share2 = party2.apply_poly_challenge(&poly_challenge).unwrap();
+        let share3 = party3.apply_poly_challenge(&poly_challenge).unwrap();
 
         match dealer.receive_shares(&mut rng, &[share0, share1, share2, share3]) {
             Ok(_proof) => {
@@ -484,13 +484,13 @@ mod tests {
 
         // Now do the protocol flow as normal....
 
-        let (party0, value_com0) = party0.assign_position(0, &mut rng);
+        let (party0, value_com0) = party0.assign_position(0, &mut rng).unwrap();
 
         let (dealer, value_challenge) = dealer
             .receive_value_commitments(&[value_com0])
             .unwrap();
 
-        let (party0, poly_com0) = party0.apply_challenge(&value_challenge, &mut rng);
+        let (party0, poly_com0) = party0.apply_value_challenge(&value_challenge, &mut rng).unwrap();
 
         let (_dealer, mut poly_challenge) = dealer
             .receive_poly_commitments(&[poly_com0])
@@ -499,7 +499,7 @@ mod tests {
         // But now simulate a malicious dealer choosing x = 0
         poly_challenge.x = Scalar::zero();
 
-        let maybe_share0 = party0.apply_challenge(&poly_challenge);
+        let maybe_share0 = party0.apply_poly_challenge(&poly_challenge);
 
         // XXX when we have error types, check finer info than "was error"
         assert!(maybe_share0.is_err());
