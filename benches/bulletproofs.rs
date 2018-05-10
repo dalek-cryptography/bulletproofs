@@ -87,7 +87,7 @@ fn verify_aggregated_rangeproof_helper(n: usize, c: &mut Criterion) {
             ).unwrap();
 
             // XXX would be nice to have some convenience API for this
-            let pg = &generators.all().pedersen_generators;
+            let pg = &generators.pedersen_generators;
             let value_commitments: Vec<_> = values
                 .iter()
                 .zip(blindings.iter())
@@ -100,7 +100,7 @@ fn verify_aggregated_rangeproof_helper(n: usize, c: &mut Criterion) {
 
                 proof.verify(
                     &value_commitments,
-                    generators.all(),
+                    &generators,
                     &mut transcript,
                     &mut rng,
                     n,

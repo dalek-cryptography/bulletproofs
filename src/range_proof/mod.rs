@@ -10,7 +10,7 @@ use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::IsIdentity;
 
-use generators::{Generators, GeneratorsView};
+use generators::Generators;
 use inner_product_proof::InnerProductProof;
 use proof_transcript::ProofTranscript;
 use util;
@@ -76,7 +76,7 @@ impl RangeProof {
             return Err("mismatched values and blindings len");
         }
 
-        let dealer = Dealer::new(generators.all(), n, values.len(), transcript)?;
+        let dealer = Dealer::new(generators, n, values.len(), transcript)?;
 
         let parties: Vec<_> = values
             .iter()
@@ -119,7 +119,7 @@ impl RangeProof {
     pub fn verify_single<R: Rng>(
         &self,
         V: &RistrettoPoint,
-        gens: GeneratorsView,
+        gens: &Generators,
         transcript: &mut ProofTranscript,
         rng: &mut R,
         n: usize,
@@ -133,7 +133,7 @@ impl RangeProof {
     pub fn verify<R: Rng>(
         &self,
         value_commitments: &[RistrettoPoint],
-        gens: GeneratorsView,
+        gens: &Generators,
         transcript: &mut ProofTranscript,
         rng: &mut R,
         n: usize,
@@ -314,7 +314,7 @@ mod tests {
             // 2. Serialize
             proof_bytes = bincode::serialize(&proof).unwrap();
 
-            let pg = &generators.all().pedersen_generators;
+            let pg = &generators.pedersen_generators;
 
             // XXX would be nice to have some convenience API for this
             value_commitments = values
@@ -344,10 +344,10 @@ mod tests {
                 proof
                     .verify(
                         &value_commitments,
-                        generators.all(),
+                        &generators,
                         &mut transcript,
                         &mut rng,
-                        n,
+                        n
                     )
                     .is_ok()
             );
@@ -426,7 +426,7 @@ mod tests {
         let v3_blinding = Scalar::random(&mut rng);
         let party3 = Party::new(v3, v3_blinding, n, &generators).unwrap();
 
-        let dealer = Dealer::new(generators.all(), n, m, &mut transcript).unwrap();
+        let dealer = Dealer::new(&generators, n, m, &mut transcript).unwrap();
 
         let (party0, value_com0) = party0.assign_position(0, &mut rng);
         let (party1, value_com1) = party1.assign_position(1, &mut rng);
@@ -480,21 +480,17 @@ mod tests {
         let v0_blinding = Scalar::random(&mut rng);
         let party0 = Party::new(v0, v0_blinding, n, &generators).unwrap();
 
-        let dealer = Dealer::new(generators.all(), n, m, &mut transcript).unwrap();
+        let dealer = Dealer::new(&generators, n, m, &mut transcript).unwrap();
 
         // Now do the protocol flow as normal....
 
         let (party0, value_com0) = party0.assign_position(0, &mut rng);
 
-        let (dealer, value_challenge) = dealer
-            .receive_value_commitments(&[value_com0])
-            .unwrap();
+        let (dealer, value_challenge) = dealer.receive_value_commitments(&[value_com0]).unwrap();
 
         let (party0, poly_com0) = party0.apply_challenge(&value_challenge, &mut rng);
 
-        let (_dealer, mut poly_challenge) = dealer
-            .receive_poly_commitments(&[poly_com0])
-            .unwrap();
+        let (_dealer, mut poly_challenge) = dealer.receive_poly_commitments(&[poly_com0]).unwrap();
 
         // But now simulate a malicious dealer choosing x = 0
         poly_challenge.x = Scalar::zero();
