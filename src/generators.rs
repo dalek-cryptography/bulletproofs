@@ -1,20 +1,5 @@
 //! The `generators` module contains API for producing a
 //! set of generators for a rangeproof.
-//!
-//!
-//! # Example
-//!
-//! ```
-//! # extern crate ristretto_bulletproofs;
-//! # use ristretto_bulletproofs::{PedersenGenerators,Generators};
-//! # fn main() {
-//! let generators = Generators::new(PedersenGenerators::default(), 64,1);
-//! let view = generators.all();
-//! let G0 = view.G[0];
-//! let H0 = view.H[0];
-//!
-//! # }
-//! ```
 
 #![allow(non_snake_case)]
 #![deny(missing_docs)]
@@ -61,7 +46,8 @@ impl Iterator for GeneratorsChain {
     }
 }
 
-/// `Generators` contains all the generators needed for aggregating `m` range proofs of `n` bits each.
+/// The `Generators` struct contains all the generators needed for
+/// aggregating `m` range proofs of `n` bits each.
 #[derive(Clone)]
 pub struct Generators {
     /// Number of bits in a rangeproof
@@ -69,14 +55,18 @@ pub struct Generators {
     /// Number of values or parties
     pub m: usize,
     /// Bases for Pedersen commitments
-    pedersen_generators: PedersenGenerators,
+    pub pedersen_generators: PedersenGenerators,
     /// Per-bit generators for the bit values
-    G: Vec<RistrettoPoint>,
+    pub G: Vec<RistrettoPoint>,
     /// Per-bit generators for the bit blinding factors
-    H: Vec<RistrettoPoint>,
+    pub H: Vec<RistrettoPoint>,
 }
 
-/// Represents a view into `Generators` relevant to a specific range proof.
+/// The `GeneratorsView` is produced by `Generators::share()`.
+///
+/// The `Generators` struct represents generators for an aggregated
+/// range proof `m` proofs of `n` bits each; the `GeneratorsView`
+/// represents the generators for one of the `m` parties' shares.
 #[derive(Copy, Clone)]
 pub struct GeneratorsView<'a> {
     /// Bases for Pedersen commitments
@@ -98,12 +88,6 @@ pub struct PedersenGenerators {
 }
 
 impl PedersenGenerators {
-    /// Constructs a pair of Pedersen generators
-    /// from a pair of generators provided by the user.
-    pub fn new(B: RistrettoPoint, B_blinding: RistrettoPoint) -> Self {
-        PedersenGenerators { B, B_blinding }
-    }
-
     /// Creates a Pedersen commitment using the value scalar and a blinding factor.
     pub fn commit(&self, value: Scalar, blinding: Scalar) -> RistrettoPoint {
         ristretto::multiscalar_mul(&[value, blinding], &[self.B, self.B_blinding])
@@ -134,20 +118,11 @@ impl Generators {
             .collect();
 
         Generators {
+            pedersen_generators,
             n,
             m,
-            pedersen_generators: pedersen_generators,
             G,
             H,
-        }
-    }
-
-    /// Returns a view into the entirety of the generators.
-    pub fn all(&self) -> GeneratorsView {
-        GeneratorsView {
-            pedersen_generators: &self.pedersen_generators,
-            G: &self.G[..],
-            H: &self.H[..],
         }
     }
 
@@ -177,21 +152,15 @@ mod tests {
 
         // The concatenation of shares must be the full generator set
         assert_eq!(
-            [gens.all().G[..n].to_vec(), gens.all().H[..n].to_vec()],
+            [gens.G[..n].to_vec(), gens.H[..n].to_vec()],
             [gens.share(0).G[..].to_vec(), gens.share(0).H[..].to_vec()]
         );
         assert_eq!(
-            [
-                gens.all().G[n..][..n].to_vec(),
-                gens.all().H[n..][..n].to_vec(),
-            ],
+            [gens.G[n..][..n].to_vec(), gens.H[n..][..n].to_vec()],
             [gens.share(1).G[..].to_vec(), gens.share(1).H[..].to_vec()]
         );
         assert_eq!(
-            [
-                gens.all().G[2 * n..][..n].to_vec(),
-                gens.all().H[2 * n..][..n].to_vec(),
-            ],
+            [gens.G[2 * n..][..n].to_vec(), gens.H[2 * n..][..n].to_vec()],
             [gens.share(2).G[..].to_vec(), gens.share(2).H[..].to_vec()]
         );
     }

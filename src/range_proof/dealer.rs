@@ -1,8 +1,8 @@
-//! The `dealer` module contains the API for the dealer state while the dealer is 
-//! engaging in an aggregated multiparty computation protocol. 
+//! The `dealer` module contains the API for the dealer state while the dealer is
+//! engaging in an aggregated multiparty computation protocol.
 //!
 //! For more explanation of how the `dealer`, `party`, and `messages` modules orchestrate the protocol execution, see
-//! [the API for the aggregated multiparty computation protocol](../aggregation/index.html#api-for-the-aggregated-multiparty-computation-protocol). 
+//! [the API for the aggregated multiparty computation protocol](../aggregation/index.html#api-for-the-aggregated-multiparty-computation-protocol).
 
 use rand::Rng;
 
@@ -10,7 +10,7 @@ use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::Identity;
 
-use generators::GeneratorsView;
+use generators::Generators;
 use inner_product_proof;
 use proof_transcript::ProofTranscript;
 use range_proof::RangeProof;
@@ -25,7 +25,7 @@ pub struct Dealer {}
 impl Dealer {
     /// Creates a new dealer coordinating `m` parties proving `n`-bit ranges.
     pub fn new<'a, 'b>(
-        gens: GeneratorsView<'b>,
+        gens: &'b Generators,
         n: usize,
         m: usize,
         transcript: &'a mut ProofTranscript,
@@ -74,7 +74,7 @@ pub struct DealerAwaitingValueCommitments<'a, 'b> {
     /// The dealer keeps a copy of the initial transcript state, so
     /// that it can attempt to verify the aggregated proof at the end.
     initial_transcript: ProofTranscript,
-    gens: GeneratorsView<'b>,
+    gens: &'b Generators,
 }
 
 impl<'a, 'b> DealerAwaitingValueCommitments<'a, 'b> {
@@ -125,7 +125,7 @@ pub struct DealerAwaitingPolyCommitments<'a, 'b> {
     m: usize,
     transcript: &'a mut ProofTranscript,
     initial_transcript: ProofTranscript,
-    gens: GeneratorsView<'b>,
+    gens: &'b Generators,
     value_challenge: ValueChallenge,
 }
 
@@ -171,7 +171,7 @@ pub struct DealerAwaitingProofShares<'a, 'b> {
     m: usize,
     transcript: &'a mut ProofTranscript,
     initial_transcript: ProofTranscript,
-    gens: GeneratorsView<'b>,
+    gens: &'b Generators,
     value_challenge: ValueChallenge,
     poly_challenge: PolyChallenge,
 }
