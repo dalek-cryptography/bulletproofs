@@ -110,6 +110,7 @@ impl<'a> PartyAwaitingPosition<'a> {
 
 /// When party knows its position (`j`), it can produce commitments
 /// to all bits of the value and necessary blinding factors.
+#[derive(Clone)]
 pub struct PartyAwaitingValueChallenge<'a> {
     n: usize, // bitsize of the range
     v: u64,

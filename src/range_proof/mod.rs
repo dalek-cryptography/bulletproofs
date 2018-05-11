@@ -437,16 +437,32 @@ mod tests {
             .receive_value_commitments(vec![value_com0, value_com1, value_com2, value_com3])
             .unwrap();
 
-        let (party0, poly_com0) = party0.apply_challenge(&value_challenge, &mut rng);
+        let mut replay_results: Vec<(PartyAwaitingPolyChallenge, messages::PolyCommitment)> = vec![];
+        for _ in 0..10 {
+            let replay_clone = party0.clone();
+            let replay_result = replay_clone.apply_challenge(&value_challenge, &mut rng);
+            replay_results.push(replay_result);
+        };
+        // Do something with the replay results to determine secrets.
+        assert_eq!(replay_results.len(), 10);
+        
+        let (_party0, poly_com0) = party0.apply_challenge(&value_challenge, &mut rng);
         let (party1, poly_com1) = party1.apply_challenge(&value_challenge, &mut rng);
         let (party2, poly_com2) = party2.apply_challenge(&value_challenge, &mut rng);
         let (party3, poly_com3) = party3.apply_challenge(&value_challenge, &mut rng);
-
         let (dealer, poly_challenge) = dealer
             .receive_poly_commitments(vec![poly_com0, poly_com1, poly_com2, poly_com3])
             .unwrap();
+            
+        let mut shares_results: Vec<messages::ProofShare> 
+            = replay_results.into_iter()
+            .map(|(party_awaiting_poly, _poly_commit)| {
+                party_awaiting_poly.apply_challenge(&poly_challenge).unwrap()
+            }).collect();
+        // Do something else with the shares results to determine secrets.
+        assert_eq!(shares_results.len(), 10);
 
-        let share0 = party0.apply_challenge(&poly_challenge).unwrap();
+        let share0 = shares_results.pop().unwrap();
         let share1 = party1.apply_challenge(&poly_challenge).unwrap();
         let share2 = party2.apply_challenge(&poly_challenge).unwrap();
         let share3 = party3.apply_challenge(&poly_challenge).unwrap();
