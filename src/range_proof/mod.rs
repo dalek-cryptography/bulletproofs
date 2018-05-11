@@ -93,14 +93,14 @@ impl RangeProof {
             .map(|(j, p)| p.assign_position(j, rng))
             .unzip();
 
-        let (dealer, value_challenge) = dealer.receive_value_commitments(&value_commitments)?;
+        let (dealer, value_challenge) = dealer.receive_value_commitments(value_commitments)?;
 
         let (parties, poly_commitments): (Vec<_>, Vec<_>) = parties
             .into_iter()
             .map(|p| p.apply_challenge(&value_challenge, rng))
             .unzip();
 
-        let (dealer, poly_challenge) = dealer.receive_poly_commitments(&poly_commitments)?;
+        let (dealer, poly_challenge) = dealer.receive_poly_commitments(poly_commitments)?;
 
         let proof_shares: Vec<_> = parties
             .into_iter()
@@ -434,7 +434,7 @@ mod tests {
         let (party3, value_com3) = party3.assign_position(3, &mut rng);
 
         let (dealer, value_challenge) = dealer
-            .receive_value_commitments(&[value_com0, value_com1, value_com2, value_com3])
+            .receive_value_commitments(vec![value_com0, value_com1, value_com2, value_com3])
             .unwrap();
 
         let (party0, poly_com0) = party0.apply_challenge(&value_challenge, &mut rng);
@@ -443,7 +443,7 @@ mod tests {
         let (party3, poly_com3) = party3.apply_challenge(&value_challenge, &mut rng);
 
         let (dealer, poly_challenge) = dealer
-            .receive_poly_commitments(&[poly_com0, poly_com1, poly_com2, poly_com3])
+            .receive_poly_commitments(vec![poly_com0, poly_com1, poly_com2, poly_com3])
             .unwrap();
 
         let share0 = party0.apply_challenge(&poly_challenge).unwrap();
@@ -486,11 +486,12 @@ mod tests {
 
         let (party0, value_com0) = party0.assign_position(0, &mut rng);
 
-        let (dealer, value_challenge) = dealer.receive_value_commitments(&[value_com0]).unwrap();
+        let (dealer, value_challenge) = dealer.receive_value_commitments(vec![value_com0]).unwrap();
 
         let (party0, poly_com0) = party0.apply_challenge(&value_challenge, &mut rng);
 
-        let (_dealer, mut poly_challenge) = dealer.receive_poly_commitments(&[poly_com0]).unwrap();
+        let (_dealer, mut poly_challenge) =
+            dealer.receive_poly_commitments(vec![poly_com0]).unwrap();
 
         // But now simulate a malicious dealer choosing x = 0
         poly_challenge.x = Scalar::zero();

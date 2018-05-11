@@ -124,7 +124,7 @@ pub fn sum_of_powers(x: &Scalar, n: usize) -> Scalar {
 
 // takes the sum of all of the powers of x, up to n
 fn sum_of_powers_slow(x: &Scalar, n: usize) -> Scalar {
-    exp_iter(*x).take(n).fold(Scalar::zero(), |acc, x| acc + x)
+    exp_iter(*x).take(n).sum()
 }
 
 #[cfg(test)]
