@@ -88,14 +88,17 @@ impl<'a> PartyAwaitingPosition<'a> {
         );
 
         // Return next state and all commitments
-        let value_commitment = ValueCommitment { V: self.V, A, S };
+        let value_commitment = ValueCommitment {
+            V_j: self.V,
+            A_j: A,
+            S_j: S,
+        };
         let next_state = PartyAwaitingValueChallenge {
             n: self.n,
             v: self.v,
             v_blinding: self.v_blinding,
             generators: self.generators,
             j,
-            value_commitment,
             a_blinding,
             s_blinding,
             s_L,
@@ -114,7 +117,6 @@ pub struct PartyAwaitingValueChallenge<'a> {
 
     j: usize,
     generators: &'a Generators,
-    value_commitment: ValueCommitment,
     a_blinding: Scalar,
     s_blinding: Scalar,
     s_L: Vec<Scalar>,
@@ -165,11 +167,12 @@ impl<'a> PartyAwaitingValueChallenge<'a> {
             .pedersen_generators
             .commit(t_poly.2, t_2_blinding);
 
-        let poly_commitment = PolyCommitment { T_1, T_2 };
+        let poly_commitment = PolyCommitment {
+            T_1_j: T_1,
+            T_2_j: T_2,
+        };
 
         let papc = PartyAwaitingPolyChallenge {
-            value_commitment: self.value_commitment,
-            poly_commitment,
             z: vc.z,
             offset_z,
             l_poly,
@@ -187,8 +190,6 @@ impl<'a> PartyAwaitingValueChallenge<'a> {
 }
 
 pub struct PartyAwaitingPolyChallenge {
-    value_commitment: ValueCommitment,
-    poly_commitment: PolyCommitment,
     z: Scalar,
     offset_z: Scalar,
     l_poly: util::VecPoly1,
@@ -221,8 +222,6 @@ impl PartyAwaitingPolyChallenge {
         let r_vec = self.r_poly.eval(pc.x);
 
         Ok(ProofShare {
-            value_commitment: self.value_commitment,
-            poly_commitment: self.poly_commitment,
             t_x_blinding,
             t_x,
             e_blinding,
