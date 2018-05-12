@@ -5,6 +5,9 @@
 use std::borrow::Borrow;
 use std::iter;
 
+use rayon;
+use rayon::prelude::*;
+
 use curve25519_dalek::ristretto;
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
@@ -74,17 +77,21 @@ impl InnerProductProof {
             let (G_L, G_R) = G.split_at_mut(n);
             let (H_L, H_R) = H.split_at_mut(n);
 
-            let c_L = inner_product(&a_L, &b_R);
-            let c_R = inner_product(&a_R, &b_L);
-
-            let L = ristretto::vartime::multiscalar_mul(
-                a_L.iter().chain(b_R.iter()).chain(iter::once(&c_L)),
-                G_R.iter().chain(H_L.iter()).chain(iter::once(Q)),
-            );
-
-            let R = ristretto::vartime::multiscalar_mul(
-                a_R.iter().chain(b_L.iter()).chain(iter::once(&c_R)),
-                G_L.iter().chain(H_R.iter()).chain(iter::once(Q)),
+            let (L, R) = rayon::join(
+                || {
+                    let c_L = inner_product(&a_L, &b_R);
+                    ristretto::vartime::multiscalar_mul(
+                        a_L.iter().chain(b_R.iter()).chain(iter::once(&c_L)),
+                        G_R.iter().chain(H_L.iter()).chain(iter::once(Q)),
+                    )
+                },
+                || {
+                    let c_R = inner_product(&a_R, &b_L);
+                    ristretto::vartime::multiscalar_mul(
+                        a_R.iter().chain(b_L.iter()).chain(iter::once(&c_R)),
+                        G_L.iter().chain(H_R.iter()).chain(iter::once(Q)),
+                    )
+                },
             );
 
             L_vec.push(L);
@@ -99,9 +106,20 @@ impl InnerProductProof {
             for i in 0..n {
                 a_L[i] = a_L[i] * u + u_inv * a_R[i];
                 b_L[i] = b_L[i] * u_inv + u * b_R[i];
-                G_L[i] = ristretto::vartime::multiscalar_mul(&[u_inv, u], &[G_L[i], G_R[i]]);
-                H_L[i] = ristretto::vartime::multiscalar_mul(&[u, u_inv], &[H_L[i], H_R[i]]);
             }
+            // Parallelized calculation of each index of the vectors G and H.
+            // G_L[i] = G_L[i] * u_inv + G_R[i] * u (for all i)
+            G_L.par_iter_mut()
+                .zip(G_R.par_iter())
+                .for_each(|(G_L_i, G_R_i)| {
+                    *G_L_i = ristretto::vartime::multiscalar_mul(&[u_inv, u], &[*G_L_i, *G_R_i]);
+                });
+            // H_L[i] = H_L[i] * u + H_R[i] * u_inv (for all i)
+            H_L.par_iter_mut()
+                .zip(H_R.par_iter())
+                .for_each(|(H_L_i, H_R_i)| {
+                    *H_L_i = ristretto::vartime::multiscalar_mul(&[u, u_inv], &[*H_L_i, *H_R_i]);
+                });
 
             a = a_L;
             b = b_L;
