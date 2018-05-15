@@ -4,11 +4,11 @@
 //! For more explanation of how the `dealer`, `party`, and `messages` modules orchestrate the protocol execution, see
 //! [the API for the aggregated multiparty computation protocol](../aggregation/index.html#api-for-the-aggregated-multiparty-computation-protocol).
 
-use curve25519_dalek::ristretto;
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
+use curve25519_dalek::traits::MultiscalarMul;
 use generators::Generators;
-use rand::Rng;
+use rand::{CryptoRng, Rng};
 use std::iter;
 use util;
 
@@ -54,14 +54,14 @@ pub struct PartyAwaitingPosition<'a> {
 impl<'a> PartyAwaitingPosition<'a> {
     /// Assigns the position to a party,
     /// at which point the party knows its generators.
-    pub fn assign_position<R: Rng>(
+    pub fn assign_position<R: Rng + CryptoRng>(
         self,
         j: usize,
-        mut rng: &mut R,
+        rng: &mut R,
     ) -> (PartyAwaitingValueChallenge<'a>, ValueCommitment) {
         let gen_share = self.generators.share(j);
 
-        let a_blinding = Scalar::random(&mut rng);
+        let a_blinding = Scalar::random(rng);
         // Compute A = <a_L, G> + <a_R, H> + a_blinding * B_blinding
         let mut A = gen_share.pedersen_generators.B_blinding * a_blinding;
 
@@ -75,12 +75,12 @@ impl<'a> PartyAwaitingPosition<'a> {
             A += point;
         }
 
-        let s_blinding = Scalar::random(&mut rng);
-        let s_L: Vec<Scalar> = (0..self.n).map(|_| Scalar::random(&mut rng)).collect();
-        let s_R: Vec<Scalar> = (0..self.n).map(|_| Scalar::random(&mut rng)).collect();
+        let s_blinding = Scalar::random(rng);
+        let s_L: Vec<Scalar> = (0..self.n).map(|_| Scalar::random(rng)).collect();
+        let s_R: Vec<Scalar> = (0..self.n).map(|_| Scalar::random(rng)).collect();
 
         // Compute S = <s_L, G> + <s_R, H> + s_blinding * B_blinding
-        let S = ristretto::multiscalar_mul(
+        let S = RistrettoPoint::multiscalar_mul(
             iter::once(&s_blinding).chain(s_L.iter()).chain(s_R.iter()),
             iter::once(&gen_share.pedersen_generators.B_blinding)
                 .chain(gen_share.G.iter())
@@ -124,7 +124,7 @@ pub struct PartyAwaitingValueChallenge<'a> {
 }
 
 impl<'a> PartyAwaitingValueChallenge<'a> {
-    pub fn apply_challenge<R: Rng>(
+    pub fn apply_challenge<R: Rng + CryptoRng>(
         self,
         vc: &ValueChallenge,
         rng: &mut R,

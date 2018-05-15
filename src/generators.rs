@@ -5,11 +5,11 @@
 #![deny(missing_docs)]
 
 // XXX we should use Sha3 everywhere
+use sha2::{Digest, Sha512};
 
-use curve25519_dalek::ristretto;
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
-use sha2::{Digest, Sha512};
+use curve25519_dalek::traits::MultiscalarMul;
 
 /// The `GeneratorsChain` creates an arbitrary-long sequence of orthogonal generators.
 /// The sequence can be deterministically produced starting with an arbitrary point.
@@ -90,7 +90,7 @@ pub struct PedersenGenerators {
 impl PedersenGenerators {
     /// Creates a Pedersen commitment using the value scalar and a blinding factor.
     pub fn commit(&self, value: Scalar, blinding: Scalar) -> RistrettoPoint {
-        ristretto::multiscalar_mul(&[value, blinding], &[self.B, self.B_blinding])
+        RistrettoPoint::multiscalar_mul(&[value, blinding], &[self.B, self.B_blinding])
     }
 }
 
