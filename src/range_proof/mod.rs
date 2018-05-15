@@ -1,14 +1,13 @@
 #![allow(non_snake_case)]
 #![doc(include = "../docs/range-proof-protocol.md")]
 
-use rand::Rng;
+use rand::{CryptoRng, Rng};
 
 use std::iter;
 
-use curve25519_dalek::ristretto;
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
-use curve25519_dalek::traits::IsIdentity;
+use curve25519_dalek::traits::{IsIdentity, VartimeMultiscalarMul};
 
 use generators::Generators;
 use inner_product_proof::InnerProductProof;
@@ -47,7 +46,7 @@ impl RangeProof {
     /// blinding scalar `v_blinding`.
     ///
     /// XXX add doctests
-    pub fn prove_single<R: Rng>(
+    pub fn prove_single<R: Rng + CryptoRng>(
         generators: &Generators,
         transcript: &mut ProofTranscript,
         rng: &mut R,
@@ -61,7 +60,7 @@ impl RangeProof {
     /// Create a rangeproof for a set of values.
     ///
     /// XXX add doctests
-    pub fn prove_multiple<R: Rng>(
+    pub fn prove_multiple<R: Rng + CryptoRng>(
         generators: &Generators,
         transcript: &mut ProofTranscript,
         rng: &mut R,
@@ -116,7 +115,7 @@ impl RangeProof {
     /// This is a convenience wrapper around `verify` for the `m=1` case.
     ///
     /// XXX add doctests
-    pub fn verify_single<R: Rng>(
+    pub fn verify_single<R: Rng + CryptoRng>(
         &self,
         V: &RistrettoPoint,
         gens: &Generators,
@@ -130,7 +129,7 @@ impl RangeProof {
     /// Verifies an aggregated rangeproof for the given value commitments.
     ///
     /// XXX add doctests
-    pub fn verify<R: Rng>(
+    pub fn verify<R: Rng + CryptoRng>(
         &self,
         value_commitments: &[RistrettoPoint],
         gens: &Generators,
@@ -193,7 +192,7 @@ impl RangeProof {
         let value_commitment_scalars = util::exp_iter(z).take(m).map(|z_exp| c * zz * z_exp);
         let basepoint_scalar = w * (self.t_x - a * b) + c * (delta(n, m, &y, &z) - self.t_x);
 
-        let mega_check = ristretto::vartime::multiscalar_mul(
+        let mega_check = RistrettoPoint::vartime_multiscalar_mul(
             iter::once(Scalar::one())
                 .chain(iter::once(x))
                 .chain(value_commitment_scalars)
@@ -241,7 +240,7 @@ fn delta(n: usize, m: usize, y: &Scalar, z: &Scalar) -> Scalar {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rand::OsRng;
+    use rand::rngs::OsRng;
 
     use generators::PedersenGenerators;
 
@@ -409,20 +408,20 @@ mod tests {
         let mut transcript = ProofTranscript::new(b"AggregatedRangeProofTest");
 
         // Parties 0, 2 are honest and use a 32-bit value
-        let v0 = rng.next_u32() as u64;
+        let v0 = rng.gen::<u32>() as u64;
         let v0_blinding = Scalar::random(&mut rng);
         let party0 = Party::new(v0, v0_blinding, n, &generators).unwrap();
 
-        let v2 = rng.next_u32() as u64;
+        let v2 = rng.gen::<u32>() as u64;
         let v2_blinding = Scalar::random(&mut rng);
         let party2 = Party::new(v2, v2_blinding, n, &generators).unwrap();
 
         // Parties 1, 3 are dishonest and use a 64-bit value
-        let v1 = rng.next_u64();
+        let v1 = rng.gen::<u64>();
         let v1_blinding = Scalar::random(&mut rng);
         let party1 = Party::new(v1, v1_blinding, n, &generators).unwrap();
 
-        let v3 = rng.next_u64();
+        let v3 = rng.gen::<u64>();
         let v3_blinding = Scalar::random(&mut rng);
         let party3 = Party::new(v3, v3_blinding, n, &generators).unwrap();
 
@@ -476,7 +475,7 @@ mod tests {
         let mut rng = OsRng::new().unwrap();
         let mut transcript = ProofTranscript::new(b"AggregatedRangeProofTest");
 
-        let v0 = rng.next_u32() as u64;
+        let v0 = rng.gen::<u32>() as u64;
         let v0_blinding = Scalar::random(&mut rng);
         let party0 = Party::new(v0, v0_blinding, n, &generators).unwrap();
 

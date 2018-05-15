@@ -4,7 +4,7 @@ extern crate criterion;
 use criterion::Criterion;
 
 extern crate rand;
-use rand::{OsRng, Rng};
+use rand::{rngs::OsRng, Rng};
 
 extern crate curve25519_dalek;
 use curve25519_dalek::scalar::Scalar;

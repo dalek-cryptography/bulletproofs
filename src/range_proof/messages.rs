@@ -58,8 +58,7 @@ impl ProofShare {
     ) -> Result<(), &'static str> {
         use std::iter;
 
-        use curve25519_dalek::ristretto;
-        use curve25519_dalek::traits::IsIdentity;
+        use curve25519_dalek::traits::{IsIdentity, VartimeMultiscalarMul};
 
         use inner_product_proof::inner_product;
         use util;
@@ -89,7 +88,7 @@ impl ProofShare {
                 z + exp_y_inv * y_jn_inv * (-r_i) + exp_y_inv * y_jn_inv * (zz * z_j * exp_2)
             });
 
-        let P_check = ristretto::vartime::multiscalar_mul(
+        let P_check = RistrettoPoint::vartime_multiscalar_mul(
             iter::once(Scalar::one())
                 .chain(iter::once(*x))
                 .chain(iter::once(-self.e_blinding))
@@ -108,7 +107,7 @@ impl ProofShare {
         let sum_of_powers_y = util::sum_of_powers(&y, n);
         let sum_of_powers_2 = util::sum_of_powers(&Scalar::from_u64(2), n);
         let delta = (z - zz) * sum_of_powers_y * y_jn - z * zz * sum_of_powers_2 * z_j;
-        let t_check = ristretto::vartime::multiscalar_mul(
+        let t_check = RistrettoPoint::vartime_multiscalar_mul(
             iter::once(zz * z_j)
                 .chain(iter::once(*x))
                 .chain(iter::once(x * x))
