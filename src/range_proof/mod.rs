@@ -179,14 +179,15 @@ impl RangeProof {
         // Construct concat_z_and_2, an iterator of the values of
         // z^0 * \vec(2)^n || z^1 * \vec(2)^n || ... || z^(m-1) * \vec(2)^n
         let powers_of_2: Vec<Scalar> = util::exp_iter(Scalar::from_u64(2)).take(n).collect();
-        let powers_of_z = util::exp_iter(z).take(m);
-        let concat_z_and_2 =
-            powers_of_z.flat_map(|exp_z| powers_of_2.iter().map(move |exp_2| exp_2 * exp_z));
+        let concat_z_and_2: Vec<Scalar> = util::exp_iter(z)
+            .take(m)
+            .flat_map(|exp_z| powers_of_2.iter().map(move |exp_2| exp_2 * exp_z))
+            .collect();
 
         let g = s.iter().map(|s_i| minus_z - a * s_i);
         let h = s_inv
             .zip(util::exp_iter(y.invert()))
-            .zip(concat_z_and_2)
+            .zip(concat_z_and_2.iter())
             .map(|((s_i_inv, exp_y_inv), z_and_2)| z + exp_y_inv * (zz * z_and_2 - b * s_i_inv));
 
         let value_commitment_scalars = util::exp_iter(z).take(m).map(|z_exp| c * zz * z_exp);
