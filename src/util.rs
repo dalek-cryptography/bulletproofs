@@ -26,6 +26,10 @@ impl Iterator for ScalarExp {
         self.next_exp_x *= self.x;
         Some(exp_x)
     }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (usize::max_value(), None)
+    }
 }
 
 /// Return an iterator of the powers of `x`.
