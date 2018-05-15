@@ -5,9 +5,9 @@
 use std::borrow::Borrow;
 use std::iter;
 
-use curve25519_dalek::ristretto;
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
+use curve25519_dalek::traits::VartimeMultiscalarMul;
 
 use proof_transcript::ProofTranscript;
 
@@ -77,12 +77,12 @@ impl InnerProductProof {
             let c_L = inner_product(&a_L, &b_R);
             let c_R = inner_product(&a_R, &b_L);
 
-            let L = ristretto::vartime::multiscalar_mul(
+            let L = RistrettoPoint::vartime_multiscalar_mul(
                 a_L.iter().chain(b_R.iter()).chain(iter::once(&c_L)),
                 G_R.iter().chain(H_L.iter()).chain(iter::once(Q)),
             );
 
-            let R = ristretto::vartime::multiscalar_mul(
+            let R = RistrettoPoint::vartime_multiscalar_mul(
                 a_R.iter().chain(b_L.iter()).chain(iter::once(&c_R)),
                 G_L.iter().chain(H_R.iter()).chain(iter::once(Q)),
             );
@@ -99,8 +99,8 @@ impl InnerProductProof {
             for i in 0..n {
                 a_L[i] = a_L[i] * u + u_inv * a_R[i];
                 b_L[i] = b_L[i] * u_inv + u * b_R[i];
-                G_L[i] = ristretto::vartime::multiscalar_mul(&[u_inv, u], &[G_L[i], G_R[i]]);
-                H_L[i] = ristretto::vartime::multiscalar_mul(&[u, u_inv], &[H_L[i], H_R[i]]);
+                G_L[i] = RistrettoPoint::vartime_multiscalar_mul(&[u_inv, u], &[G_L[i], G_R[i]]);
+                H_L[i] = RistrettoPoint::vartime_multiscalar_mul(&[u, u_inv], &[H_L[i], H_R[i]]);
             }
 
             a = a_L;
@@ -201,7 +201,7 @@ impl InnerProductProof {
         let neg_u_sq = u_sq.iter().map(|ui| -ui);
         let neg_u_inv_sq = u_inv_sq.iter().map(|ui| -ui);
 
-        let expect_P = ristretto::vartime::multiscalar_mul(
+        let expect_P = RistrettoPoint::vartime_multiscalar_mul(
             iter::once(self.a * self.b)
                 .chain(a_times_s)
                 .chain(h_times_b_div_s)
@@ -274,7 +274,7 @@ mod tests {
         // a.iter() has Item=&Scalar, need Item=Scalar to chain with b_prime
         let a_prime = a.iter().cloned();
 
-        let P = ristretto::vartime::multiscalar_mul(
+        let P = RistrettoPoint::vartime_multiscalar_mul(
             a_prime.chain(b_prime).chain(iter::once(c)),
             G.iter().chain(H.iter()).chain(iter::once(&Q)),
         );

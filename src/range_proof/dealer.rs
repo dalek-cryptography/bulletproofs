@@ -4,7 +4,7 @@
 //! For more explanation of how the `dealer`, `party`, and `messages` modules orchestrate the protocol execution, see
 //! [the API for the aggregated multiparty computation protocol](../aggregation/index.html#api-for-the-aggregated-multiparty-computation-protocol).
 
-use rand::Rng;
+use rand::{CryptoRng, Rng};
 
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
@@ -251,7 +251,7 @@ impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
     /// error.
     ///
     /// XXX define error types so we can surface the blame info
-    pub fn receive_shares<R: Rng>(
+    pub fn receive_shares<R: Rng + CryptoRng>(
         mut self,
         rng: &mut R,
         proof_shares: &[ProofShare],
