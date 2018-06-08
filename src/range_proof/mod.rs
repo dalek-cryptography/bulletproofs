@@ -5,7 +5,7 @@ use rand::{CryptoRng, Rng};
 
 use std::iter;
 
-use curve25519_dalek::ristretto::RistrettoPoint;
+use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::{IsIdentity, VartimeMultiscalarMul};
 
@@ -14,6 +14,9 @@ use inner_product_proof::InnerProductProof;
 use proof_transcript::ProofTranscript;
 use util;
 
+use serde::{self, Serialize, Deserialize, Serializer, Deserializer};
+use serde::de::Visitor;
+
 // Modules for MPC protocol
 
 pub mod dealer;
@@ -21,16 +24,16 @@ pub mod messages;
 pub mod party;
 
 /// The `RangeProof` struct represents a single range proof.
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct RangeProof {
     /// Commitment to the bits of the value
-    A: RistrettoPoint,
+    A: CompressedRistretto,
     /// Commitment to the blinding factors
-    S: RistrettoPoint,
+    S: CompressedRistretto,
     /// Commitment to the \\(t_1\\) coefficient of \\( t(x) \\)
-    T_1: RistrettoPoint,
+    T_1: CompressedRistretto,
     /// Commitment to the \\(t_2\\) coefficient of \\( t(x) \\)
-    T_2: RistrettoPoint,
+    T_2: CompressedRistretto,
     /// Evaluation of the polynomial \\(t(x)\\) at the challenge point \\(x\\)
     t_x: Scalar,
     /// Blinding factor for the synthetic commitment to \\(t(x)\\)
@@ -122,7 +125,7 @@ impl RangeProof {
         transcript: &mut ProofTranscript,
         rng: &mut R,
         n: usize,
-    ) -> Result<(), ()> {
+    ) -> Result<(), &'static str> {
         self.verify(&[*V], gens, transcript, rng, n)
     }
 
@@ -136,7 +139,7 @@ impl RangeProof {
         transcript: &mut ProofTranscript,
         rng: &mut R,
         n: usize,
-    ) -> Result<(), ()> {
+    ) -> Result<(), &'static str> {
         // First, replay the "interactive" protocol using the proof
         // data to recompute all challenges.
 
@@ -145,19 +148,21 @@ impl RangeProof {
         transcript.commit_u64(n as u64);
         transcript.commit_u64(m as u64);
 
+        // TODO: allow user to supply compressed commitments
+        // to avoid unnecessary compression
         for V in value_commitments.iter() {
             transcript.commit(V.compress().as_bytes());
         }
-        transcript.commit(self.A.compress().as_bytes());
-        transcript.commit(self.S.compress().as_bytes());
+        transcript.commit(self.A.as_bytes());
+        transcript.commit(self.S.as_bytes());
 
         let y = transcript.challenge_scalar();
         let z = transcript.challenge_scalar();
         let zz = z * z;
         let minus_z = -z;
 
-        transcript.commit(self.T_1.compress().as_bytes());
-        transcript.commit(self.T_2.compress().as_bytes());
+        transcript.commit(self.T_1.as_bytes());
+        transcript.commit(self.T_2.as_bytes());
 
         let x = transcript.challenge_scalar();
 
@@ -192,6 +197,18 @@ impl RangeProof {
         let value_commitment_scalars = util::exp_iter(z).take(m).map(|z_exp| c * zz * z_exp);
         let basepoint_scalar = w * (self.t_x - a * b) + c * (delta(n, m, &y, &z) - self.t_x);
 
+        let Ls = self.ipp_proof
+            .L_vec
+            .iter()
+            .map(|p| p.decompress().ok_or("RangeProof's L point is invalid"))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let Rs = self.ipp_proof
+            .R_vec
+            .iter()
+            .map(|p| p.decompress().ok_or("RangeProof's R point is invalid"))
+            .collect::<Result<Vec<_>, _>>()?;
+
         let mega_check = RistrettoPoint::vartime_multiscalar_mul(
             iter::once(Scalar::one())
                 .chain(iter::once(x))
@@ -204,26 +221,125 @@ impl RangeProof {
                 .chain(h)
                 .chain(x_sq.iter().cloned())
                 .chain(x_inv_sq.iter().cloned()),
-            iter::once(&self.A)
-                .chain(iter::once(&self.S))
+            iter::once(&self.A.decompress().ok_or(
+                "RangeProof.A is invalid Ristretto point",
+            )?).chain(iter::once(&self.S.decompress().ok_or(
+                "RangeProof.S is invalid Ristretto point",
+            )?))
                 .chain(value_commitments.iter())
-                .chain(iter::once(&self.T_1))
-                .chain(iter::once(&self.T_2))
+                .chain(iter::once(&self.T_1.decompress().ok_or(
+                    "RangeProof.T_1 is invalid Ristretto point",
+                )?))
+                .chain(iter::once(&self.T_2.decompress().ok_or(
+                    "RangeProof.T_2 is invalid Ristretto point",
+                )?))
                 .chain(iter::once(&gens.pedersen_generators.B_blinding))
                 .chain(iter::once(&gens.pedersen_generators.B))
                 .chain(gens.G.iter())
                 .chain(gens.H.iter())
-                .chain(self.ipp_proof.L_vec.iter())
-                .chain(self.ipp_proof.R_vec.iter()),
+                .chain(Ls.iter())
+                .chain(Rs.iter()),
         );
 
         if mega_check.is_identity() {
             Ok(())
         } else {
-            Err(())
+            Err("RangeProof is invalid")
         }
     }
+
+    /// Serializes the proof into a byte array of \\(2 \lg n + 9\\) 32-byte elements,
+    /// where \\(n\\) is the number of secret bits.
+    /// The layout of the range proof is:
+    /// * four compressed Ristretto points \\(A,S,T_1,T_2\\),
+    /// * three scalars \\(t_x, \tilde{t}_x, \tilde{e}\\),
+    /// * \\(n\\) pairs of compressed Ristretto points \\(L_0,R_0\dots,L_{n-1},R_{n-1}\\),
+    /// * two scalars \\(a, b\\).
+    pub fn to_bytes(&self) -> Vec<u8> {
+        // 7 elements: points A, S, T1, T2, scalars tx, tx_bl, e_bl.
+        let mut buf = Vec::with_capacity(7 * 32 + self.ipp_proof.serialized_size());
+        buf.extend_from_slice(self.A.as_bytes());
+        buf.extend_from_slice(self.S.as_bytes());
+        buf.extend_from_slice(self.T_1.as_bytes());
+        buf.extend_from_slice(self.T_2.as_bytes());
+        buf.extend_from_slice(self.t_x.as_bytes());
+        buf.extend_from_slice(self.t_x_blinding.as_bytes());
+        buf.extend_from_slice(self.e_blinding.as_bytes());
+        buf.extend_from_slice(self.ipp_proof.to_bytes().as_slice());
+        buf
+    }
+
+    /// Deserializes the proof from a byte slice.
+    /// Returns an error in the following cases:
+    /// * the slice does not have \\(2n+9\\) 32-byte elements,
+    /// * \\(n\\) is larger or equal to 32 (proof is too big),
+    /// * any of \\(4+2n\\) points are not valid compressed Ristretto points,
+    /// * any of 3+2 scalars are not canonical scalars.
+    pub fn from_bytes(slice: &[u8]) -> Result<RangeProof, &'static str> {
+        let b = slice.len();
+        if b % 32 != 0 {
+            return Err("RangeProof size is not divisible by 32");
+        }
+        let num_elements = b / 32;
+        if num_elements < 7 {
+            return Err("RangeProof must contain at least seven 32-byte elements");
+        }
+
+        use util::{read_ristretto, decode_scalar};
+        Ok(RangeProof {
+            A: read_ristretto(&slice[0 * 32..]),
+            S: read_ristretto(&slice[1 * 32..]),
+            T_1: read_ristretto(&slice[2 * 32..]),
+            T_2: read_ristretto(&slice[3 * 32..]),
+            t_x: decode_scalar(&slice[4 * 32..][..32]).ok_or(
+                "RangeProof.t_x is not a canonical scalar",
+            )?,
+            t_x_blinding: decode_scalar(&slice[5 * 32..][..32]).ok_or(
+                "RangeProof.t_x_blinding is not a canonical scalar",
+            )?,
+            e_blinding: decode_scalar(&slice[6 * 32..][..32]).ok_or(
+                "RangeProof.e_blinding is not a canonical scalar",
+            )?,
+            ipp_proof: InnerProductProof::from_bytes(&slice[7 * 32..])?,
+        })
+    }
 }
+
+impl Serialize for RangeProof {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_bytes(&self.to_bytes()[..])
+    }
+}
+
+impl<'de> Deserialize<'de> for RangeProof {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct RangeProofVisitor;
+
+        impl<'de> Visitor<'de> for RangeProofVisitor {
+            type Value = RangeProof;
+
+            fn expecting(&self, formatter: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
+                formatter.write_str("a valid RangeProof")
+            }
+
+            fn visit_bytes<E>(self, v: &[u8]) -> Result<RangeProof, E>
+            where
+                E: serde::de::Error,
+            {
+                RangeProof::from_bytes(v).map_err(|e| serde::de::Error::custom(e))
+            }
+        }
+
+        deserializer.deserialize_bytes(RangeProofVisitor)
+    }
+}
+
 
 /// Compute
 /// \\[

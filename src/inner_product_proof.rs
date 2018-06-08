@@ -5,16 +5,17 @@
 use std::borrow::Borrow;
 use std::iter;
 
-use curve25519_dalek::ristretto::RistrettoPoint;
+use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::VartimeMultiscalarMul;
 
 use proof_transcript::ProofTranscript;
+use util::{read_ristretto, decode_scalar};
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct InnerProductProof {
-    pub(crate) L_vec: Vec<RistrettoPoint>,
-    pub(crate) R_vec: Vec<RistrettoPoint>,
+    pub(crate) L_vec: Vec<CompressedRistretto>,
+    pub(crate) R_vec: Vec<CompressedRistretto>,
     pub(crate) a: Scalar,
     pub(crate) b: Scalar,
 }
@@ -87,8 +88,8 @@ impl InnerProductProof {
                 G_L.iter().chain(H_R.iter()).chain(iter::once(Q)),
             );
 
-            L_vec.push(L);
-            R_vec.push(R);
+            L_vec.push(L.compress());
+            R_vec.push(R.compress());
 
             verifier.commit(L.compress().as_bytes());
             verifier.commit(R.compress().as_bytes());
@@ -130,10 +131,8 @@ impl InnerProductProof {
 
         let mut challenges = Vec::with_capacity(lg_n);
         for (L, R) in self.L_vec.iter().zip(self.R_vec.iter()) {
-            // XXX maybe avoid this compression when proof ser/de is sorted out
-            transcript.commit(L.compress().as_bytes());
-            transcript.commit(R.compress().as_bytes());
-
+            transcript.commit(L.as_bytes());
+            transcript.commit(R.as_bytes());
             challenges.push(transcript.challenge_scalar());
         }
 
@@ -181,7 +180,7 @@ impl InnerProductProof {
         Q: &RistrettoPoint,
         G: &[RistrettoPoint],
         H: &[RistrettoPoint],
-    ) -> Result<(), ()>
+    ) -> Result<(), &'static str>
     where
         I: IntoIterator,
         I::Item: Borrow<Scalar>,
@@ -194,12 +193,26 @@ impl InnerProductProof {
         let inv_s = s.iter().rev();
 
         let h_times_b_div_s = Hprime_factors
-            .into_iter()
-            .zip(inv_s)
-            .map(|(h_i, s_i_inv)| (self.b * s_i_inv) * h_i.borrow());
+             .into_iter()
+             .zip(inv_s)
+             .map(|(h_i, s_i_inv)| (self.b * s_i_inv) * h_i.borrow());
 
         let neg_u_sq = u_sq.iter().map(|ui| -ui);
         let neg_u_inv_sq = u_inv_sq.iter().map(|ui| -ui);
+
+        let Ls = self.L_vec
+            .iter()
+            .map(|p| {
+                p.decompress().ok_or("InnerProductProof L point is invalid")
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let Rs = self.R_vec
+            .iter()
+            .map(|p| {
+                p.decompress().ok_or("InnerProductProof R point is invalid")
+            })
+            .collect::<Result<Vec<_>, _>>()?;
 
         let expect_P = RistrettoPoint::vartime_multiscalar_mul(
             iter::once(self.a * self.b)
@@ -210,15 +223,75 @@ impl InnerProductProof {
             iter::once(Q)
                 .chain(G.iter())
                 .chain(H.iter())
-                .chain(self.L_vec.iter())
-                .chain(self.R_vec.iter()),
+                .chain(Ls.iter())
+                .chain(Rs.iter()),
         );
 
         if expect_P == *P {
             Ok(())
         } else {
-            Err(())
+            Err("InnerProductProof is invalid")
         }
+    }
+
+    /// Returns the size in bytes required to serialize the inner product proof.
+    /// For `n` multiplications the proof size is \\(32 \cdot (2\lg n+2)\\) bytes.
+    pub fn serialized_size(&self) -> usize {
+        (self.L_vec.len() * 2 + 2) * 32
+    }
+
+    /// Serializes the proof into a byte array of \\(2n+2\\) 32-byte elements.
+    /// The layout of the inner product proof is:
+    /// * \\(n\\) pairs of compressed Ristretto points \\(L_0, R_0 \dots, L_{n-1}, R_{n-1}\\),
+    /// * two scalars \\(a, b\\).
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut buf = Vec::with_capacity(self.serialized_size());
+        for (l, r) in self.L_vec.iter().zip(self.R_vec.iter()) {
+            buf.extend_from_slice(l.as_bytes());
+            buf.extend_from_slice(r.as_bytes());
+        }
+        buf.extend_from_slice(self.a.as_bytes());
+        buf.extend_from_slice(self.b.as_bytes());
+        buf
+    }
+
+    /// Deserializes the proof from a byte slice.
+    /// Returns an error in the following cases:
+    /// * the slice does not have \\(2n+2\\) 32-byte elements,
+    /// * \\(n\\) is larger or equal to 32 (proof is too big),
+    /// * any of \\(2n\\) points are not valid compressed Ristretto points,
+    /// * any of 2 scalars are not canonical scalars modulo Ristretto group order.
+    pub fn from_bytes(slice: &[u8]) -> Result<InnerProductProof, &'static str> {
+        let b = slice.len();
+        if b % 32 != 0 {
+            return Err("InnerProductProof size is not divisible by 32");
+        }
+        let num_elements = b / 32;
+        if num_elements < 2 {
+            return Err(
+                "InnerProductProof must contain at least two 32-byte elements",
+            );
+        }
+        if (num_elements - 2) % 2 != 0 {
+            return Err("InnerProductProof must contain even number of points");
+        }
+        let lg_n = (num_elements - 2) / 2;
+        if lg_n >= 32 {
+            return Err("InnerProductProof contains too many points");
+        }
+        let mut L_vec: Vec<CompressedRistretto> = Vec::with_capacity(lg_n);
+        let mut R_vec: Vec<CompressedRistretto> = Vec::with_capacity(lg_n);
+        for i in 0..lg_n {
+            L_vec.push(read_ristretto(&slice[2 * i * 32..]));
+            R_vec.push(read_ristretto(&slice[(2 * i + 1) * 32..]));
+        }
+        let a = decode_scalar(&slice[32 * (2 * lg_n + 0)..][..32]).ok_or(
+            "InnerProductProof.a is not a canonical scalar",
+        )?;
+        let b = decode_scalar(&slice[32 * (2 * lg_n + 1)..][..32]).ok_or(
+            "InnerProductProof.b is not a canonical scalar",
+        )?;
+        Ok(InnerProductProof { L_vec, R_vec, a, b })
     }
 }
 
@@ -290,6 +363,14 @@ mod tests {
             b.clone(),
         );
 
+        let mut verifier = ProofTranscript::new(b"innerproducttest");
+        assert!(
+            proof
+                .verify(&mut verifier, util::exp_iter(y_inv), &P, &Q, &G, &H)
+                .is_ok()
+        );
+
+        let proof = InnerProductProof::from_bytes(proof.to_bytes().as_slice()).unwrap();
         let mut verifier = ProofTranscript::new(b"innerproducttest");
         assert!(
             proof

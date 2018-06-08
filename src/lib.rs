@@ -8,6 +8,7 @@
 //! Note that docs will only build on nightly Rust until
 //! [RFC 1990 stabilizes](https://github.com/rust-lang/rust/issues/44732).
 
+extern crate core;
 extern crate byteorder;
 extern crate curve25519_dalek;
 extern crate rand;
@@ -17,6 +18,7 @@ extern crate tiny_keccak;
 
 #[macro_use]
 extern crate serde_derive;
+extern crate serde;
 
 #[cfg(test)]
 extern crate test;

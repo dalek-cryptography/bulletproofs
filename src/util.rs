@@ -2,6 +2,7 @@
 #![allow(non_snake_case)]
 
 use curve25519_dalek::scalar::Scalar;
+use curve25519_dalek::ristretto::CompressedRistretto;
 use inner_product_proof::inner_product;
 
 /// Represents a degree-1 vector polynomial \\(\mathbf{a} + \mathbf{b} \cdot x\\).
@@ -125,6 +126,25 @@ pub fn sum_of_powers(x: &Scalar, n: usize) -> Scalar {
 // takes the sum of all of the powers of x, up to n
 fn sum_of_powers_slow(x: &Scalar, n: usize) -> Scalar {
     exp_iter(*x).take(n).sum()
+}
+
+/// Reads a ristretto point from a 32-byte compressed form, slicing first 32 bytes.
+/// WARNING: caller must provide a slice of 32+ bytes.
+pub fn read_ristretto(data: &[u8]) -> CompressedRistretto {
+    let mut buf32 = [0u8; 32];
+    buf32[..].copy_from_slice(&data[..32]);
+    CompressedRistretto(buf32)
+}
+
+/// Decodes a canonical scalar from a 32-byte compressed form.
+pub fn decode_scalar(data: &[u8]) -> Option<Scalar> {
+    if data.len() != 32 {
+        // we don't need an error code as caller would have checked the length already
+        return None;
+    }
+    let mut buf32 = [0u8; 32];
+    buf32[..].copy_from_slice(data);
+    Scalar::from_canonical_bytes(buf32)
 }
 
 #[cfg(test)]
