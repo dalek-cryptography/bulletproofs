@@ -199,7 +199,7 @@ impl CircuitProof {
         })
     }
 
-    pub fn verify_proof<R: Rng + CryptoRng>(
+    pub fn verify<R: Rng + CryptoRng>(
         &self,
         gen: &Generators,
         transcript: &mut ProofTranscript,
@@ -396,7 +396,7 @@ mod tests {
 
         let mut verify_transcript = ProofTranscript::new(b"CircuitProofTest");
 
-        circuit_proof.verify_proof(
+        circuit_proof.verify(
             &generators,
             &mut verify_transcript,
             &mut rng,
