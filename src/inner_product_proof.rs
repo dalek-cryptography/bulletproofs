@@ -134,7 +134,6 @@ impl InnerProductProof {
     ) -> (Vec<Scalar>, Vec<Scalar>, Vec<Scalar>) {
         let lg_n = self.L_vec.len();
         let n = 1 << lg_n;
-        println!("n, lg_n, {:?} {:?}", n, lg_n);
 
         // 1. Recompute x_k,...,x_1 based on the proof transcript
 
