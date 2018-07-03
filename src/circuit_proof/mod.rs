@@ -31,12 +31,13 @@ pub struct CircuitProof {
 }
 
 impl CircuitProof {
-    pub fn generate_proof<R: Rng + CryptoRng>(
+    // XXX removed `c` (constants vector) from prover input, since prover doesn't use it to create proof.
+    pub fn prove<R: Rng + CryptoRng>(
         gen: &Generators,
         transcript: &mut ProofTranscript,
         rng: &mut R,
     
-        n: usize, // or we can just calculate parameters ourselves
+        n: usize,
         m: usize,
         q: usize,
 
@@ -44,16 +45,24 @@ impl CircuitProof {
         W_R: Vec<Vec<Scalar>>,
         W_O: Vec<Vec<Scalar>>,
         W_V: Vec<Vec<Scalar>>, // Q vectors, of length m each
-        _c: Vec<Scalar>,   
         a_L: Vec<Scalar>,
         a_R: Vec<Scalar>,
         a_O: Vec<Scalar>,
         v_blinding: Vec<Scalar>,
-    ) -> CircuitProof {
+    ) -> Result<CircuitProof, &'static str> {
+        if W_L.len() != q || W_R.len() != q || W_O.len() != q || W_V.len() != q {
+            return Err("Matrix size doesn't match specified parameters.");
+        }
+        if a_L.len() != n || a_R.len() != n || a_O.len() != n || v_blinding.len() != m {
+            return Err("Input vector size doesn't match specified parameters.");
+        }
+        if gen.n != n {
+            return Err("Generator length doesn't match specified parameters.");
+        }
+
         transcript.commit_u64(n as u64);
         transcript.commit_u64(m as u64);
         transcript.commit_u64(q as u64);
-        // TODO: check n, m, q against input sizes
     
         let i_blinding = Scalar::random(rng);
         let o_blinding = Scalar::random(rng);
@@ -122,9 +131,6 @@ impl CircuitProof {
         }
         
         let t_poly = l_poly.inner_product(&r_poly);
-
-        // let t2 = t_poly.t2;
-        // let t2_check = 
     
         let t_1_blinding = Scalar::random(rng);
         let t_3_blinding = Scalar::random(rng);
@@ -137,30 +143,20 @@ impl CircuitProof {
         let T_4 = gen.pedersen_generators.commit(t_poly.t4, t_4_blinding);
         let T_5 = gen.pedersen_generators.commit(t_poly.t5, t_5_blinding);
         let T_6 = gen.pedersen_generators.commit(t_poly.t6, t_6_blinding);
+
         transcript.commit(T_1.compress().as_bytes());
         transcript.commit(T_3.compress().as_bytes());
         transcript.commit(T_4.compress().as_bytes());
         transcript.commit(T_5.compress().as_bytes());
         transcript.commit(T_6.compress().as_bytes());
-
         let x = transcript.challenge_scalar();
 
-        let mut t_2_blinding = Scalar::zero();
-
-        // TODO: acheive this with a map & zip to make it neater
-        let mut W_V_blinded = vec![Scalar::zero(); q];
-        for row in 0..q {
-            for col in 0..m{
-                W_V_blinded[row] += W_V[row][col] * v_blinding[col];
-            }
-        }
-        
-        // TODO: use inner_product function here instead 
-        let mut exp_z = z; // z^n starting at n=1
-        for row in 0..q {
-            t_2_blinding += W_V_blinded[row] * exp_z;
-            exp_z = exp_z * z; // z^n -> z^(n+1)
-        }
+        // t_2_blinding = <z*z^Q, W_V * v_blinding>
+        // in the t_x_blinding calculations, line 76.
+        let t_2_blinding = W_V.iter()
+            .zip(util::exp_iter(z))
+            .map(|(W_V_i, exp_z)| z * exp_z * inner_product(&W_V_i, &v_blinding))
+            .sum();
 
         let t_blinding_poly = util::Poly6 {
             t1: t_1_blinding,
@@ -185,7 +181,6 @@ impl CircuitProof {
         let w = transcript.challenge_scalar();
         let Q = w * gen.pedersen_generators.B;
 
-        // TODO: figure out how to handle IPP when n=0
         let ipp_proof = InnerProductProof::create(
             transcript,
             &Q,
@@ -196,12 +191,12 @@ impl CircuitProof {
             r_vec.clone(),
         );
     
-        CircuitProof {
+        Ok(CircuitProof {
             A_I, A_O, S,
             T_1, T_3, T_4, T_5, T_6,
             t_x, t_x_blinding, e_blinding,
             l_vec, r_vec, ipp_proof,
-        }
+        })
     }
 
     pub fn verify_proof<R: Rng + CryptoRng>(
@@ -210,7 +205,7 @@ impl CircuitProof {
         transcript: &mut ProofTranscript,
         rng: &mut R,
 
-        n: usize, // potentially calculate parameters ourselves
+        n: usize,
         m: usize,
         q: usize,
 
@@ -220,8 +215,17 @@ impl CircuitProof {
         W_V: Vec<Vec<Scalar>>, // Q vectors, of length m each
         c: Vec<Scalar>,
         V: Vec<RistrettoPoint>, // Vector of commitments, length m
-    ) -> Result<(), ()> {
-        // TODO: check n, m, q against input sizes
+    ) -> Result<(), &'static str> {
+        if W_L.len() != q || W_R.len() != q || W_O.len() != q || W_V.len() != q {
+            return Err("Matrix size doesn't match specified parameters.");
+        }
+        if c.len() != q || V.len() != m {
+            return Err("Input vector size doesn't match specified parameters.");
+        }
+        if gen.n != n {
+            return Err("Generator length doesn't match specified parameters.");
+        }
+
         transcript.commit_u64(n as u64);
         transcript.commit_u64(m as u64);
         transcript.commit_u64(q as u64);
@@ -281,10 +285,6 @@ impl CircuitProof {
         let a = self.ipp_proof.a;
         let b = self.ipp_proof.b;
 
-        println!("a and b from ipp: {:?}, {:?}", a, b);
-        println!("x, x_inv, s: {:?}, {:?}, {:?}", x_sq, x_inv_sq, s);
-        println!("len of G and H: {:?} {:?}", gen.G.len(), gen.H.len());
-
         // define parameters for P check
         let g = s.iter().take(n).map(|s_i| - a * s_i);
         let h = s_inv
@@ -338,7 +338,7 @@ impl CircuitProof {
         );
 
         if !mega_check.is_identity() {
-            return Err(());
+            return Err("Circuit did not verify correctly.");
         }
 
         Ok(())
@@ -355,7 +355,6 @@ pub fn matrix_flatten(W: Vec<Vec<Scalar>>, z: Scalar, output_dim: usize) -> Vec<
     let mut exp_z = z; // z^n starting at n=1
 
     for row in 0..q {
-        debug_assert!(W[row].len() == output_dim);
         for col in 0..output_dim {
             result[col] += exp_z * W[row][col];
         }
@@ -384,15 +383,16 @@ mod tests {
         a_O: Vec<Scalar>,
         V: Vec<RistrettoPoint>, 
         v_blinding: Vec<Scalar>,
-    ) -> Result<(), ()> {
+    ) -> Result<(), &'static str> {
         let generators = Generators::new(PedersenGenerators::default(), n, 1);
         let mut proof_transcript = ProofTranscript::new(b"CircuitProofTest");
         let mut rng = OsRng::new().unwrap();
 
-        let circuit_proof = CircuitProof::generate_proof(
+        let circuit_proof = CircuitProof::prove(
             &generators, &mut proof_transcript, &mut rng,
             n, m, q,
-            W_L.clone(), W_R.clone(), W_O.clone(), W_V.clone(), c.clone(), a_L, a_R, a_O, v_blinding);
+            W_L.clone(), W_R.clone(), W_O.clone(), W_V.clone(), 
+            a_L, a_R, a_O, v_blinding).unwrap();    
 
         let mut verify_transcript = ProofTranscript::new(b"CircuitProofTest");
 
@@ -423,7 +423,7 @@ mod tests {
 
     #[test]
     // Test that a basic multiplication circuit on inputs (with linear contraints) succeeds
-    // LINEAR CONSTRAINTS (explicit in matrices):
+    // LINEAR CONSTRAINTS:
     // a_L[0] = 2
     // a_R[0] = 3
     // a_O[0] = 6
@@ -458,7 +458,7 @@ mod tests {
 
     #[test]
     // Test that a basic multiplication circuit on inputs (with linear constraints) fails
-    // LINEAR CONSTRAINTS (explicit in matrices):
+    // LINEAR CONSTRAINTS:
     // a_L[0] = 2
     // a_R[0] = 3
     // a_O[0] = 7
@@ -710,95 +710,4 @@ mod tests {
             V, v_blinding,
         ).is_err());
     }
-/*  extra circuit tests that still need debugging, but are not a priority right now
-    #[test]
-    // Test that a 2 bit range proof circuit succeeds
-    // LINEAR CONSTRAINTS:
-    // a_L[0] + 2*a_L[1] = V[0]
-    // a_L[0] - a_R[0] = 1
-    // a_L[1] - a_R[1] = 1
-    // a_O[0] = 0    (are the a_O constraints redundant with a_O definitions?)
-    // a_O[1] = 0
-    // MUL CONSTRAINTS:
-    // a_L[0] * a_R[0] = a_O[0]
-    // a_L[1] * a_R[1] = a_O[1]
-    fn range_proof_circuit_succeed() {
-        let n = 2;
-        let m = 1;
-        let q = 5;
-
-        let one = Scalar::one();
-        let zer = Scalar::zero();   
-        
-        let W_L = vec![vec![one, Scalar::from_u64(2)], vec![one, zer], vec![zer, one], vec![zer, zer], vec![zer, zer]];
-        let W_R = vec![vec![zer, zer], vec![-one, zer], vec![zer, -one], vec![zer, zer], vec![zer, zer]];
-        let W_O = vec![vec![zer, zer], vec![zer, zer], vec![zer, zer], vec![one, zer], vec![zer, one]];
-        let W_V = vec![vec![one], vec![zer], vec![zer], vec![zer], vec![zer]];
-        let c = vec![zer, one, one, zer, zer];
-
-        let v = vec![Scalar::from_u64(2)];
-        let (V, v_blinding) = blinding_helper(&v);
-
-        // a_L = bit representation of v = [1, 0]
-        let a_L = vec![one, zer];
-        // a_R = a_L - 1^n = [0, -1]
-        let a_R = vec![zer, -one];
-        // a_O should be equal to zero. TODO: is this redundant with the last two linear constraints?
-        let a_O = vec![zer, zer];
-
-        assert!(create_and_verify_helper(
-            n, m, q,
-            W_L, W_R, W_O, W_V,
-            c, a_L, a_R, a_O, 
-            V, v_blinding,
-        ).is_ok());        
-    }
-
-    #[test]
-    // Test that a 2 in 2 out merge circuit succeeds
-    // NOTE: we are treating the asset type as a single scalar, which
-    // does not necessarily reflect how we would want to implement CA.
-    // LINEAR CONSTRAINTS:
-    // V[4] + V[6] = 0
-    // V[5] + V[7] = 0
-    // a_L[0] = -V[O] - c*V[1] + V[2] + c*V[3]
-    // a_R[0] = V[0] + V[1] - V[2] + c*V[3] - c*c*V[4] + c*c*V[7]
-    // a_O[0] = 0    (is this redundant with a_O definitions?)
-    fn merge_circuit_succeed() {
-        let n = 1;
-        let m = 8;
-        let q = 5;
-
-        let one = Scalar::one();
-        let zer = Scalar::zero();
-        let mut rng = OsRng::new().unwrap();
-        let z = Scalar::random(&mut rng);
-
-        let W_L = vec![vec![zer], vec![zer], vec![one], vec![zer], vec![zer]];
-        let W_R = vec![vec![zer], vec![zer], vec![zer], vec![one], vec![zer]];
-        let W_O = vec![vec![zer], vec![zer], vec![zer], vec![zer], vec![one]];
-        let W_V = vec![vec![zer, zer, zer, zer, one, zer, one, zer],
-                       vec![zer, zer, zer, zer, zer, one, zer, one],
-                       vec![-one, -z, one, z, zer, zer, zer, zer],
-                       vec![one, one, -one, z, -z*z, zer, zer, z*z],
-                       vec![zer, zer, zer, zer, zer, zer, zer, zer]];
-        let c = vec![zer, zer, zer, zer, zer];
-
-        // merge 23 + 17 = 40, and they have the same asset type (30)
-        let v = vec![Scalar::from_u64(23), Scalar::from_u64(17), Scalar::from_u64(0), Scalar::from_u64(40), 
-                     Scalar::from_u64(30), Scalar::from_u64(30), Scalar::from_u64(30), Scalar::from_u64(30)];
-        let (V, v_blinding) = blinding_helper(&v);
-
-        let a_L = vec![-Scalar::from_u64(23) + z * Scalar::from_u64(23)];
-        let a_R = vec![zer];
-        let a_O = vec![zer];
-
-        assert!(create_and_verify_helper(
-            n, m, q,
-            W_L, W_R, W_O, W_V,
-            c, a_L, a_R, a_O, 
-            V, v_blinding,
-        ).is_ok()); 
-    }
-*/
 }
