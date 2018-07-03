@@ -1133,7 +1133,7 @@ When we take the inner product of \\({\mathbf{l}}(x)\\) and \\({\mathbf{l}}(x)\\
 \end{aligned}
 \\]
 
-Notice that the second degree of \\(t(x)\\) does not include any blinding factors (because the blinding factors end up being in the third degree of \\(t(x)\\)). The second degree also includes the inner product forms of the initial arithmetic gate statements that we are trying to prove:
+Notice that the second degree of \\(t(x)\\) does not include any blinding factors (because the blinding factors end up in the third or greater degrees of \\(t(x)\\)). The second degree also includes the inner product forms of the initial arithmetic gate statements that we are trying to prove:
 
 \\[
 \begin{aligned}
@@ -1203,7 +1203,7 @@ TODO insert explanation for relating commitments to equation
     +                        &\quad &  \quad &  +                          & \quad &  \quad &  +             & \quad &  \quad& +                             &\quad & \quad & +   \\\\
   \tilde{e} \cdot \widetilde{B}  &\quad &= \quad & \tilde{i} \cdot x \cdot \widetilde{B} & \quad &+ \quad & \tilde{o} \cdot x^2 \cdot \widetilde{B}  & \quad &+ \quad& 0 &\quad &+\quad & \tilde{s} \cdot x^3 \cdot \widetilde{B} \\\\
     \shortparallel           &\quad &  \quad & \shortparallel              & \quad &  \quad & \shortparallel & \quad &  \quad& \shortparallel                &\quad & \quad & \shortparallel   \\\\
-                 &\quad &= \quad & x \cdot A_I                         & \quad &+ \quad & x^2 \cdot A_O - \langle \textbf{1}, \textbf{H} \rangle & \quad &+ \quad& W_L \cdot X + W_R \cdot X + W_O                       &\quad &+\quad & x^3 \cdot S
+                 &\quad &= \quad & x \cdot A_I                         & \quad &+ \quad & x^2 \cdot A_O - \langle \textbf{1}, \textbf{H} \rangle & \quad &+ \quad& W_L \cdot x + W_R \cdot x + W_O                       &\quad &+\quad & x^3 \cdot S
 \end{aligned}
 \\]
 
