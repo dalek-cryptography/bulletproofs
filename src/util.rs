@@ -14,9 +14,16 @@ pub struct VecPoly3(pub Vec<Scalar>, pub Vec<Scalar>, pub Vec<Scalar>, pub Vec<S
 /// Represents a degree-2 scalar polynomial \\(a + b \cdot x + c \cdot x^2\\)
 pub struct Poly2(pub Scalar, pub Scalar, pub Scalar);
 
-/// Represents a degree-6 scalar polynomial
-/// \\(a + b \cdot x + c \cdot x^2 + d \cdot x^3 + e \cdot x^4 + f \cdot x^5 + g \cdot x^6\\)
-pub struct Poly6(pub Scalar, pub Scalar, pub Scalar, pub Scalar, pub Scalar, pub Scalar, pub Scalar);
+/// Represents a degree-6 scalar polynomial, without the zeroth degree
+/// \\(a \cdot x + b \cdot x^2 + c \cdot x^3 + d \cdot x^4 + e \cdot x^5 + f \cdot x^6\\)
+pub struct Poly6 {
+  pub t1: Scalar,
+  pub t2: Scalar,
+  pub t3: Scalar,
+  pub t4: Scalar,
+  pub t5: Scalar,
+  pub t6: Scalar,
+}
 
 /// Provides an iterator over the powers of a `Scalar`.
 ///
@@ -86,33 +93,47 @@ impl VecPoly1 {
 }
 
 impl VecPoly3 {
-  pub fn zero(n: usize) -> Self {
-    VecPoly3(vec![Scalar::zero(); n], vec![Scalar::zero(); n], 
-             vec![Scalar::zero(); n], vec![Scalar::zero(); n]) 
-  }
+    pub fn zero(n: usize) -> Self {
+        VecPoly3(vec![Scalar::zero(); n], vec![Scalar::zero(); n], 
+                 vec![Scalar::zero(); n], vec![Scalar::zero(); n]) 
+    }
 
-  // Optimized performance given properties of l(x) and r(x) in circuit proof.
-  // We know that l(x).0 and r(x).2 are zeroes.
-  // TODO: can we optimize more by using karatsuba-like methods?
-  pub fn inner_product(&self, rhs: &VecPoly3) -> Poly6 {
-    let l = self;
-    let r = rhs;
+    // Optimized performance given properties of l(x) and r(x) in circuit proof.
+    // We know that l(x).0 and r(x).2 are zeroes.
+    // TODO: can we optimize more by using karatsuba-like methods?
+    pub fn inner_product(&self, rhs: &VecPoly3) -> Poly6 {
+        let l = self;
+        let r = rhs;
+    
+        let t1 = inner_product(&l.1, &r.0);
+        let t2 = inner_product(&l.1, &r.1) + inner_product(&l.2, &r.0);
+        let t3 = inner_product(&l.2, &r.1) + inner_product(&l.3, &r.0);
+        let t4 = inner_product(&l.1, &r.3) + inner_product(&l.3, &r.1);
+        let t5 = inner_product(&l.2, &r.3);
+        let t6 = inner_product(&l.3, &r.3);
+    
+        Poly6{t1, t2, t3, t4, t5, t6}
+    }
 
-    let t1 = inner_product(&l.1, &r.0);
-    let t2 = inner_product(&l.1, &r.1) + inner_product(&l.2, &r.0);
-    let t3 = inner_product(&l.2, &r.1) + inner_product(&l.3, &r.0);
-    let t4 = inner_product(&l.1, &r.3) + inner_product(&l.3, &r.1);
-    let t5 = inner_product(&l.2, &r.3);
-    let t6 = inner_product(&l.3, &r.3);
-
-    // TODO: don't have poly6 include the zeroth term so we don't have to make a zero scalar
-    Poly6(Scalar::zero(), t1, t2, t3, t4, t5, t6)
-  }
+    pub fn eval(&self, x: Scalar) -> Vec<Scalar> {
+        let n = self.0.len();
+        let mut out = vec![Scalar::zero(); n];
+        for i in 0..n {
+            out[i] += self.0[i] + x * (self.1[i] + x * (self.2[i] + x * self.3[i]));
+        }
+        out       
+    }
 }
 
 impl Poly2 {
     pub fn eval(&self, x: Scalar) -> Scalar {
         self.0 + x * (self.1 + x * self.2)
+    }
+}
+
+impl Poly6 {
+    pub fn eval(&self, x: Scalar) -> Scalar {
+        x * (self.t1 + x * (self.t2 + x * (self.t3 + x * (self.t4 + x * (self.t5 + x * self.t6)))))
     }
 }
 
