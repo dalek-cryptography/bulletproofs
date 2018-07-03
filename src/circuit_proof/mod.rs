@@ -5,7 +5,7 @@ use std::iter;
 
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
-use curve25519_dalek::traits::MultiscalarMul;
+use curve25519_dalek::traits::{IsIdentity, MultiscalarMul, VartimeMultiscalarMul};
 
 use generators::Generators;
 use proof_transcript::ProofTranscript;  
@@ -59,7 +59,7 @@ impl CircuitProof {
         let s_blinding = Scalar::random(rng);
         let s_L: Vec<Scalar> = (0..n).map(|_| Scalar::random(rng)).collect();
         let s_R: Vec<Scalar> = (0..n).map(|_| Scalar::random(rng)).collect();
-    
+
         // A_I = <a_L, G> + <a_R, H> + i_blinding * B_blinding
         let A_I = RistrettoPoint::multiscalar_mul(
           iter::once(&i_blinding).chain(a_L.iter()).chain(a_R.iter()),
@@ -128,24 +128,27 @@ impl CircuitProof {
         let t_5_blinding = Scalar::random(rng);
         let t_6_blinding = Scalar::random(rng);
 
-        // TODO: acheive this with a map & zip to make it neater
-        let mut W_V_blinded = vec![Scalar::zero(); m];
-        for row in 0..q {
-            for col in 0..m{
-                W_V_blinded[row] += W_V[row][col] * v_blinding[col];
-            }
-        }
         let mut t_2_blinding = Scalar::zero();
-        // TODO: use inner_product function here instead 
-        let mut exp_z = z; // z^n starting at n=1
-        for row in 0..q {
-            t_2_blinding += W_V_blinded[row] * exp_z;
-            exp_z = exp_z * z; // z^n -> z^(n+1)
+        if m > 0 {
+            // TODO: acheive this with a map & zip to make it neater
+            let mut W_V_blinded = vec![Scalar::zero(); m];
+            for row in 0..q {
+                for col in 0..m{
+                    W_V_blinded[row] += W_V[row][col] * v_blinding[col];
+                }
+            }
+            
+            // TODO: use inner_product function here instead 
+            let mut exp_z = z; // z^n starting at n=1
+            for row in 0..q {
+                t_2_blinding += W_V_blinded[row] * exp_z;
+                exp_z = exp_z * z; // z^n -> z^(n+1)
+            }
         }
 
         let t_blinding_poly = util::Poly6 {
             t1: t_1_blinding,
-            t2: t_1_blinding, // TODO: actually compute the t_2 component
+            t2: t_2_blinding, 
             t3: t_3_blinding,
             t4: t_4_blinding,
             t5: t_5_blinding,
@@ -216,11 +219,11 @@ impl CircuitProof {
         let z_zQ_WO: Vec<Scalar> = matrix_flatten(W_O, z);
         let z_zQ_WV: Vec<Scalar> = matrix_flatten(W_V, z);
 
-        if self.t_x == inner_product(&self.l_vec, &self.r_vec) {
-            return Ok(());
-        } else {
+        if self.t_x != inner_product(&self.l_vec, &self.r_vec) {
             return Err(());
         }
+
+        Ok(())
     }
 }
 
@@ -232,12 +235,11 @@ pub fn matrix_flatten(W: Vec<Vec<Scalar>>, z: Scalar) -> Vec<Scalar> {
     let mut exp_z = z; // z^n starting at n=1
 
     for row in 0..q {
-        for col in 0..n {
-            result[n] += z * W[row][col]
+         for col in 0..n {
+            result[col] += z * W[row][col];
         }
         exp_z = exp_z * z; // z^n -> z^(n+1)
-    }
-    
+    } 
     result
 }
 
@@ -249,8 +251,8 @@ mod tests {
 
     #[test]
     // test basic multiplication circuit that computes a*b=c
-    // potentially doesn't have to have any linear constraints (it's redundant).
-    fn test_circuit_mult() {
+    // with linear constraints (which are redundant in this case)
+    fn circuit_mult1() {
         let n = 1;
         let m = 0;
         let q = 3;
@@ -258,6 +260,7 @@ mod tests {
         let zer = Scalar::zero();
         let one = Scalar::one();
 
+        // test that 2 * 3 = 6 verifies properly
         let W_L = vec![vec![zer], vec![zer], vec![one]];
         let W_R = vec![vec![zer], vec![one], vec![zer]];
         let W_O = vec![vec![one], vec![zer], vec![zer]];
@@ -266,10 +269,10 @@ mod tests {
         let a_L = vec![Scalar::from_u64(2)];
         let a_R = vec![Scalar::from_u64(3)];
         let a_O = vec![Scalar::from_u64(6)];
-        let v_blinding = vec![Scalar::zero(); 3]; // since we don't have anything to blind
+        let v_blinding = vec![]; // since we don't have anything to blind
 
         let generators = Generators::new(PedersenGenerators::default(), n, 1);
-        let mut proof_transcript = ProofTranscript::new(b"CircuitProofTest-Multiplication");
+        let mut proof_transcript = ProofTranscript::new(b"CircuitProofTest-Mult");
         let mut rng = OsRng::new().unwrap();
 
         let circuit_proof = CircuitProof::generate_proof(
@@ -277,7 +280,7 @@ mod tests {
             n, m, q,
             W_L.clone(), W_R.clone(), W_O.clone(), W_V.clone(), c.clone(), a_L, a_R, a_O, v_blinding);
 
-        let mut verify_transcript = ProofTranscript::new(b"CircuitProofTest-Multiplication");
+        let mut verify_transcript = ProofTranscript::new(b"CircuitProofTest-Mult");
 
         assert!(circuit_proof.verify_proof(
             &generators,
@@ -286,5 +289,55 @@ mod tests {
             W_L, W_R, W_O, W_V, c, 
             )
         .is_ok());
+    }
+
+
+    #[test]
+    // test basic multiplication circuit that computes a*b=c without redundant linear constraints 
+    // the purpose of the test is to make sure we can handle empty matrix inputs correctly.
+    fn circuit_mult2() {
+        let n = 0;
+        let m = 0;
+        let q = 0;
+
+        let zer = Scalar::zero();
+        let one = Scalar::one();
+
+        // test that 2 * 3 = 6 verifies properly
+        let W_L = vec![vec![]];
+        let W_R = vec![vec![]];
+        let W_O = vec![vec![]];
+        let W_V = vec![vec![]];
+        let c = vec![];    
+        let a_L = vec![Scalar::from_u64(2)];
+        let a_R = vec![Scalar::from_u64(3)];
+        let a_O = vec![Scalar::from_u64(6)];
+        let v_blinding = vec![]; 
+
+        let generators = Generators::new(PedersenGenerators::default(), n, 1);
+        let mut proof_transcript = ProofTranscript::new(b"CircuitProofTest-Mult");
+        let mut rng = OsRng::new().unwrap();
+
+        let circuit_proof = CircuitProof::generate_proof(
+            &generators, &mut proof_transcript, &mut rng,
+            n, m, q,
+            W_L.clone(), W_R.clone(), W_O.clone(), W_V.clone(), c.clone(), a_L, a_R, a_O, v_blinding);
+
+        let mut verify_transcript = ProofTranscript::new(b"CircuitProofTest-Mult");
+
+        assert!(circuit_proof.verify_proof(
+            &generators,
+            &mut verify_transcript,
+            n, m, q,
+            W_L, W_R, W_O, W_V, c, 
+            )
+        .is_ok());
+    }
+
+    #[test]
+    // test a commitment is actually a commitment of a value
+    // v = comm(a)
+    fn test_circuit_commitment() {
+        // TODO: make sure we handle empty matrix cases for a_L, a_R, a_O
     }
 }
