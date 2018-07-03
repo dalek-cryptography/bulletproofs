@@ -83,7 +83,7 @@ The variable renaming is as follows:
 \\[
 \begin{aligned}
     g        &\xrightarrow{} B               & \gamma   &\xrightarrow{} \tilde{v}      \\\\
-    h        &\xrightarrow{} \tilde{B}       & \alpha   &\xrightarrow{} \tilde{a}      \\\\
+    h        &\xrightarrow{} \widetilde{B}       & \alpha   &\xrightarrow{} \tilde{a}      \\\\
     {\mathbf{g}}   &\xrightarrow{} {\mathbf{G}}          & \rho     &\xrightarrow{} \tilde{s}      \\\\
     {\mathbf{h}}   &\xrightarrow{} {\mathbf{H}}          & \tau\_i   &\xrightarrow{} \tilde{t}\_i    \\\\
              &                               & \mu      &\xrightarrow{} \tilde{e}      \\\\
@@ -207,7 +207,7 @@ goal is to rearrange the inner product above so that terms
 involving \\({\mathbf{a}}\_{L}\\) appear only on the left-hand side, terms
 involving \\({\mathbf{a}}\_{R}\\) appear only on the right-hand side, and
 non-secret terms (which the verifier can compute on its own) are
-factored out into a new term \\(\delta\\).
+factored out into a new term \\(\delta(y, z) \\).
 
 First, break the statement into simpler terms, then rearrange:
 \\[
@@ -1056,5 +1056,156 @@ z \textbf{z}^Q \cdot \textbf{W}\_L \rangle +
 \langle \textbf{a}\_O, 
 -\textbf{y}^n + z \textbf{z}^Q \cdot \textbf{W}\_O \rangle
 \\]
+
+TODO: explain how if you want to combine \\( \langle a, b \rangle + \langle c, d \rangle\\) you can do it by taking one degree of the linear combination with respect to a challenge scalar. For example, the 2nd degree of \\( \langle a \cdot x + c \cdot x^2, b \cdot x + d \cdot x^0 \rangle \\) is equal to \\( \langle a, b \rangle + \langle c, d \rangle\\).
+
+\\[
+\begin{aligned}
+a &= \textbf{a}\_L + \textbf{y}^{-n} \circ (z \textbf{z}^Q \cdot \textbf{W}\_R) \\\\
+b &= \textbf{y}^n \circ \textbf{a}\_R +
+z \textbf{z}^Q \cdot \textbf{W}\_L\\\\
+c &= \textbf{a}\_O \\\\
+d &= -\textbf{y}^n + z \textbf{z}^Q \cdot \textbf{W}\_O
+\end{aligned}
+\\]
+
+\\[
+\langle z \textbf{z}^Q,
+\textbf{c} + \textbf{W}\_V \cdot \textbf{v} \rangle + \delta(y, z) = 
+\text{2nd degree of }
+\langle (\textbf{a}\_L + \textbf{y}^{-n} \circ (z \textbf{z}^Q \cdot \textbf{W}\_R)) \cdot x + 
+\textbf{a}\_O \cdot x^2,
+(\textbf{y}^n \circ \textbf{a}\_R +
+z \textbf{z}^Q \cdot \textbf{W}\_L) \cdot x +
+(-\textbf{y}^n + z \textbf{z}^Q \cdot \textbf{W}\_O) \cdot x^0 \rangle 
+\\]
+
+Distribute the \\(x\\) values: 
+
+\\[
+\langle z \textbf{z}^Q,
+\textbf{c} + \textbf{W}\_V \cdot \textbf{v} \rangle + \delta(y, z) = 
+\text{2nd degree of }
+\langle \textbf{a}\_L \cdot x + \textbf{y}^{-n} \circ (z \textbf{z}^Q \cdot \textbf{W}\_R) \cdot x + 
+\textbf{a}\_O \cdot x^2,
+\textbf{y}^n \circ \textbf{a}\_R \cdot x +
+z \textbf{z}^Q \cdot \textbf{W}\_L \cdot x -
+\textbf{y}^n + z \textbf{z}^Q \cdot \textbf{W}\_O \rangle
+\\]
+
+Blinding the inner product
+--------------------------
+
+TODO: explain why blinding is neessary
+
+The prover chooses vectors of blinding factors
+
+Instead, the prover chooses vectors of blinding factors
+\\[
+{\mathbf{s}}\_{L}, {\mathbf{s}}\_{R} \\;{\xleftarrow{\\$}}\\; {\mathbb Z\_p}^{n},
+\\]
+
+and uses them to blind \\(\mathbf{a}\_L\\) and \\(\mathbf{a}\_R\\):
+
+\\[
+\begin{aligned}
+\mathbf{a}\_{L} &\leftarrow \mathbf{a}\_{L} + \mathbf{s}\_{L} \cdot x^2 \\\\
+\mathbf{a}\_{R} &\leftarrow \mathbf{a}\_{R} + \mathbf{s}\_{R} \cdot x^2
+\end{aligned}
+\\]
+
+We construct vector polynomials \\({\mathbf{l}}(x)\\) and \\({\mathbf{l}}(x)\\) with these new definitions:
+\\[
+\begin{aligned}
+  {\mathbf{l}}(x) &= (\textbf{a}\_L + \textbf{s}\_L \cdot x^2) \cdot x + \textbf{y}^{-n} \circ (z \textbf{z}^Q \cdot \textbf{W}\_R) \cdot x + \textbf{a}\_O \cdot x^2 \\\\
+  &= \textbf{a}\_L \cdot x + \textbf{s}\_L \cdot x^3 + \textbf{y}^{-n} \circ (z \textbf{z}^Q \cdot \textbf{W}\_R) \cdot x + \textbf{a}\_O \cdot x^2 \\\\
+  {\mathbf{r}}(x) &= \textbf{y}^n \circ (\textbf{a}\_R + \textbf{s}\_R \cdot x^2) \cdot x + z \textbf{z}^Q \cdot \textbf{W}\_L \cdot x - \textbf{y}^n + z \textbf{z}^Q \cdot \textbf{W}\_O \\\\
+  &= \textbf{y}^n \circ \textbf{a}\_R \cdot x + \textbf{s}\_R \cdot x^3 + z \textbf{z}^Q \cdot \textbf{W}\_L \cdot x - \textbf{y}^n + z \textbf{z}^Q \cdot \textbf{W}\_O
+\end{aligned}
+\\]
+
+When we take the inner product of \\({\mathbf{l}}(x)\\) and \\({\mathbf{l}}(x)\\), we get:
+
+\\[
+\begin{aligned}
+  t(x) = {\langle {\mathbf{l}}(x), {\mathbf{r}}(x) \rangle} &= t\_{1} x + t\_{2} x^{2} + t\_{3} x^{3} + t\_{4} x^{4} + t\_{5} x^{5} + t\_{6} x^{6} \\\\
+  &= \sum_{i=1}^{6} t_i x^i
+\end{aligned}
+\\]
+
+Notice that the second degree of \\(t(x)\\) does not include any blinding factors (because the blinding factors end up being in the third degree of \\(t(x)\\)). The second degree also includes the inner product forms of the initial arithmetic gate statements that we are trying to prove:
+
+\\[
+\begin{aligned}
+t_2 &= \text{2nd degree of } \langle {\mathbf{l}}(x), {\mathbf{r}}(x) \rangle
+\\\\
+&= \langle z \textbf{z}^Q,
+\textbf{c} + \textbf{W}\_V \cdot \textbf{v} \rangle + \delta(y, z) \\\\
+&= \langle \textbf{a}\_L \circ \textbf{a}\_R, \textbf{y}^n \rangle -
+\langle \textbf{a}\_O, \textbf{y}^n \rangle + 
+\langle z \textbf{z}^Q, 
+\textbf{W}\_L \cdot \textbf{a}\_L \rangle +
+\langle z \textbf{z}^Q, 
+\textbf{W}\_R \cdot \textbf{a}\_R \rangle +
+\langle z \textbf{z}^Q, 
+\textbf{W}\_O \cdot \textbf{a}\_O \rangle + \delta(y, z)
+\end{aligned}
+\\]
+
+Proving that \\(t_2\\) is correct
+---------------------------------
+
+\\[
+\begin{aligned}
+t_2 &= \langle z \textbf{z}^Q,
+\textbf{c} + \textbf{W}\_V \cdot \textbf{v} \rangle + \delta(y, z) \\\\
+V_j &= B \cdot v_j + \widetilde{B} \cdot \tilde{v}\_j \quad \forall j \in [1, m] \\\\
+T_i &= B \cdot t_i + \widetilde{B} \cdot \tilde{t}\_i \quad \forall i \in [1, 3, 4, 5, 6] \\\\
+\end{aligned}
+\\]
+
+TODO: insert explanation here
+
+\\[
+\begin{aligned}
+  t(x) B                     &\quad &= \quad & x^2 \langle z \textbf{z}^Q , \textbf{W}\_v \cdot \textbf{v} \rangle \cdot B      & \quad &+ \quad & x^2 \big(\langle  z \textbf{z}^Q , \textbf{c} \rangle + \delta(y,z)\big) B  & \quad &+ \quad& x t\_{1} B                     &\quad &+\quad & \sum\_{i=3}^{6} x^i t\_{i} B \\\\
+    +                        &\quad &  \quad &  +                          & \quad &  \quad &  +             & \quad &  \quad& +                             &\quad & \quad & +   \\\\
+  {\tilde{t}}(x) {\widetilde{B}} &\quad &= \quad & x^2 \langle z \textbf{z}^Q , \textbf{W}\_v \cdot \tilde{\textbf{v}} \rangle \cdot \widetilde{B}  & \quad &+ \quad & 0 {\widetilde{B}}  & \quad &+ \quad& x {\tilde{t}}\_{1} {\widetilde{B}} &\quad &+\quad & \sum\_{i=3}^{6} x^i \tilde{t\_{i}} {\widetilde{B}} \\\\
+    \shortparallel           &\quad &  \quad & \shortparallel              & \quad &  \quad & \shortparallel & \quad &  \quad& \shortparallel                &\quad & \quad & \shortparallel   \\\\
+                 &\quad &= \quad & x^2 \langle z \textbf{z}^Q , \textbf{W}\_v \cdot \textbf{V} \rangle                         & \quad &+ \quad & x^2 \big(\langle  z \textbf{z}^Q , \textbf{c} \rangle + \delta(y,z)\big) B  & \quad &+ \quad& x T\_{1}                       &\quad &+\quad & \sum\_{i=3}^{6} x^i T\_{i}
+\end{aligned}
+\\]
+
+Proving that \\(\textbf{l}(x)\\), \\(\textbf{r}(x)\\) are correct
+-----------------------------------------------------------------
+
+TODO: insert explanation for \\(\textbf{H}' = \textbf{y}^{-n} \\).
+
+\\[
+\begin{aligned}
+\textbf{H}' &= \textbf{y}^{-n} \\\\
+A_I &= \widetilde{B} \cdot \tilde{i} + \langle \textbf{G} , \textbf{a}\_L \rangle + \langle \textbf{H}, \textbf{a}\_R \rangle \\\\
+A_O &= \widetilde{B} \cdot \tilde{o} + \langle \textbf{G} , \textbf{a}\_O \rangle \\\\
+W_L &= \langle z \textbf{z}^Q \cdot \textbf{W}\_L , \textbf{H}' \rangle \\\\
+W_R &= \textbf{y}^{-n} \circ (\langle z \textbf{z}^Q \cdot \textbf{W}\_R) , \textbf{G} \rangle \\\\
+W_O &= \langle z \textbf{z}^Q \cdot \textbf{W}\_O , \textbf{H}' \rangle \\\\
+S &= \widetilde{B} \cdot \tilde{s} + \langle \textbf{G} , \textbf{s}\_L \rangle + \langle \textbf{H}, \textbf{s}\_R \rangle
+\end{aligned}
+\\]
+
+TODO insert explanation for relating commitments to equation
+
+\\[
+\begin{aligned}
+  {\langle {\mathbf{l}}(x), {\mathbf{G}} \rangle}         &\quad &= \quad & {\langle {\mathbf{a}}\_L \cdot x, {\mathbf{G}} \rangle}      & \quad &+ \quad & {\langle {\mathbf{a}}\_O \cdot x^2, {\mathbf{G}} \rangle}  & \quad &+ \quad& \langle \textbf{y}^{-n} \circ (z \textbf{z}^Q \cdot \textbf{W}\_R) \cdot x , \textbf{G} \rangle      &\quad &+\quad & \langle \textbf{s}\_L \cdot x^3 , \textbf{G} \rangle \\\\
+    +                        &\quad &  \quad &  +                          & \quad &  \quad &  +             & \quad &  \quad& +                             &\quad & \quad & +   \\\\
+  {\langle {\mathbf{r}}(x), {\mathbf{H}}' \rangle}  &\quad &= \quad & \langle \textbf{a}\_R \cdot x, {\mathbf{H}} \rangle & \quad &+ \quad & - \langle \textbf{1}, \textbf{H} \rangle  & \quad &+ \quad& \langle z \textbf{z}^Q \cdot (\textbf{W}\_L \cdot x + \textbf{W}\_O), \textbf{H}' \rangle &\quad &+\quad & \langle \textbf{s}\_R \cdot x^3 , \textbf{H} \rangle \\\\
+    +                        &\quad &  \quad &  +                          & \quad &  \quad &  +             & \quad &  \quad& +                             &\quad & \quad & +   \\\\
+  \tilde{e} \cdot \widetilde{B}  &\quad &= \quad & \tilde{i} \cdot x \cdot \widetilde{B} & \quad &+ \quad & \tilde{o} \cdot x^2 \cdot \widetilde{B}  & \quad &+ \quad& 0 &\quad &+\quad & \tilde{s} \cdot x^3 \cdot \widetilde{B} \\\\
+    \shortparallel           &\quad &  \quad & \shortparallel              & \quad &  \quad & \shortparallel & \quad &  \quad& \shortparallel                &\quad & \quad & \shortparallel   \\\\
+                 &\quad &= \quad & x \cdot A_I                         & \quad &+ \quad & x^2 \cdot A_O - \langle \textbf{1}, \textbf{H} \rangle & \quad &+ \quad& W_L \cdot X + W_R \cdot X + W_O                       &\quad &+\quad & x^3 \cdot S
+\end{aligned}
+\\]
+
 
 [bulletproofs_paper]: https://eprint.iacr.org/2017/1066.pdf
