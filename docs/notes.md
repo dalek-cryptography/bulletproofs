@@ -1305,5 +1305,4 @@ so the verifier uses \\(P\\) and \\(t(x)\\) as inputs to the inner-product proto
 to prove that
 \\(t(x) = {\langle {\mathbf{l}}(x), {\mathbf{r}}(x) \rangle}\\).
 
-
 [bulletproofs_paper]: https://eprint.iacr.org/2017/1066.pdf
