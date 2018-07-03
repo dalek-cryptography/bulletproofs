@@ -348,7 +348,7 @@ mod tests {
     #[test]
     // test basic multiplication circuit that computes a*b=c
     // with linear constraints (which are redundant in this case)
-    fn circuit_mult1() {
+    fn circuit_mult1_succeed() {
         let n = 1;
         let m = 0;
         let q = 3;
@@ -390,10 +390,51 @@ mod tests {
 
 
     #[test]
+    // Test that circuit multiplication verification fails when it is incorrect
+    fn circuit_mult1_fail() {
+        let n = 1;
+        let m = 0;
+        let q = 3;
+
+        let zer = Scalar::zero();
+        let one = Scalar::one();
+
+        // test that 2 * 3 = 7 does not verify properly
+        let W_L = vec![vec![zer], vec![zer], vec![one]];
+        let W_R = vec![vec![zer], vec![one], vec![zer]];
+        let W_O = vec![vec![one], vec![zer], vec![zer]];
+        let W_V = vec![vec![], vec![], vec![]];
+        let c = vec![Scalar::from_u64(7), Scalar::from_u64(3), Scalar::from_u64(2)];  
+        let V = vec![];  
+        let a_L = vec![Scalar::from_u64(2)];
+        let a_R = vec![Scalar::from_u64(3)];
+        let a_O = vec![Scalar::from_u64(7)];
+        let v_blinding = vec![]; // since we don't have anything to blind
+
+        let generators = Generators::new(PedersenGenerators::default(), n, 1);
+        let mut proof_transcript = ProofTranscript::new(b"CircuitProofTest-Mult");
+        let mut rng = OsRng::new().unwrap();
+
+        let circuit_proof = CircuitProof::generate_proof(
+            &generators, &mut proof_transcript, &mut rng,
+            n, m, q,
+            W_L.clone(), W_R.clone(), W_O.clone(), W_V.clone(), c.clone(), a_L, a_R, a_O, v_blinding);
+
+        let mut verify_transcript = ProofTranscript::new(b"CircuitProofTest-Mult");
+
+        assert!(circuit_proof.verify_proof(
+            &generators,
+            &mut verify_transcript,
+            n, m, q,
+            W_L, W_R, W_O, W_V, c, V,
+            )
+        .is_err());
+    }
+
+    #[test]
     // test basic multiplication circuit that computes a*b=c without redundant linear constraints 
     // the purpose of the test is to make sure we can handle empty matrix inputs correctly.
-    // TODO: figure out why this doesn't fail for wrong inputs
-    fn circuit_mult2() {
+    fn circuit_mult2_succeed() {
         let n = 0;
         let m = 0;
         let q = 0;
@@ -431,15 +472,13 @@ mod tests {
     }
 
     #[test]
-    // test basic multiplication circuit that computes a*b=c without redundant linear constraints 
-    // the purpose of the test is to make sure we can handle empty matrix inputs correctly.
-    // TODO: figure out why this doesn't fail for wrong inputs
+    // Test that circuit multiplication verification fails when it is incorrect
     fn circuit_mult2_fail() {
         let n = 0;
         let m = 0;
         let q = 0;
 
-        // test that 2 * 3 = 6 verifies properly
+        // test that 2 * 3 = 7 does not verify properly
         let W_L = vec![vec![]];
         let W_R = vec![vec![]];
         let W_O = vec![vec![]];
