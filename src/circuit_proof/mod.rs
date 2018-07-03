@@ -92,9 +92,9 @@ impl CircuitProof {
         let mut l_poly = util::VecPoly3::zero(n);
         let mut r_poly = util::VecPoly3::zero(n);
         
-        let z_zQ_WL: Vec<Scalar> = matrix_flatten(W_L, z);
-        let z_zQ_WR: Vec<Scalar> = matrix_flatten(W_R, z);
-        let z_zQ_WO: Vec<Scalar> = matrix_flatten(W_O, z);
+        let z_zQ_WL: Vec<Scalar> = matrix_flatten(W_L, z, n);
+        let z_zQ_WR: Vec<Scalar> = matrix_flatten(W_R, z, n);
+        let z_zQ_WO: Vec<Scalar> = matrix_flatten(W_O, z, n);
     
         let mut exp_y = Scalar::one(); // y^n starting at n=0
         let mut exp_y_inv = Scalar::one(); // y^-n starting at n=0
@@ -224,14 +224,14 @@ impl CircuitProof {
             .collect();
 
         // W_L_point = <h * y^-n , z * z^Q * W_L>, line 81
-        let W_L_flatten: Vec<Scalar> = matrix_flatten(W_L, z);
+        let W_L_flatten: Vec<Scalar> = matrix_flatten(W_L, z, n);
         let W_L_point = RistrettoPoint::vartime_multiscalar_mul(
             W_L_flatten.clone(),
             H_prime.iter()
         );
 
         // W_R_point = <g , y^-n * z * z^Q * W_R>, line 82
-        let W_R_flatten: Vec<Scalar> = matrix_flatten(W_R, z);
+        let W_R_flatten: Vec<Scalar> = matrix_flatten(W_R, z, n);
         let W_R_flatten_yinv: Vec<Scalar> = W_R_flatten
             .iter()
             .zip(util::exp_iter(y.invert()))
@@ -243,7 +243,7 @@ impl CircuitProof {
         );  
 
         // W_O_point = <h * y^-n , z * z^Q * W_O>, line 83
-        let W_O_flatten: Vec<Scalar> = matrix_flatten(W_O, z);
+        let W_O_flatten: Vec<Scalar> = matrix_flatten(W_O, z, n);
         let W_O_point = RistrettoPoint::vartime_multiscalar_mul(
             W_O_flatten,
             H_prime.iter()
@@ -282,7 +282,7 @@ impl CircuitProof {
         let delta = inner_product(&W_R_flatten_yinv, &W_L_flatten);
         let powers_of_z: Vec<Scalar> = util::exp_iter(z).take(q).collect();
         let z_c = z * inner_product(&powers_of_z, &c);
-        let W_V_flatten: Vec<Scalar> = matrix_flatten(W_V, z);
+        let W_V_flatten: Vec<Scalar> = matrix_flatten(W_V, z, m);
         let V_multiplier = W_V_flatten.iter().map(|W_V_i| x * x * W_V_i);
 
         let t = RistrettoPoint::vartime_multiscalar_mul(
@@ -324,14 +324,15 @@ impl CircuitProof {
 // Computes z * z^Q * W, where W is a qxn matrix and z is a scalar.
 // Input: Qxn matrix of scalars and scalar z
 // Output: length n vector of Scalars
-pub fn matrix_flatten(W: Vec<Vec<Scalar>>, z: Scalar) -> Vec<Scalar> {
+pub fn matrix_flatten(W: Vec<Vec<Scalar>>, z: Scalar, output_dim: usize) -> Vec<Scalar> {
     let q = W.len();
-    let n = W[0].len();
-    let mut result = vec![Scalar::zero(); n];
+   
+    let mut result = vec![Scalar::zero(); output_dim];
     let mut exp_z = z; // z^n starting at n=1
 
     for row in 0..q {
-        for col in 0..n {
+        debug_assert!(W[row].len() == output_dim);
+        for col in 0..output_dim {
             result[col] += exp_z * W[row][col];
         }
         exp_z = exp_z * z; // z^n -> z^(n+1)
@@ -379,15 +380,31 @@ mod tests {
         )
     }
 
+    fn blinding_helper(v: &Vec<Scalar>) -> (Vec<RistrettoPoint>, Vec<Scalar>) {
+        let generators = Generators::new(PedersenGenerators::default(), 1, 1);
+        let mut rng = OsRng::new().unwrap();
+        let m = v.len();
+
+        let v_blinding: Vec<Scalar> = (0..m).map(|_| Scalar::random(&mut rng)).collect();
+        let V: Vec<RistrettoPoint> = v.iter()
+            .zip(v_blinding.clone())
+            .map(|(v_i, v_blinding_i)| 
+                generators.pedersen_generators.commit(*v_i, v_blinding_i)
+            )
+            .collect();
+
+        (V, v_blinding)
+    }
+
     #[test]
-    // Test that a basic multiplication circuit (with linear contraints) succeeds
+    // Test that a basic multiplication circuit on inputs (with linear contraints) succeeds
     // LINEAR CONSTRAINTS (explicit in matrices):
     // a_L[0] = 2
     // a_R[0] = 3
     // a_O[0] = 6
-    // MULT CONSTRAINTS (implicit):
+    // MUL CONSTRAINTS (implicit):
     // a_L[0] * a_R[0] = a_O[0]
-    fn circuit_mult1_succeed() {
+    fn mul_circuit_1_succeed() {
         let n = 1;
         let m = 0;
         let q = 3;
@@ -414,16 +431,15 @@ mod tests {
         ).is_ok());
     }
 
-
     #[test]
-    // Test that a basic multiplication circuit fails
+    // Test that a basic multiplication circuit on inputs (with linear constraints) fails
     // LINEAR CONSTRAINTS (explicit in matrices):
     // a_L[0] = 2
     // a_R[0] = 3
     // a_O[0] = 7
-    // MULT CONSTRAINTS (implicit):
+    // MUL CONSTRAINTS (implicit):
     // a_L[0] * a_R[0] = a_O[0]    
-    fn circuit_mult1_fail() {
+    fn mul_circuit_1_fail() {
         let n = 1;
         let m = 0;
         let q = 3;
@@ -451,19 +467,19 @@ mod tests {
     }
 
     #[test]
-    // Test that a basic multiplication circuit (without linear contraints) succeeds
+    // Test that a basic multiplication circuit on inputs (without linear contraints) succeeds
     // LINEAR CONSTRAINTS: none
-    // MULT CONSTRAINTS:
+    // MUL CONSTRAINTS:
     // a_L[0] * a_R[0] = a_O[0]
-    fn circuit_mult2_succeed() {
-        let n = 0;
+    fn mul_circuit_2_succeed() {
+        let n = 1;
         let m = 0;
         let q = 0;
 
-        let W_L = vec![vec![]];
-        let W_R = vec![vec![]];
-        let W_O = vec![vec![]];
-        let W_V = vec![vec![]];
+        let W_L = vec![];
+        let W_R = vec![];
+        let W_O = vec![];
+        let W_V = vec![];
         let c = vec![];    
         let a_L = vec![Scalar::from_u64(2)];
         let a_R = vec![Scalar::from_u64(3)];
@@ -480,19 +496,19 @@ mod tests {
     }
 
     #[test]
-    // Test that a basic multiplication circuit (without linear contraints) fails
+    // Test that a basic multiplication circuit on inputs (without linear contraints) fails
     // LINEAR CONSTRAINTS: none
-    // MULT CONSTRAINTS:
+    // MUL CONSTRAINTS:
     // a_L[0] * a_R[0] = a_O[0]
-    fn circuit_mult2_fail() {
-        let n = 0;
+    fn mul_circuit_2_fail() {
+        let n = 1;
         let m = 0;
         let q = 0;
 
-        let W_L = vec![vec![]];
-        let W_R = vec![vec![]];
-        let W_O = vec![vec![]];
-        let W_V = vec![vec![]];
+        let W_L = vec![];
+        let W_R = vec![];
+        let W_O = vec![];
+        let W_V = vec![];
         let c = vec![];    
         let a_L = vec![Scalar::from_u64(2)];
         let a_R = vec![Scalar::from_u64(3)];
@@ -512,8 +528,8 @@ mod tests {
     // Test that a basic addition circuit (without multiplication gates) succeeds
     // LINEAR CONSTRAINTS:
     // V[0] + V[1] = V[2]
-    // MULT CONSTRAINTS: none
-    fn circuit_add_succeed() {
+    // MUL CONSTRAINTS: none
+    fn add_circuit_succeed() {
         let n = 0;
         let m = 3;
         let q = 1;
@@ -530,17 +546,8 @@ mod tests {
         let a_R = vec![]; 
         let a_O = vec![];    
 
-        let generators = Generators::new(PedersenGenerators::default(), n, 1);
-        let mut rng = OsRng::new().unwrap();
-
         let v = vec![one, Scalar::from_u64(3), Scalar::from_u64(4)];
-        let v_blinding: Vec<Scalar> = (0..m).map(|_| Scalar::random(&mut rng)).collect();
-        let V: Vec<RistrettoPoint> = v.iter()
-            .zip(v_blinding.clone())
-            .map(|(v_i, v_blinding_i)| 
-                generators.pedersen_generators.commit(*v_i, v_blinding_i)
-            )
-            .collect();
+        let (V, v_blinding) = blinding_helper(&v);
         
         assert!(create_and_verify_helper(
             n, m, q,
@@ -554,8 +561,8 @@ mod tests {
     // Test that a basic addition circuit (without multiplication gates) fails
     // LINEAR CONSTRAINTS:
     // V[0] + V[1] = V[2]
-    // MULT CONSTRAINTS: none
-    fn circuit_add_fail() {
+    // MUL CONSTRAINTS: none
+    fn add_circuit_fail() {
         let n = 0;
         let m = 3;
         let q = 1;
@@ -572,17 +579,8 @@ mod tests {
         let a_R = vec![]; 
         let a_O = vec![];    
 
-        let generators = Generators::new(PedersenGenerators::default(), n, 1);
-        let mut rng = OsRng::new().unwrap();
-
         let v = vec![zer, Scalar::from_u64(3), Scalar::from_u64(4)];
-        let v_blinding: Vec<Scalar> = (0..m).map(|_| Scalar::random(&mut rng)).collect();
-        let V: Vec<RistrettoPoint> = v.iter()
-            .zip(v_blinding.clone())
-            .map(|(v_i, v_blinding_i)| 
-                generators.pedersen_generators.commit(*v_i, v_blinding_i)
-            )
-            .collect();
+        let (V, v_blinding) = blinding_helper(&v);
         
         assert!(create_and_verify_helper(
             n, m, q,
@@ -592,5 +590,190 @@ mod tests {
         ).is_err());
     }
 
+    #[test]
+    // Test that a 2 in 2 out shuffle circuit succeeds
+    // LINEAR CONSTRAINTS:
+    // a_O[0] = a_O[1]
+    // a_L[0] = V[0] - z
+    // a_L[1] = V[2] - z
+    // a_R[0] = V[1] - z
+    // a_R[1] = V[3] - z
+    // MUL CONSTRAINTS:
+    // a_L[0] * a_R[0] = a_O[0]
+    // a_L[1] * a_R[1] = a_O[1]
+    fn shuffle_circuit_succeed() {
+        let n = 2;
+        let m = 4;
+        let q = 5;
 
+        let one = Scalar::one();
+        let zer = Scalar::zero();
+
+        let mut rng = OsRng::new().unwrap();
+        // TODO: is this the best way to generate z? Maybe z generation should be deterministic, 
+        // based on public inputs, so you can't maliciously choose a z value.
+        let z = Scalar::random(&mut rng); 
+
+        let W_L = vec![vec![zer, zer], vec![one, zer], vec![zer, one], vec![zer, zer], vec![zer, zer]];
+        let W_R = vec![vec![zer, zer], vec![zer, zer], vec![zer, zer], vec![one, zer], vec![zer, one]];
+        let W_O = vec![vec![one, -one], vec![zer, zer], vec![zer, zer], vec![zer, zer], vec![zer, zer]];
+        let W_V = vec![vec![zer, zer, zer, zer],
+                       vec![one, zer, zer, zer],
+                       vec![zer, zer, one, zer],
+                       vec![zer, one, zer, zer],
+                       vec![zer, zer, zer, one]];
+        let c = vec![zer, -z, -z, -z, -z];
+
+        let v = vec![Scalar::from_u64(3), Scalar::from_u64(7), Scalar::from_u64(7), Scalar::from_u64(3)];
+        let (V, v_blinding) = blinding_helper(&v);
+
+        let a_L = vec![v[0] - z, v[2] - z];
+        let a_R = vec![v[1] - z, v[3] - z];
+        let a_O = vec![a_L[0] * a_R[0], a_L[1] * a_R[1]];
+
+       assert!(create_and_verify_helper(
+            n, m, q,
+            W_L, W_R, W_O, W_V,
+            c, a_L, a_R, a_O, 
+            V, v_blinding,
+        ).is_ok());
+    }
+
+    #[test]
+    // Test that a 2 in 2 out shuffle circuit fails
+    // LINEAR CONSTRAINTS:
+    // a_O[0] = a_O[1]
+    // a_L[0] = V[0] - z
+    // a_L[1] = V[2] - z
+    // a_R[0] = V[1] - z
+    // a_R[1] = V[3] - z
+    // MUL CONSTRAINTS:
+    // a_L[0] * a_R[0] = a_O[0]
+    // a_L[1] * a_R[1] = a_O[1]
+    fn shuffle_circuit_fail() {
+        let n = 2;
+        let m = 4;
+        let q = 5;
+
+        let one = Scalar::one();
+        let zer = Scalar::zero();
+
+        let mut rng = OsRng::new().unwrap();
+        let z = Scalar::random(&mut rng);
+
+        let W_L = vec![vec![zer, zer], vec![one, zer], vec![zer, one], vec![zer, zer], vec![zer, zer]];
+        let W_R = vec![vec![zer, zer], vec![zer, zer], vec![zer, zer], vec![one, zer], vec![zer, one]];
+        let W_O = vec![vec![one, -one], vec![zer, zer], vec![zer, zer], vec![zer, zer], vec![zer, zer]];
+        let W_V = vec![vec![zer, zer, zer, zer],
+                       vec![one, zer, zer, zer],
+                       vec![zer, zer, one, zer],
+                       vec![zer, one, zer, zer],
+                       vec![zer, zer, zer, one]];
+        let c = vec![zer, -z, -z, -z, -z];
+
+        let v = vec![Scalar::from_u64(3), Scalar::from_u64(7), Scalar::from_u64(8), Scalar::from_u64(3)];
+        let (V, v_blinding) = blinding_helper(&v);
+
+        let a_L = vec![v[0] - z, v[2] - z];
+        let a_R = vec![v[1] - z, v[3] - z];
+        let a_O = vec![a_L[0] * a_R[0], a_L[1] * a_R[1]];
+
+       assert!(create_and_verify_helper(
+            n, m, q,
+            W_L, W_R, W_O, W_V,
+            c, a_L, a_R, a_O, 
+            V, v_blinding,
+        ).is_err());
+    }
+/*  extra circuit tests that still need debugging, but are not a priority right now
+    #[test]
+    // Test that a 2 bit range proof circuit succeeds
+    // LINEAR CONSTRAINTS:
+    // a_L[0] + 2*a_L[1] = V[0]
+    // a_L[0] - a_R[0] = 1
+    // a_L[1] - a_R[1] = 1
+    // a_O[0] = 0    (are the a_O constraints redundant with a_O definitions?)
+    // a_O[1] = 0
+    // MUL CONSTRAINTS:
+    // a_L[0] * a_R[0] = a_O[0]
+    // a_L[1] * a_R[1] = a_O[1]
+    fn range_proof_circuit_succeed() {
+        let n = 2;
+        let m = 1;
+        let q = 5;
+
+        let one = Scalar::one();
+        let zer = Scalar::zero();   
+        
+        let W_L = vec![vec![one, Scalar::from_u64(2)], vec![one, zer], vec![zer, one], vec![zer, zer], vec![zer, zer]];
+        let W_R = vec![vec![zer, zer], vec![-one, zer], vec![zer, -one], vec![zer, zer], vec![zer, zer]];
+        let W_O = vec![vec![zer, zer], vec![zer, zer], vec![zer, zer], vec![one, zer], vec![zer, one]];
+        let W_V = vec![vec![one], vec![zer], vec![zer], vec![zer], vec![zer]];
+        let c = vec![zer, one, one, zer, zer];
+
+        let v = vec![Scalar::from_u64(2)];
+        let (V, v_blinding) = blinding_helper(&v);
+
+        // a_L = bit representation of v = [1, 0]
+        let a_L = vec![one, zer];
+        // a_R = a_L - 1^n = [0, -1]
+        let a_R = vec![zer, -one];
+        // a_O should be equal to zero. TODO: is this redundant with the last two linear constraints?
+        let a_O = vec![zer, zer];
+
+        assert!(create_and_verify_helper(
+            n, m, q,
+            W_L, W_R, W_O, W_V,
+            c, a_L, a_R, a_O, 
+            V, v_blinding,
+        ).is_ok());        
+    }
+
+    #[test]
+    // Test that a 2 in 2 out merge circuit succeeds
+    // NOTE: we are treating the asset type as a single scalar, which
+    // does not necessarily reflect how we would want to implement CA.
+    // LINEAR CONSTRAINTS:
+    // V[4] + V[6] = 0
+    // V[5] + V[7] = 0
+    // a_L[0] = -V[O] - c*V[1] + V[2] + c*V[3]
+    // a_R[0] = V[0] + V[1] - V[2] + c*V[3] - c*c*V[4] + c*c*V[7]
+    // a_O[0] = 0    (is this redundant with a_O definitions?)
+    fn merge_circuit_succeed() {
+        let n = 1;
+        let m = 8;
+        let q = 5;
+
+        let one = Scalar::one();
+        let zer = Scalar::zero();
+        let mut rng = OsRng::new().unwrap();
+        let z = Scalar::random(&mut rng);
+
+        let W_L = vec![vec![zer], vec![zer], vec![one], vec![zer], vec![zer]];
+        let W_R = vec![vec![zer], vec![zer], vec![zer], vec![one], vec![zer]];
+        let W_O = vec![vec![zer], vec![zer], vec![zer], vec![zer], vec![one]];
+        let W_V = vec![vec![zer, zer, zer, zer, one, zer, one, zer],
+                       vec![zer, zer, zer, zer, zer, one, zer, one],
+                       vec![-one, -z, one, z, zer, zer, zer, zer],
+                       vec![one, one, -one, z, -z*z, zer, zer, z*z],
+                       vec![zer, zer, zer, zer, zer, zer, zer, zer]];
+        let c = vec![zer, zer, zer, zer, zer];
+
+        // merge 23 + 17 = 40, and they have the same asset type (30)
+        let v = vec![Scalar::from_u64(23), Scalar::from_u64(17), Scalar::from_u64(0), Scalar::from_u64(40), 
+                     Scalar::from_u64(30), Scalar::from_u64(30), Scalar::from_u64(30), Scalar::from_u64(30)];
+        let (V, v_blinding) = blinding_helper(&v);
+
+        let a_L = vec![Scalar::from_u64(23) * (z - one)];
+        let a_R = vec![zer];
+        let a_O = vec![zer];
+
+        assert!(create_and_verify_helper(
+            n, m, q,
+            W_L, W_R, W_O, W_V,
+            c, a_L, a_R, a_O, 
+            V, v_blinding,
+        ).is_ok()); 
+    }
+*/
 }
