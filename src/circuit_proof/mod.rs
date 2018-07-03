@@ -345,9 +345,48 @@ mod tests {
     use rand::rngs::OsRng;
     use generators::PedersenGenerators;
 
+    fn create_and_verify_helper(
+        n: usize,
+        m: usize,
+        q: usize,
+        W_L: Vec<Vec<Scalar>>, // Q vectors, of length n each
+        W_R: Vec<Vec<Scalar>>,
+        W_O: Vec<Vec<Scalar>>,
+        W_V: Vec<Vec<Scalar>>, // Q vectors, of length m each
+        c: Vec<Scalar>,  
+        a_L: Vec<Scalar>,
+        a_R: Vec<Scalar>,
+        a_O: Vec<Scalar>,
+        V: Vec<RistrettoPoint>, 
+        v_blinding: Vec<Scalar>,
+    ) -> Result<(), ()> {
+        let generators = Generators::new(PedersenGenerators::default(), n, 1);
+        let mut proof_transcript = ProofTranscript::new(b"CircuitProofTest");
+        let mut rng = OsRng::new().unwrap();
+
+        let circuit_proof = CircuitProof::generate_proof(
+            &generators, &mut proof_transcript, &mut rng,
+            n, m, q,
+            W_L.clone(), W_R.clone(), W_O.clone(), W_V.clone(), c.clone(), a_L, a_R, a_O, v_blinding);
+
+        let mut verify_transcript = ProofTranscript::new(b"CircuitProofTest");
+
+        circuit_proof.verify_proof(
+            &generators,
+            &mut verify_transcript,
+            n, m, q,
+            W_L, W_R, W_O, W_V, c, V,
+        )
+    }
+
     #[test]
-    // test basic multiplication circuit that computes a*b=c
-    // with linear constraints (which are redundant in this case)
+    // Test that a basic multiplication circuit (with linear contraints) succeeds
+    // LINEAR CONSTRAINTS (explicit in matrices):
+    // a_L[0] = 2
+    // a_R[0] = 3
+    // a_O[0] = 6
+    // MULT CONSTRAINTS (implicit):
+    // a_L[0] * a_R[0] = a_O[0]
     fn circuit_mult1_succeed() {
         let n = 1;
         let m = 0;
@@ -356,41 +395,34 @@ mod tests {
         let zer = Scalar::zero();
         let one = Scalar::one();
 
-        // test that 2 * 3 = 6 verifies properly
         let W_L = vec![vec![zer], vec![zer], vec![one]];
         let W_R = vec![vec![zer], vec![one], vec![zer]];
         let W_O = vec![vec![one], vec![zer], vec![zer]];
         let W_V = vec![vec![], vec![], vec![]];
-        let c = vec![Scalar::from_u64(6), Scalar::from_u64(3), Scalar::from_u64(2)];  
-        let V = vec![];  
+        let c = vec![Scalar::from_u64(6), Scalar::from_u64(3), Scalar::from_u64(2)];   
         let a_L = vec![Scalar::from_u64(2)];
         let a_R = vec![Scalar::from_u64(3)];
         let a_O = vec![Scalar::from_u64(6)];
+        let V = vec![]; 
         let v_blinding = vec![]; // since we don't have anything to blind
 
-        let generators = Generators::new(PedersenGenerators::default(), n, 1);
-        let mut proof_transcript = ProofTranscript::new(b"CircuitProofTest-Mult");
-        let mut rng = OsRng::new().unwrap();
-
-        let circuit_proof = CircuitProof::generate_proof(
-            &generators, &mut proof_transcript, &mut rng,
+        assert!(create_and_verify_helper(
             n, m, q,
-            W_L.clone(), W_R.clone(), W_O.clone(), W_V.clone(), c.clone(), a_L, a_R, a_O, v_blinding);
-
-        let mut verify_transcript = ProofTranscript::new(b"CircuitProofTest-Mult");
-
-        assert!(circuit_proof.verify_proof(
-            &generators,
-            &mut verify_transcript,
-            n, m, q,
-            W_L, W_R, W_O, W_V, c, V,
-            )
-        .is_ok());
+            W_L, W_R, W_O, W_V,
+            c, a_L, a_R, a_O, 
+            V, v_blinding,
+        ).is_ok());
     }
 
 
     #[test]
-    // Test that circuit multiplication verification fails when it is incorrect
+    // Test that a basic multiplication circuit fails
+    // LINEAR CONSTRAINTS (explicit in matrices):
+    // a_L[0] = 2
+    // a_R[0] = 3
+    // a_O[0] = 7
+    // MULT CONSTRAINTS (implicit):
+    // a_L[0] * a_R[0] = a_O[0]    
     fn circuit_mult1_fail() {
         let n = 1;
         let m = 0;
@@ -399,121 +431,166 @@ mod tests {
         let zer = Scalar::zero();
         let one = Scalar::one();
 
-        // test that 2 * 3 = 7 does not verify properly
         let W_L = vec![vec![zer], vec![zer], vec![one]];
         let W_R = vec![vec![zer], vec![one], vec![zer]];
         let W_O = vec![vec![one], vec![zer], vec![zer]];
         let W_V = vec![vec![], vec![], vec![]];
         let c = vec![Scalar::from_u64(7), Scalar::from_u64(3), Scalar::from_u64(2)];  
-        let V = vec![];  
         let a_L = vec![Scalar::from_u64(2)];
         let a_R = vec![Scalar::from_u64(3)];
         let a_O = vec![Scalar::from_u64(7)];
+        let V = vec![];  
         let v_blinding = vec![]; // since we don't have anything to blind
 
-        let generators = Generators::new(PedersenGenerators::default(), n, 1);
-        let mut proof_transcript = ProofTranscript::new(b"CircuitProofTest-Mult");
-        let mut rng = OsRng::new().unwrap();
-
-        let circuit_proof = CircuitProof::generate_proof(
-            &generators, &mut proof_transcript, &mut rng,
+        assert!(create_and_verify_helper(
             n, m, q,
-            W_L.clone(), W_R.clone(), W_O.clone(), W_V.clone(), c.clone(), a_L, a_R, a_O, v_blinding);
-
-        let mut verify_transcript = ProofTranscript::new(b"CircuitProofTest-Mult");
-
-        assert!(circuit_proof.verify_proof(
-            &generators,
-            &mut verify_transcript,
-            n, m, q,
-            W_L, W_R, W_O, W_V, c, V,
-            )
-        .is_err());
+            W_L, W_R, W_O, W_V,
+            c, a_L, a_R, a_O, 
+            V, v_blinding,
+        ).is_err());
     }
 
     #[test]
-    // test basic multiplication circuit that computes a*b=c without redundant linear constraints 
-    // the purpose of the test is to make sure we can handle empty matrix inputs correctly.
+    // Test that a basic multiplication circuit (without linear contraints) succeeds
+    // LINEAR CONSTRAINTS: none
+    // MULT CONSTRAINTS:
+    // a_L[0] * a_R[0] = a_O[0]
     fn circuit_mult2_succeed() {
         let n = 0;
         let m = 0;
         let q = 0;
 
-        // test that 2 * 3 = 6 verifies properly
         let W_L = vec![vec![]];
         let W_R = vec![vec![]];
         let W_O = vec![vec![]];
         let W_V = vec![vec![]];
         let c = vec![];    
-        let V = vec![]; 
         let a_L = vec![Scalar::from_u64(2)];
         let a_R = vec![Scalar::from_u64(3)];
         let a_O = vec![Scalar::from_u64(6)];
+        let V = vec![]; 
         let v_blinding = vec![]; 
 
-        let generators = Generators::new(PedersenGenerators::default(), n, 1);
-        let mut proof_transcript = ProofTranscript::new(b"CircuitProofTest-Mult");
-        let mut rng = OsRng::new().unwrap();
-
-        let circuit_proof = CircuitProof::generate_proof(
-            &generators, &mut proof_transcript, &mut rng,
+        assert!(create_and_verify_helper(
             n, m, q,
-            W_L.clone(), W_R.clone(), W_O.clone(), W_V.clone(), c.clone(), a_L, a_R, a_O, v_blinding);
-
-        let mut verify_transcript = ProofTranscript::new(b"CircuitProofTest-Mult");
-
-        assert!(circuit_proof.verify_proof(
-            &generators,
-            &mut verify_transcript,
-            n, m, q,
-            W_L, W_R, W_O, W_V, c, V,
-            )
-        .is_ok());
+            W_L, W_R, W_O, W_V,
+            c, a_L, a_R, a_O, 
+            V, v_blinding,
+        ).is_ok());
     }
 
     #[test]
-    // Test that circuit multiplication verification fails when it is incorrect
+    // Test that a basic multiplication circuit (without linear contraints) fails
+    // LINEAR CONSTRAINTS: none
+    // MULT CONSTRAINTS:
+    // a_L[0] * a_R[0] = a_O[0]
     fn circuit_mult2_fail() {
         let n = 0;
         let m = 0;
         let q = 0;
 
-        // test that 2 * 3 = 7 does not verify properly
         let W_L = vec![vec![]];
         let W_R = vec![vec![]];
         let W_O = vec![vec![]];
         let W_V = vec![vec![]];
         let c = vec![];    
-        let V = vec![]; 
         let a_L = vec![Scalar::from_u64(2)];
         let a_R = vec![Scalar::from_u64(3)];
         let a_O = vec![Scalar::from_u64(7)];
+        let V = vec![]; 
         let v_blinding = vec![]; 
 
-        let generators = Generators::new(PedersenGenerators::default(), n, 1);
-        let mut proof_transcript = ProofTranscript::new(b"CircuitProofTest-Mult");
-        let mut rng = OsRng::new().unwrap();
-
-        let circuit_proof = CircuitProof::generate_proof(
-            &generators, &mut proof_transcript, &mut rng,
+        assert!(create_and_verify_helper(
             n, m, q,
-            W_L.clone(), W_R.clone(), W_O.clone(), W_V.clone(), c.clone(), a_L, a_R, a_O, v_blinding);
-
-        let mut verify_transcript = ProofTranscript::new(b"CircuitProofTest-Mult");
-
-        assert!(circuit_proof.verify_proof(
-            &generators,
-            &mut verify_transcript,
-            n, m, q,
-            W_L, W_R, W_O, W_V, c, V,
-            )
-        .is_err());
+            W_L, W_R, W_O, W_V,
+            c, a_L, a_R, a_O, 
+            V, v_blinding,
+        ).is_err());
     }
 
     #[test]
-    // test a commitment is actually a commitment of a value
-    // v = comm(a)
-    fn test_circuit_commitment() {
-        // TODO
+    // Test that a basic addition circuit (without multiplication gates) succeeds
+    // LINEAR CONSTRAINTS:
+    // V[0] + V[1] = V[2]
+    // MULT CONSTRAINTS: none
+    fn circuit_add_succeed() {
+        let n = 0;
+        let m = 3;
+        let q = 1;
+
+        let one = Scalar::one();
+        let zer = Scalar::zero();
+
+        let W_L = vec![vec![]];
+        let W_R = vec![vec![]];
+        let W_O = vec![vec![]];
+        let W_V = vec![vec![one, one, -one]];
+        let c = vec![zer];
+        let a_L = vec![]; 
+        let a_R = vec![]; 
+        let a_O = vec![];    
+
+        let generators = Generators::new(PedersenGenerators::default(), n, 1);
+        let mut rng = OsRng::new().unwrap();
+
+        let v = vec![one, Scalar::from_u64(3), Scalar::from_u64(4)];
+        let v_blinding: Vec<Scalar> = (0..m).map(|_| Scalar::random(&mut rng)).collect();
+        let V: Vec<RistrettoPoint> = v.iter()
+            .zip(v_blinding.clone())
+            .map(|(v_i, v_blinding_i)| 
+                generators.pedersen_generators.commit(*v_i, v_blinding_i)
+            )
+            .collect();
+        
+        assert!(create_and_verify_helper(
+            n, m, q,
+            W_L, W_R, W_O, W_V,
+            c, a_L, a_R, a_O, 
+            V, v_blinding,
+        ).is_ok());
     }
+
+    #[test]
+    // Test that a basic addition circuit (without multiplication gates) fails
+    // LINEAR CONSTRAINTS:
+    // V[0] + V[1] = V[2]
+    // MULT CONSTRAINTS: none
+    fn circuit_add_fail() {
+        let n = 0;
+        let m = 3;
+        let q = 1;
+
+        let one = Scalar::one();
+        let zer = Scalar::zero();
+
+        let W_L = vec![vec![]];
+        let W_R = vec![vec![]];
+        let W_O = vec![vec![]];
+        let W_V = vec![vec![one, one, -one]];
+        let c = vec![zer];
+        let a_L = vec![]; 
+        let a_R = vec![]; 
+        let a_O = vec![];    
+
+        let generators = Generators::new(PedersenGenerators::default(), n, 1);
+        let mut rng = OsRng::new().unwrap();
+
+        let v = vec![zer, Scalar::from_u64(3), Scalar::from_u64(4)];
+        let v_blinding: Vec<Scalar> = (0..m).map(|_| Scalar::random(&mut rng)).collect();
+        let V: Vec<RistrettoPoint> = v.iter()
+            .zip(v_blinding.clone())
+            .map(|(v_i, v_blinding_i)| 
+                generators.pedersen_generators.commit(*v_i, v_blinding_i)
+            )
+            .collect();
+        
+        assert!(create_and_verify_helper(
+            n, m, q,
+            W_L, W_R, W_O, W_V,
+            c, a_L, a_R, a_O, 
+            V, v_blinding,
+        ).is_err());
+    }
+
+
 }
