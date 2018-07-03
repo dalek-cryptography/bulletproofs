@@ -10,6 +10,7 @@ use curve25519_dalek::traits::MultiscalarMul;
 use generators::Generators;
 use proof_transcript::ProofTranscript;  
 use util;
+use inner_product_proof::inner_product;
 
 #[derive(Clone, Debug)]
 pub struct CircuitProof {
@@ -30,18 +31,18 @@ pub struct CircuitProof {
 
 impl CircuitProof {
     pub fn generate_proof<R: Rng + CryptoRng>(
-        gen: Generators,
+        gen: &Generators,
         transcript: &mut ProofTranscript,
         rng: &mut R,
     
-        n: usize,
+        n: usize, // or we can just calculate parameters ourselves
         m: usize,
         q: usize,
 
         W_L: Vec<Vec<Scalar>>, // Q vectors, of length n each
         W_R: Vec<Vec<Scalar>>,
         W_O: Vec<Vec<Scalar>>,
-        W_V: Vec<Vec<Scalar>>,
+        W_V: Vec<Vec<Scalar>>, // Q vectors, of length m each
         _c: Vec<Scalar>,   
         a_L: Vec<Scalar>,
         a_R: Vec<Scalar>,
@@ -135,6 +136,7 @@ impl CircuitProof {
             }
         }
         let mut t_2_blinding = Scalar::zero();
+        // TODO: use inner_product function here instead 
         let mut exp_z = z; // z^n starting at n=1
         for row in 0..q {
             t_2_blinding += W_V_blinded[row] * exp_z;
@@ -176,6 +178,50 @@ impl CircuitProof {
             l_vec, r_vec,
         }
     }
+
+    pub fn verify_proof(
+        &self,
+        gen: &Generators,
+        transcript: &mut ProofTranscript,
+
+        n: usize, // potentially calculate parameters ourselves
+        m: usize,
+        q: usize,
+
+        W_L: Vec<Vec<Scalar>>, // Q vectors, of length n each
+        W_R: Vec<Vec<Scalar>>,
+        W_O: Vec<Vec<Scalar>>,
+        W_V: Vec<Vec<Scalar>>, // Q vectors, of length m each
+        c: Vec<Scalar>,   
+    ) -> Result<(), ()> {
+        // TODO: check n, m, q against input sizes
+        transcript.commit_u64(n as u64);
+        transcript.commit_u64(m as u64);
+        transcript.commit_u64(q as u64);
+        transcript.commit(self.A_I.compress().as_bytes());
+        transcript.commit(self.A_O.compress().as_bytes());
+        transcript.commit(self.S.compress().as_bytes());
+        let y = transcript.challenge_scalar();
+        let z = transcript.challenge_scalar();  
+
+        transcript.commit(self.T_1.compress().as_bytes());
+        transcript.commit(self.T_3.compress().as_bytes());
+        transcript.commit(self.T_4.compress().as_bytes());
+        transcript.commit(self.T_5.compress().as_bytes());
+        transcript.commit(self.T_6.compress().as_bytes());
+        let x = transcript.challenge_scalar();      
+
+        let z_zQ_WL: Vec<Scalar> = matrix_flatten(W_L, z);
+        let z_zQ_WR: Vec<Scalar> = matrix_flatten(W_R, z);
+        let z_zQ_WO: Vec<Scalar> = matrix_flatten(W_O, z);
+        let z_zQ_WV: Vec<Scalar> = matrix_flatten(W_V, z);
+
+        if self.t_x == inner_product(&self.l_vec, &self.r_vec) {
+            return Ok(());
+        } else {
+            return Err(());
+        }
+    }
 }
 
 // Computes z * z^Q * W, where W is a qxn matrix and z is a scalar.
@@ -193,4 +239,52 @@ pub fn matrix_flatten(W: Vec<Vec<Scalar>>, z: Scalar) -> Vec<Scalar> {
     }
     
     result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;   
+    use rand::rngs::OsRng;
+    use generators::PedersenGenerators;
+
+    #[test]
+    // test basic multiplication circuit that computes a*b=c
+    // potentially doesn't have to have any linear constraints (it's redundant).
+    fn test_circuit_mult() {
+        let n = 1;
+        let m = 0;
+        let q = 3;
+
+        let zer = Scalar::zero();
+        let one = Scalar::one();
+
+        let W_L = vec![vec![zer], vec![zer], vec![one]];
+        let W_R = vec![vec![zer], vec![one], vec![zer]];
+        let W_O = vec![vec![one], vec![zer], vec![zer]];
+        let W_V = vec![vec![], vec![], vec![]];
+        let c = vec![Scalar::from_u64(6), Scalar::from_u64(3), Scalar::from_u64(2)];    
+        let a_L = vec![Scalar::from_u64(2)];
+        let a_R = vec![Scalar::from_u64(3)];
+        let a_O = vec![Scalar::from_u64(6)];
+        let v_blinding = vec![Scalar::zero(); 3]; // since we don't have anything to blind
+
+        let generators = Generators::new(PedersenGenerators::default(), n, 1);
+        let mut proof_transcript = ProofTranscript::new(b"CircuitProofTest-Multiplication");
+        let mut rng = OsRng::new().unwrap();
+
+        let circuit_proof = CircuitProof::generate_proof(
+            &generators, &mut proof_transcript, &mut rng,
+            n, m, q,
+            W_L.clone(), W_R.clone(), W_O.clone(), W_V.clone(), c.clone(), a_L, a_R, a_O, v_blinding);
+
+        let mut verify_transcript = ProofTranscript::new(b"CircuitProofTest-Multiplication");
+
+        assert!(circuit_proof.verify_proof(
+            &generators,
+            &mut verify_transcript,
+            n, m, q,
+            W_L, W_R, W_O, W_V, c, 
+            )
+        .is_ok());
+    }
 }
