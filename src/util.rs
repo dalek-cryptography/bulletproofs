@@ -7,6 +7,10 @@ use inner_product_proof::inner_product;
 /// Represents a degree-1 vector polynomial \\(\mathbf{a} + \mathbf{b} \cdot x\\).
 pub struct VecPoly1(pub Vec<Scalar>, pub Vec<Scalar>);
 
+/// Represents a degree-3 vector polynomial 
+/// \\(\mathbf{a} + \mathbf{b} \cdot x + \mathbf{c} \cdot x^2 + \mathbf{d} \cdot x^3 \\).
+pub struct VecPoly3(pub Vec<Scalar>, pub Vec<Scalar>, pub Vec<Scalar>, pub Vec<Scalar>);
+
 /// Represents a degree-2 scalar polynomial \\(a + b \cdot x + c \cdot x^2\\)
 pub struct Poly2(pub Scalar, pub Scalar, pub Scalar);
 
@@ -75,6 +79,14 @@ impl VecPoly1 {
         }
         out
     }
+}
+
+impl VecPoly3 {
+  pub fn zero(n: usize) -> Self {
+    VecPoly3(vec![Scalar::zero(); n], vec![Scalar::zero(); n], 
+             vec![Scalar::zero(); n], vec![Scalar::zero(); n]) 
+  }
+  // pub fn inner_product(&self, rhs: &VecPoly3) -> 
 }
 
 impl Poly2 {
