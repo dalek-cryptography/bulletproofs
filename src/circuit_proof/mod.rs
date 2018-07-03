@@ -175,8 +175,6 @@ impl CircuitProof {
         let l_vec = l_poly.eval(x);
         let r_vec = r_poly.eval(x);
         let e_blinding = x * (i_blinding + x * (o_blinding + x * s_blinding));
-
-        println!("challenges x, y, z {:?},{:?},{:?}", x, y, z);
     
         CircuitProof {
             A_I, A_O, S,
@@ -263,7 +261,7 @@ impl CircuitProof {
         let P = RistrettoPoint::vartime_multiscalar_mul(
             iter::once(x)
                 .chain(iter::once(x * x))
-                .chain(vec![Scalar::one(); n]) // vector of ones
+                .chain(vec![-Scalar::one(); n]) // vector of ones
                 .chain(iter::once(x))
                 .chain(iter::once(x))
                 .chain(iter::once(Scalar::one()))
@@ -276,7 +274,6 @@ impl CircuitProof {
                 .chain(iter::once(&W_O_point))
                 .chain(iter::once(&self.S))
         );
-        println!("challenges x, y, z {:?},{:?},{:?}", x, y, z);
 
         if P != P_check {
             return Err(());
@@ -286,7 +283,7 @@ impl CircuitProof {
         let powers_of_z: Vec<Scalar> = util::exp_iter(z).take(q).collect();
         let z_c = z * inner_product(&powers_of_z, &c);
         let W_V_flatten: Vec<Scalar> = matrix_flatten(W_V, z);
-        let V_multiplier = W_V_flatten.iter().map(|W_V_i| z * z * W_V_i);
+        let V_multiplier = W_V_flatten.iter().map(|W_V_i| x * x * W_V_i);
 
         let t = RistrettoPoint::vartime_multiscalar_mul(
             iter::once(x * x * (delta + z_c))
