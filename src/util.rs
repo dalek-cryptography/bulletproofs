@@ -14,7 +14,7 @@ pub struct VecPoly3(pub Vec<Scalar>, pub Vec<Scalar>, pub Vec<Scalar>, pub Vec<S
 /// Represents a degree-2 scalar polynomial \\(a + b \cdot x + c \cdot x^2\\)
 pub struct Poly2(pub Scalar, pub Scalar, pub Scalar);
 
-/// Represents a degree-6 scalar polynomial 
+/// Represents a degree-6 scalar polynomial
 /// \\(a + b \cdot x + c \cdot x^2 + d \cdot x^3 + e \cdot x^4 + f \cdot x^5 + g \cdot x^6\\)
 pub struct Poly6(pub Scalar, pub Scalar, pub Scalar, pub Scalar, pub Scalar, pub Scalar, pub Scalar);
 
@@ -91,19 +91,22 @@ impl VecPoly3 {
              vec![Scalar::zero(); n], vec![Scalar::zero(); n]) 
   }
 
+  // Optimized performance given properties of l(x) and r(x) in circuit proof.
+  // We know that l(x).0 and r(x).2 are zeroes.
+  // TODO: can we optimize more by using karatsuba-like methods?
   pub fn inner_product(&self, rhs: &VecPoly3) -> Poly6 {
-        // Uses Karatsuba's method
-        let l = self;
-        let r = rhs;
+    let l = self;
+    let r = rhs;
 
-        let t0 = inner_product(&l.0, &r.0);
-        let t2 = inner_product(&l.1, &r.1);
+    let t1 = inner_product(&l.1, &r.0);
+    let t2 = inner_product(&l.1, &r.1) + inner_product(&l.2, &r.0);
+    let t3 = inner_product(&l.2, &r.1) + inner_product(&l.3, &r.0);
+    let t4 = inner_product(&l.1, &r.3) + inner_product(&l.3, &r.1);
+    let t5 = inner_product(&l.2, &r.3);
+    let t6 = inner_product(&l.3, &r.3);
 
-        let l0_plus_l1 = add_vec(&l.0, &l.1);
-        let r0_plus_r1 = add_vec(&r.0, &r.1);
-
-        let t1 = inner_product(&l0_plus_l1, &r0_plus_r1) - t0 - t2;  
-        unimplemented!() 
+    // TODO: don't have poly6 include the zeroth term so we don't have to make a zero scalar
+    Poly6(Scalar::zero(), t1, t2, t3, t4, t5, t6)
   }
 }
 

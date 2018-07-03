@@ -89,25 +89,46 @@ impl CircuitProof {
     let mut exp_y_inv = Scalar::one(); // y^-n starting at n=0
     let y_inv = y.invert();
 
-    // l_poly.0 = 0
-    // l_poly.1 = a_L + y^-n * (z * z^Q * W_R)
-    // l_poly.2 = a_O
-    // l_poly.3 = s_L
-    // r_poly.0 = (z * z^Q * W_O) - y^n
-    // r_poly.1 = y^n * a_R + (z * z^Q * W_L)
-    // r_poly.2 = 0
-    // r_poly.3 = y^n * s_R
     for i in 0..n {
+      // l_poly.0 = 0
+      // l_poly.1 = a_L + y^-n * (z * z^Q * W_R)
       l_poly.1[i] = a_L[i] + exp_y_inv * z_zQ_WR[i];
+      // l_poly.2 = a_O
       l_poly.2[i] = a_O[i];
+      // l_poly.3 = s_L
       l_poly.3[i] = s_L[i];
+      // r_poly.0 = (z * z^Q * W_O) - y^n
       r_poly.0[i] = z_zQ_WO[i] - exp_y;
+      // r_poly.1 = y^n * a_R + (z * z^Q * W_L)
       r_poly.1[i] = exp_y * a_R[i] + z_zQ_WL[i];
+      // r_poly.2 = 0
+      // r_poly.3 = y^n * s_R
       r_poly.3[i] = exp_y * s_R[i];
 
       exp_y = exp_y * y; // y^i -> y^(i+1)
       exp_y_inv = exp_y_inv * y_inv; // y^-i -> y^-(i+1)
     }
+    
+    let t_poly = l_poly.inner_product(&r_poly);
+
+    // TODO: this is ugly but rust doesn't support tuple indexing so we can't iterate over 
+    // t_poly unless we change how it is represented.
+    let t_1_blinding = Scalar::random(rng);
+    let t_3_blinding = Scalar::random(rng);
+    let t_4_blinding = Scalar::random(rng);
+    let t_5_blinding = Scalar::random(rng);
+    let t_6_blinding = Scalar::random(rng);
+    let T_1 = gen.pedersen_generators.commit(t_poly.1, t_1_blinding);
+    let T_3 = gen.pedersen_generators.commit(t_poly.3, t_3_blinding);
+    let T_4 = gen.pedersen_generators.commit(t_poly.4, t_4_blinding);
+    let T_5 = gen.pedersen_generators.commit(t_poly.5, t_5_blinding);
+    let T_6 = gen.pedersen_generators.commit(t_poly.6, t_6_blinding);
+    transcript.commit(T_1.compress().as_bytes());
+    transcript.commit(T_3.compress().as_bytes());
+    transcript.commit(T_4.compress().as_bytes());
+    transcript.commit(T_5.compress().as_bytes());
+    transcript.commit(T_6.compress().as_bytes());
+
     unimplemented!()
   }
 }
