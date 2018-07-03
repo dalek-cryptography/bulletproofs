@@ -241,13 +241,6 @@ impl CircuitProof {
         transcript.commit(self.t_x_blinding.as_bytes());
         transcript.commit(self.e_blinding.as_bytes());
         let w = transcript.challenge_scalar();
-        let Q = w * gen.pedersen_generators.B;     
-
-        let H_prime: Vec<RistrettoPoint> = gen.H
-            .iter()
-            .zip(util::exp_iter(y.invert()))
-            .map(|(H_i, exp_y_inv)| H_i * exp_y_inv)
-            .collect();
 
         // W_L_point = <h * y^-n , z * z^Q * W_L>, line 81
         let W_L_flatten: Vec<Scalar> = matrix_flatten(W_L, z, n);
@@ -255,7 +248,6 @@ impl CircuitProof {
             W_L_flatten.clone(),
             H_prime.iter()
         );
-
         // W_R_point = <g , y^-n * z * z^Q * W_R>, line 82
         let W_R_flatten: Vec<Scalar> = matrix_flatten(W_R, z, n);
         let W_R_flatten_yinv: Vec<Scalar> = W_R_flatten
@@ -267,7 +259,6 @@ impl CircuitProof {
             W_R_flatten_yinv.clone(),
             gen.G.iter()
         );  
-
         // W_O_point = <h * y^-n , z * z^Q * W_O>, line 83
         let W_O_flatten: Vec<Scalar> = matrix_flatten(W_O, z, n);
         let W_O_point = RistrettoPoint::vartime_multiscalar_mul(
@@ -275,30 +266,33 @@ impl CircuitProof {
             H_prime.iter()
         );
 
+        let powers_of_y_inv: Vec<Scalar> = util::exp_iter(y.invert()).take(n).collect();
+        let h: Vec<Scalar> = self.r_vec.iter()
+            .zip(util::exp_iter(y.invert()))
+            .map(|(r_i, exp_y_inv)| - r_i * exp_y_inv - Scalar::one())
+            .collect();
+
         let neg_l_vec: Vec<Scalar> = self.l_vec.iter().map(|l_i| -l_i).collect();
-        let neg_r_vec: Vec<Scalar> = self.r_vec.iter().map(|r_i| -r_i).collect();
 
         let P = RistrettoPoint::vartime_multiscalar_mul(
             iter::once(x)
                 .chain(iter::once(x * x))
-                .chain(vec![-Scalar::one(); n]) // vector of ones
                 .chain(iter::once(x))
                 .chain(iter::once(x))
                 .chain(iter::once(Scalar::one()))
                 .chain(iter::once(x * x * x))
                 .chain(iter::once(-self.e_blinding))
                 .chain(neg_l_vec)
-                .chain(neg_r_vec),
+                .chain(h),
             iter::once(&self.A_I)
                 .chain(iter::once(&self.A_O))
-                .chain(gen.H.iter())
                 .chain(iter::once(&W_L_point))
                 .chain(iter::once(&W_R_point))
                 .chain(iter::once(&W_O_point))
                 .chain(iter::once(&self.S))
                 .chain(iter::once(&gen.pedersen_generators.B_blinding))
                 .chain(gen.G.iter())
-                .chain(H_prime.iter())
+                .chain(gen.H.iter())
         );
 
         if !P.is_identity() {
@@ -330,13 +324,6 @@ impl CircuitProof {
                 .chain(iter::once(&self.T_6))
                 .chain(iter::once(&gen.pedersen_generators.B))
                 .chain(iter::once(&gen.pedersen_generators.B_blinding))
-        );
-
-        let t_check = RistrettoPoint::vartime_multiscalar_mul(
-            iter::once(self.t_x)
-                .chain(iter::once(self.t_x_blinding)),
-            iter::once(gen.pedersen_generators.B)
-                .chain(iter::once(gen.pedersen_generators.B_blinding))
         );
 
         if !t.is_identity() {
