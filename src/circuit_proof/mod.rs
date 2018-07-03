@@ -277,12 +277,16 @@ impl CircuitProof {
 
         // Get IPP variables
         let (x_sq, x_inv_sq, s) = self.ipp_proof.verification_scalars(transcript);
-        let s_inv = s.iter().rev();
+        let s_inv = s.iter().rev().take(n);
         let a = self.ipp_proof.a;
         let b = self.ipp_proof.b;
 
+        println!("a and b from ipp: {:?}, {:?}", a, b);
+        println!("x, x_inv, s: {:?}, {:?}, {:?}", x_sq, x_inv_sq, s);
+        println!("len of G and H: {:?} {:?}", gen.G.len(), gen.H.len());
+
         // define parameters for P check
-        let g = s.iter().map(|s_i| - a * s_i);
+        let g = s.iter().take(n).map(|s_i| - a * s_i);
         let h = s_inv
             .zip(util::exp_iter(y.invert()))
             .map(|(s_i_inv, exp_y_inv)| - exp_y_inv * b * s_i_inv - Scalar::one());
