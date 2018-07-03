@@ -100,9 +100,12 @@ impl VecPoly3 {
 
     // Optimized performance given properties of l(x) and r(x) in circuit proof.
     // We know that l(x).0 and r(x).2 are zeroes.
+    // MUST call l_poly.inner_product(r_poly).
     pub fn inner_product(&self, rhs: &VecPoly3) -> Poly6 {
         let l = self;
         let r = rhs;
+
+        // TODO: make checks that l_poly.0 and r_poly.2 are zero.
     
         let t1 = inner_product(&l.1, &r.0);
         let t2 = inner_product(&l.1, &r.1) + inner_product(&l.2, &r.0);
