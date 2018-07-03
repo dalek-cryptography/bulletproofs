@@ -242,6 +242,12 @@ impl CircuitProof {
         transcript.commit(self.e_blinding.as_bytes());
         let w = transcript.challenge_scalar();
 
+        // Calculte points that represent the matrices
+        let H_prime: Vec<RistrettoPoint> = gen.H
+            .iter()
+            .zip(util::exp_iter(y.invert()))
+            .map(|(H_i, exp_y_inv)| H_i * exp_y_inv)
+            .collect();
         // W_L_point = <h * y^-n , z * z^Q * W_L>, line 81
         let W_L_flatten: Vec<Scalar> = matrix_flatten(W_L, z, n);
         let W_L_point = RistrettoPoint::vartime_multiscalar_mul(
@@ -266,13 +272,16 @@ impl CircuitProof {
             H_prime.iter()
         );
 
-        let powers_of_y_inv: Vec<Scalar> = util::exp_iter(y.invert()).take(n).collect();
-        let h: Vec<Scalar> = self.r_vec.iter()
-            .zip(util::exp_iter(y.invert()))
-            .map(|(r_i, exp_y_inv)| - r_i * exp_y_inv - Scalar::one())
-            .collect();
+        // Get IPP variables
+        let (x_sq, x_inv_sq, s) = self.ipp_proof.verification_scalars(transcript);
+        let s_inv = s.iter().rev();
+        let a = self.ipp_proof.a;
+        let b = self.ipp_proof.b;
 
-        let neg_l_vec: Vec<Scalar> = self.l_vec.iter().map(|l_i| -l_i).collect();
+        let g = s.iter().map(|s_i| - a * s_i);
+        let h = s_inv
+            .zip(util::exp_iter(y.invert()))
+            .map(|(s_i_inv, exp_y_inv)| - exp_y_inv * b * s_i_inv - Scalar::one());
 
         let P = RistrettoPoint::vartime_multiscalar_mul(
             iter::once(x)
@@ -281,18 +290,24 @@ impl CircuitProof {
                 .chain(iter::once(x))
                 .chain(iter::once(Scalar::one()))
                 .chain(iter::once(x * x * x))
+                .chain(iter::once(w * (self.t_x - a * b)))
                 .chain(iter::once(-self.e_blinding))
-                .chain(neg_l_vec)
-                .chain(h),
+                .chain(g)
+                .chain(h)
+                .chain(x_sq.iter().cloned())
+                .chain(x_inv_sq.iter().cloned()),
             iter::once(&self.A_I)
                 .chain(iter::once(&self.A_O))
                 .chain(iter::once(&W_L_point))
                 .chain(iter::once(&W_R_point))
                 .chain(iter::once(&W_O_point))
                 .chain(iter::once(&self.S))
+                .chain(iter::once(&gen.pedersen_generators.B))
                 .chain(iter::once(&gen.pedersen_generators.B_blinding))
                 .chain(gen.G.iter())
                 .chain(gen.H.iter())
+                .chain(self.ipp_proof.L_vec.iter())
+                .chain(self.ipp_proof.R_vec.iter()),
         );
 
         if !P.is_identity() {
@@ -333,13 +348,7 @@ impl CircuitProof {
         if self.t_x != inner_product(&self.l_vec, &self.r_vec) {
             return Err(());
         }
-/*
-        let (x_sq, x_inv_sq, s) = self.ipp_proof.verification_scalars(transcript);
-        let s_inv = s.iter().rev();
 
-        let a = self.ipp_proof.a;
-        let b = self.ipp_proof.b;
-*/
         Ok(())
     }
 }
