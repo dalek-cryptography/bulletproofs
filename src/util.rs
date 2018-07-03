@@ -100,7 +100,6 @@ impl VecPoly3 {
 
     // Optimized performance given properties of l(x) and r(x) in circuit proof.
     // We know that l(x).0 and r(x).2 are zeroes.
-    // TODO: can we optimize more by using karatsuba-like methods?
     pub fn inner_product(&self, rhs: &VecPoly3) -> Poly6 {
         let l = self;
         let r = rhs;

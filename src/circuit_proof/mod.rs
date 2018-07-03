@@ -214,10 +214,69 @@ impl CircuitProof {
         transcript.commit(self.T_6.compress().as_bytes());
         let x = transcript.challenge_scalar();      
 
-        let z_zQ_WL: Vec<Scalar> = matrix_flatten(W_L, z);
-        let z_zQ_WR: Vec<Scalar> = matrix_flatten(W_R, z);
-        let z_zQ_WO: Vec<Scalar> = matrix_flatten(W_O, z);
+        let H_prime: Vec<RistrettoPoint> = gen.H
+            .iter()
+            .zip(util::exp_iter(y.invert()))
+            .map(|(H_i, exp_y_inv)| H_i * exp_y_inv)
+            .collect();
+
+        // W_L_point = <h * y^-n , z * z^Q * W_L>, line 81
+        let W_L_right: Vec<Scalar> = matrix_flatten(W_L, z);
+        let W_L_point = RistrettoPoint::vartime_multiscalar_mul(
+            W_L_right,
+            H_prime.iter()
+        );
+
+        // W_R_point = <g , y^-n * z * z^Q * W_R>, line 82
+        let W_R_flatten: Vec<Scalar> = matrix_flatten(W_R, z);
+        let W_R_right: Vec<Scalar> = W_R_flatten
+            .iter()
+            .zip(util::exp_iter(y.invert()))
+            .map(|(W_R_right_i, exp_y_inv)| W_R_right_i * exp_y_inv)
+            .collect();
+        let W_R_point = RistrettoPoint::vartime_multiscalar_mul(
+            W_R_right,
+            gen.G.iter()
+        );  
+
+        // W_O_point = <h * y^-n , z * z^Q * W_O>, line 83
+        let W_O_right: Vec<Scalar> = matrix_flatten(W_O, z);
+        let W_O_point = RistrettoPoint::vartime_multiscalar_mul(
+            W_O_right,
+            H_prime.iter()
+        );
+
         let z_zQ_WV: Vec<Scalar> = matrix_flatten(W_V, z);
+
+        let P_check = RistrettoPoint::vartime_multiscalar_mul(
+            iter::once(self.e_blinding)
+                .chain(self.l_vec.clone())
+                .chain(self.r_vec.clone()),
+            iter::once(&gen.pedersen_generators.B_blinding)
+                .chain(gen.G.iter())
+                .chain(H_prime.iter())
+        );
+
+        let P = RistrettoPoint::vartime_multiscalar_mul(
+            iter::once(x)
+                .chain(iter::once(x * x))
+                .chain(vec![Scalar::one(); n]) // vector of ones
+                .chain(iter::once(x))
+                .chain(iter::once(x))
+                .chain(iter::once(Scalar::one()))
+                .chain(iter::once(x * x * x)),
+            iter::once(&self.A_I)
+                .chain(iter::once(&self.A_O))
+                .chain(gen.H.iter())
+                .chain(iter::once(&W_L_point))
+                .chain(iter::once(&W_R_point))
+                .chain(iter::once(&W_O_point))
+                .chain(iter::once(&self.S))
+        );
+
+        if P != P_check {
+            return Err(());
+        }
 
         if self.t_x != inner_product(&self.l_vec, &self.r_vec) {
             return Err(());
