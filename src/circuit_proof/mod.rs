@@ -10,7 +10,7 @@ use curve25519_dalek::traits::{IsIdentity, MultiscalarMul, VartimeMultiscalarMul
 use generators::Generators;
 use proof_transcript::ProofTranscript;  
 use util;
-use inner_product_proof::inner_product;
+use inner_product_proof::{inner_product, InnerProductProof};
 
 #[derive(Clone, Debug)]
 pub struct CircuitProof {
@@ -27,6 +27,7 @@ pub struct CircuitProof {
     pub e_blinding: Scalar,
     pub l_vec: Vec<Scalar>,
     pub r_vec: Vec<Scalar>,
+    pub ipp_proof: InnerProductProof,
 }
 
 impl CircuitProof {
@@ -175,12 +176,31 @@ impl CircuitProof {
         let l_vec = l_poly.eval(x);
         let r_vec = r_poly.eval(x);
         let e_blinding = x * (i_blinding + x * (o_blinding + x * s_blinding));
+
+        transcript.commit(t_x.as_bytes());
+        transcript.commit(t_x_blinding.as_bytes());
+        transcript.commit(e_blinding.as_bytes());
+
+        // Get a challenge value to combine statements for the IPP
+        let w = transcript.challenge_scalar();
+        let Q = w * gen.pedersen_generators.B;
+
+        // TODO: figure out how to handle IPP when n=0
+        let ipp_proof = InnerProductProof::create(
+            transcript,
+            &Q,
+            util::exp_iter(y.invert()),
+            gen.G.to_vec(),
+            gen.H.to_vec(),
+            l_vec.clone(),
+            r_vec.clone(),
+        );
     
         CircuitProof {
             A_I, A_O, S,
             T_1, T_3, T_4, T_5, T_6,
             t_x, t_x_blinding, e_blinding,
-            l_vec, r_vec,
+            l_vec, r_vec, ipp_proof,
         }
     }
 
@@ -215,7 +235,13 @@ impl CircuitProof {
         transcript.commit(self.T_4.compress().as_bytes());
         transcript.commit(self.T_5.compress().as_bytes());
         transcript.commit(self.T_6.compress().as_bytes());
-        let x = transcript.challenge_scalar();      
+        let x = transcript.challenge_scalar(); 
+
+        transcript.commit(self.t_x.as_bytes());
+        transcript.commit(self.t_x_blinding.as_bytes());
+        transcript.commit(self.e_blinding.as_bytes());
+        let w = transcript.challenge_scalar();
+        let Q = w * gen.pedersen_generators.B;     
 
         let H_prime: Vec<RistrettoPoint> = gen.H
             .iter()
@@ -249,14 +275,8 @@ impl CircuitProof {
             H_prime.iter()
         );
 
-        let P_check = RistrettoPoint::vartime_multiscalar_mul(
-            iter::once(self.e_blinding)
-                .chain(self.l_vec.clone())
-                .chain(self.r_vec.clone()),
-            iter::once(&gen.pedersen_generators.B_blinding)
-                .chain(gen.G.iter())
-                .chain(H_prime.iter())
-        );
+        let neg_l_vec: Vec<Scalar> = self.l_vec.iter().map(|l_i| -l_i).collect();
+        let neg_r_vec: Vec<Scalar> = self.r_vec.iter().map(|r_i| -r_i).collect();
 
         let P = RistrettoPoint::vartime_multiscalar_mul(
             iter::once(x)
@@ -265,7 +285,10 @@ impl CircuitProof {
                 .chain(iter::once(x))
                 .chain(iter::once(x))
                 .chain(iter::once(Scalar::one()))
-                .chain(iter::once(x * x * x)),
+                .chain(iter::once(x * x * x))
+                .chain(iter::once(-self.e_blinding))
+                .chain(neg_l_vec)
+                .chain(neg_r_vec),
             iter::once(&self.A_I)
                 .chain(iter::once(&self.A_O))
                 .chain(gen.H.iter())
@@ -273,9 +296,12 @@ impl CircuitProof {
                 .chain(iter::once(&W_R_point))
                 .chain(iter::once(&W_O_point))
                 .chain(iter::once(&self.S))
+                .chain(iter::once(&gen.pedersen_generators.B_blinding))
+                .chain(gen.G.iter())
+                .chain(H_prime.iter())
         );
 
-        if P != P_check {
+        if !P.is_identity() {
             return Err(());
         }
 
@@ -292,7 +318,9 @@ impl CircuitProof {
                 .chain(iter::once(x * x * x))
                 .chain(iter::once(x * x * x * x))
                 .chain(iter::once(x * x * x * x * x))
-                .chain(iter::once(x * x * x * x * x * x)),
+                .chain(iter::once(x * x * x * x * x * x))
+                .chain(iter::once(-self.t_x))
+                .chain(iter::once(-self.t_x_blinding)),
             iter::once(&gen.pedersen_generators.B)
                 .chain(V.iter())
                 .chain(iter::once(&self.T_1))
@@ -300,6 +328,8 @@ impl CircuitProof {
                 .chain(iter::once(&self.T_4))
                 .chain(iter::once(&self.T_5))
                 .chain(iter::once(&self.T_6))
+                .chain(iter::once(&gen.pedersen_generators.B))
+                .chain(iter::once(&gen.pedersen_generators.B_blinding))
         );
 
         let t_check = RistrettoPoint::vartime_multiscalar_mul(
@@ -309,14 +339,20 @@ impl CircuitProof {
                 .chain(iter::once(gen.pedersen_generators.B_blinding))
         );
 
-        if t != t_check {
+        if !t.is_identity() {
             return Err(());
         }
 
         if self.t_x != inner_product(&self.l_vec, &self.r_vec) {
             return Err(());
         }
+/*
+        let (x_sq, x_inv_sq, s) = self.ipp_proof.verification_scalars(transcript);
+        let s_inv = s.iter().rev();
 
+        let a = self.ipp_proof.a;
+        let b = self.ipp_proof.b;
+*/
         Ok(())
     }
 }
@@ -764,7 +800,7 @@ mod tests {
                      Scalar::from_u64(30), Scalar::from_u64(30), Scalar::from_u64(30), Scalar::from_u64(30)];
         let (V, v_blinding) = blinding_helper(&v);
 
-        let a_L = vec![Scalar::from_u64(23) * (z - one)];
+        let a_L = vec![-Scalar::from_u64(23) + z * Scalar::from_u64(23)];
         let a_R = vec![zer];
         let a_O = vec![zer];
 
