@@ -2,11 +2,14 @@ This module contains notes on how and why Bulletproofs work.
 
 The documentation is laid out roughly as follows.  General notes on
 the range proof and inner-product proofs are here.  The description of
-each protocol is contained in the respective `range_proof` and
-`inner_product_proof` modules.  Finally, structs from those modules
+each protocol is contained in the respective [`range_proof`][rp_notes] and
+[`inner_product_proof`][ipp_notes] modules.  Finally, structs from those modules
 are publicly re-exported from the crate root, so that the external
 documentation describes how to use the API, while the internal
 documentation describes how it works.
+
+[rp_notes]: https://doc-internal.dalek.rs/ristretto_bulletproofs/range_proof/index.html
+[ipp_notes]: https://doc-internal.dalek.rs/ristretto_bulletproofs/inner_product_proof/index.html
 
 Notation
 ========
@@ -612,7 +615,7 @@ The aggregation protocol is a multi-party computation protocol, involving \\(m\\
 
 The Bulletproofs paper outlines two versions of multi-party computation aggregation. In the first approach, the inner-product proof is performed by the dealer, which requires sending the vectors used for the inner-product to the dealer. In the second approach, the inner-product proof is performed using multi-party computation, which sends less data but requires one round for each iteration of the inner-product protocol. We chose to implement the first approach because it requires fewer round trips between parties, which outweighed the slight message size savings of the second approach. 
 
-For more information on how the aggregation protocol works and is implemented, see the [protocol notes](../aggregated_range_proof/index.html). 
+For more information on how the aggregation protocol works and is implemented, see the [protocol notes](../range_proof/index.html). 
 
 The aggregated range proof has the same form as the individual range proof, in that the provers (the parties) still perform the same calculations to prove that \\(t(x) = \langle \mathbf{l}(x), \mathbf{r}(x) \rangle \\) and that \\(t_0, \mathbf{l}(x), \mathbf{r}(x)\\) are correct. The difference is that the challenge values are obtained from the dealer, which generates them by combining commitments from all the parties, and that the calculations of different parties are seperated by different powers of the challenge scalars \\(y\\) and \\(z\\).
 
@@ -878,5 +881,180 @@ With these observations, we can simplify the combined \\(m\\)-party statement ab
 \end{aligned}
 \\]
 
+Arithmetic Circuit Proofs
+=========================
+
+TODO: write description of arithmetic circuit proof here.
+
+Notation for arithmetic circuit proofs
+------------------------------------------
+
+In the paper, matrices are labeled as \\( \textbf{W}\_L, \textbf{W}\_R, \textbf{W}\_O, \textbf{W}\_V \\). We will keep this notation, but will note to readers not to confuse the \\(\textbf{W}\_{L,R,O,V}\\) notation for being a vector of points. 
+
+We keep the variable renamings from the range proof notes above. We also rename a few more variables from the paper, to make it clearer which variables are blinding factors and what they correspond to.
+\\[
+\begin{aligned}
+    \alpha        &\xrightarrow{} \tilde{i} \\\\
+    \beta         &\xrightarrow{} \tilde{o} \\\\
+\end{aligned}
+\\]
+
+Proving statements about arithmetic circuits gates
+--------------------------------------------------
+
+TODO: explain multiplication gate of fan-in 2, and how it relates to this equation:
+
+\\[
+\textbf{a}\_L \circ \textbf{a}\_R = \textbf{a}\_O
+\\]
+
+TODO: explain other gates, and how they can be expressed as linear constraints, and how those relate to this equation:
+
+\\[
+\textbf{W}\_L \cdot \textbf{a}\_L +
+\textbf{W}\_R \cdot \textbf{a}\_R +
+\textbf{W}\_O \cdot \textbf{a}\_O =
+\textbf{W}\_V \cdot \textbf{v} +
+\textbf{c}
+\\]
+
+Combining statements using challenge variables
+----------------------------------------------
+
+We can rewrite the statement about multiplication gates into an inner product equation, using the challenge variable \\(y\\). TODO: explain why we can do this and why we want to.
+
+\\[
+\langle \textbf{a}\_L \circ \textbf{a}\_R - \textbf{a}\_O ,
+\textbf{y}^n \rangle = 0
+\\]
+
+We can rewrite the statement about the linear constraints into an inner product equation, using the challenge variable \\(z\\). TODO: explain why we can do this, and why the multiplication by single z.
+
+\\[
+\langle z \textbf{z}^Q, 
+\textbf{W}\_L \cdot \textbf{a}\_L +
+\textbf{W}\_R \cdot \textbf{a}\_R +
+\textbf{W}\_O \cdot \textbf{a}\_O -
+\textbf{W}\_V \cdot \textbf{v} -
+\textbf{c}
+\rangle = 0
+\\]
+
+We can combine these two inner product equations, since they are offset by different multiples of challenge variable \\(z\\). This gives us:
+
+\\[
+\langle \textbf{a}\_L \circ \textbf{a}\_R - \textbf{a}\_O ,
+\textbf{y}^n \rangle +
+\langle z \textbf{z}^Q, 
+\textbf{W}\_L \cdot \textbf{a}\_L +
+\textbf{W}\_R \cdot \textbf{a}\_R +
+\textbf{W}\_O \cdot \textbf{a}\_O -
+\textbf{W}\_V \cdot \textbf{v} -
+\textbf{c}
+\rangle = 0
+\\]
+
+Rearranging into a single inner product statement
+-------------------------------------------------
+
+TODO: explain why we want to express it as a single inner product.
+
+If we break apart the equation into individual terms, we can write it as:
+
+\\[
+\langle z \textbf{z}^Q,
+\textbf{c} + \textbf{W}\_V \cdot \textbf{v} \rangle =
+\langle \textbf{a}\_L \circ \textbf{a}\_R, \textbf{y}^n \rangle -
+\langle \textbf{a}\_O, \textbf{y}^n \rangle + 
+\langle z \textbf{z}^Q, 
+\textbf{W}\_L \cdot \textbf{a}\_L \rangle +
+\langle z \textbf{z}^Q, 
+\textbf{W}\_R \cdot \textbf{a}\_R \rangle +
+\langle z \textbf{z}^Q, 
+\textbf{W}\_O \cdot \textbf{a}\_O \rangle
+\\]
+
+Merge the statements containing \\(\textbf{a}\_O \\).
+
+\\[
+\langle z \textbf{z}^Q,
+\textbf{c} + \textbf{W}\_V \cdot \textbf{v} \rangle =
+\langle \textbf{a}\_L, 
+\textbf{y}^n \circ \textbf{a}\_R \rangle + 
+\langle \textbf{a}\_L,
+z \textbf{z}^Q \cdot \textbf{W}\_L \rangle +
+\langle \textbf{a}\_O, 
+-\textbf{y}^n + z \textbf{z}^Q \cdot \textbf{W}\_O \rangle +
+\langle \textbf{a}\_R, 
+z \textbf{z}^Q \cdot \textbf{W}\_R \rangle
+\\]
+
+Multiply the \\( \langle \textbf{a}\_R, 
+z \textbf{z}^Q \cdot \textbf{W}\_R \rangle \\) term by \\(\textbf{y}^n\\) one one side of the inner product and by \\(\textbf{y}^{-n}\\) on the other side:
+
+\\[
+\langle z \textbf{z}^Q,
+\textbf{c} + \textbf{W}\_V \cdot \textbf{v} \rangle =
+\langle \textbf{a}\_L, 
+\textbf{y}^n \circ \textbf{a}\_R \rangle + 
+\langle \textbf{a}\_L,
+z \textbf{z}^Q \cdot \textbf{W}\_L \rangle +
+\langle \textbf{a}\_O, 
+-\textbf{y}^n + z \textbf{z}^Q \cdot \textbf{W}\_O \rangle +
+\langle \textbf{y}^n \circ \textbf{a}\_R, 
+\textbf{y}^{-n} \circ (z \textbf{z}^Q \cdot \textbf{W}\_R) \rangle
+\\]
+
+Merge the statements containing \\(\textbf{y}^n \circ \textbf{a}\_R\\).
+
+\\[
+\langle z \textbf{z}^Q,
+\textbf{c} + \textbf{W}\_V \cdot \textbf{v} \rangle =
+\langle \textbf{a}\_L + \textbf{y}^{-n} \circ (z \textbf{z}^Q \cdot \textbf{W}\_R), 
+\textbf{y}^n \circ \textbf{a}\_R \rangle + 
+\langle \textbf{a}\_L,
+z \textbf{z}^Q \cdot \textbf{W}\_L \rangle +
+\langle \textbf{a}\_O, 
+-\textbf{y}^n + z \textbf{z}^Q \cdot \textbf{W}\_O \rangle
+\\]
+
+Add \\(\delta(y, z) = \langle \textbf{y}^{-n} \circ (z \textbf{z}^Q \cdot \textbf{W}\_R), z \textbf{z}^Q \cdot \textbf{W}\_L \rangle \\) to both sides. 
+
+\\[
+\langle z \textbf{z}^Q,
+\textbf{c} + \textbf{W}\_V \cdot \textbf{v} \rangle + \delta(y, z) =
+\langle \textbf{a}\_L + \textbf{y}^{-n} \circ (z \textbf{z}^Q \cdot \textbf{W}\_R), 
+\textbf{y}^n \circ \textbf{a}\_R \rangle + 
+\langle \textbf{a}\_L,
+z \textbf{z}^Q \cdot \textbf{W}\_L \rangle +
+\langle \textbf{a}\_O, 
+-\textbf{y}^n + z \textbf{z}^Q \cdot \textbf{W}\_O \rangle + 
+\langle \textbf{y}^{-n} \circ (z \textbf{z}^Q \cdot \textbf{W}\_R), z \textbf{z}^Q \cdot \textbf{W}\_L \rangle
+\\]
+
+Merge the terms containing \\(z \textbf{z}^Q \cdot \textbf{W}\_L\\).
+
+\\[
+\langle z \textbf{z}^Q,
+\textbf{c} + \textbf{W}\_V \cdot \textbf{v} \rangle + \delta(y, z) =
+\langle \textbf{a}\_L + \textbf{y}^{-n} \circ (z \textbf{z}^Q \cdot \textbf{W}\_R), 
+\textbf{y}^n \circ \textbf{a}\_R \rangle + 
+\langle \textbf{a}\_L + \textbf{y}^{-n} \circ (z \textbf{z}^Q \cdot \textbf{W}\_R),
+z \textbf{z}^Q \cdot \textbf{W}\_L \rangle +
+\langle \textbf{a}\_O, 
+-\textbf{y}^n + z \textbf{z}^Q \cdot \textbf{W}\_O \rangle
+\\]
+
+Merge the terms containing \\(\textbf{a}\_L + \textbf{y}^{-n} \circ (z \textbf{z}^Q \cdot \textbf{W}\_R)\\).
+
+\\[
+\langle z \textbf{z}^Q,
+\textbf{c} + \textbf{W}\_V \cdot \textbf{v} \rangle + \delta(y, z) =
+\langle \textbf{a}\_L + \textbf{y}^{-n} \circ (z \textbf{z}^Q \cdot \textbf{W}\_R), 
+\textbf{y}^n \circ \textbf{a}\_R +
+z \textbf{z}^Q \cdot \textbf{W}\_L \rangle +
+\langle \textbf{a}\_O, 
+-\textbf{y}^n + z \textbf{z}^Q \cdot \textbf{W}\_O \rangle
+\\]
 
 [bulletproofs_paper]: https://eprint.iacr.org/2017/1066.pdf
