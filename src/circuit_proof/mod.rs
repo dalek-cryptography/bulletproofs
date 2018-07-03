@@ -204,10 +204,11 @@ impl CircuitProof {
         }
     }
 
-    pub fn verify_proof(
+    pub fn verify_proof<R: Rng + CryptoRng>(
         &self,
         gen: &Generators,
         transcript: &mut ProofTranscript,
+        rng: &mut R,
 
         n: usize, // potentially calculate parameters ourselves
         m: usize,
@@ -241,6 +242,8 @@ impl CircuitProof {
         transcript.commit(self.t_x_blinding.as_bytes());
         transcript.commit(self.e_blinding.as_bytes());
         let w = transcript.challenge_scalar();
+
+        let r = Scalar::random(rng);
 
         // Calculte points that represent the matrices
         let H_prime: Vec<RistrettoPoint> = gen.H
@@ -278,24 +281,38 @@ impl CircuitProof {
         let a = self.ipp_proof.a;
         let b = self.ipp_proof.b;
 
+        // define parameters for P check
         let g = s.iter().map(|s_i| - a * s_i);
         let h = s_inv
             .zip(util::exp_iter(y.invert()))
             .map(|(s_i_inv, exp_y_inv)| - exp_y_inv * b * s_i_inv - Scalar::one());
 
-        let P = RistrettoPoint::vartime_multiscalar_mul(
-            iter::once(x)
-                .chain(iter::once(x * x))
-                .chain(iter::once(x))
-                .chain(iter::once(x))
-                .chain(iter::once(Scalar::one()))
-                .chain(iter::once(x * x * x))
-                .chain(iter::once(w * (self.t_x - a * b)))
-                .chain(iter::once(-self.e_blinding))
-                .chain(g)
-                .chain(h)
-                .chain(x_sq.iter().cloned())
-                .chain(x_inv_sq.iter().cloned()),
+        // define parameters for t check
+        let delta = inner_product(&W_R_flatten_yinv, &W_L_flatten);
+        let powers_of_z: Vec<Scalar> = util::exp_iter(z).take(q).collect();
+        let z_c = z * inner_product(&powers_of_z, &c);
+        let W_V_flatten: Vec<Scalar> = matrix_flatten(W_V, z, m);
+        let V_multiplier = W_V_flatten.iter().map(|W_V_i| r * x * x * W_V_i);
+
+        let mega_check = RistrettoPoint::vartime_multiscalar_mul(
+            iter::once(x) // A_I
+                .chain(iter::once(x * x)) // A_O
+                .chain(iter::once(x)) // W_L_point
+                .chain(iter::once(x)) // W_R_point
+                .chain(iter::once(Scalar::one())) // W_O_point
+                .chain(iter::once(x * x * x)) // S
+                .chain(iter::once(w * (self.t_x - a * b) + r * (x * x * (delta + z_c) - self.t_x))) // B
+                .chain(iter::once(-self.e_blinding - r * self.t_x_blinding)) // B_blinding
+                .chain(g) // G
+                .chain(h) // H
+                .chain(x_sq.iter().cloned()) // ipp_proof.L_vec
+                .chain(x_inv_sq.iter().cloned()) // ipp_proof.R_vec
+                .chain(V_multiplier) // V
+                .chain(iter::once(r * x)) // T_1
+                .chain(iter::once(r * x * x * x)) // T_3
+                .chain(iter::once(r * x * x * x * x)) // T_4
+                .chain(iter::once(r * x * x * x * x * x)) // T_5
+                .chain(iter::once(r * x * x * x * x * x * x)), // T_6
             iter::once(&self.A_I)
                 .chain(iter::once(&self.A_O))
                 .chain(iter::once(&W_L_point))
@@ -307,45 +324,16 @@ impl CircuitProof {
                 .chain(gen.G.iter())
                 .chain(gen.H.iter())
                 .chain(self.ipp_proof.L_vec.iter())
-                .chain(self.ipp_proof.R_vec.iter()),
-        );
-
-        if !P.is_identity() {
-            return Err(());
-        }
-
-        let delta = inner_product(&W_R_flatten_yinv, &W_L_flatten);
-        let powers_of_z: Vec<Scalar> = util::exp_iter(z).take(q).collect();
-        let z_c = z * inner_product(&powers_of_z, &c);
-        let W_V_flatten: Vec<Scalar> = matrix_flatten(W_V, z, m);
-        let V_multiplier = W_V_flatten.iter().map(|W_V_i| x * x * W_V_i);
-
-        let t = RistrettoPoint::vartime_multiscalar_mul(
-            iter::once(x * x * (delta + z_c))
-                .chain(V_multiplier)
-                .chain(iter::once(x))
-                .chain(iter::once(x * x * x))
-                .chain(iter::once(x * x * x * x))
-                .chain(iter::once(x * x * x * x * x))
-                .chain(iter::once(x * x * x * x * x * x))
-                .chain(iter::once(-self.t_x))
-                .chain(iter::once(-self.t_x_blinding)),
-            iter::once(&gen.pedersen_generators.B)
+                .chain(self.ipp_proof.R_vec.iter())
                 .chain(V.iter())
                 .chain(iter::once(&self.T_1))
                 .chain(iter::once(&self.T_3))
                 .chain(iter::once(&self.T_4))
                 .chain(iter::once(&self.T_5))
                 .chain(iter::once(&self.T_6))
-                .chain(iter::once(&gen.pedersen_generators.B))
-                .chain(iter::once(&gen.pedersen_generators.B_blinding))
         );
 
-        if !t.is_identity() {
-            return Err(());
-        }
-
-        if self.t_x != inner_product(&self.l_vec, &self.r_vec) {
+        if !mega_check.is_identity() {
             return Err(());
         }
 
@@ -407,6 +395,7 @@ mod tests {
         circuit_proof.verify_proof(
             &generators,
             &mut verify_transcript,
+            &mut rng,
             n, m, q,
             W_L, W_R, W_O, W_V, c, V,
         )
