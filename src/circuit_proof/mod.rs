@@ -115,9 +115,9 @@ impl CircuitProof {
         let mut l_poly = util::VecPoly3::zero(circuit.n);
         let mut r_poly = util::VecPoly3::zero(circuit.n);
         
-        let z_zQ_WL: Vec<Scalar> = matrix_flatten(circuit.W_L, z, circuit.n);
-        let z_zQ_WR: Vec<Scalar> = matrix_flatten(circuit.W_R, z, circuit.n);
-        let z_zQ_WO: Vec<Scalar> = matrix_flatten(circuit.W_O, z, circuit.n);
+        let z_zQ_WL: Vec<Scalar> = matrix_flatten(circuit.W_L, z, circuit.n)?;
+        let z_zQ_WR: Vec<Scalar> = matrix_flatten(circuit.W_R, z, circuit.n)?;
+        let z_zQ_WO: Vec<Scalar> = matrix_flatten(circuit.W_O, z, circuit.n)?;
     
         let mut exp_y = Scalar::one(); // y^n starting at n=0
         let mut exp_y_inv = Scalar::one(); // y^-n starting at n=0
@@ -258,13 +258,13 @@ impl CircuitProof {
             .map(|(H_i, exp_y_inv)| H_i * exp_y_inv)
             .collect();
         // W_L_point = <h * y^-n , z * z^Q * W_L>, line 81
-        let W_L_flatten: Vec<Scalar> = matrix_flatten(circuit.W_L, z, circuit.n);
+        let W_L_flatten: Vec<Scalar> = matrix_flatten(circuit.W_L, z, circuit.n)?;
         let W_L_point = RistrettoPoint::vartime_multiscalar_mul(
             W_L_flatten.clone(),
             H_prime.iter()
         );
         // W_R_point = <g , y^-n * z * z^Q * W_R>, line 82
-        let W_R_flatten: Vec<Scalar> = matrix_flatten(circuit.W_R, z, circuit.n);
+        let W_R_flatten: Vec<Scalar> = matrix_flatten(circuit.W_R, z, circuit.n)?;
         let W_R_flatten_yinv: Vec<Scalar> = W_R_flatten
             .iter()
             .zip(util::exp_iter(y.invert()))
@@ -275,7 +275,7 @@ impl CircuitProof {
             gen.G.iter()
         );  
         // W_O_point = <h * y^-n , z * z^Q * W_O>, line 83
-        let W_O_flatten: Vec<Scalar> = matrix_flatten(circuit.W_O, z, circuit.n);
+        let W_O_flatten: Vec<Scalar> = matrix_flatten(circuit.W_O, z, circuit.n)?;
         let W_O_point = RistrettoPoint::vartime_multiscalar_mul(
             W_O_flatten,
             H_prime.iter()
@@ -297,7 +297,7 @@ impl CircuitProof {
         let delta = inner_product(&W_R_flatten_yinv, &W_L_flatten);
         let powers_of_z: Vec<Scalar> = util::exp_iter(z).take(circuit.q).collect();
         let z_c = z * inner_product(&powers_of_z, &circuit.c);
-        let W_V_flatten: Vec<Scalar> = matrix_flatten(circuit.W_V, z, circuit.m);
+        let W_V_flatten: Vec<Scalar> = matrix_flatten(circuit.W_V, z, circuit.m)?;
         let V_multiplier = W_V_flatten.iter().map(|W_V_i| r * x * x * W_V_i);
 
         let mega_check = RistrettoPoint::vartime_multiscalar_mul(
@@ -350,19 +350,22 @@ impl CircuitProof {
 // Computes z * z^Q * W, where W is a qxn matrix and z is a scalar.
 // Input: Qxn matrix of scalars and scalar z
 // Output: length n vector of Scalars
-pub fn matrix_flatten(W: Vec<Vec<Scalar>>, z: Scalar, output_dim: usize) -> Vec<Scalar> {
+pub fn matrix_flatten(W: Vec<Vec<Scalar>>, z: Scalar, output_dim: usize) -> Result<Vec<Scalar>, &'static str> {
     let q = W.len();
    
     let mut result = vec![Scalar::zero(); output_dim];
     let mut exp_z = z; // z^n starting at n=1
 
     for row in 0..q {
+        if W[row].len() != output_dim {
+            return Err("matrix size doesn't match specified parameters in matrix_flatten");
+        }
         for col in 0..output_dim {
             result[col] += exp_z * W[row][col];
         }
         exp_z = exp_z * z; // z^n -> z^(n+1)
     } 
-    result
+    Ok(result)
 }
 
 #[cfg(test)]
@@ -402,7 +405,7 @@ mod tests {
             &generators,
             &mut verify_transcript,
             &mut rng,
-            circuit, 
+            circuit,
             V,
         )
     }
