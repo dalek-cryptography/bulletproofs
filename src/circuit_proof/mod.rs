@@ -13,6 +13,31 @@ use util;
 use inner_product_proof::{inner_product, InnerProductProof};
 
 #[derive(Clone, Debug)]
+pub struct Circuit {
+    n: usize,
+    m: usize,
+    q: usize,
+    c: Vec<Scalar>, // vector of constants, length q
+    W_L: Vec<Vec<Scalar>>, // q vectors, of length n each
+    W_R: Vec<Vec<Scalar>>,
+    W_O: Vec<Vec<Scalar>>,
+    W_V: Vec<Vec<Scalar>>, // q vectors, of length m each
+}
+
+impl Circuit {
+    pub fn check_parameters(&self) -> Result<(), &'static str> {
+        if self.W_L.len() != self.q || self.W_R.len() != self.q || 
+            self.W_O.len() != self.q || self.W_V.len() != self.q {
+            return Err("Circuit matrix size doesn't match specified parameters.");
+        }
+        if self.c.len() != self.q {
+            return Err("Circuit constants vector size doesn't match specified parameters.");
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug)]
 pub struct CircuitProof {
     pub A_I: RistrettoPoint,
     pub A_O: RistrettoPoint,
@@ -25,50 +50,38 @@ pub struct CircuitProof {
     pub t_x: Scalar,
     pub t_x_blinding: Scalar,
     pub e_blinding: Scalar,
-    pub l_vec: Vec<Scalar>,
-    pub r_vec: Vec<Scalar>,
     pub ipp_proof: InnerProductProof,
 }
 
 impl CircuitProof {
-    // XXX removed `c` (constants vector) from prover input, since prover doesn't use it to create proof.
     pub fn prove<R: Rng + CryptoRng>(
         gen: &Generators,
         transcript: &mut ProofTranscript,
         rng: &mut R,
-    
-        n: usize,
-        m: usize,
-        q: usize,
-
-        W_L: Vec<Vec<Scalar>>, // Q vectors, of length n each
-        W_R: Vec<Vec<Scalar>>,
-        W_O: Vec<Vec<Scalar>>,
-        W_V: Vec<Vec<Scalar>>, // Q vectors, of length m each
+        circuit: Circuit,
         a_L: Vec<Scalar>,
         a_R: Vec<Scalar>,
         a_O: Vec<Scalar>,
         v_blinding: Vec<Scalar>,
     ) -> Result<CircuitProof, &'static str> {
-        if W_L.len() != q || W_R.len() != q || W_O.len() != q || W_V.len() != q {
-            return Err("Matrix size doesn't match specified parameters.");
-        }
-        if a_L.len() != n || a_R.len() != n || a_O.len() != n || v_blinding.len() != m {
+        circuit.check_parameters()?;
+        if a_L.len() != circuit.n || a_R.len() != circuit.n || 
+            a_O.len() != circuit.n || v_blinding.len() != circuit.m {
             return Err("Input vector size doesn't match specified parameters.");
         }
-        if gen.n != n {
+        if gen.n != circuit.n {
             return Err("Generator length doesn't match specified parameters.");
         }
 
-        transcript.commit_u64(n as u64);
-        transcript.commit_u64(m as u64);
-        transcript.commit_u64(q as u64);
+        transcript.commit_u64(circuit.n as u64);
+        transcript.commit_u64(circuit.m as u64);
+        transcript.commit_u64(circuit.q as u64);
     
         let i_blinding = Scalar::random(rng);
         let o_blinding = Scalar::random(rng);
         let s_blinding = Scalar::random(rng);
-        let s_L: Vec<Scalar> = (0..n).map(|_| Scalar::random(rng)).collect();
-        let s_R: Vec<Scalar> = (0..n).map(|_| Scalar::random(rng)).collect();
+        let s_L: Vec<Scalar> = (0..circuit.n).map(|_| Scalar::random(rng)).collect();
+        let s_R: Vec<Scalar> = (0..circuit.n).map(|_| Scalar::random(rng)).collect();
 
         // A_I = <a_L, G> + <a_R, H> + i_blinding * B_blinding
         let A_I = RistrettoPoint::multiscalar_mul(
@@ -99,18 +112,18 @@ impl CircuitProof {
         let y = transcript.challenge_scalar();
         let z = transcript.challenge_scalar();
     
-        let mut l_poly = util::VecPoly3::zero(n);
-        let mut r_poly = util::VecPoly3::zero(n);
+        let mut l_poly = util::VecPoly3::zero(circuit.n);
+        let mut r_poly = util::VecPoly3::zero(circuit.n);
         
-        let z_zQ_WL: Vec<Scalar> = matrix_flatten(W_L, z, n);
-        let z_zQ_WR: Vec<Scalar> = matrix_flatten(W_R, z, n);
-        let z_zQ_WO: Vec<Scalar> = matrix_flatten(W_O, z, n);
+        let z_zQ_WL: Vec<Scalar> = matrix_flatten(circuit.W_L, z, circuit.n);
+        let z_zQ_WR: Vec<Scalar> = matrix_flatten(circuit.W_R, z, circuit.n);
+        let z_zQ_WO: Vec<Scalar> = matrix_flatten(circuit.W_O, z, circuit.n);
     
         let mut exp_y = Scalar::one(); // y^n starting at n=0
         let mut exp_y_inv = Scalar::one(); // y^-n starting at n=0
         let y_inv = y.invert();
     
-        for i in 0..n {
+        for i in 0..circuit.n {
           // l_poly.0 = 0
           // l_poly.1 = a_L + y^-n * (z * z^Q * W_R)
           l_poly.1[i] = a_L[i] + exp_y_inv * z_zQ_WR[i];
@@ -153,7 +166,7 @@ impl CircuitProof {
 
         // t_2_blinding = <z*z^Q, W_V * v_blinding>
         // in the t_x_blinding calculations, line 76.
-        let t_2_blinding = W_V.iter()
+        let t_2_blinding = circuit.W_V.iter()
             .zip(util::exp_iter(z))
             .map(|(W_V_i, exp_z)| z * exp_z * inner_product(&W_V_i, &v_blinding))
             .sum();
@@ -195,7 +208,7 @@ impl CircuitProof {
             A_I, A_O, S,
             T_1, T_3, T_4, T_5, T_6,
             t_x, t_x_blinding, e_blinding,
-            l_vec, r_vec, ipp_proof,
+            ipp_proof,
         })
     }
 
@@ -204,31 +217,20 @@ impl CircuitProof {
         gen: &Generators,
         transcript: &mut ProofTranscript,
         rng: &mut R,
-
-        n: usize,
-        m: usize,
-        q: usize,
-
-        W_L: Vec<Vec<Scalar>>, // Q vectors, of length n each
-        W_R: Vec<Vec<Scalar>>,
-        W_O: Vec<Vec<Scalar>>,
-        W_V: Vec<Vec<Scalar>>, // Q vectors, of length m each
-        c: Vec<Scalar>,
+        circuit: Circuit,
         V: Vec<RistrettoPoint>, // Vector of commitments, length m
     ) -> Result<(), &'static str> {
-        if W_L.len() != q || W_R.len() != q || W_O.len() != q || W_V.len() != q {
-            return Err("Matrix size doesn't match specified parameters.");
+        circuit.check_parameters()?;
+        if V.len() != circuit.m {
+            return Err("Commitments vector size doesn't match specified parameters.");
         }
-        if c.len() != q || V.len() != m {
-            return Err("Input vector size doesn't match specified parameters.");
-        }
-        if gen.n != n {
+        if gen.n != circuit.n {
             return Err("Generator length doesn't match specified parameters.");
         }
 
-        transcript.commit_u64(n as u64);
-        transcript.commit_u64(m as u64);
-        transcript.commit_u64(q as u64);
+        transcript.commit_u64(circuit.n as u64);
+        transcript.commit_u64(circuit.m as u64);
+        transcript.commit_u64(circuit.q as u64);
         transcript.commit(self.A_I.compress().as_bytes());
         transcript.commit(self.A_O.compress().as_bytes());
         transcript.commit(self.S.compress().as_bytes());
@@ -249,20 +251,20 @@ impl CircuitProof {
 
         let r = Scalar::random(rng);
 
-        // Calculte points that represent the matrices
+        // Calculate points that represent the matrices
         let H_prime: Vec<RistrettoPoint> = gen.H
             .iter()
             .zip(util::exp_iter(y.invert()))
             .map(|(H_i, exp_y_inv)| H_i * exp_y_inv)
             .collect();
         // W_L_point = <h * y^-n , z * z^Q * W_L>, line 81
-        let W_L_flatten: Vec<Scalar> = matrix_flatten(W_L, z, n);
+        let W_L_flatten: Vec<Scalar> = matrix_flatten(circuit.W_L, z, circuit.n);
         let W_L_point = RistrettoPoint::vartime_multiscalar_mul(
             W_L_flatten.clone(),
             H_prime.iter()
         );
         // W_R_point = <g , y^-n * z * z^Q * W_R>, line 82
-        let W_R_flatten: Vec<Scalar> = matrix_flatten(W_R, z, n);
+        let W_R_flatten: Vec<Scalar> = matrix_flatten(circuit.W_R, z, circuit.n);
         let W_R_flatten_yinv: Vec<Scalar> = W_R_flatten
             .iter()
             .zip(util::exp_iter(y.invert()))
@@ -273,7 +275,7 @@ impl CircuitProof {
             gen.G.iter()
         );  
         // W_O_point = <h * y^-n , z * z^Q * W_O>, line 83
-        let W_O_flatten: Vec<Scalar> = matrix_flatten(W_O, z, n);
+        let W_O_flatten: Vec<Scalar> = matrix_flatten(circuit.W_O, z, circuit.n);
         let W_O_point = RistrettoPoint::vartime_multiscalar_mul(
             W_O_flatten,
             H_prime.iter()
@@ -281,21 +283,21 @@ impl CircuitProof {
 
         // Get IPP variables
         let (x_sq, x_inv_sq, s) = self.ipp_proof.verification_scalars(transcript);
-        let s_inv = s.iter().rev().take(n);
+        let s_inv = s.iter().rev().take(circuit.n);
         let a = self.ipp_proof.a;
         let b = self.ipp_proof.b;
 
         // define parameters for P check
-        let g = s.iter().take(n).map(|s_i| - a * s_i);
+        let g = s.iter().take(circuit.n).map(|s_i| - a * s_i);
         let h = s_inv
             .zip(util::exp_iter(y.invert()))
             .map(|(s_i_inv, exp_y_inv)| - exp_y_inv * b * s_i_inv - Scalar::one());
 
         // define parameters for t check
         let delta = inner_product(&W_R_flatten_yinv, &W_L_flatten);
-        let powers_of_z: Vec<Scalar> = util::exp_iter(z).take(q).collect();
-        let z_c = z * inner_product(&powers_of_z, &c);
-        let W_V_flatten: Vec<Scalar> = matrix_flatten(W_V, z, m);
+        let powers_of_z: Vec<Scalar> = util::exp_iter(z).take(circuit.q).collect();
+        let z_c = z * inner_product(&powers_of_z, &circuit.c);
+        let W_V_flatten: Vec<Scalar> = matrix_flatten(circuit.W_V, z, circuit.m);
         let V_multiplier = W_V_flatten.iter().map(|W_V_i| r * x * x * W_V_i);
 
         let mega_check = RistrettoPoint::vartime_multiscalar_mul(
@@ -373,11 +375,11 @@ mod tests {
         n: usize,
         m: usize,
         q: usize,
-        W_L: Vec<Vec<Scalar>>, // Q vectors, of length n each
+        c: Vec<Scalar>,
+        W_L: Vec<Vec<Scalar>>, 
         W_R: Vec<Vec<Scalar>>,
         W_O: Vec<Vec<Scalar>>,
-        W_V: Vec<Vec<Scalar>>, // Q vectors, of length m each
-        c: Vec<Scalar>,  
+        W_V: Vec<Vec<Scalar>>,
         a_L: Vec<Scalar>,
         a_R: Vec<Scalar>,
         a_O: Vec<Scalar>,
@@ -387,11 +389,11 @@ mod tests {
         let generators = Generators::new(PedersenGenerators::default(), n, 1);
         let mut proof_transcript = ProofTranscript::new(b"CircuitProofTest");
         let mut rng = OsRng::new().unwrap();
+        let circuit = Circuit {n, m, q, c, W_L, W_R, W_O, W_V};
 
         let circuit_proof = CircuitProof::prove(
             &generators, &mut proof_transcript, &mut rng,
-            n, m, q,
-            W_L.clone(), W_R.clone(), W_O.clone(), W_V.clone(), 
+            circuit.clone(), 
             a_L, a_R, a_O, v_blinding).unwrap();    
 
         let mut verify_transcript = ProofTranscript::new(b"CircuitProofTest");
@@ -400,8 +402,8 @@ mod tests {
             &generators,
             &mut verify_transcript,
             &mut rng,
-            n, m, q,
-            W_L, W_R, W_O, W_V, c, V,
+            circuit, 
+            V,
         )
     }
 
@@ -449,9 +451,9 @@ mod tests {
         let v_blinding = vec![]; // since we don't have anything to blind
 
         assert!(create_and_verify_helper(
-            n, m, q,
+            n, m, q, c,
             W_L, W_R, W_O, W_V,
-            c, a_L, a_R, a_O, 
+            a_L, a_R, a_O, 
             V, v_blinding,
         ).is_ok());
     }
@@ -484,9 +486,9 @@ mod tests {
         let v_blinding = vec![]; // since we don't have anything to blind
 
         assert!(create_and_verify_helper(
-            n, m, q,
+            n, m, q, c,
             W_L, W_R, W_O, W_V,
-            c, a_L, a_R, a_O, 
+            a_L, a_R, a_O, 
             V, v_blinding,
         ).is_err());
     }
@@ -513,9 +515,9 @@ mod tests {
         let v_blinding = vec![]; 
 
         assert!(create_and_verify_helper(
-            n, m, q,
+            n, m, q, c,
             W_L, W_R, W_O, W_V,
-            c, a_L, a_R, a_O, 
+            a_L, a_R, a_O, 
             V, v_blinding,
         ).is_ok());
     }
@@ -542,9 +544,9 @@ mod tests {
         let v_blinding = vec![]; 
 
         assert!(create_and_verify_helper(
-            n, m, q,
+            n, m, q, c,
             W_L, W_R, W_O, W_V,
-            c, a_L, a_R, a_O, 
+            a_L, a_R, a_O, 
             V, v_blinding,
         ).is_err());
     }
@@ -575,9 +577,9 @@ mod tests {
         let (V, v_blinding) = blinding_helper(&v);
         
         assert!(create_and_verify_helper(
-            n, m, q,
+            n, m, q, c,
             W_L, W_R, W_O, W_V,
-            c, a_L, a_R, a_O, 
+            a_L, a_R, a_O, 
             V, v_blinding,
         ).is_ok());
     }
@@ -608,9 +610,9 @@ mod tests {
         let (V, v_blinding) = blinding_helper(&v);
         
         assert!(create_and_verify_helper(
-            n, m, q,
+            n, m, q, c,
             W_L, W_R, W_O, W_V,
-            c, a_L, a_R, a_O, 
+            a_L, a_R, a_O, 
             V, v_blinding,
         ).is_err());
     }
@@ -657,9 +659,9 @@ mod tests {
         let a_O = vec![a_L[0] * a_R[0], a_L[1] * a_R[1]];
 
        assert!(create_and_verify_helper(
-            n, m, q,
+            n, m, q, c,
             W_L, W_R, W_O, W_V,
-            c, a_L, a_R, a_O, 
+            a_L, a_R, a_O, 
             V, v_blinding,
         ).is_ok());
     }
@@ -704,9 +706,9 @@ mod tests {
         let a_O = vec![a_L[0] * a_R[0], a_L[1] * a_R[1]];
 
        assert!(create_and_verify_helper(
-            n, m, q,
+            n, m, q, c,
             W_L, W_R, W_O, W_V,
-            c, a_L, a_R, a_O, 
+            a_L, a_R, a_O, 
             V, v_blinding,
         ).is_err());
     }
