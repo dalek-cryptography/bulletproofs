@@ -12,8 +12,8 @@ use inner_product_proof::{inner_product, InnerProductProof};
 use proof_transcript::ProofTranscript;
 use util;
 
-// Note: we can swap out this circuit representation later, when we have R1CS support,
-// since for large circuits we don't want to keep all the matrices in memory.
+pub mod r1cs;
+
 #[derive(Clone, Debug)]
 pub struct Circuit {
     n: usize,
@@ -388,7 +388,7 @@ pub fn matrix_flatten(
 
     for row in 0..W.len() {
         if W[row].len() != output_dim {
-            return Err("matrix size doesn't match specified parameters in matrix_flatten");
+            return Err("Matrix size doesn't match specified parameters in matrix_flatten");
         }
         for col in 0..output_dim {
             result[col] += exp_z * W[row][col];
