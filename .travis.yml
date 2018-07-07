@@ -14,8 +14,7 @@ env:
 script:
   - cargo $TEST_COMMAND --features="$FEATURES" $EXTRA_FLAGS
 
-# enable this integration if we upstream the repo
-#notifications:
-#  slack:
-#    rooms:
-#      - dalek-cryptography:Xxv9WotKYWdSoKlgKNqXiHoD#dalek-bots
+notifications:
+  slack:
+    rooms:
+      - dalek-cryptography:Xxv9WotKYWdSoKlgKNqXiHoD#dalek-bots
