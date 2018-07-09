@@ -1,5 +1,6 @@
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::ristretto::RistrettoPoint;
+use std::iter::FromIterator;
 
 use circuit_proof::{Circuit, CircuitInput};
 
@@ -9,7 +10,14 @@ use circuit_proof::{Circuit, CircuitInput};
 // (That would require the bellman code to be decoupled from the underlying pairings.)
 
 /// Represents a variable in our constraint system, where the value represents the index.
+#[derive(Clone, Debug)]
 pub struct Variable(usize);
+
+impl Variable {
+	pub fn get_index(&self) -> usize {
+		self.0
+	}
+}
 
 /// Represents a linear combination of some variables multiplied with their scalar coefficients, 
 /// plus a scalar. E.g. LC = variable[0]*scalar[0] + variable[1]*scalar[1] + scalar
@@ -27,6 +35,11 @@ impl LinearCombination {
 			constant,
 		}
 	}
+
+	// Used to check that variables in the linear combination are valid
+	pub fn get_variables(&self) -> Vec<Variable> {
+		self.variables.iter().map(|(var, _)| var.clone()).collect()
+	}
 }
 
 /// Represents a vector of groups of 3 linear combinations, where a * b = c
@@ -42,10 +55,49 @@ pub struct ConstraintSystem {
 // (?) We also need to keep track of the evals of a, b, c (to know what values to assign to variables?)
 
 impl ConstraintSystem {
+	pub fn new() -> Self {
+		ConstraintSystem {
+			a: vec![],
+			b: vec![],
+			c: vec![],
+			var_assignment: vec![],
+		}
+	}
 	// TODO: make it so you have to request variables from the constraint system,
 	// so it does variable allocation and assignment at the same time
-	pub fn alloc_variable(&self, val: Scalar) -> Variable {
-		unimplemented!();
+	pub fn alloc_variable(&mut self, val: Scalar) -> Variable {
+		self.var_assignment.push(val);
+		Variable(self.var_assignment.len()-1)
+	}
+
+	pub fn push_lc_a(&mut self, lc: LinearCombination) -> Result<(), &'static str> {
+		self.check_lc(&lc)?;
+		self.a.push(lc);
+		Ok(())
+	}
+
+	pub fn push_lc_b(&mut self, lc: LinearCombination) -> Result<(), &'static str> {
+		self.check_lc(&lc)?;
+		self.b.push(lc);
+		Ok(())
+	}
+
+	pub fn push_lc_c(&mut self, lc: LinearCombination) -> Result<(), &'static str> {
+		self.check_lc(&lc)?;
+		self.c.push(lc);
+		Ok(())
+	}
+
+	fn check_lc(&self, lc: &LinearCombination) -> Result<(), &'static str> {
+		let vars = lc.get_variables();
+		let num_vars = self.var_assignment.len() - 1;
+		for var in vars {
+			let index = var.get_index();
+			if index > num_vars {
+				return Err("Invalid variable index");
+			}
+		}
+		Ok(())
 	}
 
 	pub fn create_proof_input(&self) -> (Circuit, CircuitInput) {
@@ -60,16 +112,11 @@ impl ConstraintSystem {
 	#[test]
 	// trivial case using constant multiplication
     fn mul_circuit_constants() {
-    	let lc_a = LinearCombination::construct(vec![], Scalar::from_u64(3));
-    	let lc_b = LinearCombination::construct(vec![], Scalar::from_u64(4));
-    	let lc_c = LinearCombination::construct(vec![], Scalar::from_u64(12));
-    	
-    	let cs = ConstraintSystem {
-    		a: vec![lc_a], 
-    		b: vec![lc_b], 
-    		c: vec![lc_c],
-    		var_assignment: vec![],
-    	};
+    	let mut cs = ConstraintSystem::new();
+
+    	cs.push_lc_a(LinearCombination::construct(vec![], Scalar::from_u64(3)));
+    	cs.push_lc_b(LinearCombination::construct(vec![], Scalar::from_u64(4)));
+    	cs.push_lc_c(LinearCombination::construct(vec![], Scalar::from_u64(12)));
 
     	let (circuit, circuit_input) = cs.create_proof_input();
     	assert_eq!(circuit.q, 3);
@@ -78,31 +125,26 @@ impl ConstraintSystem {
     #[test]
     // multiplication circuit where a, b, c are all (private?) variables
     fn mul_circuit_variables() {
-    	// TODO: use alloc_variable to create the variables instead
-    	let var_a = Variable(0);
-    	let var_b = Variable(1);
-    	let var_c = Variable(2);
+    	let mut cs = ConstraintSystem::new();
 
-    	let lc_a = LinearCombination {
+    	let var_a = cs.alloc_variable(Scalar::from_u64(3));
+    	let var_b = cs.alloc_variable(Scalar::from_u64(4));
+    	let var_c = cs.alloc_variable(Scalar::from_u64(12));
+
+    	cs.push_lc_a(LinearCombination {
     		variables: vec![(var_a, Scalar::one())],
     		constant: Scalar::zero(),
-    	};
-    	let lc_b = LinearCombination {
+    	});
+    	cs.push_lc_b(LinearCombination {
     		variables: vec![(var_b, Scalar::one())],
     		constant: Scalar::zero(),
-    	};
-    	let lc_c = LinearCombination {
+    	});
+    	cs.push_lc_c(LinearCombination {
     		variables: vec![(var_c, Scalar::one())],
     		constant: Scalar::zero(),
-    	};
+    	});
 
-    	let cs = ConstraintSystem {
-    		a: vec![lc_a], 
-    		b: vec![lc_b], 
-    		c: vec![lc_c],
-    		var_assignment: vec![Scalar::from_u64(3), Scalar::from_u64(4), Scalar::from_u64(12)],
-    	};
-
-    	let proof_input = cs.create_proof_input();
+    	let (circuit, circuit_input) = cs.create_proof_input();
+    	assert_eq!(circuit.q, 3);
     }
 }
