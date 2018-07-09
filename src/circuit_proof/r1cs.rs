@@ -40,6 +40,15 @@ impl LinearCombination {
 	pub fn get_variables(&self) -> Vec<Variable> {
 		self.variables.iter().map(|(var, _)| var.clone()).collect()
 	}
+
+	// evaluate the linear combination, given the variable values in var_assignment
+	pub fn eval(&self, var_assignment: &Vec<Scalar>) -> Scalar {
+		let sum_vars: Scalar = self.variables.iter()
+					.map(|(var, scalar)|
+						scalar * var_assignment[var.get_index()]
+					).sum();
+		sum_vars + self.constant
+	}
 }
 
 /// Represents a vector of groups of 3 linear combinations, where a * b = c
@@ -93,8 +102,19 @@ impl ConstraintSystem {
 	}
 
 	pub fn create_proof_input(&self) -> (Circuit, CircuitInput) {
-		// eval a, b, c - to know what values to assign to variables
-		
+		// naive conversion that doesn't do any multiplication elimination
+		let n = self.a.len();
+		let m = self.var_assignment.len();
+		let q = self.a.len() * 3;
+
+		// eval a, b, c and assign results to a_L, a_R, a_O respectively
+		let a_L: Vec<Scalar> = 
+			self.a.iter().map(|lc| lc.eval(&self.var_assignment)).collect();
+		let a_R: Vec<Scalar> = 
+			self.b.iter().map(|lc| lc.eval(&self.var_assignment)).collect();
+		let a_O: Vec<Scalar> = 
+			self.c.iter().map(|lc| lc.eval(&self.var_assignment)).collect();
+
 		unimplemented!();
 	}
 }

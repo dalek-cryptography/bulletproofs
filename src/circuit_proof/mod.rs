@@ -13,6 +13,7 @@ use proof_transcript::ProofTranscript;
 use util;
 
 pub mod r1cs;
+// TODO: move circuit proof code into another file and import, so folder is more balanced.
 
 #[derive(Clone, Debug)]
 pub struct Circuit {
