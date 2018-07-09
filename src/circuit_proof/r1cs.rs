@@ -37,8 +37,22 @@ impl LinearCombination {
 	}
 
 	// Used to check that variables in the linear combination are valid
-	pub fn get_variables(&self) -> Vec<Variable> {
-		self.variables.iter().map(|(var, _)| var.clone()).collect()
+	pub fn check_variables(&self, var_count: usize) -> Result<(), &'static str> {
+		for (var, _) in &self.variables {
+			let index = var.get_index();
+			if index > var_count - 1 {
+				return Err("Invalid variable index");
+			}
+		}
+		Ok(())
+	}
+
+	pub fn get_variables(&self) -> Vec<(Variable, Scalar)> {
+		self.variables.clone()
+	}
+
+	pub fn get_constant(&self) -> Scalar {
+		self.constant.clone()
 	}
 
 	// evaluate the linear combination, given the variable values in var_assignment
@@ -81,23 +95,13 @@ impl ConstraintSystem {
 	// Pushing a, b, c together prevents mismatched constraints.
 	pub fn push_lc(&mut self, lc_a: LinearCombination, lc_b: LinearCombination, lc_c: LinearCombination)
 	-> Result<(), &'static str> {
-		self.check_lc(&lc_a)?;
-		self.check_lc(&lc_b)?;
-		self.check_lc(&lc_c)?;
+		let num_vars = self.var_assignment.len();
+		lc_a.check_variables(num_vars)?;
+		lc_b.check_variables(num_vars)?;
+		lc_c.check_variables(num_vars)?;
 		self.a.push(lc_a);
 		self.b.push(lc_b);
 		self.c.push(lc_c);
-		Ok(())
-	}
-
-	fn check_lc(&self, lc: &LinearCombination) -> Result<(), &'static str> {
-		let vars = lc.get_variables();
-		for var in vars {
-			let index = var.get_index();
-			if index > self.var_assignment.len() - 1 {
-				return Err("Invalid variable index");
-			}
-		}
 		Ok(())
 	}
 
@@ -115,7 +119,38 @@ impl ConstraintSystem {
 		let a_O: Vec<Scalar> = 
 			self.c.iter().map(|lc| lc.eval(&self.var_assignment)).collect();
 
-		unimplemented!();
+		// Linear constraints are ordered as follows:
+		// a[0], a[1], ... b[0], b[1], ... c[0], c[1], ...
+		// s.t. W_L || W_R || W_O || c || W_V matrix is in reduced row echelon form
+		let zer = Scalar::zero();
+		let one = Scalar::one();
+		let mut W_L = vec![vec![zer; n]; q]; // qxn matrix which corresponds to a.
+		let mut W_R = vec![vec![zer; n]; q]; // qxn matrix which corresponds to b.
+		let mut W_O = vec![vec![zer; n]; q]; // qxn matrix which corresponds to c.
+		for i in 0..n {
+			W_L[i][i] = one;
+			W_R[i + n][i] = one;
+			W_O[i + 2*n][i] = one;
+		}
+
+		// TODO: can create / append to c on the fly instead
+		let mut c = vec![zer; q]; // length q vector of constants.
+		let mut W_V = vec![vec![zer; m]; q]; // qxm matrix of commitments.
+		for (i, lc) in self.a.iter().chain(self.b.iter()).chain(self.c.iter()).enumerate() {
+			for (var, scalar) in lc.get_variables() {
+				W_V[i][var.get_index()] = scalar;
+			}
+			c[i] = lc.get_constant();
+		};
+
+		let circuit = Circuit {
+			n, m, q, c,
+			W_L, W_R, W_O, W_V
+		};
+		let circuit_input = CircuitInput {
+			a_L, a_R, a_O
+		};
+		(circuit, circuit_input)
 	}
 }
 

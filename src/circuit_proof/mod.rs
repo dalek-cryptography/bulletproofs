@@ -48,7 +48,7 @@ pub struct CircuitInput {
     a_L: Vec<Scalar>,
     a_R: Vec<Scalar>,
     a_O: Vec<Scalar>,
-    v_blinding: Vec<Scalar>, // should this also contain V (commitment?) - TBD
+    // v_blinding: Vec<Scalar>, // should this also contain V (commitment?) - TBD
 }
 
 #[derive(Clone, Debug)]
