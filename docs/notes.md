@@ -93,7 +93,7 @@ The variable renaming is as follows:
 Range Proofs from inner products
 ================================
 
-The goal of a *range proof*  is for a prover to convince a verifier
+The goal of a *range proof* is for a prover to convince a verifier
 that a particular value \\(v\\) lies within a valid range, without revealing
 any additional information about the value \\(v\\).
 
