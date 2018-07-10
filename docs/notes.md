@@ -93,7 +93,7 @@ The variable renaming is as follows:
 Range Proofs from inner products
 ================================
 
-The goal of a *range proof*  is for a prover to convince a verifier
+The goal of a *range proof* is for a prover to convince a verifier
 that a particular value \\(v\\) lies within a valid range, without revealing
 any additional information about the value \\(v\\).
 
@@ -522,7 +522,7 @@ check the final equality directly.
 
 If the prover can demonstrate that the above \\(P'\\) has such structure
 over generators \\({\mathbf{G}}\\), \\({\mathbf{H}}\\) and \\(Q\\) for all
-\\(w \in {\mathbb Z\_{p}^{*}}\\), then the original \\(P\\) and \\(c\\) must satisfy
+\\(w \in {\mathbb Z\_{p}^{\*}}\\), then the original \\(P\\) and \\(c\\) must satisfy
 the original relation
 \\((P = {\langle {\mathbf{a}}, {\mathbf{G}} \rangle} + {\langle {\mathbf{b}}, {\mathbf{H}} \rangle}
 \wedge c = {\langle {\mathbf{a}}, {\mathbf{b}} \rangle})\\).
@@ -884,16 +884,16 @@ With these observations, we can simplify the combined \\(m\\)-party statement ab
 Arithmetic Circuit Proofs
 =========================
 
-The goal of an *arithmetic circuit proof*  is for a prover to convince a verifier that a particular set of values \\(v\\) satisfy the constraints represented by the arithmetic circuit, without revealing any additional information about the values \\(v\\).
+The goal of an *arithmetic circuit proof* is for a prover to convince a verifier that a particular set of values \\(v\\) satisfy the constraints represented by the arithmetic circuit, without revealing any additional information about the values \\(v\\).
 
-The prover begins with a vector of secret values \\(v\\), and a vector of commitments to those secret values \\(V\\).
+The prover will use the efficient inner product proof to do this, so we want to work towards expressing the arithmetic circuit's conditions in terms of a single inner product. The prover begins with a vector of secret values \\(v\\), and a vector of commitments to those secret values \\(V\\). The prover will send \\(V\\) to the verifier, along with the proof.
 
 Notation for arithmetic circuit proofs
 ------------------------------------------
 
 In the paper, matrices are labeled as \\( \textbf{W}\_L, \textbf{W}\_R, \textbf{W}\_O, \textbf{W}\_V \\). We will keep this notation, but will note to readers not to confuse the \\(\textbf{W}\_{L,R,O,V}\\) notation for being a vector of points. 
 
-We keep the variable renamings from the range proof notes above. We also rename a few more variables from the paper, to make it clearer which variables are blinding factors and what they correspond to.
+We will use the notation described in the [`notation`](index.html#notation) section of the notes. We also rename a few more variables from the paper, to make it clear which variables are blinding factors and what they correspond to.
 \\[
 \begin{aligned}
     \alpha        &\xrightarrow{} \tilde{i} \\\\
@@ -904,13 +904,13 @@ We keep the variable renamings from the range proof notes above. We also rename 
 Proving statements about arithmetic circuits gates
 --------------------------------------------------
 
-TODO: explain multiplication gate of fan-in 2, and how it relates to this equation:
+One type of gate in an arithmetic circuit is a multiplication gate of fan-in 2, which takes two input values and multiplies them to get an output value. If for all of the multiplication gates in a circuit, \\(\textbf{a}\_L\\) is the vector of left inputs, \\(\textbf{a}\_R\\) is the vector of right inputs, and \\(\textbf{a}\_O\\) is the vector of outputs, then the following equation will represent the relationship between the inputs and outputs of all the multiplication gates in the circuit:
 
 \\[
 \textbf{a}\_L \circ \textbf{a}\_R = \textbf{a}\_O
 \\]
 
-TODO: explain other gates, and how they can be expressed as linear constraints, and how those relate to this equation:
+Other types of gates in arithmetic circuits are constant multiplication gates and addition gates. A constant multiplication gate can be represented by a constant multiplied by an input, and an addition gate can be represented by the addition of two or more inputs. All of the constant multiplication gates and addition gates in a circuit can be represented as a collection of linear constraints, as expressed in the following equation:
 
 \\[
 \textbf{W}\_L \cdot \textbf{a}\_L +
@@ -923,14 +923,15 @@ TODO: explain other gates, and how they can be expressed as linear constraints, 
 Combining statements using challenge variables
 ----------------------------------------------
 
-We can rewrite the statement about multiplication gates into an inner product equation, using the challenge variable \\(y\\). TODO: explain why we can do this and why we want to.
+We can rewrite the statement about multiplication gates into an inner product equation, using the challenge variable \\(y\\). We can do this for a random challenge \\(y\\) because \\({\mathbf{b}} = {\mathbf{0}}\\) if and only
+if[^2] \\({\langle {\mathbf{b}}, {\mathbf{y}}^{n} \rangle} = 0\\). 
 
 \\[
 \langle \textbf{a}\_L \circ \textbf{a}\_R - \textbf{a}\_O ,
 \textbf{y}^n \rangle = 0
 \\]
 
-We can rewrite the statement about the linear constraints into an inner product equation, using the challenge variable \\(z\\). TODO: explain why we can do this, and why the multiplication by single z.
+We can rewrite the statement about the linear constraints into an inner product equation, using the challenge variable \\(z\\). We can do this for a random challenge \\(z\\), for the same reason as above.
 
 \\[
 \langle z \textbf{z}^Q, 
@@ -942,7 +943,7 @@ We can rewrite the statement about the linear constraints into an inner product 
 \rangle = 0
 \\]
 
-We can combine these two inner product equations, since they are offset by different multiples of challenge variable \\(z\\). This gives us:
+We can combine these two inner product equations, since they are offset by different multiples of challenge variable \\(z\\). The statement about multiplication gates is multiplied by \\(z^0\\), while the statements about addition and scalar multiplication gates are multiplied by a power of \\(z\\) between \\(z^1\\) and \\(z * z^Q\\). Combining the two equations gives us:
 
 \\[
 \langle \textbf{a}\_L \circ \textbf{a}\_R - \textbf{a}\_O ,
@@ -1122,7 +1123,7 @@ We construct vector polynomials \\({\mathbf{l}}(x)\\) and \\({\mathbf{l}}(x)\\) 
   {\mathbf{l}}(x) &= (\textbf{a}\_L + \textbf{s}\_L \cdot x^2) \cdot x + \textbf{y}^{-n} \circ (z \textbf{z}^Q \cdot \textbf{W}\_R) \cdot x + \textbf{a}\_O \cdot x^2 \\\\
   &= \textbf{a}\_L \cdot x + \textbf{s}\_L \cdot x^3 + \textbf{y}^{-n} \circ (z \textbf{z}^Q \cdot \textbf{W}\_R) \cdot x + \textbf{a}\_O \cdot x^2 \\\\
   {\mathbf{r}}(x) &= \textbf{y}^n \circ (\textbf{a}\_R + \textbf{s}\_R \cdot x^2) \cdot x + z \textbf{z}^Q \cdot \textbf{W}\_L \cdot x - \textbf{y}^n + z \textbf{z}^Q \cdot \textbf{W}\_O \\\\
-  &= \textbf{y}^n \circ \textbf{a}\_R \cdot x + \textbf{s}\_R \cdot x^3 + z \textbf{z}^Q \cdot \textbf{W}\_L \cdot x - \textbf{y}^n + z \textbf{z}^Q \cdot \textbf{W}\_O
+  &= \textbf{y}^n \circ \textbf{a}\_R \cdot x + \textbf{y}^n \circ \textbf{s}\_R \cdot x^3 + z \textbf{z}^Q \cdot \textbf{W}\_L \cdot x - \textbf{y}^n + z \textbf{z}^Q \cdot \textbf{W}\_O
 \end{aligned}
 \\]
 
