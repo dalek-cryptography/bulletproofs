@@ -12,6 +12,8 @@ use inner_product_proof::{inner_product, InnerProductProof};
 use proof_transcript::ProofTranscript;
 use util;
 
+// Note: we can swap out this circuit representation later, when we have R1CS support,
+// since for large circuits we don't want to keep all the matrices in memory.
 #[derive(Clone, Debug)]
 pub struct Circuit {
     n: usize,
@@ -309,6 +311,10 @@ impl CircuitProof {
         let W_V_flatten: Vec<Scalar> = matrix_flatten(circuit.W_V, z, circuit.m)?;
         let V_multiplier = W_V_flatten.iter().map(|W_V_i| r * x * x * W_V_i);
 
+        // group the T_scalars and T_points together
+        let T_scalars = vec![r*x, r*x*x*x, r*x*x*x*x, r*x*x*x*x*x, r*x*x*x*x*x*x]; // TODO: do better
+        let T_points = vec![self.T_1, self.T_3, self.T_4, self.T_5, self.T_6];
+
         let mega_check = RistrettoPoint::vartime_multiscalar_mul(
             iter::once(x) // A_I
                 .chain(iter::once(x * x)) // A_O
@@ -323,11 +329,7 @@ impl CircuitProof {
                 .chain(x_sq.iter().cloned()) // ipp_proof.L_vec
                 .chain(x_inv_sq.iter().cloned()) // ipp_proof.R_vec
                 .chain(V_multiplier) // V
-                .chain(iter::once(r * x)) // T_1
-                .chain(iter::once(r * x * x * x)) // T_3
-                .chain(iter::once(r * x * x * x * x)) // T_4
-                .chain(iter::once(r * x * x * x * x * x)) // T_5
-                .chain(iter::once(r * x * x * x * x * x * x)), // T_6
+                .chain(T_scalars), // T_points
             iter::once(&self.A_I)
                 .chain(iter::once(&self.A_O))
                 .chain(iter::once(&W_L_point))
@@ -341,11 +343,7 @@ impl CircuitProof {
                 .chain(self.ipp_proof.L_vec.iter())
                 .chain(self.ipp_proof.R_vec.iter())
                 .chain(V.iter())
-                .chain(iter::once(&self.T_1))
-                .chain(iter::once(&self.T_3))
-                .chain(iter::once(&self.T_4))
-                .chain(iter::once(&self.T_5))
-                .chain(iter::once(&self.T_6)),
+                .chain(T_points.iter()),
         );
 
         if !mega_check.is_identity() {
@@ -356,20 +354,20 @@ impl CircuitProof {
     }
 }
 
-// Computes z * z^Q * W, where W is a qxn matrix and z is a scalar.
-// Input: Qxn matrix of scalars and scalar z
-// Output: length n vector of Scalars
+// Computes z * z^Q * W, where W is a qx(n or m) matrix and z is a scalar.
+// Input: Qx(n or m) matrix of scalars and scalar z
+// Output: length (n or m) vector of Scalars
+// Note: output_dim parameter is necessary in case W is `qxn` where `q=0`, 
+//       such that it is not possible to derive `n` from looking at W.
 pub fn matrix_flatten(
     W: Vec<Vec<Scalar>>,
     z: Scalar,
     output_dim: usize,
 ) -> Result<Vec<Scalar>, &'static str> {
-    let q = W.len();
-
     let mut result = vec![Scalar::zero(); output_dim];
     let mut exp_z = z; // z^n starting at n=1
 
-    for row in 0..q {
+    for row in 0..W.len() {
         if W[row].len() != output_dim {
             return Err("matrix size doesn't match specified parameters in matrix_flatten");
         }

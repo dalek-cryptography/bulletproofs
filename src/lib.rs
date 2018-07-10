@@ -34,7 +34,6 @@ mod inner_product_proof;
 mod proof_transcript;
 mod range_proof;
 
-pub use circuit_proof::CircuitProof;
 pub use generators::{Generators, GeneratorsView, PedersenGenerators};
 pub use proof_transcript::ProofTranscript;
 pub use range_proof::RangeProof;
