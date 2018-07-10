@@ -267,6 +267,7 @@ impl CircuitProof {
         let w = transcript.challenge_scalar();
 
         let r = Scalar::random(rng);
+        let xx = x * x;
 
         // Calculate points that represent the matrices
         let H_prime: Vec<RistrettoPoint> = gen
@@ -309,20 +310,23 @@ impl CircuitProof {
         let powers_of_z: Vec<Scalar> = util::exp_iter(z).take(circuit.q).collect();
         let z_c = z * inner_product(&powers_of_z, &circuit.c);
         let W_V_flatten: Vec<Scalar> = matrix_flatten(circuit.W_V, z, circuit.m)?;
-        let V_multiplier = W_V_flatten.iter().map(|W_V_i| r * x * x * W_V_i);
+        let V_multiplier = W_V_flatten.iter().map(|W_V_i| r * xx * W_V_i);
 
         // group the T_scalars and T_points together
-        let T_scalars = vec![r*x, r*x*x*x, r*x*x*x*x, r*x*x*x*x*x, r*x*x*x*x*x*x]; // TODO: do better
+        let T_scalars = util::exp_iter(x)
+            .take(5)
+            .zip(vec![x, xx, xx, xx, xx])
+            .map(|(x_exp, mult)| x_exp * mult * r);
         let T_points = vec![self.T_1, self.T_3, self.T_4, self.T_5, self.T_6];
 
         let mega_check = RistrettoPoint::vartime_multiscalar_mul(
             iter::once(x) // A_I
-                .chain(iter::once(x * x)) // A_O
+                .chain(iter::once(xx)) // A_O
                 .chain(iter::once(x)) // W_L_point
                 .chain(iter::once(x)) // W_R_point
                 .chain(iter::once(Scalar::one())) // W_O_point
-                .chain(iter::once(x * x * x)) // S
-                .chain(iter::once(w * (self.t_x - a * b) + r * (x * x * (delta + z_c) - self.t_x))) // B
+                .chain(iter::once(x * xx)) // S
+                .chain(iter::once(w * (self.t_x - a * b) + r * (xx * (delta + z_c) - self.t_x))) // B
                 .chain(iter::once(-self.e_blinding - r * self.t_x_blinding)) // B_blinding
                 .chain(g) // G
                 .chain(h) // H
@@ -357,7 +361,7 @@ impl CircuitProof {
 // Computes z * z^Q * W, where W is a qx(n or m) matrix and z is a scalar.
 // Input: Qx(n or m) matrix of scalars and scalar z
 // Output: length (n or m) vector of Scalars
-// Note: output_dim parameter is necessary in case W is `qxn` where `q=0`, 
+// Note: output_dim parameter is necessary in case W is `qxn` where `q=0`,
 //       such that it is not possible to derive `n` from looking at W.
 pub fn matrix_flatten(
     W: Vec<Vec<Scalar>>,
