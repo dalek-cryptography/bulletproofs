@@ -93,7 +93,7 @@ The variable renaming is as follows:
 Range Proofs from inner products
 ================================
 
-The goal of a *range proof* is for a prover to convince a verifier
+The goal of a *range proof*  is for a prover to convince a verifier
 that a particular value \\(v\\) lies within a valid range, without revealing
 any additional information about the value \\(v\\).
 
@@ -884,7 +884,9 @@ With these observations, we can simplify the combined \\(m\\)-party statement ab
 Arithmetic Circuit Proofs
 =========================
 
-TODO: write description of arithmetic circuit proof here.
+The goal of an *arithmetic circuit proof*  is for a prover to convince a verifier that a particular set of values \\(v\\) satisfy the constraints represented by the arithmetic circuit, without revealing any additional information about the values \\(v\\).
+
+The prover begins with a vector of secret values \\(v\\), and a vector of commitments to those secret values \\(V\\).
 
 Notation for arithmetic circuit proofs
 ------------------------------------------
