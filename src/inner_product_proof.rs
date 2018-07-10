@@ -57,7 +57,7 @@ impl InnerProductProof {
                 R_vec: vec![],
                 a: Scalar::zero(),
                 b: Scalar::zero(),
-            }
+            };
         }
 
         // All of the input vectors must have the same length.
