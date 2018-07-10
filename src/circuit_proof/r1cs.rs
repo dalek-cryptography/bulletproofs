@@ -133,7 +133,7 @@ impl ConstraintSystem {
 			W_O[i + 2*n][i] = one;
 		}
 
-		// TODO: can create / append to c on the fly instead
+		// TODO: create / append to c on the fly instead
 		let mut c = vec![zer; q]; // length q vector of constants.
 		let mut W_V = vec![vec![zer; m]; q]; // qxm matrix of commitments.
 		for (i, lc) in self.a.iter().chain(self.b.iter()).chain(self.c.iter()).enumerate() {
@@ -142,6 +142,8 @@ impl ConstraintSystem {
 			}
 			c[i] = lc.get_constant();
 		};
+
+		let mut rng = OsRng::new().unwrap();
 
 		let circuit = Circuit {
 			n, m, q, c,
@@ -155,9 +157,8 @@ impl ConstraintSystem {
 }
 
 #[cfg(test)]
-	mod tests {
+mod tests {
     use super::*; 
-
 	#[test]
 	// trivial case using constant multiplication
     fn mul_circuit_constants() {
