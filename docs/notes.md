@@ -1100,9 +1100,7 @@ z \textbf{z}^Q \cdot \textbf{W}\_L \cdot x -
 Blinding the inner product
 --------------------------
 
-The prover cannot send the vectors in the inner-product equation to the verifier without revealing information about the values \\(v\\). Also, since the inner-product argument is not zero-knowledge, the vectors cannot be used in teh inner-product argument without revealing information about \\(v\\) either.
-
-To solve this problem, the prover chooses vectors of blinding factors
+The prover cannot send the vectors in the inner-product equation to the verifier without revealing information about the values \\(v\\). Also, since the inner-product argument is not zero-knowledge, the vectors cannot be used in teh inner-product argument without revealing information about \\(v\\) either. To solve this problem, the prover chooses vectors of blinding factors
 
 \\[
 {\mathbf{s}}\_{L}, {\mathbf{s}}\_{R} \\;{\xleftarrow{\\$}}\\; {\mathbb Z\_p}^{n},
