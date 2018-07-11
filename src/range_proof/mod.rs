@@ -285,22 +285,31 @@ impl RangeProof {
             return Err("RangeProof must contain at least seven 32-byte elements");
         }
 
-        use util::{read_ristretto, decode_scalar};
+        use util::read32;
+
+        let A = CompressedRistretto(read32(&slice[0 * 32..]));
+        let S = CompressedRistretto(read32(&slice[1 * 32..]));
+        let T_1 = CompressedRistretto(read32(&slice[2 * 32..]));
+        let T_2 = CompressedRistretto(read32(&slice[3 * 32..]));
+
+        let t_x = Scalar::from_canonical_bytes(read32(&slice[4 * 32..]))
+            .ok_or("RangeProof.t_x is not a canonical scalar")?;
+        let t_x_blinding = Scalar::from_canonical_bytes(read32(&slice[5 * 32..]))
+            .ok_or("RangeProof.t_x_blinding is not a canonical scalar")?;
+        let e_blinding = Scalar::from_canonical_bytes(read32(&slice[6 * 32..]))
+            .ok_or("RangeProof.e_blinding is not a canonical scalar")?;
+
+        let ipp_proof = InnerProductProof::from_bytes(&slice[7 * 32..])?;
+
         Ok(RangeProof {
-            A: read_ristretto(&slice[0 * 32..]),
-            S: read_ristretto(&slice[1 * 32..]),
-            T_1: read_ristretto(&slice[2 * 32..]),
-            T_2: read_ristretto(&slice[3 * 32..]),
-            t_x: decode_scalar(&slice[4 * 32..][..32]).ok_or(
-                "RangeProof.t_x is not a canonical scalar",
-            )?,
-            t_x_blinding: decode_scalar(&slice[5 * 32..][..32]).ok_or(
-                "RangeProof.t_x_blinding is not a canonical scalar",
-            )?,
-            e_blinding: decode_scalar(&slice[6 * 32..][..32]).ok_or(
-                "RangeProof.e_blinding is not a canonical scalar",
-            )?,
-            ipp_proof: InnerProductProof::from_bytes(&slice[7 * 32..])?,
+            A,
+            S,
+            T_1,
+            T_2,
+            t_x,
+            t_x_blinding,
+            e_blinding,
+            ipp_proof,
         })
     }
 }

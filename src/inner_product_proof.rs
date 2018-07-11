@@ -10,7 +10,6 @@ use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::VartimeMultiscalarMul;
 
 use proof_transcript::ProofTranscript;
-use util::{read_ristretto, decode_scalar};
 
 #[derive(Clone, Debug)]
 pub struct InnerProductProof {
@@ -279,18 +278,23 @@ impl InnerProductProof {
         if lg_n >= 32 {
             return Err("InnerProductProof contains too many points");
         }
+
+        use util::read32;
+
         let mut L_vec: Vec<CompressedRistretto> = Vec::with_capacity(lg_n);
         let mut R_vec: Vec<CompressedRistretto> = Vec::with_capacity(lg_n);
         for i in 0..lg_n {
-            L_vec.push(read_ristretto(&slice[2 * i * 32..]));
-            R_vec.push(read_ristretto(&slice[(2 * i + 1) * 32..]));
+            let pos = 2 * i * 32;
+            L_vec.push(CompressedRistretto(read32(&slice[pos..])));
+            R_vec.push(CompressedRistretto(read32(&slice[pos + 32..])));
         }
-        let a = decode_scalar(&slice[32 * (2 * lg_n + 0)..][..32]).ok_or(
-            "InnerProductProof.a is not a canonical scalar",
-        )?;
-        let b = decode_scalar(&slice[32 * (2 * lg_n + 1)..][..32]).ok_or(
-            "InnerProductProof.b is not a canonical scalar",
-        )?;
+
+        let pos = 2 * lg_n * 32;
+        let a = Scalar::from_canonical_bytes(read32(&slice[pos..]))
+            .ok_or("InnerProductProof.a is not a canonical scalar")?;
+        let b = Scalar::from_canonical_bytes(read32(&slice[pos + 32..]))
+            .ok_or("InnerProductProof.b is not a canonical scalar")?;
+
         Ok(InnerProductProof { L_vec, R_vec, a, b })
     }
 }
