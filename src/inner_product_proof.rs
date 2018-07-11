@@ -231,8 +231,11 @@ impl InnerProductProof {
         }
     }
 
-    /// Returns the size in bytes required to serialize the inner product proof.
-    /// For `n` multiplications the proof size is \\(32 \cdot (2\lg n+2)\\) bytes.
+    /// Returns the size in bytes required to serialize the inner
+    /// product proof.
+    ///
+    /// For vectors of length `n` the proof size is
+    /// \\(32 \cdot (2\lg n+2)\\) bytes.
     pub fn serialized_size(&self) -> usize {
         (self.L_vec.len() * 2 + 2) * 32
     }
