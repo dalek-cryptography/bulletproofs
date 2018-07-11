@@ -209,6 +209,11 @@ impl RangeProof {
             .map(|p| p.decompress().ok_or("RangeProof's R point is invalid"))
             .collect::<Result<Vec<_>, _>>()?;
 
+        let A = self.A.decompress().ok_or("RangeProof A is invalid")?;
+        let S = self.S.decompress().ok_or("RangeProof S is invalid")?;
+        let T_1 = self.T_1.decompress().ok_or("RangeProof T_1 is invalid")?;
+        let T_2 = self.T_2.decompress().ok_or("RangeProof T_2 is invalid")?;
+
         let mega_check = RistrettoPoint::vartime_multiscalar_mul(
             iter::once(Scalar::one())
                 .chain(iter::once(x))
@@ -221,18 +226,11 @@ impl RangeProof {
                 .chain(h)
                 .chain(x_sq.iter().cloned())
                 .chain(x_inv_sq.iter().cloned()),
-            iter::once(&self.A.decompress().ok_or(
-                "RangeProof.A is invalid Ristretto point",
-            )?).chain(iter::once(&self.S.decompress().ok_or(
-                "RangeProof.S is invalid Ristretto point",
-            )?))
+            iter::once(&A)
+                .chain(iter::once(&S))
                 .chain(value_commitments.iter())
-                .chain(iter::once(&self.T_1.decompress().ok_or(
-                    "RangeProof.T_1 is invalid Ristretto point",
-                )?))
-                .chain(iter::once(&self.T_2.decompress().ok_or(
-                    "RangeProof.T_2 is invalid Ristretto point",
-                )?))
+                .chain(iter::once(&T_1))
+                .chain(iter::once(&T_2))
                 .chain(iter::once(&gens.pedersen_generators.B_blinding))
                 .chain(iter::once(&gens.pedersen_generators.B))
                 .chain(gens.G.iter())
