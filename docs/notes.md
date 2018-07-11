@@ -383,8 +383,8 @@ to \\({\mathbf{a}}\_{L}\\), \\({\mathbf{a}}\_{R}\\), \\({\mathbf{s}}\_{L}\\), an
 we need commitments to \\({\mathbf{y}}^{n} \circ {\mathbf{a}}\_{R}\\) and
 \\({\mathbf{y}}^{n} \circ {\mathbf{s}}\_{R}\\). However, since the prover
 must form commitments before receiving the verifier’s challenge \\(y\\), the
-prover can only commit to \\(a\_{R}\\) and \\(s\_{R}\\). Since the prover’s
-commitments are to \\(a\_{R}\\) and \\(s\_{R}\\), the verifier needs to transmute
+prover can only commit to \\({\mathbf{a}}\_{R}\\) and \\({\mathbf{s}}\_{R}\\). Since the prover’s
+commitments are to \\({\mathbf{a}}\_{R}\\) and \\({\mathbf{s}}\_{R}\\), the verifier needs to transmute
 the prover’s commitment
 \\(
 \operatorname{Com}({\mathbf{a}}\_{L},{\mathbf{a}}\_{R}, {\widetilde{a}})
@@ -893,10 +893,9 @@ Notation for arithmetic circuit proofs
 
 In the paper, matrices are labeled as \\( \textbf{W}\_L, \textbf{W}\_R, \textbf{W}\_O, \textbf{W}\_V \\). We will keep this notation, but will note to readers not to confuse the \\(\textbf{W}\_{L,R,O,V}\\) notation for being a vector of points. 
 
-We will use the notation described in the [`notation`](index.html#notation) section of the notes. We also rename a few more variables from the paper, to make it clear which variables are blinding factors and what they correspond to.
+We will use the notation described in the [`notation`](index.html#notation) section of the notes. We also rename one more variable from the paper, to make it clear which variables are blinding factors and what they correspond to.
 \\[
 \begin{aligned}
-    \alpha        &\xrightarrow{} \tilde{i} \\\\
     \beta         &\xrightarrow{} \tilde{o} \\\\
 \end{aligned}
 \\]
@@ -1209,12 +1208,49 @@ bottom row of the diagram to check consistency:
 Proving that \\(\textbf{l}(x)\\), \\(\textbf{r}(x)\\) are correct
 -----------------------------------------------------------------
 
-TODO: insert explanation for \\(\textbf{H}' = \textbf{y}^{-n} \\).
+We want to relate \\({\mathbf{l}}(x)\\) and \\({\mathbf{r}}(x)\\) to commitments
+to \\({\mathbf{a}}\_{L}\\), \\({\mathbf{a}}\_{R}\\), \\({\mathbf{s}}\_{L}\\), and
+\\({\mathbf{s}}\_{R}\\). However, since \\[
+{\mathbf{r}}(x) = \textbf{y}^n \circ \textbf{a}\_R \cdot x + \textbf{y}^n \circ \textbf{s}\_R \cdot x^3 + z \textbf{z}^Q \cdot \textbf{W}\_L \cdot x - \textbf{y}^n + z \textbf{z}^Q \cdot \textbf{W}\_O
+\\]
+we need commitments to \\({\mathbf{y}}^{n} \circ {\mathbf{a}}\_{R}\\) and
+\\({\mathbf{y}}^{n} \circ {\mathbf{s}}\_{R}\\). However, since the prover
+must form commitments before receiving the verifier’s challenge \\(y\\), the
+prover can only commit to \\({\mathbf{a}}\_{R}\\) and \\({\mathbf{s}}\_{R}\\). Since the prover’s
+commitments are to \\({\mathbf{a}}\_{R}\\) and \\({\mathbf{s}}\_{R}\\), the verifier needs to transmute
+the prover’s commitment over
+\\(
+({\mathbf{a}}\_{L},{\mathbf{a}}\_{R}, {\widetilde{a}})
+\\)
+into a commitment over
+\\(
+({\mathbf{a}}\_{L}, {\mathbf{y}}^{n} \circ {\mathbf{a}}\_{R}, {\widetilde{a}})
+\\)
+(and similarly for \\({\mathbf{s}}\_{R}\\)).
+To do this, notice that
+\\[
+\begin{aligned}
+  \text{commitment over }({\mathbf{a}}\_{L}, {\mathbf{a}}\_{R}, {\widetilde{a}})
+  &=
+  {\langle {\mathbf{a}}\_{L}, {\mathbf{G}} \rangle} + {\langle {\mathbf{a}}\_{R}, {\mathbf{H}} \rangle} + {\widetilde{a}} {\widetilde{B}} \\\\
+  &=
+  {\langle {\mathbf{a}}\_{L}, {\mathbf{G}} \rangle} + {\langle {\mathbf{y}}^{n} \circ {\mathbf{a}}\_{R}, {\mathbf{y}}^{-n} \circ {\mathbf{H}} \rangle} + {\widetilde{a}} {\widetilde{B}},
+\end{aligned}
+\\]
+so that by changing generators to
+\\({\mathbf{H}}' = {\mathbf{y}}^{-n} \circ {\mathbf{H}}\\), the point which
+is a commitment to
+\\(({\mathbf{a}}\_{L}, {\mathbf{a}}\_{R}, {\widetilde{a}})\\) with respect to
+\\(({\mathbf{G}}, {\mathbf{H}}, {\widetilde{a}})\\) is transmuted into a
+commitment to
+\\(({\mathbf{a}}\_{L}, {\mathbf{y}}^{n} \circ {\mathbf{a}}\_{R}, {\widetilde{a}})\\)
+with respect to \\(({\mathbf{G}}, {\mathbf{H}}', {\widetilde{a}})\\).
+
+We define the following commitments over the components of \\({\mathbf{l}}(x)\\) and \\({\mathbf{r}}(x)\\):
 
 \\[
 \begin{aligned}
-\textbf{H}' &= \textbf{y}^{-n} \\\\
-A_I &= \widetilde{B} \cdot \tilde{i} + \langle \textbf{G} , \textbf{a}\_L \rangle + \langle \textbf{H}, \textbf{a}\_R \rangle \\\\
+A_I &= \widetilde{B} \cdot \tilde{a} + \langle \textbf{G} , \textbf{a}\_L \rangle + \langle \textbf{H}, \textbf{a}\_R \rangle \\\\
 A_O &= \widetilde{B} \cdot \tilde{o} + \langle \textbf{G} , \textbf{a}\_O \rangle \\\\
 W_L &= \langle z \textbf{z}^Q \cdot \textbf{W}\_L , \textbf{H}' \rangle \\\\
 W_R &= \textbf{y}^{-n} \circ (\langle z \textbf{z}^Q \cdot \textbf{W}\_R) , \textbf{G} \rangle \\\\
@@ -1223,7 +1259,17 @@ S &= \widetilde{B} \cdot \tilde{s} + \langle \textbf{G} , \textbf{s}\_L \rangle 
 \end{aligned}
 \\]
 
-TODO insert explanation for relating commitments to equation
+For reference, here are the equations for \\({\mathbf{l}}(x)\\) and \\({\mathbf{r}}(x)\\) again:
+
+\\[
+\begin{aligned}
+  {\mathbf{l}}(x)  &= \textbf{a}\_L \cdot x + \textbf{s}\_L \cdot x^3 + \textbf{y}^{-n} \circ (z \textbf{z}^Q \cdot \textbf{W}\_R) \cdot x + \textbf{a}\_O \cdot x^2 \\\\
+  {\mathbf{r}}(x)  &= \textbf{y}^n \circ \textbf{a}\_R \cdot x + \textbf{y}^n \circ \textbf{s}\_R \cdot x^3 + z \textbf{z}^Q \cdot \textbf{W}\_L \cdot x - \textbf{y}^n + z \textbf{z}^Q \cdot \textbf{W}\_O
+\end{aligned}
+\\]
+
+To relate the prover’s commitments to
+\\({\mathbf{l}}(x)\\) and \\({\mathbf{r}}(x)\\), we use the following diagram:
 
 \\[
 \begin{aligned}
@@ -1231,11 +1277,33 @@ TODO insert explanation for relating commitments to equation
     +                        &\quad &  \quad &  +                          & \quad &  \quad &  +             & \quad &  \quad& +                             &\quad & \quad & +   \\\\
   {\langle {\mathbf{r}}(x), {\mathbf{H}}' \rangle}  &\quad &= \quad & \langle \textbf{a}\_R \cdot x, {\mathbf{H}} \rangle & \quad &+ \quad & - \langle \textbf{1}, \textbf{H} \rangle  & \quad &+ \quad& \langle z \textbf{z}^Q \cdot (\textbf{W}\_L \cdot x + \textbf{W}\_O), \textbf{H}' \rangle &\quad &+\quad & \langle \textbf{s}\_R \cdot x^3 , \textbf{H} \rangle \\\\
     +                        &\quad &  \quad &  +                          & \quad &  \quad &  +             & \quad &  \quad& +                             &\quad & \quad & +   \\\\
-  \tilde{e} \cdot \widetilde{B}  &\quad &= \quad & \tilde{i} \cdot x \cdot \widetilde{B} & \quad &+ \quad & \tilde{o} \cdot x^2 \cdot \widetilde{B}  & \quad &+ \quad& 0 &\quad &+\quad & \tilde{s} \cdot x^3 \cdot \widetilde{B} \\\\
+  \tilde{e} \cdot \widetilde{B}  &\quad &= \quad & \tilde{a} \cdot x \cdot \widetilde{B} & \quad &+ \quad & \tilde{o} \cdot x^2 \cdot \widetilde{B}  & \quad &+ \quad& 0 &\quad &+\quad & \tilde{s} \cdot x^3 \cdot \widetilde{B} \\\\
     \shortparallel           &\quad &  \quad & \shortparallel              & \quad &  \quad & \shortparallel & \quad &  \quad& \shortparallel                &\quad & \quad & \shortparallel   \\\\
                  &\quad &= \quad & x \cdot A_I                         & \quad &+ \quad & x^2 \cdot A_O - \langle \textbf{1}, \textbf{H} \rangle & \quad &+ \quad& W_L \cdot x + W_R \cdot x + W_O                       &\quad &+\quad & x^3 \cdot S
 \end{aligned}
 \\]
+
+We can interpret the rows and columns similarly to the previous diagram:
+the sum of each column is a vector Pedersen commitment with left and right halves from the first and second rows respectively
+and blinding factor from the third row.
+The sum of all of the columns is a vector
+Pedersen commitment to \\({\mathbf{l}}(x)\\) and \\({\mathbf{r}}(x)\\) with
+synthetic blinding factor \\({\widetilde{e}}\\).
+
+To convince the verifier that
+\\(t(x) = {\langle {\mathbf{l}}(x), {\mathbf{r}}(x) \rangle}\\), the prover
+sends \\({\widetilde{e}}\\) to the verifier, who uses the bottom row
+to compute
+\\[
+\begin{aligned}
+  P &= -{\widetilde{e}} {\widetilde{B}} + x \cdot A_I + x^2 \cdot A_O - \langle \textbf{1}, \textbf{H} \rangle + W_L \cdot x + W_R \cdot x + W_O + x^3 \cdot S \\\\
+\end{aligned}
+\\]
+if the prover is honest, this is
+\\(P = {\langle {\mathbf{l}}(x), {\mathbf{G}} \rangle} + {\langle {\mathbf{r}}(x), {\mathbf{H}}' \rangle}\\),
+so the verifier uses \\(P\\) and \\(t(x)\\) as inputs to the inner-product protocol
+to prove that
+\\(t(x) = {\langle {\mathbf{l}}(x), {\mathbf{r}}(x) \rangle}\\).
 
 
 [bulletproofs_paper]: https://eprint.iacr.org/2017/1066.pdf
