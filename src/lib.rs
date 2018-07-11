@@ -28,6 +28,7 @@ mod util;
 
 #[doc(include = "../docs/notes.md")]
 mod notes {}
+mod circuit_proof;
 mod generators;
 mod inner_product_proof;
 mod proof_transcript;

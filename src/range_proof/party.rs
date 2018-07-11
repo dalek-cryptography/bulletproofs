@@ -158,11 +158,13 @@ impl<'a> PartyAwaitingValueChallenge<'a> {
         // Generate x by committing to T_1, T_2 (line 49-54)
         let t_1_blinding = Scalar::random(rng);
         let t_2_blinding = Scalar::random(rng);
-        let T_1 = self.generators
+        let T_1 = self
+            .generators
             .share(self.j)
             .pedersen_generators
             .commit(t_poly.1, t_1_blinding);
-        let T_2 = self.generators
+        let T_2 = self
+            .generators
             .share(self.j)
             .pedersen_generators
             .commit(t_poly.2, t_2_blinding);

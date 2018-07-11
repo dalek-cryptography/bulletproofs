@@ -80,7 +80,8 @@ impl ProofShare {
         }
 
         let g = self.l_vec.iter().map(|l_i| minus_z - l_i);
-        let h = self.r_vec
+        let h = self
+            .r_vec
             .iter()
             .zip(util::exp_iter(Scalar::from_u64(2)))
             .zip(util::exp_iter(y_inv))
