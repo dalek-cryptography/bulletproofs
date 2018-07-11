@@ -246,9 +246,13 @@ impl RangeProof {
         }
     }
 
-    /// Serializes the proof into a byte array of \\(2 \lg n + 9\\) 32-byte elements,
-    /// where \\(n\\) is the number of secret bits.
-    /// The layout of the range proof is:
+    /// Serializes the proof into a byte array of \\(2 \lg n + 9\\)
+    /// 32-byte elements, where \\(n\\) is the number of secret bits.
+    ///
+    /// # Layout
+    ///
+    /// The layout of the range proof encoding is:
+    ///
     /// * four compressed Ristretto points \\(A,S,T_1,T_2\\),
     /// * three scalars \\(t_x, \tilde{t}_x, \tilde{e}\\),
     /// * \\(n\\) pairs of compressed Ristretto points \\(L_0,R_0\dots,L_{n-1},R_{n-1}\\),
@@ -263,24 +267,20 @@ impl RangeProof {
         buf.extend_from_slice(self.t_x.as_bytes());
         buf.extend_from_slice(self.t_x_blinding.as_bytes());
         buf.extend_from_slice(self.e_blinding.as_bytes());
+        // XXX this costs an extra alloc
         buf.extend_from_slice(self.ipp_proof.to_bytes().as_slice());
         buf
     }
 
     /// Deserializes the proof from a byte slice.
-    /// Returns an error in the following cases:
-    /// * the slice does not have \\(2n+9\\) 32-byte elements,
-    /// * \\(n\\) is larger or equal to 32 (proof is too big),
-    /// * any of \\(4+2n\\) points are not valid compressed Ristretto points,
-    /// * any of 3+2 scalars are not canonical scalars.
+    ///
+    /// Returns an error if the byte slice cannot be parsed into a `RangeProof`.
     pub fn from_bytes(slice: &[u8]) -> Result<RangeProof, &'static str> {
-        let b = slice.len();
-        if b % 32 != 0 {
+        if slice.len() % 32 != 0 {
             return Err("RangeProof size is not divisible by 32");
         }
-        let num_elements = b / 32;
-        if num_elements < 7 {
-            return Err("RangeProof must contain at least seven 32-byte elements");
+        if slice.len() < 7 * 32 {
+            return Err("RangeProof size is too small");
         }
 
         use util::read32;
