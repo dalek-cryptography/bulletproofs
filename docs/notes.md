@@ -1101,14 +1101,14 @@ z \textbf{z}^Q \cdot \textbf{W}\_L \cdot x -
 Blinding the inner product
 --------------------------
 
-TODO: explain why blinding is neessary
+The prover cannot send the vectors in the inner-product equation to the verifier without revealing information about the values \\(v\\). Also, since the inner-product argument is not zero-knowledge, the vectors cannot be used in teh inner-product argument without revealing information about \\(v\\) either.
 
-Instead, the prover chooses vectors of blinding factors
+To solve this problem, the prover chooses vectors of blinding factors
 \\[
 {\mathbf{s}}\_{L}, {\mathbf{s}}\_{R} \\;{\xleftarrow{\\$}}\\; {\mathbb Z\_p}^{n},
 \\]
 
-and uses them to blind \\(\mathbf{a}\_L\\) and \\(\mathbf{a}\_R\\):
+and uses them to blind \\(\mathbf{a}\_L\\) and \\(\mathbf{a}\_R\\).
 
 \\[
 \begin{aligned}
@@ -1116,6 +1116,8 @@ and uses them to blind \\(\mathbf{a}\_L\\) and \\(\mathbf{a}\_R\\):
 \mathbf{a}\_{R} &\leftarrow \mathbf{a}\_{R} + \mathbf{s}\_{R} \cdot x^2
 \end{aligned}
 \\]
+
+The blinding factors are multiplied by \\(x^2\\) so that when the substitution is made into the \\(\textbf{l}(x)\\) and \\(\textbf{r}(x)\\) equations, \\({\mathbf{s}}\_{L}\\) will be in the third degree of \\(x\\) in \\(\textbf{l}(x)\\), and \\({\mathbf{s}}\_{L}\\) will be in the third degree of \\(x\\) in \\(\textbf{r}(x)\\). As a result, the blinding factors will not interfere with the value \\(t_2\\), which is the 2nd degree of \\(\langle {\mathbf{l}}(x), {\mathbf{r}}(x) \rangle\\).
 
 We construct vector polynomials \\({\mathbf{l}}(x)\\) and \\({\mathbf{l}}(x)\\) with these new definitions:
 \\[
@@ -1136,7 +1138,7 @@ When we take the inner product of \\({\mathbf{l}}(x)\\) and \\({\mathbf{l}}(x)\\
 \end{aligned}
 \\]
 
-Notice that the second degree of \\(t(x)\\) does not include any blinding factors (because the blinding factors end up in the third or greater degrees of \\(t(x)\\)). The second degree also includes the inner product forms of the initial arithmetic gate statements that we are trying to prove:
+Notice that the second degree of \\(t(x)\\) does not include any blinding factors (because the blinding factors end up in the third or greater degrees of \\(t(x)\\)). The second degree also conveniently includes the inner product forms of the initial arithmetic gate statements that we are trying to prove:
 
 \\[
 \begin{aligned}
@@ -1158,16 +1160,26 @@ t_2 &= \text{2nd degree of } \langle {\mathbf{l}}(x), {\mathbf{r}}(x) \rangle
 Proving that \\(t_2\\) is correct
 ---------------------------------
 
+The prover first forms a commitment to the coefficients of \\(t(x)\\), then convinces the verifier that these commit to the correct \\(t(x)\\) by evaluating the polynomial at a challenge point \\(x\\). This proves that \\(t(x)\\) is correct and follows the following equation:
+
 \\[
 \begin{aligned}
+t(x) &= \sum\_{i=1}^{6} x^i t\_{i} \\\\
 t_2 &= \langle z \textbf{z}^Q,
 \textbf{c} + \textbf{W}\_V \cdot \textbf{v} \rangle + \delta(y, z) \\\\
+\end{aligned}
+\\]
+
+We define \\(\textbf{V}\\) as the vector of commitments to \\(\textbf{v}\\), and \\(T_i\\) as the commitment to \\(t_i\\) for \\(i \in [1, 3, 4, 5, 6]\\):
+
+\\[
+\begin{aligned}
 V_j &= B \cdot v_j + \widetilde{B} \cdot \tilde{v}\_j \quad \forall j \in [1, m] \\\\
 T_i &= B \cdot t_i + \widetilde{B} \cdot \tilde{t}\_i \quad \forall i \in [1, 3, 4, 5, 6] \\\\
 \end{aligned}
 \\]
 
-TODO: insert explanation here
+The prover forms these commitments, and sends them to the verifier. These commitments are related to each other and to \\(t(x)\\) by the following diagram:
 
 \\[
 \begin{aligned}
@@ -1177,6 +1189,21 @@ TODO: insert explanation here
     \shortparallel           &\quad &  \quad & \shortparallel              & \quad &  \quad & \shortparallel & \quad &  \quad& \shortparallel                &\quad & \quad & \shortparallel   \\\\
                  &\quad &= \quad & x^2 \langle z \textbf{z}^Q , \textbf{W}\_v \cdot \textbf{V} \rangle                         & \quad &+ \quad & x^2 \big(\langle  z \textbf{z}^Q , \textbf{c} \rangle + \delta(y,z)\big) B  & \quad &+ \quad& x T\_{1}                       &\quad &+\quad & \sum\_{i=3}^{6} x^i T\_{i}
 \end{aligned}
+\\]
+
+Notice that the sum of each column is a commitment to the variable in the top row using the blinding factor in the second row. The sum of all of the columns is
+\\(t(x) B + {\tilde{t}}(x) {\widetilde{B}}\\), a commitment to the value
+of \\(t\\) at the point \\(x\\), using the synthetic blinding factor[^3]:
+\\[
+  {\tilde{t}}(x) = x^2 \langle z \textbf{z}^Q , \textbf{W}\_v \cdot \tilde{\textbf{v}} \rangle + x {\tilde{t}}\_{1} + \sum\_{i=3}^{6} x^i \tilde{t\_{i}} 
+\\]
+
+To convince the verifier that
+\\(t(x) = \delta(y,z) + \sum\_{i=1}^{6} x^i t\_{i}\\), the prover sends
+the opening \\(t(x), {\tilde{t}}(x)\\) to the verifier, who uses the
+bottom row of the diagram to check consistency:
+\\[
+  t(x) B + {\tilde{t}}(x) {\widetilde{B}} \stackrel{?}{=} x^2 \langle z \textbf{z}^Q , \textbf{W}\_v \cdot \textbf{V} \rangle + x^2 \big(\langle  z \textbf{z}^Q , \textbf{c} \rangle + \delta(y,z)\big) B + x T\_{1} + \sum\_{i=3}^{6} x^i T\_{i}
 \\]
 
 Proving that \\(\textbf{l}(x)\\), \\(\textbf{r}(x)\\) are correct
