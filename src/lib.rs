@@ -8,8 +8,8 @@
 //! Note that docs will only build on nightly Rust until
 //! [RFC 1990 stabilizes](https://github.com/rust-lang/rust/issues/44732).
 
-extern crate core;
 extern crate byteorder;
+extern crate core;
 extern crate curve25519_dalek;
 extern crate rand;
 extern crate sha2;

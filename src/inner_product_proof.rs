@@ -192,25 +192,23 @@ impl InnerProductProof {
         let inv_s = s.iter().rev();
 
         let h_times_b_div_s = Hprime_factors
-             .into_iter()
-             .zip(inv_s)
-             .map(|(h_i, s_i_inv)| (self.b * s_i_inv) * h_i.borrow());
+            .into_iter()
+            .zip(inv_s)
+            .map(|(h_i, s_i_inv)| (self.b * s_i_inv) * h_i.borrow());
 
         let neg_u_sq = u_sq.iter().map(|ui| -ui);
         let neg_u_inv_sq = u_inv_sq.iter().map(|ui| -ui);
 
-        let Ls = self.L_vec
+        let Ls = self
+            .L_vec
             .iter()
-            .map(|p| {
-                p.decompress().ok_or("InnerProductProof L point is invalid")
-            })
+            .map(|p| p.decompress().ok_or("InnerProductProof L point is invalid"))
             .collect::<Result<Vec<_>, _>>()?;
 
-        let Rs = self.R_vec
+        let Rs = self
+            .R_vec
             .iter()
-            .map(|p| {
-                p.decompress().ok_or("InnerProductProof R point is invalid")
-            })
+            .map(|p| p.decompress().ok_or("InnerProductProof R point is invalid"))
             .collect::<Result<Vec<_>, _>>()?;
 
         let expect_P = RistrettoPoint::vartime_multiscalar_mul(
@@ -267,9 +265,7 @@ impl InnerProductProof {
         }
         let num_elements = b / 32;
         if num_elements < 2 {
-            return Err(
-                "InnerProductProof must contain at least two 32-byte elements",
-            );
+            return Err("InnerProductProof must contain at least two 32-byte elements");
         }
         if (num_elements - 2) % 2 != 0 {
             return Err("InnerProductProof must contain even number of points");

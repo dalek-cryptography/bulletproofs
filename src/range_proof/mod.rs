@@ -14,8 +14,8 @@ use inner_product_proof::InnerProductProof;
 use proof_transcript::ProofTranscript;
 use util;
 
-use serde::{self, Serialize, Deserialize, Serializer, Deserializer};
 use serde::de::Visitor;
+use serde::{self, Deserialize, Deserializer, Serialize, Serializer};
 
 // Modules for MPC protocol
 
@@ -197,13 +197,15 @@ impl RangeProof {
         let value_commitment_scalars = util::exp_iter(z).take(m).map(|z_exp| c * zz * z_exp);
         let basepoint_scalar = w * (self.t_x - a * b) + c * (delta(n, m, &y, &z) - self.t_x);
 
-        let Ls = self.ipp_proof
+        let Ls = self
+            .ipp_proof
             .L_vec
             .iter()
             .map(|p| p.decompress().ok_or("RangeProof's L point is invalid"))
             .collect::<Result<Vec<_>, _>>()?;
 
-        let Rs = self.ipp_proof
+        let Rs = self
+            .ipp_proof
             .R_vec
             .iter()
             .map(|p| p.decompress().ok_or("RangeProof's R point is invalid"))
@@ -346,7 +348,6 @@ impl<'de> Deserialize<'de> for RangeProof {
         deserializer.deserialize_bytes(RangeProofVisitor)
     }
 }
-
 
 /// Compute
 /// \\[
