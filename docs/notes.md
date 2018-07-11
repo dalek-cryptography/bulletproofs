@@ -943,7 +943,7 @@ We can rewrite the statement about the linear constraints into an inner product 
 \rangle = 0
 \\]
 
-We can combine these two inner product equations, since they are offset by different multiples of challenge variable \\(z\\). The statement about multiplication gates is multiplied by \\(z^0\\), while the statements about addition and scalar multiplication gates are multiplied by a power of \\(z\\) between \\(z^1\\) and \\(z * z^Q\\). Combining the two equations gives us:
+We can combine these two inner product equations, since they are offset by different multiples of challenge variable \\(z\\). The statement about multiplication gates is multiplied by \\(z^0\\), while the statements about addition and scalar multiplication gates are multiplied by a power of \\(z\\) between \\(z^1\\) and \\(z \cdot z^Q\\). Combining the two equations gives us:
 
 \\[
 \langle \textbf{a}\_L \circ \textbf{a}\_R - \textbf{a}\_O ,
@@ -960,7 +960,7 @@ We can combine these two inner product equations, since they are offset by diffe
 Rearranging into a single inner product statement
 -------------------------------------------------
 
-TODO: explain why we want to express it as a single inner product.
+We want to work towards expressing the arithmetic circuit's conditions in terms of a single inner product, so that we can use the inner product protocol to to represent it in a more compact and efficient-to-verify form.
 
 If we break apart the equation into individual terms, we can write it as:
 
@@ -1060,7 +1060,7 @@ z \textbf{z}^Q \cdot \textbf{W}\_L \rangle +
 -\textbf{y}^n + z \textbf{z}^Q \cdot \textbf{W}\_O \rangle
 \\]
 
-TODO: explain how if you want to combine \\( \langle a, b \rangle + \langle c, d \rangle\\) you can do it by taking one degree of the linear combination with respect to a challenge scalar. For example, the 2nd degree of \\( \langle a \cdot x + c \cdot x^2, b \cdot x + d \cdot x^0 \rangle \\) is equal to \\( \langle a, b \rangle + \langle c, d \rangle\\).
+Note: if you want to combine \\( \langle a, b \rangle + \langle c, d \rangle\\) into one inner product, you can do so by taking a degree of the linear combination with respect to a challenge scalar. For example, the 2nd degree of \\( \langle a \cdot x + c \cdot x^2, b \cdot x + d \cdot x^0 \rangle \\) is equal to \\( \langle a, b \rangle + \langle c, d \rangle\\). We can use this technique for the above equation by assigning \\(a, b, c, d\\) the following values:
 
 \\[
 \begin{aligned}
@@ -1071,6 +1071,8 @@ c &= \textbf{a}\_O \\\\
 d &= -\textbf{y}^n + z \textbf{z}^Q \cdot \textbf{W}\_O
 \end{aligned}
 \\]
+
+Next, we combine \\(a, b, c, d\\) using the equation \\( \langle a \cdot x + c \cdot x^2, b \cdot x + d \cdot x^0 \rangle \\). When we take its second degree, we recover a single inner product, which was our original goal:
 
 \\[
 \langle z \textbf{z}^Q,
@@ -1100,8 +1102,6 @@ Blinding the inner product
 --------------------------
 
 TODO: explain why blinding is neessary
-
-The prover chooses vectors of blinding factors
 
 Instead, the prover chooses vectors of blinding factors
 \\[
