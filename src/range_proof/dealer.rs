@@ -232,10 +232,10 @@ impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
         );
 
         Ok(RangeProof {
-            A: self.A,
-            S: self.S,
-            T_1: self.T_1,
-            T_2: self.T_2,
+            A: self.A.compress(),
+            S: self.S.compress(),
+            T_1: self.T_1.compress(),
+            T_2: self.T_2.compress(),
             t_x,
             t_x_blinding,
             e_blinding,
