@@ -2,7 +2,7 @@ use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::ristretto::RistrettoPoint;
 use std::iter::FromIterator;
 
-use circuit_proof::{Circuit, CircuitInput};
+use circuit_proof::{Circuit, ProverInput, VerifierInput};
 
 // This is a stripped-down version of the Bellman r1cs representation, for the purposes of
 // learning / understanding. The goal is to write this as a BulletproofsConstraintSystem that 
@@ -105,7 +105,7 @@ impl ConstraintSystem {
 		Ok(())
 	}
 
-	pub fn create_proof_input(&self) -> (Circuit, CircuitInput) {
+	pub fn create_proof_input(&self) -> (Circuit, ProverInput) {
 		// naive conversion that doesn't do any multiplication elimination
 		let n = self.a.len();
 		let m = self.var_assignment.len();
@@ -143,16 +143,14 @@ impl ConstraintSystem {
 			c[i] = lc.get_constant();
 		};
 
-		let mut rng = OsRng::new().unwrap();
-
 		let circuit = Circuit {
 			n, m, q, c,
 			W_L, W_R, W_O, W_V
 		};
-		let circuit_input = CircuitInput {
+		let prover_input = ProverInput {
 			a_L, a_R, a_O
 		};
-		(circuit, circuit_input)
+		(circuit, prover_input)
 	}
 }
 

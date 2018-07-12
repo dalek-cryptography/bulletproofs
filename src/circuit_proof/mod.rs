@@ -451,7 +451,6 @@ mod tests {
         };
 
         let circuit_proof = CircuitProof::prove(
-<<<<<<< HEAD
             &generators,
             &mut proof_transcript,
             &mut rng,
