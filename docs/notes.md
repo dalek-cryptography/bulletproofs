@@ -886,14 +886,14 @@ Arithmetic Circuit Proofs
 
 The goal of an *arithmetic circuit proof* is for a prover to convince a verifier that a particular set of values \\(v\\) satisfy the constraints represented by the arithmetic circuit, without revealing any additional information about the values \\(v\\).
 
-The prover will use the efficient inner product proof to do this, so we want to work towards expressing the arithmetic circuit's conditions in terms of a single inner product. The prover begins with a vector of secret values \\(v\\), and a vector of commitments to those secret values \\(V\\). The prover will send \\(V\\) to the verifier, along with the proof.
+The prover will use the efficient inner product protocol to do this, so we want to work towards expressing the arithmetic circuit's conditions in terms of a single inner product. The prover begins with a vector of secret values \\(v\\), and a vector of commitments to those secret values \\(V\\). The prover will send \\(V\\) to the verifier, along with the proof.
 
 Notation for arithmetic circuit proofs
 ------------------------------------------
 
 In the paper, matrices are labeled as \\( \textbf{W}\_L, \textbf{W}\_R, \textbf{W}\_O, \textbf{W}\_V \\). We will keep this notation, but will note to readers not to confuse the \\(\textbf{W}\_{L,R,O,V}\\) notation for being a vector of points. 
 
-We will use the notation described in the [`notation`](index.html#notation) section of the notes. We also rename one more variable from the paper, to make it clear which variables are blinding factors and what they correspond to.
+We will use the notation described in the [`notation`](index.html#notation) section of the notes. In addition, we rename one more variable from the paper, to make it clear which variables are blinding factors:
 \\[
 \begin{aligned}
     \beta         &\xrightarrow{} \tilde{o} \\\\
@@ -959,7 +959,7 @@ We can combine these two inner product equations, since they are offset by diffe
 Rearranging into a single inner product statement
 -------------------------------------------------
 
-We want to work towards expressing the arithmetic circuit's conditions in terms of a single inner product, so that we can use the inner product protocol to to represent it in a more compact and efficient-to-verify form.
+We want to work towards expressing the arithmetic circuit's conditions in terms of a single inner product, so that we can use the inner product argument to represent it in a more compact and efficient-to-verify form.
 
 If we break apart the equation into individual terms, we can write it as:
 
@@ -1100,7 +1100,7 @@ z \textbf{z}^Q \cdot \textbf{W}\_L \cdot x -
 Blinding the inner product
 --------------------------
 
-The prover cannot send the vectors in the inner-product equation to the verifier without revealing information about the values \\(v\\). Also, since the inner-product argument is not zero-knowledge, the vectors cannot be used in teh inner-product argument without revealing information about \\(v\\) either. To solve this problem, the prover chooses vectors of blinding factors
+The prover cannot send the vectors in the inner-product equation to the verifier without revealing information about the values \\(v\\). Also, since the inner-product argument is not zero-knowledge, the vectors cannot be used in the inner-product argument without revealing information about \\(v\\) either. To solve this problem, the prover chooses vectors of blinding factors
 
 \\[
 {\mathbf{s}}\_{L}, {\mathbf{s}}\_{R} \\;{\xleftarrow{\\$}}\\; {\mathbb Z\_p}^{n},
@@ -1115,9 +1115,9 @@ and uses them to blind \\(\mathbf{a}\_L\\) and \\(\mathbf{a}\_R\\).
 \end{aligned}
 \\]
 
-The blinding factors are multiplied by \\(x^2\\) so that when the substitution is made into the \\(\textbf{l}(x)\\) and \\(\textbf{r}(x)\\) equations, \\({\mathbf{s}}\_{L}\\) will be in the third degree of \\(x\\) in \\(\textbf{l}(x)\\), and \\({\mathbf{s}}\_{L}\\) will be in the third degree of \\(x\\) in \\(\textbf{r}(x)\\). As a result, the blinding factors will not interfere with the value \\(t_2\\), which is the 2nd degree of \\(\langle {\mathbf{l}}(x), {\mathbf{r}}(x) \rangle\\).
+Note: the blinding factors are multiplied by \\(x^2\\) so that when the substitution is made into the \\(\textbf{l}(x)\\) and \\(\textbf{r}(x)\\) equations, \\({\mathbf{s}}\_{L}\\) will be in the third degree of \\(x\\) in \\(\textbf{l}(x)\\), and \\({\mathbf{s}}\_{L}\\) will be in the third degree of \\(x\\) in \\(\textbf{r}(x)\\). As a result, the blinding factors will not interfere with the value \\(t_2\\), which is the 2nd degree of \\(\langle {\mathbf{l}}(x), {\mathbf{r}}(x) \rangle\\).
 
-We construct vector polynomials \\({\mathbf{l}}(x)\\) and \\({\mathbf{l}}(x)\\) with these new definitions:
+We construct vector polynomials \\({\mathbf{l}}(x)\\) and \\({\mathbf{r}}(x)\\), which represent the left and right sides of the input to the inner-product equation, with these new definitions:
 \\[
 \begin{aligned}
   {\mathbf{l}}(x) &= (\textbf{a}\_L + \textbf{s}\_L \cdot x^2) \cdot x + \textbf{y}^{-n} \circ (z \textbf{z}^Q \cdot \textbf{W}\_R) \cdot x + \textbf{a}\_O \cdot x^2 \\\\
@@ -1209,7 +1209,7 @@ Proving that \\(\textbf{l}(x)\\), \\(\textbf{r}(x)\\) are correct
 
 We want to relate \\({\mathbf{l}}(x)\\) and \\({\mathbf{r}}(x)\\) to commitments
 to \\({\mathbf{a}}\_{L}\\), \\({\mathbf{a}}\_{R}\\), \\({\mathbf{s}}\_{L}\\), and
-\\({\mathbf{s}}\_{R}\\). However, since \\[
+\\({\mathbf{s}}\_{R}\\). Since \\[
 {\mathbf{r}}(x) = \textbf{y}^n \circ \textbf{a}\_R \cdot x + \textbf{y}^n \circ \textbf{s}\_R \cdot x^3 + z \textbf{z}^Q \cdot \textbf{W}\_L \cdot x - \textbf{y}^n + z \textbf{z}^Q \cdot \textbf{W}\_O
 \\]
 we need commitments to \\({\mathbf{y}}^{n} \circ {\mathbf{a}}\_{R}\\) and
