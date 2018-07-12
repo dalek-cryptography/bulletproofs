@@ -959,7 +959,12 @@ We can combine these two inner product equations, since they are offset by diffe
 Rearranging into a single inner product statement
 -------------------------------------------------
 
-We want to work towards expressing the arithmetic circuit's conditions in terms of a single inner product, so that we can use the inner product argument to represent it in a more compact and efficient-to-verify form.
+We want to work towards expressing the arithmetic circuit's conditions in terms of a single inner product, so that we can use the inner product argument to represent it in a more compact and efficient-to-verify form. 
+Our goal is to rearrange the equation above so that terms
+involving \\({\mathbf{a}}\_{L}\\) and \\({\mathbf{a}}\_{O}\\) appear only on the left-hand side, terms
+involving \\({\mathbf{a}}\_{R}\\) appear only on the right-hand side, and
+non-secret terms (which the verifier can compute on its own) are
+factored out into a new term \\(\delta(y, z) \\).
 
 If we break apart the equation into individual terms, we can write it as:
 
@@ -1096,6 +1101,10 @@ Distribute the \\(x\\) values:
 z \textbf{z}^Q \cdot \textbf{W}\_L \cdot x -
 \textbf{y}^n + z \textbf{z}^Q \cdot \textbf{W}\_O \rangle
 \\]
+
+This is equivalent to the equation we started with, but has a single
+inner product with \\({\mathbf{a}}\_{L}\\) and \\({\mathbf{a}}\_{O}\\) on the left, \\({\mathbf{a}}\_{R}\\) on
+the right, and non-secret terms factored out.
 
 Blinding the inner product
 --------------------------
