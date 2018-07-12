@@ -1258,7 +1258,9 @@ S &= \widetilde{B} \cdot \tilde{s} + \langle \textbf{G} , \textbf{s}\_L \rangle 
 \end{aligned}
 \\]
 
-For reference, here are the equations for \\({\mathbf{l}}(x)\\) and \\({\mathbf{r}}(x)\\) again:
+The prover forms these commitments, and sends them to the verifier.
+
+For reference, here are the equations for \\({\mathbf{l}}(x)\\) and \\({\mathbf{r}}(x)\\):
 
 \\[
 \begin{aligned}
