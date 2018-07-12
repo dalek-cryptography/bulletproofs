@@ -319,6 +319,21 @@ impl CircuitProof {
             .map(|(x_exp, mult)| x_exp * mult * r);
         let T_points = vec![self.T_1, self.T_3, self.T_4, self.T_5, self.T_6];
 
+        // Decompress L and R points from inner product proof
+        let Ls = self
+            .ipp_proof
+            .L_vec
+            .iter()
+            .map(|p| p.decompress().ok_or("RangeProof's L point is invalid"))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let Rs = self
+            .ipp_proof
+            .R_vec
+            .iter()
+            .map(|p| p.decompress().ok_or("RangeProof's R point is invalid"))
+            .collect::<Result<Vec<_>, _>>()?;
+
         let mega_check = RistrettoPoint::vartime_multiscalar_mul(
             iter::once(x) // A_I
                 .chain(iter::once(xx)) // A_O
@@ -344,8 +359,8 @@ impl CircuitProof {
                 .chain(iter::once(&gen.pedersen_generators.B_blinding))
                 .chain(gen.G.iter())
                 .chain(gen.H.iter())
-                .chain(self.ipp_proof.L_vec.iter())
-                .chain(self.ipp_proof.R_vec.iter())
+                .chain(Ls.iter())
+                .chain(Rs.iter())
                 .chain(V.iter())
                 .chain(T_points.iter()),
         );
