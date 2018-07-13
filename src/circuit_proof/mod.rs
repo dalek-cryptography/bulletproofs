@@ -3,7 +3,7 @@
 use rand::{CryptoRng, Rng};
 use std::iter;
 
-use curve25519_dalek::ristretto::RistrettoPoint;
+use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::{IsIdentity, MultiscalarMul, VartimeMultiscalarMul};
 
@@ -44,18 +44,31 @@ impl Circuit {
 
 #[derive(Clone, Debug)]
 pub struct CircuitProof {
-    pub A_I: RistrettoPoint,
-    pub A_O: RistrettoPoint,
-    pub S: RistrettoPoint,
-    pub T_1: RistrettoPoint,
-    pub T_3: RistrettoPoint,
-    pub T_4: RistrettoPoint,
-    pub T_5: RistrettoPoint,
-    pub T_6: RistrettoPoint,
-    pub t_x: Scalar,
-    pub t_x_blinding: Scalar,
-    pub e_blinding: Scalar,
-    pub ipp_proof: InnerProductProof,
+    /// Commitment to the values of input wires
+    A_I: CompressedRistretto,
+    /// Commitment to the values of output wires
+    A_O: CompressedRistretto,
+    /// Commitment to the blinding factors
+    S: CompressedRistretto,
+    /// Commitment to the \\(t_1\\) coefficient of \\( t(x) \\)
+    T_1: CompressedRistretto,
+    /// Commitment to the \\(t_3\\) coefficient of \\( t(x) \\)
+    T_3: CompressedRistretto,
+    /// Commitment to the \\(t_4\\) coefficient of \\( t(x) \\)
+    T_4: CompressedRistretto,
+    /// Commitment to the \\(t_5\\) coefficient of \\( t(x) \\)
+    T_5: CompressedRistretto,
+    /// Commitment to the \\(t_6\\) coefficient of \\( t(x) \\)
+    T_6: CompressedRistretto,
+    /// Evaluation of the polynomial \\(t(x)\\) at the challenge point \\(x\\)
+    t_x: Scalar,
+    /// Blinding factor for the synthetic commitment to \\( t(x) \\)
+    t_x_blinding: Scalar,
+    /// Blinding factor for the synthetic commitment to the
+    /// inner-product arguments
+    e_blinding: Scalar,
+    /// Proof data for the inner-product argument.
+    ipp_proof: InnerProductProof,
 }
 
 impl CircuitProof {
@@ -97,13 +110,13 @@ impl CircuitProof {
             iter::once(&gen.pedersen_generators.B_blinding)
                 .chain(gen.G.iter())
                 .chain(gen.H.iter()),
-        );
+        ).compress();
 
         // A_O = <a_O, G> + o_blinding * B_blinding
         let A_O = RistrettoPoint::multiscalar_mul(
             iter::once(&o_blinding).chain(a_O.iter()),
             iter::once(&gen.pedersen_generators.B_blinding).chain(gen.G.iter()),
-        );
+        ).compress();
 
         // S = <s_L, G> + <s_R, H> + s_blinding * B_blinding
         let S = RistrettoPoint::multiscalar_mul(
@@ -111,11 +124,11 @@ impl CircuitProof {
             iter::once(&gen.pedersen_generators.B_blinding)
                 .chain(gen.G.iter())
                 .chain(gen.H.iter()),
-        );
+        ).compress();
 
-        transcript.commit(A_I.compress().as_bytes());
-        transcript.commit(A_O.compress().as_bytes());
-        transcript.commit(S.compress().as_bytes());
+        transcript.commit(A_I.as_bytes());
+        transcript.commit(A_O.as_bytes());
+        transcript.commit(S.as_bytes());
         let y = transcript.challenge_scalar();
         let z = transcript.challenge_scalar();
 
@@ -158,17 +171,32 @@ impl CircuitProof {
         let t_5_blinding = Scalar::random(rng);
         let t_6_blinding = Scalar::random(rng);
 
-        let T_1 = gen.pedersen_generators.commit(t_poly.t1, t_1_blinding);
-        let T_3 = gen.pedersen_generators.commit(t_poly.t3, t_3_blinding);
-        let T_4 = gen.pedersen_generators.commit(t_poly.t4, t_4_blinding);
-        let T_5 = gen.pedersen_generators.commit(t_poly.t5, t_5_blinding);
-        let T_6 = gen.pedersen_generators.commit(t_poly.t6, t_6_blinding);
+        let T_1 = gen
+            .pedersen_generators
+            .commit(t_poly.t1, t_1_blinding)
+            .compress();
+        let T_3 = gen
+            .pedersen_generators
+            .commit(t_poly.t3, t_3_blinding)
+            .compress();
+        let T_4 = gen
+            .pedersen_generators
+            .commit(t_poly.t4, t_4_blinding)
+            .compress();
+        let T_5 = gen
+            .pedersen_generators
+            .commit(t_poly.t5, t_5_blinding)
+            .compress();
+        let T_6 = gen
+            .pedersen_generators
+            .commit(t_poly.t6, t_6_blinding)
+            .compress();
 
-        transcript.commit(T_1.compress().as_bytes());
-        transcript.commit(T_3.compress().as_bytes());
-        transcript.commit(T_4.compress().as_bytes());
-        transcript.commit(T_5.compress().as_bytes());
-        transcript.commit(T_6.compress().as_bytes());
+        transcript.commit(T_1.as_bytes());
+        transcript.commit(T_3.as_bytes());
+        transcript.commit(T_4.as_bytes());
+        transcript.commit(T_5.as_bytes());
+        transcript.commit(T_6.as_bytes());
         let x = transcript.challenge_scalar();
 
         // t_2_blinding = <z*z^Q, W_V * v_blinding>
@@ -248,17 +276,17 @@ impl CircuitProof {
         transcript.commit_u64(circuit.n as u64);
         transcript.commit_u64(circuit.m as u64);
         transcript.commit_u64(circuit.q as u64);
-        transcript.commit(self.A_I.compress().as_bytes());
-        transcript.commit(self.A_O.compress().as_bytes());
-        transcript.commit(self.S.compress().as_bytes());
+        transcript.commit(self.A_I.as_bytes());
+        transcript.commit(self.A_O.as_bytes());
+        transcript.commit(self.S.as_bytes());
         let y = transcript.challenge_scalar();
         let z = transcript.challenge_scalar();
 
-        transcript.commit(self.T_1.compress().as_bytes());
-        transcript.commit(self.T_3.compress().as_bytes());
-        transcript.commit(self.T_4.compress().as_bytes());
-        transcript.commit(self.T_5.compress().as_bytes());
-        transcript.commit(self.T_6.compress().as_bytes());
+        transcript.commit(self.T_1.as_bytes());
+        transcript.commit(self.T_3.as_bytes());
+        transcript.commit(self.T_4.as_bytes());
+        transcript.commit(self.T_5.as_bytes());
+        transcript.commit(self.T_6.as_bytes());
         let x = transcript.challenge_scalar();
 
         transcript.commit(self.t_x.as_bytes());
@@ -269,6 +297,16 @@ impl CircuitProof {
         let r = Scalar::random(rng);
         let xx = x * x;
 
+        // Decompress points
+        let S = self.S.decompress().ok_or_else(|| "Invalid proof point")?;
+        let A_I = self.A_I.decompress().ok_or_else(|| "Invalid proof point")?;
+        let A_O = self.A_O.decompress().ok_or_else(|| "Invalid proof point")?;
+        let T_1 = self.T_1.decompress().ok_or_else(|| "Invalid proof point")?;
+        let T_3 = self.T_3.decompress().ok_or_else(|| "Invalid proof point")?;
+        let T_4 = self.T_4.decompress().ok_or_else(|| "Invalid proof point")?;
+        let T_5 = self.T_5.decompress().ok_or_else(|| "Invalid proof point")?;
+        let T_6 = self.T_6.decompress().ok_or_else(|| "Invalid proof point")?;
+
         // Calculate points that represent the matrices
         let H_prime: Vec<RistrettoPoint> = gen
             .H
@@ -276,10 +314,12 @@ impl CircuitProof {
             .zip(util::exp_iter(y.invert()))
             .map(|(H_i, exp_y_inv)| H_i * exp_y_inv)
             .collect();
+
         // W_L_point = <h * y^-n , z * z^Q * W_L>, line 81
         let W_L_flatten: Vec<Scalar> = matrix_flatten(circuit.W_L, z, circuit.n)?;
         let W_L_point =
             RistrettoPoint::vartime_multiscalar_mul(W_L_flatten.clone(), H_prime.iter());
+
         // W_R_point = <g , y^-n * z * z^Q * W_R>, line 82
         let W_R_flatten: Vec<Scalar> = matrix_flatten(circuit.W_R, z, circuit.n)?;
         let W_R_flatten_yinv: Vec<Scalar> = W_R_flatten
@@ -289,6 +329,7 @@ impl CircuitProof {
             .collect();
         let W_R_point =
             RistrettoPoint::vartime_multiscalar_mul(W_R_flatten_yinv.clone(), gen.G.iter());
+
         // W_O_point = <h * y^-n , z * z^Q * W_O>, line 83
         let W_O_flatten: Vec<Scalar> = matrix_flatten(circuit.W_O, z, circuit.n)?;
         let W_O_point = RistrettoPoint::vartime_multiscalar_mul(W_O_flatten, H_prime.iter());
@@ -313,11 +354,14 @@ impl CircuitProof {
         let V_multiplier = W_V_flatten.iter().map(|W_V_i| r * xx * W_V_i);
 
         // group the T_scalars and T_points together
-        let T_scalars = util::exp_iter(x)
-            .take(5)
-            .zip(vec![x, xx, xx, xx, xx])
-            .map(|(x_exp, mult)| x_exp * mult * r);
-        let T_points = vec![self.T_1, self.T_3, self.T_4, self.T_5, self.T_6];
+        let T_scalars = [
+            r * x,
+            r * xx * x,
+            r * xx * xx,
+            r * xx * xx * x,
+            r * xx * xx * xx,
+        ];
+        let T_points = [T_1, T_3, T_4, T_5, T_6];
 
         // Decompress L and R points from inner product proof
         let Ls = self
@@ -348,13 +392,13 @@ impl CircuitProof {
                 .chain(x_sq.iter().cloned()) // ipp_proof.L_vec
                 .chain(x_inv_sq.iter().cloned()) // ipp_proof.R_vec
                 .chain(V_multiplier) // V
-                .chain(T_scalars), // T_points
-            iter::once(&self.A_I)
-                .chain(iter::once(&self.A_O))
+                .chain(T_scalars.iter().cloned()), // T_points
+            iter::once(&A_I)
+                .chain(iter::once(&A_O))
                 .chain(iter::once(&W_L_point))
                 .chain(iter::once(&W_R_point))
                 .chain(iter::once(&W_O_point))
-                .chain(iter::once(&self.S))
+                .chain(iter::once(&S))
                 .chain(iter::once(&gen.pedersen_generators.B))
                 .chain(iter::once(&gen.pedersen_generators.B_blinding))
                 .chain(gen.G.iter())
