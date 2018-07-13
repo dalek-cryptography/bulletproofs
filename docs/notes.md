@@ -886,8 +886,6 @@ Arithmetic Circuit Proofs
 
 An arithmetic circuit is a directed acyclic graph, where every node with indegree zero is an input gate, and every other node is either a multiplication gate or an addition gate. Multiplication gates can either be variable multiplication gates, where two variables are multiplied together, or constant multiplication gates, where a variable is multiplied by a constant. Addition gates can also be either variable addition gates or constant addition gates. 
 
-An arithmetic circuit represents a set of constraints on the inputs, where the constraints are satisfied if and only if the inputs are correctly applied to the circuit and all of the gates in the arithmetic circuit graph perform their operations correctly. Therefore, an arithmetic circuit can also be expressed as a set of constraints on inputs.
-
 The goal of an *arithmetic circuit proof* is for a prover to convince a verifier that a particular set of values \\(v\\) satisfy the constraints represented by the arithmetic circuit, without revealing any additional information about the values \\(v\\).
 
 The prover will use the efficient inner product protocol to do this, so we want to work towards expressing the arithmetic circuit's conditions in terms of a single inner product. The prover begins with a vector of secret values \\(v\\), and a vector of commitments to those secret values \\(V\\). The prover will send \\(V\\) to the verifier, along with the proof.
@@ -907,13 +905,15 @@ We will use the notation described in the [`notation`](index.html#notation) sect
 Proving statements about arithmetic circuits gates
 --------------------------------------------------
 
-One type of gate in an arithmetic circuit is a variable multiplication gate, which takes two input variables and multiplies them to get an output. If for all of the multiplication gates in a circuit, \\(\textbf{a}\_L\\) is the vector of the first input to each gate, \\(\textbf{a}\_R\\) is the vector of the second input to each gate, and \\(\textbf{a}\_O\\) is the vector of outputs, then the following equation will represent the relationship between the inputs and outputs of all the multiplication gates in the circuit:
+An arithmetic circuit represents a set of constraints on some inputs, where the constraints are satisfied if and only if the inputs are correctly applied to the circuit and all of the gates in the arithmetic circuit graph perform their operations correctly. Therefore, an arithmetic circuit can also be expressed as a set of constraints on inputs. To convert a circuit into a constraint system, take each of its inputs as variables and reconnect them with consistency equations. 
+
+One type of gate in an arithmetic circuit is a variable multiplication gate, which takes two input variables and multiplies them to get an output. If for all of the multiplication gates in a circuit, \\(\textbf{a}\_L\\) is the vector of the first input to each gate, \\(\textbf{a}\_R\\) is the vector of the second input to each gate, and \\(\textbf{a}\_O\\) is the vector of results, then the following equation will represent the relationship between the wires of all the multiplication gates in the circuit:
 
 \\[
 \textbf{a}\_L \circ \textbf{a}\_R = \textbf{a}\_O
 \\]
 
-Other types of gates in arithmetic circuits are constant multiplication gates, constant addition gates, and variable addition gates. All of these gates can be represented as a collection of linear constraints, as expressed in the following equation:
+Other types of gates in arithmetic circuits are constant multiplication gates, constant addition gates, and variable addition gates. All of these gates can be represented as a collection of linear constraints. Constant multiplication gates are represented by multiplying the input variable by a corresponding constant in a matrix (\\( \textbf{W}\_L, \textbf{W}\_R, \textbf{W}\_O, \textbf{W}\_V \\) ), constant addition gates are represented by multiplying the input variable by one and adding the constant in \\( \textbf{c}\\), and variable addition gates are represented by multiplying both input variables by one. All of these constraints are represented together in the following equation:
 
 \\[
 \textbf{W}\_L \cdot \textbf{a}\_L +
