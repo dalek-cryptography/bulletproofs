@@ -28,6 +28,9 @@ impl InnerProductProof {
     /// The `verifier` is passed in as a parameter so that the
     /// challenges depend on the *entire* transcript (including parent
     /// protocols).
+    ///
+    /// The lengths of the vectors must all be the same, and must all be
+    /// a power of 2.
     pub fn create<I>(
         verifier: &mut ProofTranscript,
         Q: &RistrettoPoint,
@@ -127,6 +130,17 @@ impl InnerProductProof {
             a: a[0],
             b: b[0],
         };
+    }
+
+    /// Creates an empty inner product proof. This is useful for when you it is necessary to include an 
+    /// inner product proof, but the vectors to make the proof over are empty.
+    pub fn create_empty() -> InnerProductProof {
+        InnerProductProof {
+            L_vec: vec![],
+            R_vec: vec![],
+            a: Scalar::zero(),
+            b: Scalar::zero(),
+        }
     }
 
     /// Computes three vectors of verification scalars \\([u\_{i}^{2}]\\), \\([u\_{i}^{-2}]\\) and \\([s\_{i}]\\) for combined multiscalar multiplication

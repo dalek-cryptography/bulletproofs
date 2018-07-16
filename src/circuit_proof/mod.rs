@@ -72,6 +72,8 @@ pub struct CircuitProof {
 }
 
 impl CircuitProof {
+    /// Create a circuit proof.
+    /// Note: length of `gen` must be the the next power of two from `n`, unless `n` is 0.
     pub fn prove<R: Rng + CryptoRng>(
         gen: &Generators,
         transcript: &mut ProofTranscript,
@@ -90,8 +92,9 @@ impl CircuitProof {
         {
             return Err("Input vector size doesn't match specified parameters.");
         }
-        if gen.n != circuit.n {
-            return Err("Generator length doesn't match specified parameters.");
+        if !(gen.n == circuit.n.next_power_of_two() || (gen.n == 0 && circuit.n == 0)) {
+            return Err("Generator length doesn't match specified parameters.
+                Length must be the the next power of two from `n`, unless `n` is 0.");
         }
 
         transcript.commit_u64(circuit.n as u64);
@@ -231,15 +234,27 @@ impl CircuitProof {
         let w = transcript.challenge_scalar();
         let Q = w * gen.pedersen_generators.B;
 
-        let ipp_proof = InnerProductProof::create(
-            transcript,
-            &Q,
-            util::exp_iter(y.invert()),
-            gen.G.to_vec(),
-            gen.H.to_vec(),
-            l_vec.clone(),
-            r_vec.clone(),
-        );
+        let mut ipp_proof = InnerProductProof::create_empty();
+        if circuit.n > 0 {
+            let pad_length = circuit.n.next_power_of_two() - circuit.n;
+            let mut l_vec_padded = l_vec.clone();
+            let mut r_vec_padded = r_vec.clone();
+            l_vec_padded.append(&mut vec![Scalar::zero(); pad_length]);
+            r_vec_padded.append(&mut vec![Scalar::zero(); pad_length]);
+
+            println!("l vec padded: {:?}", l_vec_padded);
+            println!("r vec padded: {:?}", l_vec_padded);
+
+            ipp_proof = InnerProductProof::create(
+                transcript,
+                &Q,
+                util::exp_iter(y.invert()),
+                gen.G.to_vec(),
+                gen.H.to_vec(),
+                l_vec_padded,
+                r_vec_padded,
+            );
+        }
 
         Ok(CircuitProof {
             A_I,
@@ -387,10 +402,10 @@ impl CircuitProof {
                 .chain(iter::once(x * xx)) // S
                 .chain(iter::once(w * (self.t_x - a * b) + r * (xx * (delta + z_c) - self.t_x))) // B
                 .chain(iter::once(-self.e_blinding - r * self.t_x_blinding)) // B_blinding
-                .chain(g) // G
-                .chain(h) // H
-                .chain(x_sq.iter().cloned()) // ipp_proof.L_vec
-                .chain(x_inv_sq.iter().cloned()) // ipp_proof.R_vec
+                .chain(g.take(circuit.n)) // G
+                .chain(h.take(circuit.n)) // H
+                .chain(x_sq.iter().cloned().take(circuit.n)) // ipp_proof.L_vec
+                .chain(x_inv_sq.iter().cloned().take(circuit.n)) // ipp_proof.R_vec
                 .chain(V_multiplier) // V
                 .chain(T_scalars.iter().cloned()), // T_points
             iter::once(&A_I)
@@ -463,7 +478,7 @@ mod tests {
         V: Vec<RistrettoPoint>,
         v_blinding: Vec<Scalar>,
     ) -> Result<(), &'static str> {
-        let generators = Generators::new(PedersenGenerators::default(), n, 1);
+        let generators = generators_helper(n);
         let mut proof_transcript = ProofTranscript::new(b"CircuitProofTest");
         let mut rng = OsRng::new().unwrap();
         let circuit = Circuit {
@@ -491,6 +506,13 @@ mod tests {
         let mut verify_transcript = ProofTranscript::new(b"CircuitProofTest");
 
         circuit_proof.verify(&generators, &mut verify_transcript, &mut rng, circuit, V)
+    }
+
+    fn generators_helper(n: usize) -> Generators {
+        if n == 0 {
+            return Generators::new(PedersenGenerators::default(), n, 1);
+        }
+        Generators::new(PedersenGenerators::default(), n.next_power_of_two(), 1)
     }
 
     fn blinding_helper(v: &Vec<Scalar>) -> (Vec<RistrettoPoint>, Vec<Scalar>) {
@@ -540,7 +562,7 @@ mod tests {
         let v_blinding = vec![]; // since we don't have anything to blind
 
         assert!(
-            create_and_verify_helper(n, m, q, c, W_L, W_R, W_O, W_V, a_L, a_R, a_O, V, v_blinding,)
+            create_and_verify_helper(n, m, q, c, W_L, W_R, W_O, W_V, a_L, a_R, a_O, V, v_blinding)
                 .is_ok()
         );
     }
@@ -577,7 +599,7 @@ mod tests {
         let v_blinding = vec![]; // since we don't have anything to blind
 
         assert!(
-            create_and_verify_helper(n, m, q, c, W_L, W_R, W_O, W_V, a_L, a_R, a_O, V, v_blinding,)
+            create_and_verify_helper(n, m, q, c, W_L, W_R, W_O, W_V, a_L, a_R, a_O, V, v_blinding)
                 .is_err()
         );
     }
@@ -604,7 +626,7 @@ mod tests {
         let v_blinding = vec![];
 
         assert!(
-            create_and_verify_helper(n, m, q, c, W_L, W_R, W_O, W_V, a_L, a_R, a_O, V, v_blinding,)
+            create_and_verify_helper(n, m, q, c, W_L, W_R, W_O, W_V, a_L, a_R, a_O, V, v_blinding)
                 .is_ok()
         );
     }
@@ -631,9 +653,63 @@ mod tests {
         let v_blinding = vec![];
 
         assert!(
-            create_and_verify_helper(n, m, q, c, W_L, W_R, W_O, W_V, a_L, a_R, a_O, V, v_blinding,)
+            create_and_verify_helper(n, m, q, c, W_L, W_R, W_O, W_V, a_L, a_R, a_O, V, v_blinding)
                 .is_err()
         );
+    }
+
+    #[test]
+    // Test that a circuit with n that is not 0 or a power of 2 will succeed.
+    // LINEAR CONSTRAINTS: none
+    // MUL CONSTRAINTS:
+    // a_L[0] * a_R[0] = a_O[0]
+    fn mul_circuit_3_succeed() {
+        let n = 3;
+        let m = 0;
+        let q = 0;
+
+        let W_L = vec![];
+        let W_R = vec![];
+        let W_O = vec![];
+        let W_V = vec![];
+        let c = vec![];
+        let a_L = vec![Scalar::from_u64(2), Scalar::from_u64(5), Scalar::from_u64(9)];
+        let a_R = vec![Scalar::from_u64(3), Scalar::from_u64(7), Scalar::from_u64(8)];
+        let a_O = vec![Scalar::from_u64(6), Scalar::from_u64(35), Scalar::from_u64(72)];
+        let V = vec![];
+        let v_blinding = vec![];
+
+        assert!(
+            create_and_verify_helper(n, m, q, c, W_L, W_R, W_O, W_V, a_L, a_R, a_O, V, v_blinding)
+                .is_ok()
+        ); 
+    }
+
+    #[test]
+    // Test that a circuit with n that is not 0 or a power of 2 will fail.
+    // LINEAR CONSTRAINTS: none
+    // MUL CONSTRAINTS:
+    // a_L[0] * a_R[0] = a_O[0]
+    fn mul_circuit_3_fail() {
+        let n = 3;
+        let m = 0;
+        let q = 0;
+
+        let W_L = vec![];
+        let W_R = vec![];
+        let W_O = vec![];
+        let W_V = vec![];
+        let c = vec![];
+        let a_L = vec![Scalar::from_u64(2), Scalar::from_u64(5), Scalar::from_u64(13)];
+        let a_R = vec![Scalar::from_u64(3), Scalar::from_u64(7), Scalar::from_u64(8)];
+        let a_O = vec![Scalar::from_u64(7), Scalar::from_u64(35), Scalar::from_u64(104)];
+        let V = vec![];
+        let v_blinding = vec![];
+
+        assert!(
+            create_and_verify_helper(n, m, q, c, W_L, W_R, W_O, W_V, a_L, a_R, a_O, V, v_blinding)
+                .is_err()
+        ); 
     }
 
     #[test]
@@ -662,7 +738,7 @@ mod tests {
         let (V, v_blinding) = blinding_helper(&v);
 
         assert!(
-            create_and_verify_helper(n, m, q, c, W_L, W_R, W_O, W_V, a_L, a_R, a_O, V, v_blinding,)
+            create_and_verify_helper(n, m, q, c, W_L, W_R, W_O, W_V, a_L, a_R, a_O, V, v_blinding)
                 .is_ok()
         );
     }
@@ -693,7 +769,7 @@ mod tests {
         let (V, v_blinding) = blinding_helper(&v);
 
         assert!(
-            create_and_verify_helper(n, m, q, c, W_L, W_R, W_O, W_V, a_L, a_R, a_O, V, v_blinding,)
+            create_and_verify_helper(n, m, q, c, W_L, W_R, W_O, W_V, a_L, a_R, a_O, V, v_blinding)
                 .is_err()
         );
     }
@@ -765,7 +841,7 @@ mod tests {
         let a_O = vec![a_L[0] * a_R[0], a_L[1] * a_R[1]];
 
         assert!(
-            create_and_verify_helper(n, m, q, c, W_L, W_R, W_O, W_V, a_L, a_R, a_O, V, v_blinding,)
+            create_and_verify_helper(n, m, q, c, W_L, W_R, W_O, W_V, a_L, a_R, a_O, V, v_blinding)
                 .is_ok()
         );
     }
@@ -835,7 +911,7 @@ mod tests {
         let a_O = vec![a_L[0] * a_R[0], a_L[1] * a_R[1]];
 
         assert!(
-            create_and_verify_helper(n, m, q, c, W_L, W_R, W_O, W_V, a_L, a_R, a_O, V, v_blinding,)
+            create_and_verify_helper(n, m, q, c, W_L, W_R, W_O, W_V, a_L, a_R, a_O, V, v_blinding)
                 .is_err()
         );
     }
