@@ -66,6 +66,9 @@ impl InnerProductProof {
         assert_eq!(a.len(), n);
         assert_eq!(b.len(), n);
 
+        // All of the input vectors must have a length that is a power of two.
+        assert!(n.is_power_of_two());
+
         // XXX save these scalar mults by unrolling them into the
         // first iteration of the loop below
         for (H_i, h_i) in H.iter_mut().zip(Hprime_factors.into_iter()) {
