@@ -242,9 +242,6 @@ impl CircuitProof {
             l_vec_padded.append(&mut vec![Scalar::zero(); pad_length]);
             r_vec_padded.append(&mut vec![Scalar::zero(); pad_length]);
 
-            println!("l vec padded: {:?}", l_vec_padded);
-            println!("r vec padded: {:?}", l_vec_padded);
-
             ipp_proof = InnerProductProof::create(
                 transcript,
                 &Q,
@@ -284,8 +281,9 @@ impl CircuitProof {
         if V.len() != circuit.m {
             return Err("Commitments vector size doesn't match specified parameters.");
         }
-        if gen.n != circuit.n {
-            return Err("Generator length doesn't match specified parameters.");
+        if !(gen.n == circuit.n.next_power_of_two() || (gen.n == 0 && circuit.n == 0)) {
+            return Err("Generator length doesn't match specified parameters.
+                Length must be the the next power of two from `n`, unless `n` is 0.");
         }
 
         transcript.commit_u64(circuit.n as u64);
@@ -402,10 +400,10 @@ impl CircuitProof {
                 .chain(iter::once(x * xx)) // S
                 .chain(iter::once(w * (self.t_x - a * b) + r * (xx * (delta + z_c) - self.t_x))) // B
                 .chain(iter::once(-self.e_blinding - r * self.t_x_blinding)) // B_blinding
-                .chain(g.take(circuit.n)) // G
-                .chain(h.take(circuit.n)) // H
-                .chain(x_sq.iter().cloned().take(circuit.n)) // ipp_proof.L_vec
-                .chain(x_inv_sq.iter().cloned().take(circuit.n)) // ipp_proof.R_vec
+                .chain(g) // G
+                .chain(h) // H
+                .chain(x_sq.iter().cloned()) // ipp_proof.L_vec
+                .chain(x_inv_sq.iter().cloned()) // ipp_proof.R_vec
                 .chain(V_multiplier) // V
                 .chain(T_scalars.iter().cloned()), // T_points
             iter::once(&A_I)
