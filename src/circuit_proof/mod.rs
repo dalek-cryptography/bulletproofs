@@ -234,24 +234,22 @@ impl CircuitProof {
         let w = transcript.challenge_scalar();
         let Q = w * gen.pedersen_generators.B;
 
-        let mut ipp_proof = InnerProductProof::create_empty();
+        let mut l_vec_padded = l_vec.clone();
+        let mut r_vec_padded = r_vec.clone();
         if circuit.n > 0 {
-            let pad_length = circuit.n.next_power_of_two() - circuit.n;
-            let mut l_vec_padded = l_vec.clone();
-            let mut r_vec_padded = r_vec.clone();
+            let pad_length = circuit.n.next_power_of_two() - circuit.n;   
             l_vec_padded.append(&mut vec![Scalar::zero(); pad_length]);
-            r_vec_padded.append(&mut vec![Scalar::zero(); pad_length]);
-
-            ipp_proof = InnerProductProof::create(
-                transcript,
-                &Q,
-                util::exp_iter(y.invert()),
-                gen.G.to_vec(),
-                gen.H.to_vec(),
-                l_vec_padded,
-                r_vec_padded,
-            );
+            r_vec_padded.append(&mut vec![Scalar::zero(); pad_length]); 
         }
+        let ipp_proof = InnerProductProof::create(
+            transcript,
+            &Q,
+            util::exp_iter(y.invert()),
+            gen.G.to_vec(),
+            gen.H.to_vec(),
+            l_vec_padded,
+            r_vec_padded,
+        );
 
         Ok(CircuitProof {
             A_I,
