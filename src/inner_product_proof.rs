@@ -443,4 +443,72 @@ mod tests {
         ];
         assert_eq!(Scalar::from_u64(40), inner_product(&a, &b));
     }
+
+    #[test]
+    fn test_ipp_with_padding() {
+        let n = 3usize;
+        let mut rng = OsRng::new().unwrap();
+
+        use generators::{Generators, PedersenGenerators};
+        let gens = Generators::new(PedersenGenerators::default(), n.next_power_of_two(), 1);
+        let G = gens.share(0).G.to_vec();
+        let H = gens.share(0).H.to_vec();
+
+        // Q would be determined upstream in the protocol, so we pick a random one.
+        let Q = RistrettoPoint::hash_from_bytes::<Sha512>(b"test point");
+
+        // a and b are the vectors for which we want to prove c = <a,b>
+        let a: Vec<_> = (0..n).map(|_| Scalar::random(&mut rng)).collect();
+        let b: Vec<_> = (0..n).map(|_| Scalar::random(&mut rng)).collect();
+        let c = inner_product(&a, &b);
+
+        // y_inv is (the inverse of) a random challenge
+        let y_inv = Scalar::random(&mut rng);
+
+        // P would be determined upstream, but we need a correct P to check the proof.
+        //
+        // To generate P = <a,G> + <b,H'> + <a,b> Q, compute
+        //             P = <a,G> + <b',H> + <a,b> Q,
+        // where b' = b \circ y^(-n)
+        let b_prime = b.iter().zip(util::exp_iter(y_inv)).map(|(bi, yi)| bi * yi);
+        // a.iter() has Item=&Scalar, need Item=Scalar to chain with b_prime
+        let a_prime = a.iter().cloned();
+
+        let P = RistrettoPoint::vartime_multiscalar_mul(
+            a_prime.chain(b_prime).chain(iter::once(c)),
+            G.iter().chain(H.iter()).chain(iter::once(&Q)),
+        );
+
+        let mut a_padded = a.clone();
+        let mut b_padded = b.clone();
+        let pad_length = n.next_power_of_two() - n;   
+        a_padded.append(&mut vec![Scalar::zero(); pad_length]);
+        b_padded.append(&mut vec![Scalar::zero(); pad_length]); 
+
+        let mut verifier = ProofTranscript::new(b"innerproducttest");
+        let proof = InnerProductProof::create(
+            &mut verifier,
+            &Q,
+            util::exp_iter(y_inv),
+            G.clone(),
+            H.clone(),
+            a_padded,
+            b_padded,
+        );
+
+        let mut verifier = ProofTranscript::new(b"innerproducttest");
+        assert!(
+            proof
+                .verify(&mut verifier, util::exp_iter(y_inv), &P, &Q, &G, &H)
+                .is_ok()
+        );
+
+        let proof = InnerProductProof::from_bytes(proof.to_bytes().as_slice()).unwrap();
+        let mut verifier = ProofTranscript::new(b"innerproducttest");
+        assert!(
+            proof
+                .verify(&mut verifier, util::exp_iter(y_inv), &P, &Q, &G, &H)
+                .is_ok()
+        );
+    }
 }
