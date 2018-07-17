@@ -1,6 +1,9 @@
+use rand::{CryptoRng, Rng};
+
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::ristretto::RistrettoPoint;
 use std::iter::FromIterator;
+use generators::PedersenGenerators;
 
 use circuit_proof::{Circuit, ProverInput, VerifierInput};
 
@@ -105,7 +108,11 @@ impl ConstraintSystem {
 		Ok(())
 	}
 
-	pub fn create_proof_input(&self) -> (Circuit, ProverInput) {
+	pub fn create_proof_input<R: Rng + CryptoRng>(
+		&self,
+		pedersen_generators: &PedersenGenerators,
+		rng: &mut R,
+	) -> (Circuit, ProverInput, VerifierInput) {
 		// naive conversion that doesn't do any multiplication elimination
 		let n = self.a.len();
 		let m = self.var_assignment.len();
@@ -143,23 +150,75 @@ impl ConstraintSystem {
 			c[i] = lc.get_constant();
 		};
 
-		let circuit = Circuit {
-			n, m, q, c,
-			W_L, W_R, W_O, W_V
-		};
-		let prover_input = ProverInput {
-			a_L, a_R, a_O
-		};
-		(circuit, prover_input)
+        let v_blinding: Vec<Scalar> = (0..m).map(|_| Scalar::random(rng)).collect();
+
+        let V: Vec<RistrettoPoint> = self
+            .var_assignment
+            .iter()
+            .zip(v_blinding.clone())
+            .map(|(v_i, v_blinding_i)| pedersen_generators.commit(*v_i, v_blinding_i))
+            .collect();
+
+        let circuit = Circuit {
+            n,
+            m,
+            q,
+            c,
+            W_L,
+            W_R,
+            W_O,
+            W_V,
+        };
+        let prover_input = ProverInput { a_L, a_R, a_O, v_blinding };
+        let verifier_input = VerifierInput { V };
+        (circuit, prover_input, verifier_input)
 	}
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*; 
+    use super::*;
+    use circuit_proof::CircuitProof;
+    use proof_transcript::ProofTranscript;
+    use rand::rngs::OsRng;
+    use generators::Generators;
+
+    fn create_and_verify_helper(
+        circuit: Circuit,
+        prover_input: ProverInput,
+        verifier_input: VerifierInput,
+    ) -> Result<(), &'static str> {
+        let generators = Generators::new(PedersenGenerators::default(), circuit.n, 1);
+        let mut proof_transcript = ProofTranscript::new(b"CircuitProofTest");
+        let mut rng = OsRng::new().unwrap();
+
+        let circuit_proof = CircuitProof::prove(
+            &generators,
+            &mut proof_transcript,
+            &mut rng,
+            &circuit.clone(),
+            prover_input.a_L,
+            prover_input.a_R,
+            prover_input.a_O,
+            prover_input.v_blinding,
+        ).unwrap();
+
+        let mut verify_transcript = ProofTranscript::new(b"CircuitProofTest");
+
+        circuit_proof.verify(
+            &generators,
+            &mut verify_transcript,
+            &mut rng,
+            &circuit,
+            verifier_input.V,
+        )
+    }
+
 	#[test]
 	// trivial case using constant multiplication
     fn mul_circuit_constants() {
+    	let mut rng = OsRng::new().unwrap();
+    	let pedersen_generators = PedersenGenerators::default();
     	let mut cs = ConstraintSystem::new();
 
     	let lc_a = LinearCombination::construct(vec![], Scalar::from_u64(3));
@@ -167,13 +226,18 @@ mod tests {
     	let lc_c = LinearCombination::construct(vec![], Scalar::from_u64(12));
     	cs.push_lc(lc_a, lc_b, lc_c);
 
-    	let (circuit, circuit_input) = cs.create_proof_input();
-    	assert_eq!(circuit.q, 3);
+    	let (circuit, prover_input, verifier_input) = cs.create_proof_input(&pedersen_generators, &mut rng);
+    	assert!(
+    		create_and_verify_helper(circuit, prover_input, verifier_input)
+    			.is_ok()
+    	);
     }
 
     #[test]
     // multiplication circuit where a, b, c are all (private?) variables
     fn mul_circuit_variables() {
+    	let mut rng = OsRng::new().unwrap();
+    	let pedersen_generators = PedersenGenerators::default();
     	let mut cs = ConstraintSystem::new();
 
     	let var_a = cs.alloc_variable(Scalar::from_u64(3));
@@ -184,8 +248,11 @@ mod tests {
     	let lc_b = LinearCombination::construct(vec![(var_b, Scalar::one())], Scalar::zero());
     	let lc_c = LinearCombination::construct(vec![(var_c, Scalar::one())], Scalar::zero());
 		cs.push_lc(lc_a, lc_b, lc_c);
-
-    	let (circuit, circuit_input) = cs.create_proof_input();
-    	assert_eq!(circuit.q, 3);
+		
+    	let (circuit, prover_input, verifier_input) = cs.create_proof_input(&pedersen_generators, &mut rng);
+    	assert!(
+    		create_and_verify_helper(circuit, prover_input, verifier_input)
+    			.is_ok()
+    	);
     }
 }

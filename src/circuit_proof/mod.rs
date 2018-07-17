@@ -48,6 +48,7 @@ pub struct ProverInput {
     a_L: Vec<Scalar>,
     a_R: Vec<Scalar>,
     a_O: Vec<Scalar>,
+    v_blinding: Vec<Scalar>,
 }
 
 pub struct VerifierInput {
