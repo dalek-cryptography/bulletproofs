@@ -444,9 +444,9 @@ mod tests {
         assert_eq!(Scalar::from_u64(40), inner_product(&a, &b));
     }
 
-    #[test]
-    fn test_ipp_with_padding() {
-        let n = 3usize;
+    // helper function for making tests for n values that are not
+    // zero or powers of two, such that the vectors need to be padded.
+    fn test_helper_with_padding(n: usize) {
         let mut rng = OsRng::new().unwrap();
 
         use generators::{Generators, PedersenGenerators};
@@ -458,8 +458,12 @@ mod tests {
         let Q = RistrettoPoint::hash_from_bytes::<Sha512>(b"test point");
 
         // a and b are the vectors for which we want to prove c = <a,b>
-        let a: Vec<_> = (0..n).map(|_| Scalar::random(&mut rng)).collect();
-        let b: Vec<_> = (0..n).map(|_| Scalar::random(&mut rng)).collect();
+        let mut a: Vec<_> = (0..n).map(|_| Scalar::random(&mut rng)).collect();
+        let mut b: Vec<_> = (0..n).map(|_| Scalar::random(&mut rng)).collect();
+        let pad_length = n.next_power_of_two() - n;   
+        a.append(&mut vec![Scalar::zero(); pad_length]);
+        b.append(&mut vec![Scalar::zero(); pad_length]); 
+
         let c = inner_product(&a, &b);
 
         // y_inv is (the inverse of) a random challenge
@@ -479,12 +483,6 @@ mod tests {
             G.iter().chain(H.iter()).chain(iter::once(&Q)),
         );
 
-        let mut a_padded = a.clone();
-        let mut b_padded = b.clone();
-        let pad_length = n.next_power_of_two() - n;   
-        a_padded.append(&mut vec![Scalar::zero(); pad_length]);
-        b_padded.append(&mut vec![Scalar::zero(); pad_length]); 
-
         let mut verifier = ProofTranscript::new(b"innerproducttest");
         let proof = InnerProductProof::create(
             &mut verifier,
@@ -492,8 +490,8 @@ mod tests {
             util::exp_iter(y_inv),
             G.clone(),
             H.clone(),
-            a_padded,
-            b_padded,
+            a.clone(),
+            b.clone(),
         );
 
         let mut verifier = ProofTranscript::new(b"innerproducttest");
@@ -510,5 +508,16 @@ mod tests {
                 .verify(&mut verifier, util::exp_iter(y_inv), &P, &Q, &G, &H)
                 .is_ok()
         );
+    }
+
+    #[test]
+    fn make_ipp_3() {
+        test_helper_with_padding(3);
+    }
+
+
+    #[test]
+    fn make_ipp_5() {
+        test_helper_with_padding(5);
     }
 }
