@@ -216,7 +216,7 @@ mod tests {
 
 	#[test]
 	// trivial case using constant multiplication
-    fn mul_circuit_constants() {
+    fn mul_circuit_constants_succeed() {
     	let mut rng = OsRng::new().unwrap();
     	let pedersen_generators = PedersenGenerators::default();
     	let mut cs = ConstraintSystem::new();
@@ -233,9 +233,27 @@ mod tests {
     	);
     }
 
+	#[test]
+    fn mul_circuit_constants_fail() {
+    	let mut rng = OsRng::new().unwrap();
+    	let pedersen_generators = PedersenGenerators::default();
+    	let mut cs = ConstraintSystem::new();
+
+    	let lc_a = LinearCombination::construct(vec![], Scalar::from_u64(3));
+    	let lc_b = LinearCombination::construct(vec![], Scalar::from_u64(4));
+    	let lc_c = LinearCombination::construct(vec![], Scalar::from_u64(10));
+    	cs.push_lc(lc_a, lc_b, lc_c);
+
+    	let (circuit, prover_input, verifier_input) = cs.create_proof_input(&pedersen_generators, &mut rng);
+    	assert!(
+    		create_and_verify_helper(circuit, prover_input, verifier_input)
+    			.is_err()
+    	);
+    }
+
     #[test]
-    // multiplication circuit where a, b, c are all (private?) variables
-    fn mul_circuit_variables() {
+    // multiplication circuit where a, b, c are all variables
+    fn mul_circuit_variables_succeed() {
     	let mut rng = OsRng::new().unwrap();
     	let pedersen_generators = PedersenGenerators::default();
     	let mut cs = ConstraintSystem::new();
@@ -253,6 +271,29 @@ mod tests {
     	assert!(
     		create_and_verify_helper(circuit, prover_input, verifier_input)
     			.is_ok()
+    	);
+    }
+
+    #[test]
+    // multiplication circuit where a, b, c are all variables
+    fn mul_circuit_variables_fail() {
+    	let mut rng = OsRng::new().unwrap();
+    	let pedersen_generators = PedersenGenerators::default();
+    	let mut cs = ConstraintSystem::new();
+
+    	let var_a = cs.alloc_variable(Scalar::from_u64(3));
+    	let var_b = cs.alloc_variable(Scalar::from_u64(4));
+    	let var_c = cs.alloc_variable(Scalar::from_u64(10));
+
+    	let lc_a = LinearCombination::construct(vec![(var_a, Scalar::one())], Scalar::zero());
+    	let lc_b = LinearCombination::construct(vec![(var_b, Scalar::one())], Scalar::zero());
+    	let lc_c = LinearCombination::construct(vec![(var_c, Scalar::one())], Scalar::zero());
+		cs.push_lc(lc_a, lc_b, lc_c);
+		
+    	let (circuit, prover_input, verifier_input) = cs.create_proof_input(&pedersen_generators, &mut rng);
+    	assert!(
+    		create_and_verify_helper(circuit, prover_input, verifier_input)
+    			.is_err()
     	);
     }
 }
