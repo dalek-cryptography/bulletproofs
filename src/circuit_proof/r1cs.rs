@@ -215,7 +215,7 @@ mod tests {
     }
 
 	#[test]
-	// trivial case using constant multiplication
+	// 3 (const) * 4 (const) = 12 (const)
     fn mul_circuit_constants_succeed() {
     	let mut rng = OsRng::new().unwrap();
     	let pedersen_generators = PedersenGenerators::default();
@@ -234,6 +234,7 @@ mod tests {
     }
 
 	#[test]
+	// 3 (const) * 4 (const) != 10 (const)
     fn mul_circuit_constants_fail() {
     	let mut rng = OsRng::new().unwrap();
     	let pedersen_generators = PedersenGenerators::default();
@@ -252,7 +253,7 @@ mod tests {
     }
 
     #[test]
-    // multiplication circuit where a, b, c are all variables
+    // 3 (var) * 4 (var) = 12 (var)
     fn mul_circuit_variables_succeed() {
     	let mut rng = OsRng::new().unwrap();
     	let pedersen_generators = PedersenGenerators::default();
@@ -275,7 +276,7 @@ mod tests {
     }
 
     #[test]
-    // multiplication circuit where a, b, c are all variables
+    // 3 (var) * 4 (var) != 10 (var)
     fn mul_circuit_variables_fail() {
     	let mut rng = OsRng::new().unwrap();
     	let pedersen_generators = PedersenGenerators::default();
@@ -295,5 +296,216 @@ mod tests {
     		create_and_verify_helper(circuit, prover_input, verifier_input)
     			.is_err()
     	);
+    }
+
+    #[test]
+    // ( 3 (var) * 2 (const) ) * ( 4 (var) * 5 (const) ) = 120 (var)
+    fn mul_circuit_mixed_succeed() {
+    	let mut rng = OsRng::new().unwrap();
+    	let pedersen_generators = PedersenGenerators::default();
+    	let mut cs = ConstraintSystem::new();
+
+    	let var_a = cs.alloc_variable(Scalar::from_u64(3));
+    	let var_b = cs.alloc_variable(Scalar::from_u64(4));
+    	let var_c = cs.alloc_variable(Scalar::from_u64(120));
+
+    	let lc_a = LinearCombination::construct(vec![(var_a, Scalar::from_u64(2))], Scalar::zero());
+    	let lc_b = LinearCombination::construct(vec![(var_b, Scalar::from_u64(5))], Scalar::zero());
+    	let lc_c = LinearCombination::construct(vec![(var_c, Scalar::one())], Scalar::zero());
+		cs.push_lc(lc_a, lc_b, lc_c);
+		
+    	let (circuit, prover_input, verifier_input) = cs.create_proof_input(&pedersen_generators, &mut rng);
+    	assert!(
+    		create_and_verify_helper(circuit, prover_input, verifier_input)
+    			.is_ok()
+    	);
+    }
+
+    #[test]
+    // ( 3 (var) * 2 (const) ) * ( 4 (var) * 5 (const) ) != 121 (var)
+    fn mul_circuit_mixed_fail() {
+    	let mut rng = OsRng::new().unwrap();
+    	let pedersen_generators = PedersenGenerators::default();
+    	let mut cs = ConstraintSystem::new();
+
+    	let var_a = cs.alloc_variable(Scalar::from_u64(3));
+    	let var_b = cs.alloc_variable(Scalar::from_u64(4));
+    	let var_c = cs.alloc_variable(Scalar::from_u64(121));
+
+    	let lc_a = LinearCombination::construct(vec![(var_a, Scalar::from_u64(2))], Scalar::zero());
+    	let lc_b = LinearCombination::construct(vec![(var_b, Scalar::from_u64(5))], Scalar::zero());
+    	let lc_c = LinearCombination::construct(vec![(var_c, Scalar::one())], Scalar::zero());
+		cs.push_lc(lc_a, lc_b, lc_c);
+		
+    	let (circuit, prover_input, verifier_input) = cs.create_proof_input(&pedersen_generators, &mut rng);
+    	assert!(
+    		create_and_verify_helper(circuit, prover_input, verifier_input)
+    			.is_err()
+    	);
+    }
+
+
+	#[test]
+	// 3 (var) + 4 (var) = 7 (var)
+    fn add_circuit_variables_succeed() {
+    	let mut rng = OsRng::new().unwrap();
+    	let pedersen_generators = PedersenGenerators::default();
+    	let mut cs = ConstraintSystem::new();
+
+    	let var_a = cs.alloc_variable(Scalar::from_u64(3));
+    	let var_b = cs.alloc_variable(Scalar::from_u64(4));
+    	let var_c = cs.alloc_variable(Scalar::from_u64(7));
+
+    	let lc_a = LinearCombination::construct(vec![
+    		(var_a, Scalar::one()), 
+    		(var_b, Scalar::one()),
+    		(var_c, -Scalar::one()),
+    	], Scalar::zero());
+    	let lc_b = LinearCombination::construct(vec![], Scalar::one());
+    	let lc_c = LinearCombination::construct(vec![], Scalar::zero());
+    	cs.push_lc(lc_a, lc_b, lc_c);
+
+    	let (circuit, prover_input, verifier_input) = cs.create_proof_input(&pedersen_generators, &mut rng);
+    	assert!(
+    		create_and_verify_helper(circuit, prover_input, verifier_input)
+    			.is_ok()
+    	);
+    }
+
+    #[test]
+	// 3 (var) + 4 (var) != 10 (var)
+    fn add_circuit_variables_fail() {
+    	let mut rng = OsRng::new().unwrap();
+    	let pedersen_generators = PedersenGenerators::default();
+    	let mut cs = ConstraintSystem::new();
+
+    	let var_a = cs.alloc_variable(Scalar::from_u64(3));
+    	let var_b = cs.alloc_variable(Scalar::from_u64(4));
+    	let var_c = cs.alloc_variable(Scalar::from_u64(10));
+
+    	let lc_a = LinearCombination::construct(vec![
+    		(var_a, Scalar::one()), 
+    		(var_b, Scalar::one()),
+    		(var_c, -Scalar::one()),
+    	], Scalar::zero());
+    	let lc_b = LinearCombination::construct(vec![], Scalar::one());
+    	let lc_c = LinearCombination::construct(vec![], Scalar::zero());
+    	cs.push_lc(lc_a, lc_b, lc_c);
+
+    	let (circuit, prover_input, verifier_input) = cs.create_proof_input(&pedersen_generators, &mut rng);
+    	assert!(
+    		create_and_verify_helper(circuit, prover_input, verifier_input)
+    			.is_err()
+    	);
+    }
+
+	#[test]
+	// 3 (var) + 4 (var) + 8 (const) = 15 (var)
+    fn add_circuit_mixed_succeed() {
+    	let mut rng = OsRng::new().unwrap();
+    	let pedersen_generators = PedersenGenerators::default();
+    	let mut cs = ConstraintSystem::new();
+
+    	let var_a = cs.alloc_variable(Scalar::from_u64(3));
+    	let var_b = cs.alloc_variable(Scalar::from_u64(4));
+    	let var_c = cs.alloc_variable(Scalar::from_u64(15));
+
+    	let lc_a = LinearCombination::construct(vec![
+    		(var_a, Scalar::one()), 
+    		(var_b, Scalar::one()),
+    		(var_c, -Scalar::one()),
+    	], Scalar::from_u64(8));
+    	let lc_b = LinearCombination::construct(vec![], Scalar::one());
+    	let lc_c = LinearCombination::construct(vec![], Scalar::zero());
+    	cs.push_lc(lc_a, lc_b, lc_c);
+
+    	let (circuit, prover_input, verifier_input) = cs.create_proof_input(&pedersen_generators, &mut rng);
+    	assert!(
+    		create_and_verify_helper(circuit, prover_input, verifier_input)
+    			.is_ok()
+    	);
+    }
+
+	#[test]
+	// 3 (var) + 4 (var) + 8 (const) != 16 (var)
+    fn add_circuit_mixed_fail() {
+    	let mut rng = OsRng::new().unwrap();
+    	let pedersen_generators = PedersenGenerators::default();
+    	let mut cs = ConstraintSystem::new();
+
+    	let var_a = cs.alloc_variable(Scalar::from_u64(3));
+    	let var_b = cs.alloc_variable(Scalar::from_u64(4));
+    	let var_c = cs.alloc_variable(Scalar::from_u64(16));
+
+    	let lc_a = LinearCombination::construct(vec![
+    		(var_a, Scalar::one()), 
+    		(var_b, Scalar::one()),
+    		(var_c, -Scalar::one()),
+    	], Scalar::from_u64(8));
+    	let lc_b = LinearCombination::construct(vec![], Scalar::one());
+    	let lc_c = LinearCombination::construct(vec![], Scalar::zero());
+    	cs.push_lc(lc_a, lc_b, lc_c);
+
+    	let (circuit, prover_input, verifier_input) = cs.create_proof_input(&pedersen_generators, &mut rng);
+    	assert!(
+    		create_and_verify_helper(circuit, prover_input, verifier_input)
+    			.is_err()
+    	);
+    }
+
+    #[test]
+    // ( 3 (var) + 4 (var) + 8 (const) - 13 (var) ) * 2 (const) = 1 (var) * 4 (const) 
+    fn add_and_multiply_circuit_succeed() {
+    	let mut rng = OsRng::new().unwrap();
+    	let pedersen_generators = PedersenGenerators::default();
+    	let mut cs = ConstraintSystem::new();
+
+    	let var_a = cs.alloc_variable(Scalar::from_u64(3));
+    	let var_b = cs.alloc_variable(Scalar::from_u64(4));
+    	let var_c = cs.alloc_variable(Scalar::from_u64(13));
+    	let var_d = cs.alloc_variable(Scalar::one());
+
+    	let lc_a = LinearCombination::construct(vec![
+    		(var_a, Scalar::one()), 
+    		(var_b, Scalar::one()),
+    		(var_c, -Scalar::one()),
+    	], Scalar::from_u64(8));
+    	let lc_b = LinearCombination::construct(vec![], Scalar::from_u64(2));
+    	let lc_c = LinearCombination::construct(vec![(var_d, Scalar::from_u64(4))], Scalar::zero());
+    	cs.push_lc(lc_a, lc_b, lc_c);
+
+    	let (circuit, prover_input, verifier_input) = cs.create_proof_input(&pedersen_generators, &mut rng);
+    	assert!(
+    		create_and_verify_helper(circuit, prover_input, verifier_input)
+    			.is_ok()
+    	);    	
+    }
+
+    #[test]
+    // ( 3 (var) + 4 (var) + 8 (const) - 13 (var) ) * 2 (const) = 1 (var) * 3 (const) 
+    fn add_and_multiply_circuit_fail() {
+    	let mut rng = OsRng::new().unwrap();
+    	let pedersen_generators = PedersenGenerators::default();
+    	let mut cs = ConstraintSystem::new();
+
+    	let var_a = cs.alloc_variable(Scalar::from_u64(3));
+    	let var_b = cs.alloc_variable(Scalar::from_u64(4));
+    	let var_c = cs.alloc_variable(Scalar::from_u64(13));
+    	let var_d = cs.alloc_variable(Scalar::one());
+
+    	let lc_a = LinearCombination::construct(vec![
+    		(var_a, Scalar::one()), 
+    		(var_b, Scalar::one()),
+    		(var_c, -Scalar::one()),
+    	], Scalar::from_u64(8));
+    	let lc_b = LinearCombination::construct(vec![], Scalar::from_u64(2));
+    	let lc_c = LinearCombination::construct(vec![(var_d, Scalar::from_u64(3))], Scalar::zero());
+    	cs.push_lc(lc_a, lc_b, lc_c);
+
+    	let (circuit, prover_input, verifier_input) = cs.create_proof_input(&pedersen_generators, &mut rng);
+    	assert!(
+    		create_and_verify_helper(circuit, prover_input, verifier_input)
+    			.is_err()
+    	);    	
     }
 }
