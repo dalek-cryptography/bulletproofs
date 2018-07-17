@@ -201,49 +201,30 @@ impl RangeProof {
         let value_commitment_scalars = util::exp_iter(z).take(m).map(|z_exp| c * zz * z_exp);
         let basepoint_scalar = w * (self.t_x - a * b) + c * (delta(n, m, &y, &z) - self.t_x);
 
-        let Ls = self
-            .ipp_proof
-            .L_vec
-            .iter()
-            .map(|p| p.decompress().ok_or(ProofError::VerificationError))
-            .collect::<Result<Vec<_>, _>>()?;
-
-        let Rs = self
-            .ipp_proof
-            .R_vec
-            .iter()
-            .map(|p| p.decompress().ok_or(ProofError::VerificationError))
-            .collect::<Result<Vec<_>, _>>()?;
-
-        let A = self.A.decompress().ok_or(ProofError::VerificationError)?;
-        let S = self.S.decompress().ok_or(ProofError::VerificationError)?;
-        let T_1 = self.T_1.decompress().ok_or(ProofError::VerificationError)?;
-        let T_2 = self.T_2.decompress().ok_or(ProofError::VerificationError)?;
-
-        let mega_check = RistrettoPoint::vartime_multiscalar_mul(
+        let mega_check = RistrettoPoint::optional_multiscalar_mul(
             iter::once(Scalar::one())
                 .chain(iter::once(x))
-                .chain(value_commitment_scalars)
                 .chain(iter::once(c * x))
                 .chain(iter::once(c * x * x))
+                .chain(x_sq.iter().cloned())
+                .chain(x_inv_sq.iter().cloned())
                 .chain(iter::once(-self.e_blinding - c * self.t_x_blinding))
                 .chain(iter::once(basepoint_scalar))
                 .chain(g)
                 .chain(h)
-                .chain(x_sq.iter().cloned())
-                .chain(x_inv_sq.iter().cloned()),
-            iter::once(&A)
-                .chain(iter::once(&S))
-                .chain(value_commitments.iter())
-                .chain(iter::once(&T_1))
-                .chain(iter::once(&T_2))
-                .chain(iter::once(&gens.pedersen_generators.B_blinding))
-                .chain(iter::once(&gens.pedersen_generators.B))
-                .chain(gens.G.iter())
-                .chain(gens.H.iter())
-                .chain(Ls.iter())
-                .chain(Rs.iter()),
-        );
+                .chain(value_commitment_scalars),
+            iter::once(self.A.decompress())
+                .chain(iter::once(self.S.decompress()))
+                .chain(iter::once(self.T_1.decompress()))
+                .chain(iter::once(self.T_2.decompress()))
+                .chain(self.ipp_proof.L_vec.iter().map(|L| L.decompress()))
+                .chain(self.ipp_proof.R_vec.iter().map(|R| R.decompress()))
+                .chain(iter::once(Some(gens.pedersen_generators.B_blinding)))
+                .chain(iter::once(Some(gens.pedersen_generators.B)))
+                .chain(gens.G.iter().map(|&x| Some(x)))
+                .chain(gens.H.iter().map(|&x| Some(x)))
+                .chain(value_commitments.iter().map(|&x| Some(x))),
+        ).ok_or_else(|| ProofError::VerificationError)?;
 
         if mega_check.is_identity() {
             Ok(())
