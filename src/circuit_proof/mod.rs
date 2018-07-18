@@ -147,11 +147,11 @@ impl CircuitProof {
 
         let mut l_poly = util::VecPoly3::zero(circuit.n);
         let mut r_poly = util::VecPoly3::zero(circuit.n);
-        
+
         let z_zQ_WL: Vec<Scalar> = matrix_flatten(&circuit.W_L, z, circuit.n)?;
         let z_zQ_WR: Vec<Scalar> = matrix_flatten(&circuit.W_R, z, circuit.n)?;
         let z_zQ_WO: Vec<Scalar> = matrix_flatten(&circuit.W_O, z, circuit.n)?;
-    
+
         let mut exp_y = Scalar::one(); // y^n starting at n=0
         let mut exp_y_inv = Scalar::one(); // y^-n starting at n=0
         let y_inv = y.invert();
@@ -330,10 +330,8 @@ impl CircuitProof {
 
         // W_L_point = <h * y^-n , z * z^Q * W_L>, line 81
         let W_L_flatten: Vec<Scalar> = matrix_flatten(&circuit.W_L, z, circuit.n)?;
-        let W_L_point = RistrettoPoint::vartime_multiscalar_mul(
-            W_L_flatten.clone(),
-            H_prime.iter()
-        );
+        let W_L_point =
+            RistrettoPoint::vartime_multiscalar_mul(W_L_flatten.clone(), H_prime.iter());
 
         // W_R_point = <g , y^-n * z * z^Q * W_R>, line 82
         let W_R_flatten: Vec<Scalar> = matrix_flatten(&circuit.W_R, z, circuit.n)?;
@@ -347,10 +345,7 @@ impl CircuitProof {
 
         // W_O_point = <h * y^-n , z * z^Q * W_O>, line 83
         let W_O_flatten: Vec<Scalar> = matrix_flatten(&circuit.W_O, z, circuit.n)?;
-        let W_O_point = RistrettoPoint::vartime_multiscalar_mul(
-            W_O_flatten,
-            H_prime.iter()
-        );
+        let W_O_point = RistrettoPoint::vartime_multiscalar_mul(W_O_flatten, H_prime.iter());
 
         // Get IPP variables
         let (x_sq, x_inv_sq, s) = self.ipp_proof.verification_scalars(transcript);
@@ -508,13 +503,7 @@ mod tests {
 
         let mut verify_transcript = ProofTranscript::new(b"CircuitProofTest");
 
-        circuit_proof.verify(
-            &generators,
-            &mut verify_transcript,
-            &mut rng,
-            &circuit,
-            V,
-        )
+        circuit_proof.verify(&generators, &mut verify_transcript, &mut rng, &circuit, V)
     }
 
     fn blinding_helper(v: &Vec<Scalar>) -> (Vec<RistrettoPoint>, Vec<Scalar>) {
