@@ -224,7 +224,7 @@ mod tests {
     	let lc_a = LinearCombination::construct(vec![], Scalar::from_u64(3));
     	let lc_b = LinearCombination::construct(vec![], Scalar::from_u64(4));
     	let lc_c = LinearCombination::construct(vec![], Scalar::from_u64(12));
-    	cs.push_lc(lc_a, lc_b, lc_c);
+    	assert!(cs.push_lc(lc_a, lc_b, lc_c).is_ok());
 
     	let (circuit, prover_input, verifier_input) = cs.create_proof_input(&pedersen_generators, &mut rng);
     	assert!(
@@ -243,7 +243,7 @@ mod tests {
     	let lc_a = LinearCombination::construct(vec![], Scalar::from_u64(3));
     	let lc_b = LinearCombination::construct(vec![], Scalar::from_u64(4));
     	let lc_c = LinearCombination::construct(vec![], Scalar::from_u64(10));
-    	cs.push_lc(lc_a, lc_b, lc_c);
+    	assert!(cs.push_lc(lc_a, lc_b, lc_c).is_ok());
 
     	let (circuit, prover_input, verifier_input) = cs.create_proof_input(&pedersen_generators, &mut rng);
     	assert!(
@@ -266,7 +266,7 @@ mod tests {
     	let lc_a = LinearCombination::construct(vec![(var_a, Scalar::one())], Scalar::zero());
     	let lc_b = LinearCombination::construct(vec![(var_b, Scalar::one())], Scalar::zero());
     	let lc_c = LinearCombination::construct(vec![(var_c, Scalar::one())], Scalar::zero());
-		cs.push_lc(lc_a, lc_b, lc_c);
+    	assert!(cs.push_lc(lc_a, lc_b, lc_c).is_ok());
 		
     	let (circuit, prover_input, verifier_input) = cs.create_proof_input(&pedersen_generators, &mut rng);
     	assert!(
@@ -289,7 +289,7 @@ mod tests {
     	let lc_a = LinearCombination::construct(vec![(var_a, Scalar::one())], Scalar::zero());
     	let lc_b = LinearCombination::construct(vec![(var_b, Scalar::one())], Scalar::zero());
     	let lc_c = LinearCombination::construct(vec![(var_c, Scalar::one())], Scalar::zero());
-		cs.push_lc(lc_a, lc_b, lc_c);
+    	assert!(cs.push_lc(lc_a, lc_b, lc_c).is_ok());
 		
     	let (circuit, prover_input, verifier_input) = cs.create_proof_input(&pedersen_generators, &mut rng);
     	assert!(
@@ -312,7 +312,7 @@ mod tests {
     	let lc_a = LinearCombination::construct(vec![(var_a, Scalar::from_u64(2))], Scalar::zero());
     	let lc_b = LinearCombination::construct(vec![(var_b, Scalar::from_u64(5))], Scalar::zero());
     	let lc_c = LinearCombination::construct(vec![(var_c, Scalar::one())], Scalar::zero());
-		cs.push_lc(lc_a, lc_b, lc_c);
+    	assert!(cs.push_lc(lc_a, lc_b, lc_c).is_ok());
 		
     	let (circuit, prover_input, verifier_input) = cs.create_proof_input(&pedersen_generators, &mut rng);
     	assert!(
@@ -335,7 +335,7 @@ mod tests {
     	let lc_a = LinearCombination::construct(vec![(var_a, Scalar::from_u64(2))], Scalar::zero());
     	let lc_b = LinearCombination::construct(vec![(var_b, Scalar::from_u64(5))], Scalar::zero());
     	let lc_c = LinearCombination::construct(vec![(var_c, Scalar::one())], Scalar::zero());
-		cs.push_lc(lc_a, lc_b, lc_c);
+    	assert!(cs.push_lc(lc_a, lc_b, lc_c).is_ok());
 		
     	let (circuit, prover_input, verifier_input) = cs.create_proof_input(&pedersen_generators, &mut rng);
     	assert!(
@@ -363,7 +363,7 @@ mod tests {
     	], Scalar::zero());
     	let lc_b = LinearCombination::construct(vec![], Scalar::one());
     	let lc_c = LinearCombination::construct(vec![], Scalar::zero());
-    	cs.push_lc(lc_a, lc_b, lc_c);
+    	assert!(cs.push_lc(lc_a, lc_b, lc_c).is_ok());
 
     	let (circuit, prover_input, verifier_input) = cs.create_proof_input(&pedersen_generators, &mut rng);
     	assert!(
@@ -390,7 +390,7 @@ mod tests {
     	], Scalar::zero());
     	let lc_b = LinearCombination::construct(vec![], Scalar::one());
     	let lc_c = LinearCombination::construct(vec![], Scalar::zero());
-    	cs.push_lc(lc_a, lc_b, lc_c);
+    	assert!(cs.push_lc(lc_a, lc_b, lc_c).is_ok());
 
     	let (circuit, prover_input, verifier_input) = cs.create_proof_input(&pedersen_generators, &mut rng);
     	assert!(
@@ -417,7 +417,7 @@ mod tests {
     	], Scalar::from_u64(8));
     	let lc_b = LinearCombination::construct(vec![], Scalar::one());
     	let lc_c = LinearCombination::construct(vec![], Scalar::zero());
-    	cs.push_lc(lc_a, lc_b, lc_c);
+    	assert!(cs.push_lc(lc_a, lc_b, lc_c).is_ok());
 
     	let (circuit, prover_input, verifier_input) = cs.create_proof_input(&pedersen_generators, &mut rng);
     	assert!(
@@ -444,7 +444,7 @@ mod tests {
     	], Scalar::from_u64(8));
     	let lc_b = LinearCombination::construct(vec![], Scalar::one());
     	let lc_c = LinearCombination::construct(vec![], Scalar::zero());
-    	cs.push_lc(lc_a, lc_b, lc_c);
+    	assert!(cs.push_lc(lc_a, lc_b, lc_c).is_ok());
 
     	let (circuit, prover_input, verifier_input) = cs.create_proof_input(&pedersen_generators, &mut rng);
     	assert!(
@@ -472,7 +472,7 @@ mod tests {
     	], Scalar::from_u64(8));
     	let lc_b = LinearCombination::construct(vec![], Scalar::from_u64(2));
     	let lc_c = LinearCombination::construct(vec![(var_d, Scalar::from_u64(4))], Scalar::zero());
-    	cs.push_lc(lc_a, lc_b, lc_c);
+    	assert!(cs.push_lc(lc_a, lc_b, lc_c).is_ok());
 
     	let (circuit, prover_input, verifier_input) = cs.create_proof_input(&pedersen_generators, &mut rng);
     	assert!(
@@ -500,7 +500,85 @@ mod tests {
     	], Scalar::from_u64(8));
     	let lc_b = LinearCombination::construct(vec![], Scalar::from_u64(2));
     	let lc_c = LinearCombination::construct(vec![(var_d, Scalar::from_u64(3))], Scalar::zero());
-    	cs.push_lc(lc_a, lc_b, lc_c);
+    	assert!(cs.push_lc(lc_a, lc_b, lc_c).is_ok());
+
+    	let (circuit, prover_input, verifier_input) = cs.create_proof_input(&pedersen_generators, &mut rng);
+    	assert!(
+    		create_and_verify_helper(circuit, prover_input, verifier_input)
+    			.is_err()
+    	);    	
+    }
+
+    #[test]
+    // Test that a 2 in 2 out shuffle circuit succeeds
+    // lc_0: (var_0 - z) * (var_1 - z) = var_4
+    // lc_1: (var_2 - z) * (var_3 - z) = var_4
+    // var_0 and var_3 = 3
+    // var_1 and var_2 = 7
+    fn shuffle_circuit_succeed() {
+    	let mut rng = OsRng::new().unwrap();
+    	let pedersen_generators = PedersenGenerators::default();
+    	let mut cs = ConstraintSystem::new();
+        let z = Scalar::random(&mut rng);
+
+        let three = Scalar::from_u64(3);
+        let seven = Scalar::from_u64(7);
+    	let var_0 = cs.alloc_variable(three);
+    	let var_1 = cs.alloc_variable(seven);
+    	let var_2 = cs.alloc_variable(seven);
+    	let var_3 = cs.alloc_variable(three);
+    	let var_4 = cs.alloc_variable((three - z) * (seven - z));
+
+    	// lc_0: (var_0 - z) * (var_1 - z) = var_4
+    	let lc_0_a = LinearCombination::construct(vec![(var_0, Scalar::one())], -z);
+    	let lc_0_b = LinearCombination::construct(vec![(var_1, Scalar::one())], -z);
+    	let lc_0_c = LinearCombination::construct(vec![(var_4.clone(), Scalar::one())], Scalar::zero());
+    	assert!(cs.push_lc(lc_0_a, lc_0_b, lc_0_c).is_ok());
+
+    	// lc_1: (var_2 - z) * (var_3 - z) = var_4
+    	let lc_1_a = LinearCombination::construct(vec![(var_2, Scalar::one())], -z);
+    	let lc_1_b = LinearCombination::construct(vec![(var_3, Scalar::one())], -z);
+    	let lc_1_c = LinearCombination::construct(vec![(var_4, Scalar::one())], Scalar::zero());
+    	assert!(cs.push_lc(lc_1_a, lc_1_b, lc_1_c).is_ok());
+
+    	let (circuit, prover_input, verifier_input) = cs.create_proof_input(&pedersen_generators, &mut rng);
+    	assert!(
+    		create_and_verify_helper(circuit, prover_input, verifier_input)
+    			.is_ok()
+    	);    	
+    }
+
+    #[test]
+    // Test that a 2 in 2 out shuffle circuit fails
+    // lc_0: (var_0 - z) * (var_1 - z) = var_4
+    // lc_1: (var_2 - z) * (var_3 - z) = var_4
+    // var_0 = 3
+    // var_1 and var_2 and var_3 = 7
+    fn shuffle_circuit_fail() {
+    	let mut rng = OsRng::new().unwrap();
+    	let pedersen_generators = PedersenGenerators::default();
+    	let mut cs = ConstraintSystem::new();
+        let z = Scalar::random(&mut rng);
+
+        let three = Scalar::from_u64(3);
+        let seven = Scalar::from_u64(7);
+    	let var_0 = cs.alloc_variable(three);
+    	let var_1 = cs.alloc_variable(seven);
+    	let var_2 = cs.alloc_variable(seven);
+    	let var_3 = cs.alloc_variable(seven);
+    	let var_4 = cs.alloc_variable((three - z) * (seven - z));
+
+    	// lc_0: (var_0 - z) * (var_1 - z) = var_4
+    	let lc_0_a = LinearCombination::construct(vec![(var_0, Scalar::one())], -z);
+    	let lc_0_b = LinearCombination::construct(vec![(var_1, Scalar::one())], -z);
+    	let lc_0_c = LinearCombination::construct(vec![(var_4.clone(), Scalar::one())], Scalar::zero());
+    	assert!(cs.push_lc(lc_0_a, lc_0_b, lc_0_c).is_ok());
+
+    	// lc_1: (var_2 - z) * (var_3 - z) = var_4
+    	let lc_1_a = LinearCombination::construct(vec![(var_2, Scalar::one())], -z);
+    	let lc_1_b = LinearCombination::construct(vec![(var_3, Scalar::one())], -z);
+    	let lc_1_c = LinearCombination::construct(vec![(var_4, Scalar::one())], Scalar::zero());
+    	assert!(cs.push_lc(lc_1_a, lc_1_b, lc_1_c).is_ok());
 
     	let (circuit, prover_input, verifier_input) = cs.create_proof_input(&pedersen_generators, &mut rng);
     	assert!(
