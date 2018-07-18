@@ -113,16 +113,24 @@ impl ConstraintSystem {
         Ok(())
     }
 
-    pub fn create_proof_input<R: Rng + CryptoRng>(
-        &self,
-        pedersen_generators: &PedersenGenerators,
-        rng: &mut R,
-    ) -> (Circuit, ProverInput, VerifierInput) {
-        // naive conversion that doesn't do any multiplication elimination
-        let n = self.a.len();
-        let m = self.var_assignment.len();
-        let q = self.a.len() * 3;
+    fn create_verifier_input (
+    	&self,
+    	v_blinding: &Vec<Scalar>,
+    	pedersen_generators: &PedersenGenerators,
+    ) -> VerifierInput {
+        let V: Vec<RistrettoPoint> = self
+            .var_assignment
+            .iter()
+            .zip(v_blinding)
+            .map(|(v_i, v_blinding_i)| pedersen_generators.commit(*v_i, *v_blinding_i))
+            .collect();
+        VerifierInput { V }	
+    }
 
+    fn create_prover_input(
+    	&self,
+    	v_blinding: &Vec<Scalar>
+    ) -> ProverInput {
         // eval a, b, c and assign results to a_L, a_R, a_O respectively
         let a_L: Vec<Scalar> = self
             .a
@@ -139,6 +147,18 @@ impl ConstraintSystem {
             .iter()
             .map(|lc| lc.eval(&self.var_assignment))
             .collect();
+        ProverInput {
+        	a_L,
+        	a_R, 
+        	a_O,
+        	v_blinding: v_blinding.to_vec(),
+        }
+    }
+
+    fn create_circuit(&self) -> Circuit {
+        let n = self.a.len();
+        let m = self.var_assignment.len();
+        let q = self.a.len() * 3;
 
         // Linear constraints are ordered as follows:
         // a[0], a[1], ... b[0], b[1], ... c[0], c[1], ...
@@ -170,16 +190,7 @@ impl ConstraintSystem {
             c[i] = lc.get_constant();
         }
 
-        let v_blinding: Vec<Scalar> = (0..m).map(|_| Scalar::random(rng)).collect();
-
-        let V: Vec<RistrettoPoint> = self
-            .var_assignment
-            .iter()
-            .zip(v_blinding.clone())
-            .map(|(v_i, v_blinding_i)| pedersen_generators.commit(*v_i, v_blinding_i))
-            .collect();
-
-        let circuit = Circuit {
+        Circuit {
             n,
             m,
             q,
@@ -188,14 +199,21 @@ impl ConstraintSystem {
             W_R,
             W_O,
             W_V,
-        };
-        let prover_input = ProverInput {
-            a_L,
-            a_R,
-            a_O,
-            v_blinding,
-        };
-        let verifier_input = VerifierInput { V };
+        }
+    }
+
+    pub fn create_proof_input<R: Rng + CryptoRng>(
+        &self,
+        pedersen_generators: &PedersenGenerators,
+        rng: &mut R,
+    ) -> (Circuit, ProverInput, VerifierInput) {
+    	let m = self.var_assignment.len();
+        let v_blinding: Vec<Scalar> = (0..m).map(|_| Scalar::random(rng)).collect();
+
+    	let circuit = self.create_circuit();
+        let prover_input = self.create_prover_input(&v_blinding);
+        let verifier_input = self.create_verifier_input(&v_blinding, pedersen_generators);
+
         (circuit, prover_input, verifier_input)
     }
 }
