@@ -568,7 +568,7 @@ mod tests {
     fn shuffle_circuit() {
         let three = Scalar::from_u64(3);
         let seven = Scalar::from_u64(7);
-        assert!(shuffle_circuit_helper(three, seven, seven, three).is_ok());
+        assert!(shuffle_circuit_helper(three, seven, three, seven).is_ok());
         assert!(shuffle_circuit_helper(three, seven, seven, three).is_ok());
         assert!(shuffle_circuit_helper(three, seven, seven, seven).is_err());
         assert!(shuffle_circuit_helper(three, Scalar::one(), seven, three).is_err());
