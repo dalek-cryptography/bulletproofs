@@ -1046,28 +1046,32 @@ z \textbf{z}^Q \cdot \textbf{W}\_L \rangle +
 Add \\(\delta(y, z) = \langle \textbf{y}^{-n} \circ (z \textbf{z}^Q \cdot \textbf{W}\_R), z \textbf{z}^Q \cdot \textbf{W}\_L \rangle \\) to both sides. 
 
 \\[
-\langle z \textbf{z}^Q,
-\textbf{c} + \textbf{W}\_V \cdot \textbf{v} \rangle + \delta(y, z) =
-\langle \textbf{a}\_L + \textbf{y}^{-n} \circ (z \textbf{z}^Q \cdot \textbf{W}\_R), 
+\begin{aligned}
+&\langle z \textbf{z}^Q,
+\textbf{c} + \textbf{W}\_V \cdot \textbf{v} \rangle + \delta(y, z) \\\\
+&= \langle \textbf{a}\_L + \textbf{y}^{-n} \circ (z \textbf{z}^Q \cdot \textbf{W}\_R), 
 \textbf{y}^n \circ \textbf{a}\_R \rangle + 
 \langle \textbf{a}\_L,
 z \textbf{z}^Q \cdot \textbf{W}\_L \rangle +
 \langle \textbf{a}\_O, 
 -\textbf{y}^n + z \textbf{z}^Q \cdot \textbf{W}\_O \rangle + 
 \langle \textbf{y}^{-n} \circ (z \textbf{z}^Q \cdot \textbf{W}\_R), z \textbf{z}^Q \cdot \textbf{W}\_L \rangle
+\end{aligned}
 \\]
 
 Merge the terms containing \\(z \textbf{z}^Q \cdot \textbf{W}\_L\\).
 
 \\[
+\begin{aligned}
 \langle z \textbf{z}^Q,
-\textbf{c} + \textbf{W}\_V \cdot \textbf{v} \rangle + \delta(y, z) =
-\langle \textbf{a}\_L + \textbf{y}^{-n} \circ (z \textbf{z}^Q \cdot \textbf{W}\_R), 
+\textbf{c} &+ \textbf{W}\_V \cdot \textbf{v} \rangle + \delta(y, z) \\\\
+&= \langle \textbf{a}\_L + \textbf{y}^{-n} \circ (z \textbf{z}^Q \cdot \textbf{W}\_R), 
 \textbf{y}^n \circ \textbf{a}\_R \rangle + 
 \langle \textbf{a}\_L + \textbf{y}^{-n} \circ (z \textbf{z}^Q \cdot \textbf{W}\_R),
 z \textbf{z}^Q \cdot \textbf{W}\_L \rangle +
 \langle \textbf{a}\_O, 
 -\textbf{y}^n + z \textbf{z}^Q \cdot \textbf{W}\_O \rangle
+\end{aligned}
 \\]
 
 Merge the terms containing \\(\textbf{a}\_L + \textbf{y}^{-n} \circ (z \textbf{z}^Q \cdot \textbf{W}\_R)\\).
