@@ -8,7 +8,7 @@ use std::iter::FromIterator;
 use circuit_proof::{Circuit, ProverInput, VerifierInput};
 
 // This is a stripped-down version of the Bellman r1cs representation, for the purposes of
-// learning / understanding. The eventual goal is to write this as a BulletproofsConstraintSystem 
+// learning / understanding. The eventual goal is to write this as a BulletproofsConstraintSystem
 // that implements the Bellman ConstraintSystem trait, so we can use that code/logic.
 // (That would require the bellman code to be decoupled from the underlying pairings.)
 
@@ -76,7 +76,7 @@ impl ConstraintSystem {
         lc_b: LinearCombination,
         lc_c: LinearCombination,
     ) -> Result<(), &'static str> {
-        // TODO: check that the linear combinations are valid 
+        // TODO: check that the linear combinations are valid
         // (e.g. that variables are valid, belong to this constraint system).
         self.a.push(lc_a);
         self.b.push(lc_b);
@@ -85,18 +85,18 @@ impl ConstraintSystem {
     }
 
     fn eval_lc(&self, lc: &LinearCombination) -> Scalar {
-        let sum_vars: Scalar = 
-            lc.variables
+        let sum_vars: Scalar = lc
+            .variables
             .iter()
             .map(|(var, scalar)| scalar * self.var_assignment[var.0])
             .sum();
-        sum_vars + lc.constant        
+        sum_vars + lc.constant
     }
 
-    fn create_verifier_input (
-    	&self,
-    	v_blinding: &Vec<Scalar>,
-    	pedersen_generators: &PedersenGenerators,
+    fn create_verifier_input(
+        &self,
+        v_blinding: &Vec<Scalar>,
+        pedersen_generators: &PedersenGenerators,
     ) -> VerifierInput {
         let V: Vec<RistrettoPoint> = self
             .var_assignment
@@ -104,34 +104,19 @@ impl ConstraintSystem {
             .zip(v_blinding)
             .map(|(v_i, v_blinding_i)| pedersen_generators.commit(*v_i, *v_blinding_i))
             .collect();
-        VerifierInput { V }	
+        VerifierInput { V }
     }
 
-    fn create_prover_input(
-    	&self,
-    	v_blinding: &Vec<Scalar>
-    ) -> ProverInput {
+    fn create_prover_input(&self, v_blinding: &Vec<Scalar>) -> ProverInput {
         // eval a, b, c and assign results to a_L, a_R, a_O respectively
-        let a_L: Vec<Scalar> = self
-            .a
-            .iter()
-            .map(|lc| self.eval_lc(&lc))
-            .collect();
-        let a_R: Vec<Scalar> = self
-            .b
-            .iter()
-            .map(|lc| self.eval_lc(&lc))
-            .collect();
-        let a_O: Vec<Scalar> = self
-            .c
-            .iter()
-            .map(|lc| self.eval_lc(&lc))
-            .collect();
+        let a_L: Vec<Scalar> = self.a.iter().map(|lc| self.eval_lc(&lc)).collect();
+        let a_R: Vec<Scalar> = self.b.iter().map(|lc| self.eval_lc(&lc)).collect();
+        let a_O: Vec<Scalar> = self.c.iter().map(|lc| self.eval_lc(&lc)).collect();
         ProverInput {
-        	a_L,
-        	a_R, 
-        	a_O,
-        	v_blinding: v_blinding.to_vec(),
+            a_L,
+            a_R,
+            a_O,
+            v_blinding: v_blinding.to_vec(),
         }
     }
 
@@ -187,10 +172,10 @@ impl ConstraintSystem {
         pedersen_generators: &PedersenGenerators,
         rng: &mut R,
     ) -> (Circuit, ProverInput, VerifierInput) {
-    	let m = self.var_assignment.len();
+        let m = self.var_assignment.len();
         let v_blinding: Vec<Scalar> = (0..m).map(|_| Scalar::random(rng)).collect();
 
-    	let circuit = self.create_circuit();
+        let circuit = self.create_circuit();
         let prover_input = self.create_prover_input(&v_blinding);
         let verifier_input = self.create_verifier_input(&v_blinding, pedersen_generators);
 
@@ -546,8 +531,7 @@ mod tests {
         // lc_0: (var_in_0 - z) * (var_in_1 - z) = var_mul
         let lc_0_a = LinearCombination::new(vec![(var_in_0, Scalar::one())], -z);
         let lc_0_b = LinearCombination::new(vec![(var_in_1, Scalar::one())], -z);
-        let lc_0_c =
-            LinearCombination::new(vec![(var_mul.clone(), Scalar::one())], Scalar::zero());
+        let lc_0_c = LinearCombination::new(vec![(var_mul.clone(), Scalar::one())], Scalar::zero());
         assert!(cs.constrain(lc_0_a, lc_0_b, lc_0_c).is_ok());
 
         // lc_1: (var_out_0 - z) * (var_out_1 - z) = var_mul
