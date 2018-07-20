@@ -33,7 +33,7 @@ impl Party {
             .commit(Scalar::from_u64(v), v_blinding);
 
         Ok(PartyAwaitingPosition {
-            generators: generators,
+            generators,
             n,
             v,
             v_blinding,
@@ -149,7 +149,7 @@ impl<'a> PartyAwaitingValueChallenge<'a> {
             r_poly.0[i] = exp_y * (a_R_i + vc.z) + zz * offset_z * exp_2;
             r_poly.1[i] = exp_y * self.s_R[i];
 
-            exp_y = exp_y * vc.y; // y^i -> y^(i+1)
+            exp_y *= vc.y; // y^i -> y^(i+1)
             exp_2 = exp_2 + exp_2; // 2^i -> 2^(i+1)
         }
 
