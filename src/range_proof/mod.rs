@@ -341,7 +341,7 @@ impl<'de> Deserialize<'de> for RangeProof {
             where
                 E: serde::de::Error,
             {
-                RangeProof::from_bytes(v).map_err(|e| serde::de::Error::custom(e))
+                RangeProof::from_bytes(v).map_err(serde::de::Error::custom)
             }
         }
 

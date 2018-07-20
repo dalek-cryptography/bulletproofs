@@ -118,12 +118,12 @@ impl InnerProductProof {
             H = H_L;
         }
 
-        return InnerProductProof {
+        InnerProductProof {
             L_vec: L_vec,
             R_vec: R_vec,
             a: a[0],
             b: b[0],
-        };
+        }
     }
 
     /// Computes three vectors of verification scalars \\([u\_{i}^{2}]\\), \\([u\_{i}^{-2}]\\) and \\([s\_{i}]\\) for combined multiscalar multiplication

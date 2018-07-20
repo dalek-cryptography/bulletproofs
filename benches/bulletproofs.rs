@@ -9,10 +9,10 @@ use rand::{rngs::OsRng, Rng};
 extern crate curve25519_dalek;
 use curve25519_dalek::scalar::Scalar;
 
-extern crate ristretto_bulletproofs;
-use ristretto_bulletproofs::ProofTranscript;
-use ristretto_bulletproofs::RangeProof;
-use ristretto_bulletproofs::{Generators, PedersenGenerators};
+extern crate bulletproofs;
+use bulletproofs::ProofTranscript;
+use bulletproofs::RangeProof;
+use bulletproofs::{Generators, PedersenGenerators};
 
 static AGGREGATION_SIZES: [usize; 6] = [1, 2, 4, 8, 16, 32];
 
