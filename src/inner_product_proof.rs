@@ -28,9 +28,6 @@ impl InnerProductProof {
     /// The `verifier` is passed in as a parameter so that the
     /// challenges depend on the *entire* transcript (including parent
     /// protocols).
-    ///
-    /// The lengths of the vectors must all be the same, and must all be
-    /// either 0 or a power of 2.
     pub fn create<I>(
         verifier: &mut ProofTranscript,
         Q: &RistrettoPoint,
@@ -68,9 +65,6 @@ impl InnerProductProof {
         assert_eq!(H.len(), n);
         assert_eq!(a.len(), n);
         assert_eq!(b.len(), n);
-
-        // All of the input vectors must have a length that is a power of two.
-        assert!(n.is_power_of_two());
 
         // XXX save these scalar mults by unrolling them into the
         // first iteration of the loop below
