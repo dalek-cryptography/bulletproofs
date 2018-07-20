@@ -28,6 +28,9 @@ impl InnerProductProof {
     /// The `verifier` is passed in as a parameter so that the
     /// challenges depend on the *entire* transcript (including parent
     /// protocols).
+    ///
+    /// The lengths of the vectors must all be the same, and must all be
+    /// a power of 2 or zero.
     pub fn create<I>(
         verifier: &mut ProofTranscript,
         Q: &RistrettoPoint,
@@ -65,6 +68,9 @@ impl InnerProductProof {
         assert_eq!(H.len(), n);
         assert_eq!(a.len(), n);
         assert_eq!(b.len(), n);
+
+        // All of the input vectors must have a length that is a power of two.
+        assert!(n.is_power_of_two());
 
         // XXX save these scalar mults by unrolling them into the
         // first iteration of the loop below
@@ -436,5 +442,82 @@ mod tests {
             Scalar::from_u64(5),
         ];
         assert_eq!(Scalar::from_u64(40), inner_product(&a, &b));
+    }
+
+    // helper function for making tests for n values that are not
+    // zero or powers of two, such that the vectors need to be padded.
+    fn test_helper_with_padding(n: usize) {
+        let mut rng = OsRng::new().unwrap();
+
+        use generators::{Generators, PedersenGenerators};
+        let gens = Generators::new(PedersenGenerators::default(), n.next_power_of_two(), 1);
+        let G = gens.share(0).G.to_vec();
+        let H = gens.share(0).H.to_vec();
+
+        // Q would be determined upstream in the protocol, so we pick a random one.
+        let Q = RistrettoPoint::hash_from_bytes::<Sha512>(b"test point");
+
+        // a and b are the vectors for which we want to prove c = <a,b>
+        let mut a: Vec<_> = (0..n).map(|_| Scalar::random(&mut rng)).collect();
+        let mut b: Vec<_> = (0..n).map(|_| Scalar::random(&mut rng)).collect();
+        let pad_length = n.next_power_of_two() - n;   
+        a.append(&mut vec![Scalar::zero(); pad_length]);
+        b.append(&mut vec![Scalar::zero(); pad_length]); 
+
+        let c = inner_product(&a, &b);
+
+        // y_inv is (the inverse of) a random challenge
+        let y_inv = Scalar::random(&mut rng);
+
+        // P would be determined upstream, but we need a correct P to check the proof.
+        //
+        // To generate P = <a,G> + <b,H'> + <a,b> Q, compute
+        //             P = <a,G> + <b',H> + <a,b> Q,
+        // where b' = b \circ y^(-n)
+        let b_prime = b.iter().zip(util::exp_iter(y_inv)).map(|(bi, yi)| bi * yi);
+        // a.iter() has Item=&Scalar, need Item=Scalar to chain with b_prime
+        let a_prime = a.iter().cloned();
+
+        let P = RistrettoPoint::vartime_multiscalar_mul(
+            a_prime.chain(b_prime).chain(iter::once(c)),
+            G.iter().chain(H.iter()).chain(iter::once(&Q)),
+        );
+
+        let mut verifier = ProofTranscript::new(b"innerproducttest");
+        let proof = InnerProductProof::create(
+            &mut verifier,
+            &Q,
+            util::exp_iter(y_inv),
+            G.clone(),
+            H.clone(),
+            a.clone(),
+            b.clone(),
+        );
+
+        let mut verifier = ProofTranscript::new(b"innerproducttest");
+        assert!(
+            proof
+                .verify(&mut verifier, util::exp_iter(y_inv), &P, &Q, &G, &H)
+                .is_ok()
+        );
+
+        let proof = InnerProductProof::from_bytes(proof.to_bytes().as_slice()).unwrap();
+        let mut verifier = ProofTranscript::new(b"innerproducttest");
+        assert!(
+            proof
+                .verify(&mut verifier, util::exp_iter(y_inv), &P, &Q, &G, &H)
+                .is_ok()
+        );
+    }
+
+    #[test]
+    fn make_ipp_3() {
+        test_helper_with_padding(3);
+    }
+
+
+    #[test]
+    fn make_ipp_5() {
+        test_helper_with_padding(5);
     }
 }
