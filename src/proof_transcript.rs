@@ -37,8 +37,8 @@ use byteorder::{ByteOrder, LittleEndian};
 ///
 /// ```
 /// # extern crate curve25519_dalek;
-/// # extern crate ristretto_bulletproofs;
-/// # use ristretto_bulletproofs::ProofTranscript;
+/// # extern crate bulletproofs;
+/// # use bulletproofs::ProofTranscript;
 /// # fn main() {
 ///
 /// use curve25519_dalek::constants;
