@@ -1,18 +1,18 @@
 [package]
-name = "ristretto-bulletproofs"
+name = "bulletproofs"
 version = "0.1.0"
 authors = ["Cathie Yun <cathie@chain.com>", 
            "Henry de Valence <hdevalence@hdevalence.ca>",
            "Oleg Andreev <oleganza@gmail.com>"]
 readme = "README.md"
 license = "MIT"
-repository = "https://github.com/chain/ristretto-bulletproofs"
+repository = "https://github.com/dalek-cryptography/bulletproofs"
 categories = ["cryptography"]
 keywords = ["cryptography", "ristretto", "zero-knowledge", "bulletproofs"]
 description = "A pure-Rust implementation of Bulletproofs using Ristretto"
 
 [dependencies]
-curve25519-dalek = { version = "0.17", features = ["serde"] }
+curve25519-dalek = { version = "0.18", features = ["serde"] }
 subtle = "0.6"
 sha2 = "^0.7"
 rand = "0.5.0-pre.2"
@@ -27,7 +27,7 @@ criterion = "0.2"
 bincode = "1"
 
 [features]
-avx2_backend = ["curve25519-dalek/avx2_backend", "curve25519-dalek/yolocrypto"]
+avx2_backend = ["curve25519-dalek/avx2_backend"]
 
 [[bench]]
 name = "bulletproofs"
