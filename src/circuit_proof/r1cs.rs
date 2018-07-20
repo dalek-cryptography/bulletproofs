@@ -16,12 +16,6 @@ use circuit_proof::{Circuit, ProverInput, VerifierInput};
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub struct Variable(usize);
 
-impl Variable {
-    fn get_index(&self) -> usize {
-        self.0
-    }
-}
-
 /// Represents a linear combination of some variables multiplied with their scalar coefficients,
 /// plus a scalar. E.g. LC = variable[0]*scalar[0] + variable[1]*scalar[1] + scalar
 pub struct LinearCombination {
@@ -39,33 +33,12 @@ impl LinearCombination {
         }
     }
 
-    // Used to check that variables in the linear combination are valid
-    pub fn check_variables(&self, var_count: usize) -> Result<(), &'static str> {
-        for (var, _) in &self.variables {
-            let index = var.get_index();
-            if index > var_count - 1 {
-                return Err("Invalid variable index");
-            }
-        }
-        Ok(())
-    }
-
     pub fn get_variables(&self) -> Vec<(Variable, Scalar)> {
         self.variables.clone()
     }
 
     pub fn get_constant(&self) -> Scalar {
         self.constant.clone()
-    }
-
-    // evaluate the linear combination, given the variable values in var_assignment
-    pub fn eval(&self, var_assignment: &Vec<Scalar>) -> Scalar {
-        let sum_vars: Scalar = self
-            .variables
-            .iter()
-            .map(|(var, scalar)| scalar * var_assignment[var.get_index()])
-            .sum();
-        sum_vars + self.constant
     }
 }
 
@@ -103,14 +76,21 @@ impl ConstraintSystem {
         lc_b: LinearCombination,
         lc_c: LinearCombination,
     ) -> Result<(), &'static str> {
-        let num_vars = self.var_assignment.len();
-        lc_a.check_variables(num_vars)?;
-        lc_b.check_variables(num_vars)?;
-        lc_c.check_variables(num_vars)?;
+        // TODO: check that the linear combinations are valid 
+        // (e.g. that variables are valid, belong to this constraint system).
         self.a.push(lc_a);
         self.b.push(lc_b);
         self.c.push(lc_c);
         Ok(())
+    }
+
+    fn eval_lc(&self, lc: &LinearCombination) -> Scalar {
+        let sum_vars: Scalar = 
+            lc.variables
+            .iter()
+            .map(|(var, scalar)| scalar * self.var_assignment[var.0])
+            .sum();
+        sum_vars + lc.constant        
     }
 
     fn create_verifier_input (
@@ -135,17 +115,17 @@ impl ConstraintSystem {
         let a_L: Vec<Scalar> = self
             .a
             .iter()
-            .map(|lc| lc.eval(&self.var_assignment))
+            .map(|lc| self.eval_lc(&lc))
             .collect();
         let a_R: Vec<Scalar> = self
             .b
             .iter()
-            .map(|lc| lc.eval(&self.var_assignment))
+            .map(|lc| self.eval_lc(&lc))
             .collect();
         let a_O: Vec<Scalar> = self
             .c
             .iter()
-            .map(|lc| lc.eval(&self.var_assignment))
+            .map(|lc| self.eval_lc(&lc))
             .collect();
         ProverInput {
         	a_L,
@@ -185,7 +165,7 @@ impl ConstraintSystem {
             .enumerate()
         {
             for (var, scalar) in lc.get_variables() {
-                W_V[i][var.get_index()] = scalar;
+                W_V[i][var.0] = scalar;
             }
             c[i] = lc.get_constant();
         }
