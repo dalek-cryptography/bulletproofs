@@ -72,6 +72,8 @@ pub struct CircuitProof {
 }
 
 impl CircuitProof {
+    /// Create a circuit proof.
+    /// `circuit.n` must be either 0 or a power of 2, for the inner product proof to work.
     pub fn prove<R: Rng + CryptoRng>(
         gen: &Generators,
         transcript: &mut ProofTranscript,
@@ -92,6 +94,9 @@ impl CircuitProof {
         }
         if gen.n != circuit.n {
             return Err("Generator length doesn't match specified parameters.");
+        }
+        if !(circuit.n.is_power_of_two() || circuit.n == 0) {
+            return Err("Circuit's n parameter must be either 0 or a power of 2.");
         }
 
         transcript.commit_u64(circuit.n as u64);
