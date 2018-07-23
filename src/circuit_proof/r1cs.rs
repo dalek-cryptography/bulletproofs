@@ -34,6 +34,13 @@ impl LinearCombination {
         }
     }
 
+    pub fn zero() -> Self {
+        LinearCombination {
+            variables: vec![],
+            constant: Scalar::zero(),
+        }
+    }
+
     pub fn get_variables(&self) -> Vec<(Variable, Scalar)> {
         self.variables.clone()
     }
@@ -177,19 +184,10 @@ impl ConstraintSystem {
         // If `n`, the number of multiplications, is not 0 or 2, then pad the circuit.
         let n = self.a.len();
         if !(n == 0 || n.is_power_of_two()) {
-            let pad_length = n.next_power_of_two() - n;
-            self.a.append(&mut vec![
-                LinearCombination::new(vec![], Scalar::zero());
-                pad_length
-            ]);
-            self.b.append(&mut vec![
-                LinearCombination::new(vec![], Scalar::zero());
-                pad_length
-            ]);
-            self.c.append(&mut vec![
-                LinearCombination::new(vec![], Scalar::zero());
-                pad_length
-            ]);
+            let pad = n.next_power_of_two() - n;
+            self.a.append(&mut vec![LinearCombination::zero(); pad]);
+            self.b.append(&mut vec![LinearCombination::zero(); pad]);
+            self.c.append(&mut vec![LinearCombination::zero(); pad]);
         }
 
         let m = self.var_assignment.len();
