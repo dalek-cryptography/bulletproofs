@@ -18,6 +18,7 @@ pub struct Variable(usize);
 
 /// Represents a linear combination of some variables multiplied with their scalar coefficients,
 /// plus a scalar. E.g. LC = variable[0]*scalar[0] + variable[1]*scalar[1] + scalar
+#[derive(Clone)]
 pub struct LinearCombination {
     variables: Vec<(Variable, Scalar)>,
     constant: Scalar,
@@ -167,11 +168,29 @@ impl ConstraintSystem {
         }
     }
 
+    // This function can only be called once per ConstraintSystem instance.
     pub fn create_proof_input<R: Rng + CryptoRng>(
-        &self,
+        mut self,
         pedersen_generators: &PedersenGenerators,
         rng: &mut R,
     ) -> (Circuit, ProverInput, VerifierInput) {
+        let n = self.a.len();
+        if !(n == 0 || n.is_power_of_two()) {
+            let pad_length = n.next_power_of_two() - n;
+            self.a.append(&mut vec![
+                LinearCombination::new(vec![], Scalar::zero());
+                pad_length
+            ]);
+            self.b.append(&mut vec![
+                LinearCombination::new(vec![], Scalar::zero());
+                pad_length
+            ]);
+            self.c.append(&mut vec![
+                LinearCombination::new(vec![], Scalar::zero());
+                pad_length
+            ]);
+        }
+
         let m = self.var_assignment.len();
         let v_blinding: Vec<Scalar> = (0..m).map(|_| Scalar::random(rng)).collect();
 
