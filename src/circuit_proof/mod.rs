@@ -12,8 +12,9 @@ use inner_product_proof::{inner_product, InnerProductProof};
 use proof_transcript::ProofTranscript;
 use util;
 
-// Note: we can swap out this circuit representation later, when we have R1CS support,
-// since for large circuits we don't want to keep all the matrices in memory.
+pub mod r1cs;
+// TODO: move circuit proof code into another file and import, so folder is more balanced.
+
 #[derive(Clone, Debug)]
 pub struct Circuit {
     n: usize,
@@ -40,6 +41,18 @@ impl Circuit {
         }
         Ok(())
     }
+}
+
+// TODO: actually use this in circuit generation
+pub struct ProverInput {
+    a_L: Vec<Scalar>,
+    a_R: Vec<Scalar>,
+    a_O: Vec<Scalar>,
+    v_blinding: Vec<Scalar>,
+}
+
+pub struct VerifierInput {
+    V: Vec<RistrettoPoint>,
 }
 
 #[derive(Clone, Debug)]
@@ -78,7 +91,7 @@ impl CircuitProof {
         gen: &Generators,
         transcript: &mut ProofTranscript,
         rng: &mut R,
-        circuit: Circuit,
+        circuit: &Circuit,
         a_L: Vec<Scalar>,
         a_R: Vec<Scalar>,
         a_O: Vec<Scalar>,
@@ -140,9 +153,9 @@ impl CircuitProof {
         let mut l_poly = util::VecPoly3::zero(circuit.n);
         let mut r_poly = util::VecPoly3::zero(circuit.n);
 
-        let z_zQ_WL: Vec<Scalar> = matrix_flatten(circuit.W_L, z, circuit.n)?;
-        let z_zQ_WR: Vec<Scalar> = matrix_flatten(circuit.W_R, z, circuit.n)?;
-        let z_zQ_WO: Vec<Scalar> = matrix_flatten(circuit.W_O, z, circuit.n)?;
+        let z_zQ_WL: Vec<Scalar> = matrix_flatten(&circuit.W_L, z, circuit.n)?;
+        let z_zQ_WR: Vec<Scalar> = matrix_flatten(&circuit.W_R, z, circuit.n)?;
+        let z_zQ_WO: Vec<Scalar> = matrix_flatten(&circuit.W_O, z, circuit.n)?;
 
         let mut exp_y = Scalar::one(); // y^n starting at n=0
         let mut exp_y_inv = Scalar::one(); // y^-n starting at n=0
@@ -267,7 +280,7 @@ impl CircuitProof {
         gen: &Generators,
         transcript: &mut ProofTranscript,
         rng: &mut R,
-        circuit: Circuit,
+        circuit: &Circuit,
         V: Vec<RistrettoPoint>, // Vector of commitments, length m
     ) -> Result<(), &'static str> {
         circuit.check_parameters()?;
@@ -321,12 +334,12 @@ impl CircuitProof {
             .collect();
 
         // W_L_point = <h * y^-n , z * z^Q * W_L>, line 81
-        let W_L_flatten: Vec<Scalar> = matrix_flatten(circuit.W_L, z, circuit.n)?;
+        let W_L_flatten: Vec<Scalar> = matrix_flatten(&circuit.W_L, z, circuit.n)?;
         let W_L_point =
             RistrettoPoint::vartime_multiscalar_mul(W_L_flatten.clone(), H_prime.iter());
 
         // W_R_point = <g , y^-n * z * z^Q * W_R>, line 82
-        let W_R_flatten: Vec<Scalar> = matrix_flatten(circuit.W_R, z, circuit.n)?;
+        let W_R_flatten: Vec<Scalar> = matrix_flatten(&circuit.W_R, z, circuit.n)?;
         let W_R_flatten_yinv: Vec<Scalar> = W_R_flatten
             .iter()
             .zip(util::exp_iter(y.invert()))
@@ -336,7 +349,7 @@ impl CircuitProof {
             RistrettoPoint::vartime_multiscalar_mul(W_R_flatten_yinv.clone(), gen.G.iter());
 
         // W_O_point = <h * y^-n , z * z^Q * W_O>, line 83
-        let W_O_flatten: Vec<Scalar> = matrix_flatten(circuit.W_O, z, circuit.n)?;
+        let W_O_flatten: Vec<Scalar> = matrix_flatten(&circuit.W_O, z, circuit.n)?;
         let W_O_point = RistrettoPoint::vartime_multiscalar_mul(W_O_flatten, H_prime.iter());
 
         // Get IPP variables
@@ -355,7 +368,7 @@ impl CircuitProof {
         let delta = inner_product(&W_R_flatten_yinv, &W_L_flatten);
         let powers_of_z: Vec<Scalar> = util::exp_iter(z).take(circuit.q).collect();
         let z_c = z * inner_product(&powers_of_z, &circuit.c);
-        let W_V_flatten: Vec<Scalar> = matrix_flatten(circuit.W_V, z, circuit.m)?;
+        let W_V_flatten: Vec<Scalar> = matrix_flatten(&circuit.W_V, z, circuit.m)?;
         let V_multiplier = W_V_flatten.iter().map(|W_V_i| r * xx * W_V_i);
 
         // group the T_scalars and T_points together
@@ -428,7 +441,7 @@ impl CircuitProof {
 // Note: output_dim parameter is necessary in case W is `qxn` where `q=0`,
 //       such that it is not possible to derive `n` from looking at W.
 pub fn matrix_flatten(
-    W: Vec<Vec<Scalar>>,
+    W: &Vec<Vec<Scalar>>,
     z: Scalar,
     output_dim: usize,
 ) -> Result<Vec<Scalar>, &'static str> {
@@ -437,7 +450,7 @@ pub fn matrix_flatten(
 
     for row in 0..W.len() {
         if W[row].len() != output_dim {
-            return Err("matrix size doesn't match specified parameters in matrix_flatten");
+            return Err("Matrix size doesn't match specified parameters in matrix_flatten");
         }
         for col in 0..output_dim {
             result[col] += exp_z * W[row][col];
@@ -486,7 +499,7 @@ mod tests {
             &generators,
             &mut proof_transcript,
             &mut rng,
-            circuit.clone(),
+            &circuit.clone(),
             a_L,
             a_R,
             a_O,
@@ -495,7 +508,7 @@ mod tests {
 
         let mut verify_transcript = ProofTranscript::new(b"CircuitProofTest");
 
-        circuit_proof.verify(&generators, &mut verify_transcript, &mut rng, circuit, V)
+        circuit_proof.verify(&generators, &mut verify_transcript, &mut rng, &circuit, V)
     }
 
     fn blinding_helper(v: &Vec<Scalar>) -> (Vec<RistrettoPoint>, Vec<Scalar>) {
