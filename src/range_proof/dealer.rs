@@ -9,6 +9,7 @@ use rand::{CryptoRng, Rng};
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
 
+use errors::MPCError;
 use generators::Generators;
 use inner_product_proof;
 use proof_transcript::ProofTranscript;
@@ -28,12 +29,12 @@ impl Dealer {
         n: usize,
         m: usize,
         transcript: &'a mut ProofTranscript,
-    ) -> Result<DealerAwaitingValueCommitments<'a, 'b>, &'static str> {
-        if !n.is_power_of_two() || n > 64 {
-            return Err("n is not valid: must be a power of 2, and less than or equal to 64");
+    ) -> Result<DealerAwaitingValueCommitments<'a, 'b>, MPCError> {
+        if !(n == 8 || n == 16 || n == 32 || n == 64) {
+            return Err(MPCError::InvalidBitsize);
         }
         if !m.is_power_of_two() {
-            return Err("m is not valid: must be a power of 2");
+            return Err(MPCError::InvalidAggregation);
         }
 
         // At the end of the protocol, the dealer will attempt to
@@ -81,9 +82,9 @@ impl<'a, 'b> DealerAwaitingValueCommitments<'a, 'b> {
     pub fn receive_value_commitments(
         self,
         value_commitments: Vec<ValueCommitment>,
-    ) -> Result<(DealerAwaitingPolyCommitments<'a, 'b>, ValueChallenge), &'static str> {
+    ) -> Result<(DealerAwaitingPolyCommitments<'a, 'b>, ValueChallenge), MPCError> {
         if self.m != value_commitments.len() {
-            return Err("Length of value commitments doesn't match expected length m");
+            return Err(MPCError::WrongNumValueCommitments);
         }
 
         // Commit each V_j individually
@@ -137,9 +138,9 @@ impl<'a, 'b> DealerAwaitingPolyCommitments<'a, 'b> {
     pub fn receive_poly_commitments(
         self,
         poly_commitments: Vec<PolyCommitment>,
-    ) -> Result<(DealerAwaitingProofShares<'a, 'b>, PolyChallenge), &'static str> {
+    ) -> Result<(DealerAwaitingProofShares<'a, 'b>, PolyChallenge), MPCError> {
         if self.m != poly_commitments.len() {
-            return Err("Length of poly commitments doesn't match expected length m");
+            return Err(MPCError::WrongNumPolyCommitments);
         }
 
         // Commit sums of T_1_j's and T_2_j's
@@ -195,9 +196,9 @@ impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
     /// Used as a helper function by `receive_trusted_shares` (which
     /// just hands back the result) and `receive_shares` (which
     /// validates the proof shares.
-    fn assemble_shares(&mut self, proof_shares: &[ProofShare]) -> Result<RangeProof, &'static str> {
+    fn assemble_shares(&mut self, proof_shares: &[ProofShare]) -> Result<RangeProof, MPCError> {
         if self.m != proof_shares.len() {
-            return Err("Length of proof shares doesn't match expected length m");
+            return Err(MPCError::WrongNumProofShares);
         }
 
         let t_x: Scalar = proof_shares.iter().map(|ps| ps.t_x).sum();
@@ -255,19 +256,17 @@ impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
         mut self,
         rng: &mut R,
         proof_shares: &[ProofShare],
-    ) -> Result<RangeProof, &'static str> {
+    ) -> Result<RangeProof, MPCError> {
         let proof = self.assemble_shares(proof_shares)?;
 
         let V: Vec<_> = self.value_commitments.iter().map(|vc| vc.V_j).collect();
 
         // See comment in `Dealer::new` for why we use `initial_transcript`
-        if proof
-            .verify(&V, self.gens, &mut self.initial_transcript, rng, self.n)
-            .is_ok()
-        {
+        let transcript = &mut self.initial_transcript;
+        if proof.verify(&V, self.gens, transcript, rng, self.n).is_ok() {
             Ok(proof)
         } else {
-            // Create a list of bad shares
+            // Proof verification failed. Now audit the parties:
             let mut bad_shares = Vec::new();
             for j in 0..self.m {
                 match proof_shares[j].audit_share(
@@ -279,13 +278,10 @@ impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
                     &self.poly_challenge,
                 ) {
                     Ok(_) => {}
-                    // XXX pass errors upwards
                     Err(_) => bad_shares.push(j),
                 }
             }
-            // XXX pass this upwards
-            println!("bad shares: {:?}", bad_shares);
-            Err("proof failed to verify")
+            Err(MPCError::MalformedProofShares { bad_shares })
         }
     }
 
@@ -305,7 +301,7 @@ impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
     pub fn receive_trusted_shares(
         mut self,
         proof_shares: &[ProofShare],
-    ) -> Result<RangeProof, &'static str> {
+    ) -> Result<RangeProof, MPCError> {
         self.assemble_shares(proof_shares)
     }
 }

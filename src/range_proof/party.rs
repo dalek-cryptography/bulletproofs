@@ -7,6 +7,8 @@
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::MultiscalarMul;
+
+use errors::MPCError;
 use generators::Generators;
 use rand::{CryptoRng, Rng};
 use std::iter;
@@ -23,12 +25,12 @@ impl Party {
         v_blinding: Scalar,
         n: usize,
         generators: &Generators,
-    ) -> Result<PartyAwaitingPosition, &'static str> {
-        if !n.is_power_of_two() || n > 64 {
-            return Err("n is not valid: must be a power of 2, and less than or equal to 64");
+    ) -> Result<PartyAwaitingPosition, MPCError> {
+        if !(n == 8 || n == 16 || n == 32 || n == 64) {
+            return Err(MPCError::InvalidBitsize);
         }
+
         let V = generators
-            .share(0)
             .pedersen_generators
             .commit(Scalar::from_u64(v), v_blinding);
 
@@ -56,6 +58,7 @@ impl<'a> PartyAwaitingPosition<'a> {
     /// at which point the party knows its generators.
     pub fn assign_position<R: Rng + CryptoRng>(
         self,
+        // XXX need to check that j is valid (in gens range)
         j: usize,
         rng: &mut R,
     ) -> (PartyAwaitingValueChallenge<'a>, ValueCommitment) {
@@ -205,10 +208,11 @@ pub struct PartyAwaitingPolyChallenge {
 }
 
 impl PartyAwaitingPolyChallenge {
-    pub fn apply_challenge(self, pc: &PolyChallenge) -> Result<ProofShare, &'static str> {
-        // Prevent a malicious dealer from annihilating the blinding factors:
+    pub fn apply_challenge(self, pc: &PolyChallenge) -> Result<ProofShare, MPCError> {
+        // Prevent a malicious dealer from annihilating the blinding
+        // factors by supplying a zero challenge.
         if pc.x == Scalar::zero() {
-            return Err("Poly challenge was zero, which would leak secrets, bailing out");
+            return Err(MPCError::MaliciousDealer);
         }
 
         let t_blinding_poly = util::Poly2(
