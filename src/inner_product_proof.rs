@@ -11,6 +11,8 @@ use curve25519_dalek::traits::VartimeMultiscalarMul;
 
 use proof_transcript::ProofTranscript;
 
+use errors::ProofError;
+
 #[derive(Clone, Debug)]
 pub struct InnerProductProof {
     pub(crate) L_vec: Vec<CompressedRistretto>,
@@ -185,7 +187,7 @@ impl InnerProductProof {
         Q: &RistrettoPoint,
         G: &[RistrettoPoint],
         H: &[RistrettoPoint],
-    ) -> Result<(), &'static str>
+    ) -> Result<(), ProofError>
     where
         I: IntoIterator,
         I::Item: Borrow<Scalar>,
@@ -208,13 +210,13 @@ impl InnerProductProof {
         let Ls = self
             .L_vec
             .iter()
-            .map(|p| p.decompress().ok_or("InnerProductProof L point is invalid"))
+            .map(|p| p.decompress().ok_or(ProofError::VerificationError))
             .collect::<Result<Vec<_>, _>>()?;
 
         let Rs = self
             .R_vec
             .iter()
-            .map(|p| p.decompress().ok_or("InnerProductProof R point is invalid"))
+            .map(|p| p.decompress().ok_or(ProofError::VerificationError))
             .collect::<Result<Vec<_>, _>>()?;
 
         let expect_P = RistrettoPoint::vartime_multiscalar_mul(
@@ -233,7 +235,7 @@ impl InnerProductProof {
         if expect_P == *P {
             Ok(())
         } else {
-            Err("InnerProductProof is invalid")
+            Err(ProofError::VerificationError)
         }
     }
 
@@ -267,21 +269,21 @@ impl InnerProductProof {
     /// * \\(n\\) is larger or equal to 32 (proof is too big),
     /// * any of \\(2n\\) points are not valid compressed Ristretto points,
     /// * any of 2 scalars are not canonical scalars modulo Ristretto group order.
-    pub fn from_bytes(slice: &[u8]) -> Result<InnerProductProof, &'static str> {
+    pub fn from_bytes(slice: &[u8]) -> Result<InnerProductProof, ProofError> {
         let b = slice.len();
         if b % 32 != 0 {
-            return Err("InnerProductProof size is not divisible by 32");
+            return Err(ProofError::FormatError);
         }
         let num_elements = b / 32;
         if num_elements < 2 {
-            return Err("InnerProductProof must contain at least two 32-byte elements");
+            return Err(ProofError::FormatError);
         }
         if (num_elements - 2) % 2 != 0 {
-            return Err("InnerProductProof must contain even number of points");
+            return Err(ProofError::FormatError);
         }
         let lg_n = (num_elements - 2) / 2;
         if lg_n >= 32 {
-            return Err("InnerProductProof contains too many points");
+            return Err(ProofError::FormatError);
         }
 
         use util::read32;
@@ -295,10 +297,9 @@ impl InnerProductProof {
         }
 
         let pos = 2 * lg_n * 32;
-        let a = Scalar::from_canonical_bytes(read32(&slice[pos..]))
-            .ok_or("InnerProductProof.a is not a canonical scalar")?;
+        let a = Scalar::from_canonical_bytes(read32(&slice[pos..])).ok_or(ProofError::FormatError)?;
         let b = Scalar::from_canonical_bytes(read32(&slice[pos + 32..]))
-            .ok_or("InnerProductProof.b is not a canonical scalar")?;
+            .ok_or(ProofError::FormatError)?;
 
         Ok(InnerProductProof { L_vec, R_vec, a, b })
     }

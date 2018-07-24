@@ -20,6 +20,7 @@ byteorder = "1.2.1"
 serde = "1"
 serde_derive = "1"
 tiny-keccak = "1.4.1"
+failure = "0.1"
 
 [dev-dependencies]
 hex = "^0.3"

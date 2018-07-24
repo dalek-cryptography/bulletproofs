@@ -9,6 +9,7 @@ use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::{IsIdentity, VartimeMultiscalarMul};
 
+use errors::ProofError;
 use generators::Generators;
 use inner_product_proof::InnerProductProof;
 use proof_transcript::ProofTranscript;
@@ -56,7 +57,7 @@ impl RangeProof {
         v: u64,
         v_blinding: &Scalar,
         n: usize,
-    ) -> Result<RangeProof, &'static str> {
+    ) -> Result<RangeProof, ProofError> {
         RangeProof::prove_multiple(generators, transcript, rng, &[v], &[*v_blinding], n)
     }
 
@@ -70,12 +71,12 @@ impl RangeProof {
         values: &[u64],
         blindings: &[Scalar],
         n: usize,
-    ) -> Result<RangeProof, &'static str> {
+    ) -> Result<RangeProof, ProofError> {
         use self::dealer::*;
         use self::party::*;
 
         if values.len() != blindings.len() {
-            return Err("mismatched values and blindings len");
+            return Err(ProofError::WrongNumBlindingFactors);
         }
 
         let dealer = Dealer::new(generators, n, values.len(), transcript)?;
@@ -110,7 +111,9 @@ impl RangeProof {
             // Collect the iterator of Results into a Result<Vec>, then unwrap it
             .collect::<Result<Vec<_>,_>>()?;
 
-        dealer.receive_trusted_shares(&proof_shares)
+        let proof = dealer.receive_trusted_shares(&proof_shares)?;
+
+        Ok(proof)
     }
 
     /// Verifies a rangeproof for a given value commitment \\(V\\).
@@ -125,7 +128,7 @@ impl RangeProof {
         transcript: &mut ProofTranscript,
         rng: &mut R,
         n: usize,
-    ) -> Result<(), &'static str> {
+    ) -> Result<(), ProofError> {
         self.verify(&[*V], gens, transcript, rng, n)
     }
 
@@ -139,7 +142,7 @@ impl RangeProof {
         transcript: &mut ProofTranscript,
         rng: &mut R,
         n: usize,
-    ) -> Result<(), &'static str> {
+    ) -> Result<(), ProofError> {
         // First, replay the "interactive" protocol using the proof
         // data to recompute all challenges.
 
@@ -201,20 +204,20 @@ impl RangeProof {
             .ipp_proof
             .L_vec
             .iter()
-            .map(|p| p.decompress().ok_or("RangeProof's L point is invalid"))
+            .map(|p| p.decompress().ok_or(ProofError::VerificationError))
             .collect::<Result<Vec<_>, _>>()?;
 
         let Rs = self
             .ipp_proof
             .R_vec
             .iter()
-            .map(|p| p.decompress().ok_or("RangeProof's R point is invalid"))
+            .map(|p| p.decompress().ok_or(ProofError::VerificationError))
             .collect::<Result<Vec<_>, _>>()?;
 
-        let A = self.A.decompress().ok_or("RangeProof A is invalid")?;
-        let S = self.S.decompress().ok_or("RangeProof S is invalid")?;
-        let T_1 = self.T_1.decompress().ok_or("RangeProof T_1 is invalid")?;
-        let T_2 = self.T_2.decompress().ok_or("RangeProof T_2 is invalid")?;
+        let A = self.A.decompress().ok_or(ProofError::VerificationError)?;
+        let S = self.S.decompress().ok_or(ProofError::VerificationError)?;
+        let T_1 = self.T_1.decompress().ok_or(ProofError::VerificationError)?;
+        let T_2 = self.T_2.decompress().ok_or(ProofError::VerificationError)?;
 
         let mega_check = RistrettoPoint::vartime_multiscalar_mul(
             iter::once(Scalar::one())
@@ -244,7 +247,7 @@ impl RangeProof {
         if mega_check.is_identity() {
             Ok(())
         } else {
-            Err("RangeProof is invalid")
+            Err(ProofError::VerificationError)
         }
     }
 
@@ -277,12 +280,12 @@ impl RangeProof {
     /// Deserializes the proof from a byte slice.
     ///
     /// Returns an error if the byte slice cannot be parsed into a `RangeProof`.
-    pub fn from_bytes(slice: &[u8]) -> Result<RangeProof, &'static str> {
+    pub fn from_bytes(slice: &[u8]) -> Result<RangeProof, ProofError> {
         if slice.len() % 32 != 0 {
-            return Err("RangeProof size is not divisible by 32");
+            return Err(ProofError::FormatError);
         }
         if slice.len() < 7 * 32 {
-            return Err("RangeProof size is too small");
+            return Err(ProofError::FormatError);
         }
 
         use util::read32;
@@ -292,12 +295,12 @@ impl RangeProof {
         let T_1 = CompressedRistretto(read32(&slice[2 * 32..]));
         let T_2 = CompressedRistretto(read32(&slice[3 * 32..]));
 
-        let t_x = Scalar::from_canonical_bytes(read32(&slice[4 * 32..]))
-            .ok_or("RangeProof.t_x is not a canonical scalar")?;
-        let t_x_blinding = Scalar::from_canonical_bytes(read32(&slice[5 * 32..]))
-            .ok_or("RangeProof.t_x_blinding is not a canonical scalar")?;
-        let e_blinding = Scalar::from_canonical_bytes(read32(&slice[6 * 32..]))
-            .ok_or("RangeProof.e_blinding is not a canonical scalar")?;
+        let t_x =
+            Scalar::from_canonical_bytes(read32(&slice[4 * 32..])).ok_or(ProofError::FormatError)?;
+        let t_x_blinding =
+            Scalar::from_canonical_bytes(read32(&slice[5 * 32..])).ok_or(ProofError::FormatError)?;
+        let e_blinding =
+            Scalar::from_canonical_bytes(read32(&slice[6 * 32..])).ok_or(ProofError::FormatError)?;
 
         let ipp_proof = InnerProductProof::from_bytes(&slice[7 * 32..])?;
 
@@ -522,6 +525,8 @@ mod tests {
         use self::dealer::*;
         use self::party::*;
 
+        use errors::MPCError;
+
         // Simulate four parties, two of which will be dishonest and use a 64-bit value.
         let m = 4;
         let n = 32;
@@ -575,12 +580,14 @@ mod tests {
         let share3 = party3.apply_challenge(&poly_challenge).unwrap();
 
         match dealer.receive_shares(&mut rng, &[share0, share1, share2, share3]) {
-            Ok(_proof) => {
-                panic!("The proof was malformed, but it was not detected");
+            Err(MPCError::MalformedProofShares { bad_shares }) => {
+                assert_eq!(bad_shares, vec![1, 3]);
             }
-            Err(e) => {
-                // XXX when we have error types, check that it was party 1 that did it
-                assert_eq!(e, "proof failed to verify");
+            Err(_) => {
+                panic!("Got wrong error type from malformed shares");
+            }
+            Ok(_) => {
+                panic!("The proof was malformed, but it was not detected");
             }
         }
     }
