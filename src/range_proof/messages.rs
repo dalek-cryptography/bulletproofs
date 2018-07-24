@@ -55,7 +55,7 @@ impl ProofShare {
         value_challenge: &ValueChallenge,
         poly_commitment: &PolyCommitment,
         poly_challenge: &PolyChallenge,
-    ) -> Result<(), &'static str> {
+    ) -> Result<(), ()> {
         use std::iter;
 
         use curve25519_dalek::traits::{IsIdentity, VartimeMultiscalarMul};
@@ -76,7 +76,7 @@ impl ProofShare {
         let y_inv = y.invert(); // y^(-1)
 
         if self.t_x != inner_product(&self.l_vec, &self.r_vec) {
-            return Err("Inner product of l_vec and r_vec is not equal to t_x");
+            return Err(());
         }
 
         let g = self.l_vec.iter().map(|l_i| minus_z - l_i);
@@ -102,7 +102,7 @@ impl ProofShare {
                 .chain(gens.share(j).H.iter()),
         );
         if !P_check.is_identity() {
-            return Err("P check is not equal to zero");
+            return Err(());
         }
 
         let sum_of_powers_y = util::sum_of_powers(&y, n);
@@ -120,10 +120,11 @@ impl ProofShare {
                 .chain(iter::once(&gens.pedersen_generators.B))
                 .chain(iter::once(&gens.pedersen_generators.B_blinding)),
         );
-        if !t_check.is_identity() {
-            return Err("t check is not equal to zero");
-        }
 
-        Ok(())
+        if t_check.is_identity() {
+            Ok(())
+        } else {
+            Err(())
+        }
     }
 }

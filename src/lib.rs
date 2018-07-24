@@ -11,6 +11,8 @@
 extern crate byteorder;
 extern crate core;
 extern crate curve25519_dalek;
+#[macro_use]
+extern crate failure;
 extern crate rand;
 extern crate sha2;
 extern crate subtle;
@@ -21,27 +23,29 @@ extern crate serde_derive;
 extern crate serde;
 
 #[cfg(test)]
-extern crate test;
-
-#[cfg(test)]
 extern crate bincode;
+#[cfg(test)]
+extern crate test;
 
 mod util;
 
 #[doc(include = "../docs/notes.md")]
 mod notes {}
 mod circuit_proof;
+mod errors;
 mod generators;
 mod inner_product_proof;
 mod proof_transcript;
 mod range_proof;
 
+pub use errors::ProofError;
 pub use generators::{Generators, GeneratorsView, PedersenGenerators};
 pub use proof_transcript::ProofTranscript;
 pub use range_proof::RangeProof;
 
 #[doc(include = "../docs/aggregation-api.md")]
 pub mod aggregation {
+    pub use errors::MPCError;
     pub use range_proof::dealer;
     pub use range_proof::messages;
     pub use range_proof::party;
