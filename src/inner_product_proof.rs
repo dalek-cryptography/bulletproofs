@@ -417,17 +417,17 @@ mod tests {
     #[test]
     fn test_inner_product() {
         let a = vec![
-            Scalar::from_u64(1),
-            Scalar::from_u64(2),
-            Scalar::from_u64(3),
-            Scalar::from_u64(4),
+            Scalar::from(1u64),
+            Scalar::from(2u64),
+            Scalar::from(3u64),
+            Scalar::from(4u64),
         ];
         let b = vec![
-            Scalar::from_u64(2),
-            Scalar::from_u64(3),
-            Scalar::from_u64(4),
-            Scalar::from_u64(5),
+            Scalar::from(2u64),
+            Scalar::from(3u64),
+            Scalar::from(4u64),
+            Scalar::from(5u64),
         ];
-        assert_eq!(Scalar::from_u64(40), inner_product(&a, &b));
+        assert_eq!(Scalar::from(40u64), inner_product(&a, &b));
     }
 }

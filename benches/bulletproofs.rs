@@ -91,7 +91,7 @@ fn verify_aggregated_rangeproof_helper(n: usize, c: &mut Criterion) {
             let value_commitments: Vec<_> = values
                 .iter()
                 .zip(blindings.iter())
-                .map(|(&v, &v_blinding)| pg.commit(Scalar::from_u64(v), v_blinding))
+                .map(|(&v, &v_blinding)| pg.commit(Scalar::from(v), v_blinding))
                 .collect();
 
             b.iter(|| {

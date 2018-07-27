@@ -186,7 +186,7 @@ impl RangeProof {
 
         // Construct concat_z_and_2, an iterator of the values of
         // z^0 * \vec(2)^n || z^1 * \vec(2)^n || ... || z^(m-1) * \vec(2)^n
-        let powers_of_2: Vec<Scalar> = util::exp_iter(Scalar::from_u64(2)).take(n).collect();
+        let powers_of_2: Vec<Scalar> = util::exp_iter(Scalar::from(2u64)).take(n).collect();
         let powers_of_z = util::exp_iter(z).take(m);
         let concat_z_and_2 =
             powers_of_z.flat_map(|exp_z| powers_of_2.iter().map(move |exp_2| exp_2 * exp_z));
@@ -358,7 +358,7 @@ impl<'de> Deserialize<'de> for RangeProof {
 /// \\]
 fn delta(n: usize, m: usize, y: &Scalar, z: &Scalar) -> Scalar {
     let sum_y = util::sum_of_powers(y, n * m);
-    let sum_2 = util::sum_of_powers(&Scalar::from_u64(2), n);
+    let sum_2 = util::sum_of_powers(&Scalar::from(2u64), n);
     let sum_z = util::sum_of_powers(z, m);
 
     (z - z * z) * sum_y - z * z * z * sum_2 * sum_z
@@ -446,7 +446,7 @@ mod tests {
             value_commitments = values
                 .iter()
                 .zip(blindings.iter())
-                .map(|(&v, &v_blinding)| pg.commit(Scalar::from_u64(v), v_blinding))
+                .map(|(&v, &v_blinding)| pg.commit(Scalar::from(v), v_blinding))
                 .collect();
         }
 
