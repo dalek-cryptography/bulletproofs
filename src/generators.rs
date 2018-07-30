@@ -115,11 +115,26 @@ impl Default for PedersenGenerators {
 impl Generators {
     /// Creates generators for `m` range proofs of `n` bits each.
     pub fn new(pedersen_gens: PedersenGenerators, n: usize, m: usize) -> Self {
-        let G = GeneratorsChain::new(pedersen_gens.B.compress().as_bytes())
-            .take(n * m)
+        use byteorder::{ByteOrder, LittleEndian};
+
+        let G = (0..m)
+            .flat_map(|i| {
+                let party_index = i as u32;
+                let mut label = [b'G', 0, 0, 0, 0];
+                LittleEndian::write_u32(&mut label[1..5], party_index);
+
+                GeneratorsChain::new(&label).take(n)
+            })
             .collect();
-        let H = GeneratorsChain::new(pedersen_gens.B_blinding.compress().as_bytes())
-            .take(n * m)
+
+        let H = (0..m)
+            .flat_map(|i| {
+                let party_index = i as u32;
+                let mut label = [b'H', 0, 0, 0, 0];
+                LittleEndian::write_u32(&mut label[1..5], party_index);
+
+                GeneratorsChain::new(&label).take(n)
+            })
             .collect();
 
         Generators {
