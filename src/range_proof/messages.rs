@@ -97,7 +97,7 @@ impl ProofShare {
                 .chain(h),
             iter::once(&value_commitment.A_j)
                 .chain(iter::once(&value_commitment.S_j))
-                .chain(iter::once(&gens.pedersen_generators.B_blinding))
+                .chain(iter::once(&gens.pedersen_gens.B_blinding))
                 .chain(gens.share(j).G.iter())
                 .chain(gens.share(j).H.iter()),
         );
@@ -117,8 +117,8 @@ impl ProofShare {
             iter::once(&value_commitment.V_j)
                 .chain(iter::once(&poly_commitment.T_1_j))
                 .chain(iter::once(&poly_commitment.T_2_j))
-                .chain(iter::once(&gens.pedersen_generators.B))
-                .chain(iter::once(&gens.pedersen_generators.B_blinding)),
+                .chain(iter::once(&gens.pedersen_gens.B))
+                .chain(iter::once(&gens.pedersen_gens.B_blinding)),
         );
 
         if t_check.is_identity() {

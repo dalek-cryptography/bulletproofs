@@ -211,7 +211,7 @@ impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
 
         // Get a challenge value to combine statements for the IPP
         let w = self.transcript.challenge_scalar();
-        let Q = w * self.gens.pedersen_generators.B;
+        let Q = w * self.gens.pedersen_gens.B;
 
         let l_vec: Vec<Scalar> = proof_shares
             .iter()

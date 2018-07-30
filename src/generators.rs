@@ -60,7 +60,7 @@ pub struct Generators {
     /// Number of values or parties
     pub m: usize,
     /// Bases for Pedersen commitments
-    pub pedersen_generators: PedersenGenerators,
+    pub pedersen_gens: PedersenGenerators,
     /// Per-bit generators for the bit values
     pub G: Vec<RistrettoPoint>,
     /// Per-bit generators for the bit blinding factors
@@ -75,7 +75,7 @@ pub struct Generators {
 #[derive(Copy, Clone)]
 pub struct GeneratorsView<'a> {
     /// Bases for Pedersen commitments
-    pub pedersen_generators: &'a PedersenGenerators,
+    pub pedersen_gens: &'a PedersenGenerators,
     /// Per-bit generators for the bit values
     pub G: &'a [RistrettoPoint],
     /// Per-bit generators for the bit blinding factors
@@ -114,16 +114,16 @@ impl Default for PedersenGenerators {
 
 impl Generators {
     /// Creates generators for `m` range proofs of `n` bits each.
-    pub fn new(pedersen_generators: PedersenGenerators, n: usize, m: usize) -> Self {
-        let G = GeneratorsChain::new(pedersen_generators.B.compress().as_bytes())
+    pub fn new(pedersen_gens: PedersenGenerators, n: usize, m: usize) -> Self {
+        let G = GeneratorsChain::new(pedersen_gens.B.compress().as_bytes())
             .take(n * m)
             .collect();
-        let H = GeneratorsChain::new(pedersen_generators.B_blinding.compress().as_bytes())
+        let H = GeneratorsChain::new(pedersen_gens.B_blinding.compress().as_bytes())
             .take(n * m)
             .collect();
 
         Generators {
-            pedersen_generators,
+            pedersen_gens,
             n,
             m,
             G,
@@ -137,7 +137,7 @@ impl Generators {
         let lower = self.n * j;
         let upper = self.n * (j + 1);
         GeneratorsView {
-            pedersen_generators: &self.pedersen_generators,
+            pedersen_gens: &self.pedersen_gens,
             G: &self.G[lower..upper],
             H: &self.H[lower..upper],
         }
