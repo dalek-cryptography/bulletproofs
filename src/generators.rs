@@ -4,27 +4,29 @@
 #![allow(non_snake_case)]
 #![deny(missing_docs)]
 
-// XXX we should use Sha3 everywhere
-use sha2::{Digest, Sha512};
-
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::MultiscalarMul;
 
+use digest::{ExtendableOutput, Input, XofReader};
+use sha3::{Sha3XofReader, Shake256};
+
 /// The `GeneratorsChain` creates an arbitrary-long sequence of orthogonal generators.
 /// The sequence can be deterministically produced starting with an arbitrary point.
 struct GeneratorsChain {
-    next_point: RistrettoPoint,
+    reader: Sha3XofReader,
 }
 
 impl GeneratorsChain {
     /// Creates a chain of generators, determined by the hash of `label`.
     fn new(label: &[u8]) -> Self {
-        let mut hash = Sha512::default();
-        hash.input(b"GeneratorsChainInit");
-        hash.input(label);
-        let next_point = RistrettoPoint::from_hash(hash);
-        GeneratorsChain { next_point }
+        let mut shake = Shake256::default();
+        shake.process(b"GeneratorsChain");
+        shake.process(label);
+
+        GeneratorsChain {
+            reader: shake.xof_result(),
+        }
     }
 }
 
@@ -36,13 +38,16 @@ impl Default for GeneratorsChain {
 
 impl Iterator for GeneratorsChain {
     type Item = RistrettoPoint;
+
     fn next(&mut self) -> Option<Self::Item> {
-        let current_point = self.next_point;
-        let mut hash = Sha512::default();
-        hash.input(b"GeneratorsChainNext");
-        hash.input(current_point.compress().as_bytes());
-        self.next_point = RistrettoPoint::from_hash(hash);
-        Some(current_point)
+        let mut uniform_bytes = [0u8; 64];
+        self.reader.read(&mut uniform_bytes);
+
+        Some(RistrettoPoint::from_uniform_bytes(&uniform_bytes))
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (usize::max_value(), None)
     }
 }
 

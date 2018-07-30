@@ -11,10 +11,11 @@
 extern crate byteorder;
 extern crate core;
 extern crate curve25519_dalek;
+extern crate digest;
 #[macro_use]
 extern crate failure;
 extern crate rand;
-extern crate sha2;
+extern crate sha3;
 extern crate subtle;
 extern crate tiny_keccak;
 #[macro_use]
