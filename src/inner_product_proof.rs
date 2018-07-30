@@ -326,7 +326,7 @@ mod tests {
     use super::*;
 
     use rand::OsRng;
-    use sha2::Sha512;
+    use sha3::Sha3_512;
     use util;
 
     fn test_helper_create(n: usize) {
@@ -338,7 +338,7 @@ mod tests {
         let H = gens.share(0).H.to_vec();
 
         // Q would be determined upstream in the protocol, so we pick a random one.
-        let Q = RistrettoPoint::hash_from_bytes::<Sha512>(b"test point");
+        let Q = RistrettoPoint::hash_from_bytes::<Sha3_512>(b"test point");
 
         // a and b are the vectors for which we want to prove c = <a,b>
         let a: Vec<_> = (0..n).map(|_| Scalar::random(&mut rng)).collect();

@@ -30,9 +30,7 @@ impl Party {
             return Err(MPCError::InvalidBitsize);
         }
 
-        let V = generators
-            .pedersen_generators
-            .commit(Scalar::from(v), v_blinding);
+        let V = generators.pedersen_gens.commit(Scalar::from(v), v_blinding);
 
         Ok(PartyAwaitingPosition {
             generators,
@@ -66,7 +64,7 @@ impl<'a> PartyAwaitingPosition<'a> {
 
         let a_blinding = Scalar::random(rng);
         // Compute A = <a_L, G> + <a_R, H> + a_blinding * B_blinding
-        let mut A = gen_share.pedersen_generators.B_blinding * a_blinding;
+        let mut A = gen_share.pedersen_gens.B_blinding * a_blinding;
 
         use subtle::{Choice, ConditionallyAssignable};
         for i in 0..self.n {
@@ -85,7 +83,7 @@ impl<'a> PartyAwaitingPosition<'a> {
         // Compute S = <s_L, G> + <s_R, H> + s_blinding * B_blinding
         let S = RistrettoPoint::multiscalar_mul(
             iter::once(&s_blinding).chain(s_L.iter()).chain(s_R.iter()),
-            iter::once(&gen_share.pedersen_generators.B_blinding)
+            iter::once(&gen_share.pedersen_gens.B_blinding)
                 .chain(gen_share.G.iter())
                 .chain(gen_share.H.iter()),
         );
@@ -164,12 +162,12 @@ impl<'a> PartyAwaitingValueChallenge<'a> {
         let T_1 = self
             .generators
             .share(self.j)
-            .pedersen_generators
+            .pedersen_gens
             .commit(t_poly.1, t_1_blinding);
         let T_2 = self
             .generators
             .share(self.j)
-            .pedersen_generators
+            .pedersen_gens
             .commit(t_poly.2, t_2_blinding);
 
         let poly_commitment = PolyCommitment {

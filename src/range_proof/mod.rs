@@ -219,8 +219,8 @@ impl RangeProof {
                 .chain(iter::once(self.T_2.decompress()))
                 .chain(self.ipp_proof.L_vec.iter().map(|L| L.decompress()))
                 .chain(self.ipp_proof.R_vec.iter().map(|R| R.decompress()))
-                .chain(iter::once(Some(gens.pedersen_generators.B_blinding)))
-                .chain(iter::once(Some(gens.pedersen_generators.B)))
+                .chain(iter::once(Some(gens.pedersen_gens.B_blinding)))
+                .chain(iter::once(Some(gens.pedersen_gens.B)))
                 .chain(gens.G.iter().map(|&x| Some(x)))
                 .chain(gens.H.iter().map(|&x| Some(x)))
                 .chain(value_commitments.iter().map(|&x| Some(x))),
@@ -422,7 +422,7 @@ mod tests {
             // 2. Serialize
             proof_bytes = bincode::serialize(&proof).unwrap();
 
-            let pg = &generators.pedersen_generators;
+            let pg = &generators.pedersen_gens;
 
             // XXX would be nice to have some convenience API for this
             value_commitments = values
