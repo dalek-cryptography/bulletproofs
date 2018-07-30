@@ -32,7 +32,7 @@ impl Party {
 
         let V = generators
             .pedersen_generators
-            .commit(Scalar::from_u64(v), v_blinding);
+            .commit(Scalar::from(v), v_blinding);
 
         Ok(PartyAwaitingPosition {
             generators,
@@ -144,7 +144,7 @@ impl<'a> PartyAwaitingValueChallenge<'a> {
         let mut exp_y = offset_y; // start at y^j
         let mut exp_2 = Scalar::one(); // start at 2^0 = 1
         for i in 0..n {
-            let a_L_i = Scalar::from_u64((self.v >> i) & 1);
+            let a_L_i = Scalar::from((self.v >> i) & 1);
             let a_R_i = a_L_i - Scalar::one();
 
             l_poly.0[i] = a_L_i - vc.z;

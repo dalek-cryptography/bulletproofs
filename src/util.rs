@@ -26,6 +26,10 @@ impl Iterator for ScalarExp {
         self.next_exp_x *= self.x;
         Some(exp_x)
     }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (usize::max_value(), None)
+    }
 }
 
 /// Return an iterator of the powers of `x`.
@@ -109,7 +113,7 @@ pub fn sum_of_powers(x: &Scalar, n: usize) -> Scalar {
         return sum_of_powers_slow(x, n);
     }
     if n == 0 || n == 1 {
-        return Scalar::from_u64(n as u64);
+        return Scalar::from(n as u64);
     }
     let mut m = n;
     let mut result = Scalar::one() + x;
@@ -140,29 +144,29 @@ mod tests {
 
     #[test]
     fn exp_2_is_powers_of_2() {
-        let exp_2: Vec<_> = exp_iter(Scalar::from_u64(2)).take(4).collect();
+        let exp_2: Vec<_> = exp_iter(Scalar::from(2u64)).take(4).collect();
 
-        assert_eq!(exp_2[0], Scalar::from_u64(1));
-        assert_eq!(exp_2[1], Scalar::from_u64(2));
-        assert_eq!(exp_2[2], Scalar::from_u64(4));
-        assert_eq!(exp_2[3], Scalar::from_u64(8));
+        assert_eq!(exp_2[0], Scalar::from(1u64));
+        assert_eq!(exp_2[1], Scalar::from(2u64));
+        assert_eq!(exp_2[2], Scalar::from(4u64));
+        assert_eq!(exp_2[3], Scalar::from(8u64));
     }
 
     #[test]
     fn test_inner_product() {
         let a = vec![
-            Scalar::from_u64(1),
-            Scalar::from_u64(2),
-            Scalar::from_u64(3),
-            Scalar::from_u64(4),
+            Scalar::from(1u64),
+            Scalar::from(2u64),
+            Scalar::from(3u64),
+            Scalar::from(4u64),
         ];
         let b = vec![
-            Scalar::from_u64(2),
-            Scalar::from_u64(3),
-            Scalar::from_u64(4),
-            Scalar::from_u64(5),
+            Scalar::from(2u64),
+            Scalar::from(3u64),
+            Scalar::from(4u64),
+            Scalar::from(5u64),
         ];
-        assert_eq!(Scalar::from_u64(40), inner_product(&a, &b));
+        assert_eq!(Scalar::from(40u64), inner_product(&a, &b));
     }
 
     /// Raises `x` to the power `n`.
@@ -194,7 +198,7 @@ mod tests {
 
     #[test]
     fn test_sum_of_powers() {
-        let x = Scalar::from_u64(10);
+        let x = Scalar::from(10u64);
         assert_eq!(sum_of_powers_slow(&x, 0), sum_of_powers(&x, 0));
         assert_eq!(sum_of_powers_slow(&x, 1), sum_of_powers(&x, 1));
         assert_eq!(sum_of_powers_slow(&x, 2), sum_of_powers(&x, 2));
@@ -207,13 +211,13 @@ mod tests {
 
     #[test]
     fn test_sum_of_powers_slow() {
-        let x = Scalar::from_u64(10);
+        let x = Scalar::from(10u64);
         assert_eq!(sum_of_powers_slow(&x, 0), Scalar::zero());
         assert_eq!(sum_of_powers_slow(&x, 1), Scalar::one());
-        assert_eq!(sum_of_powers_slow(&x, 2), Scalar::from_u64(11));
-        assert_eq!(sum_of_powers_slow(&x, 3), Scalar::from_u64(111));
-        assert_eq!(sum_of_powers_slow(&x, 4), Scalar::from_u64(1111));
-        assert_eq!(sum_of_powers_slow(&x, 5), Scalar::from_u64(11111));
-        assert_eq!(sum_of_powers_slow(&x, 6), Scalar::from_u64(111111));
+        assert_eq!(sum_of_powers_slow(&x, 2), Scalar::from(11u64));
+        assert_eq!(sum_of_powers_slow(&x, 3), Scalar::from(111u64));
+        assert_eq!(sum_of_powers_slow(&x, 4), Scalar::from(1111u64));
+        assert_eq!(sum_of_powers_slow(&x, 5), Scalar::from(11111u64));
+        assert_eq!(sum_of_powers_slow(&x, 6), Scalar::from(111111u64));
     }
 }
