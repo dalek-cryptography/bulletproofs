@@ -83,7 +83,7 @@ impl ProofShare {
         let h = self
             .r_vec
             .iter()
-            .zip(util::exp_iter(Scalar::from_u64(2)))
+            .zip(util::exp_iter(Scalar::from(2u64)))
             .zip(util::exp_iter(y_inv))
             .map(|((r_i, exp_2), exp_y_inv)| {
                 z + exp_y_inv * y_jn_inv * (-r_i) + exp_y_inv * y_jn_inv * (zz * z_j * exp_2)
@@ -97,7 +97,7 @@ impl ProofShare {
                 .chain(h),
             iter::once(&value_commitment.A_j)
                 .chain(iter::once(&value_commitment.S_j))
-                .chain(iter::once(&gens.pedersen_generators.B_blinding))
+                .chain(iter::once(&gens.pedersen_gens.B_blinding))
                 .chain(gens.share(j).G.iter())
                 .chain(gens.share(j).H.iter()),
         );
@@ -106,7 +106,7 @@ impl ProofShare {
         }
 
         let sum_of_powers_y = util::sum_of_powers(&y, n);
-        let sum_of_powers_2 = util::sum_of_powers(&Scalar::from_u64(2), n);
+        let sum_of_powers_2 = util::sum_of_powers(&Scalar::from(2u64), n);
         let delta = (z - zz) * sum_of_powers_y * y_jn - z * zz * sum_of_powers_2 * z_j;
         let t_check = RistrettoPoint::vartime_multiscalar_mul(
             iter::once(zz * z_j)
@@ -117,8 +117,8 @@ impl ProofShare {
             iter::once(&value_commitment.V_j)
                 .chain(iter::once(&poly_commitment.T_1_j))
                 .chain(iter::once(&poly_commitment.T_2_j))
-                .chain(iter::once(&gens.pedersen_generators.B))
-                .chain(iter::once(&gens.pedersen_generators.B_blinding)),
+                .chain(iter::once(&gens.pedersen_gens.B))
+                .chain(iter::once(&gens.pedersen_gens.B_blinding)),
         );
 
         if t_check.is_identity() {

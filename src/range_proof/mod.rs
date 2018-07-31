@@ -186,63 +186,45 @@ impl RangeProof {
 
         // Construct concat_z_and_2, an iterator of the values of
         // z^0 * \vec(2)^n || z^1 * \vec(2)^n || ... || z^(m-1) * \vec(2)^n
-        let powers_of_2: Vec<Scalar> = util::exp_iter(Scalar::from_u64(2)).take(n).collect();
-        let powers_of_z = util::exp_iter(z).take(m);
-        let concat_z_and_2 =
-            powers_of_z.flat_map(|exp_z| powers_of_2.iter().map(move |exp_2| exp_2 * exp_z));
+        let powers_of_2: Vec<Scalar> = util::exp_iter(Scalar::from(2u64)).take(n).collect();
+        let concat_z_and_2: Vec<Scalar> = util::exp_iter(z)
+            .take(m)
+            .flat_map(|exp_z| powers_of_2.iter().map(move |exp_2| exp_2 * exp_z))
+            .collect();
 
         let g = s.iter().map(|s_i| minus_z - a * s_i);
         let h = s_inv
             .zip(util::exp_iter(y.invert()))
-            .zip(concat_z_and_2)
+            .zip(concat_z_and_2.iter())
             .map(|((s_i_inv, exp_y_inv), z_and_2)| z + exp_y_inv * (zz * z_and_2 - b * s_i_inv));
 
         let value_commitment_scalars = util::exp_iter(z).take(m).map(|z_exp| c * zz * z_exp);
         let basepoint_scalar = w * (self.t_x - a * b) + c * (delta(n, m, &y, &z) - self.t_x);
 
-        let Ls = self
-            .ipp_proof
-            .L_vec
-            .iter()
-            .map(|p| p.decompress().ok_or(ProofError::VerificationError))
-            .collect::<Result<Vec<_>, _>>()?;
-
-        let Rs = self
-            .ipp_proof
-            .R_vec
-            .iter()
-            .map(|p| p.decompress().ok_or(ProofError::VerificationError))
-            .collect::<Result<Vec<_>, _>>()?;
-
-        let A = self.A.decompress().ok_or(ProofError::VerificationError)?;
-        let S = self.S.decompress().ok_or(ProofError::VerificationError)?;
-        let T_1 = self.T_1.decompress().ok_or(ProofError::VerificationError)?;
-        let T_2 = self.T_2.decompress().ok_or(ProofError::VerificationError)?;
-
-        let mega_check = RistrettoPoint::vartime_multiscalar_mul(
+        let mega_check = RistrettoPoint::optional_multiscalar_mul(
             iter::once(Scalar::one())
                 .chain(iter::once(x))
-                .chain(value_commitment_scalars)
                 .chain(iter::once(c * x))
                 .chain(iter::once(c * x * x))
+                .chain(x_sq.iter().cloned())
+                .chain(x_inv_sq.iter().cloned())
                 .chain(iter::once(-self.e_blinding - c * self.t_x_blinding))
                 .chain(iter::once(basepoint_scalar))
                 .chain(g)
                 .chain(h)
-                .chain(x_sq.iter().cloned())
-                .chain(x_inv_sq.iter().cloned()),
-            iter::once(&A)
-                .chain(iter::once(&S))
-                .chain(value_commitments.iter())
-                .chain(iter::once(&T_1))
-                .chain(iter::once(&T_2))
-                .chain(iter::once(&gens.pedersen_generators.B_blinding))
-                .chain(iter::once(&gens.pedersen_generators.B))
-                .chain(gens.G.iter())
-                .chain(gens.H.iter())
-                .chain(Ls.iter())
-                .chain(Rs.iter()),
-        );
+                .chain(value_commitment_scalars),
+            iter::once(self.A.decompress())
+                .chain(iter::once(self.S.decompress()))
+                .chain(iter::once(self.T_1.decompress()))
+                .chain(iter::once(self.T_2.decompress()))
+                .chain(self.ipp_proof.L_vec.iter().map(|L| L.decompress()))
+                .chain(self.ipp_proof.R_vec.iter().map(|R| R.decompress()))
+                .chain(iter::once(Some(gens.pedersen_gens.B_blinding)))
+                .chain(iter::once(Some(gens.pedersen_gens.B)))
+                .chain(gens.G.iter().map(|&x| Some(x)))
+                .chain(gens.H.iter().map(|&x| Some(x)))
+                .chain(value_commitments.iter().map(|&x| Some(x))),
+        ).ok_or_else(|| ProofError::VerificationError)?;
 
         if mega_check.is_identity() {
             Ok(())
@@ -358,7 +340,7 @@ impl<'de> Deserialize<'de> for RangeProof {
 /// \\]
 fn delta(n: usize, m: usize, y: &Scalar, z: &Scalar) -> Scalar {
     let sum_y = util::sum_of_powers(y, n * m);
-    let sum_2 = util::sum_of_powers(&Scalar::from_u64(2), n);
+    let sum_2 = util::sum_of_powers(&Scalar::from(2u64), n);
     let sum_z = util::sum_of_powers(z, m);
 
     (z - z * z) * sum_y - z * z * z * sum_2 * sum_z
@@ -440,13 +422,13 @@ mod tests {
             // 2. Serialize
             proof_bytes = bincode::serialize(&proof).unwrap();
 
-            let pg = &generators.pedersen_generators;
+            let pg = &generators.pedersen_gens;
 
             // XXX would be nice to have some convenience API for this
             value_commitments = values
                 .iter()
                 .zip(blindings.iter())
-                .map(|(&v, &v_blinding)| pg.commit(Scalar::from_u64(v), v_blinding))
+                .map(|(&v, &v_blinding)| pg.commit(Scalar::from(v), v_blinding))
                 .collect();
         }
 
