@@ -190,7 +190,7 @@ impl ConstraintSystem {
     }
 
     pub fn prove<R: Rng + CryptoRng>(
-        &self,
+        mut self,
         gen: &Generators,
         transcript: &mut ProofTranscript,
         rng: &mut R,
@@ -204,6 +204,12 @@ impl ConstraintSystem {
         use super::circuit::matrix_flatten;
 
         // CREATE CIRCUIT PARAMS
+        if !(self.a.len() == 0 || self.a.len().is_power_of_two()) {
+            let pad = n.next_power_of_two() - n;
+            self.a.append(&mut vec![LinearCombination::zero(); pad]);
+            self.b.append(&mut vec![LinearCombination::zero(); pad]);
+            self.c.append(&mut vec![LinearCombination::zero(); pad]);
+        }
         let n = self.a.len();
         let m = self.var_assignment.len();
         let q = self.a.len() * 3;
@@ -429,6 +435,28 @@ mod tests {
             &circuit,
             &verifier_input,
         )
+    }
+
+    fn create_proof_helper(
+        cs: &ConstraintSystem,
+    ) -> CircuitProof {
+        let n = cs.a.len();
+        let generators = Generators::new(PedersenGenerators::default(), n, 1);
+        let mut proof_transcript = ProofTranscript::new(b"CircuitProofTest");
+        let mut rng = OsRng::new().unwrap();
+
+        let circuit_proof = cs.prove(
+            &generators,
+            &mut proof_transcript,
+            &mut rng,
+        ).unwrap();
+    }
+
+    fn verify_proof_helper(
+        proof: &CircuitProof,
+        cs: &ConstraintSystem,
+    ) -> Result<(), &'static str> {
+        unimplemented!()
     }
 
     #[test]
