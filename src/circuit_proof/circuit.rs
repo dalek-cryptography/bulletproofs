@@ -14,7 +14,7 @@ use util;
 
 #[derive(Clone, Debug)]
 pub struct Circuit {
-    n: usize,
+    pub n: usize,
     m: usize,
     q: usize,
     c: Vec<Scalar>,        // vector of constants, length q
@@ -38,9 +38,31 @@ impl Circuit {
         }
         Ok(())
     }
+
+    // does not check that the parameters are valid.
+    pub fn new(
+        n: usize,
+        m: usize,
+        q: usize,
+        c: Vec<Scalar>,
+        W_L: Vec<Vec<Scalar>>,
+        W_R: Vec<Vec<Scalar>>,
+        W_O: Vec<Vec<Scalar>>,
+        W_V: Vec<Vec<Scalar>>,
+    ) -> Self {
+        Circuit {
+            n,
+            m,
+            q,
+            c,
+            W_L,
+            W_R,
+            W_O,
+            W_V,
+        }
+    }
 }
 
-// TODO: actually use this in circuit generation
 pub struct ProverInput {
     a_L: Vec<Scalar>,
     a_R: Vec<Scalar>,
@@ -48,8 +70,30 @@ pub struct ProverInput {
     v_blinding: Vec<Scalar>,
 }
 
+impl ProverInput {
+    pub fn new(
+        a_L: Vec<Scalar>,
+        a_R: Vec<Scalar>,
+        a_O: Vec<Scalar>,
+        v_blinding: Vec<Scalar>,
+    ) -> Self {
+        ProverInput {
+            a_L,
+            a_R,
+            a_O,
+            v_blinding,
+        }
+    }
+}
+
 pub struct VerifierInput {
     V: Vec<RistrettoPoint>,
+}
+
+impl VerifierInput {
+    pub fn new(V: Vec<RistrettoPoint>) -> Self {
+        VerifierInput { V }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -89,16 +133,13 @@ impl CircuitProof {
         transcript: &mut ProofTranscript,
         rng: &mut R,
         circuit: &Circuit,
-        a_L: Vec<Scalar>,
-        a_R: Vec<Scalar>,
-        a_O: Vec<Scalar>,
-        v_blinding: Vec<Scalar>,
+        prover_input: &ProverInput,
     ) -> Result<CircuitProof, &'static str> {
         circuit.check_parameters()?;
-        if a_L.len() != circuit.n
-            || a_R.len() != circuit.n
-            || a_O.len() != circuit.n
-            || v_blinding.len() != circuit.m
+        if prover_input.a_L.len() != circuit.n
+            || prover_input.a_R.len() != circuit.n
+            || prover_input.a_O.len() != circuit.n
+            || prover_input.v_blinding.len() != circuit.m
         {
             return Err("Input vector size doesn't match specified parameters.");
         }
@@ -121,7 +162,9 @@ impl CircuitProof {
 
         // A_I = <a_L, G> + <a_R, H> + i_blinding * B_blinding
         let A_I = RistrettoPoint::multiscalar_mul(
-            iter::once(&i_blinding).chain(a_L.iter()).chain(a_R.iter()),
+            iter::once(&i_blinding)
+                .chain(prover_input.a_L.iter())
+                .chain(prover_input.a_R.iter()),
             iter::once(&gen.pedersen_generators.B_blinding)
                 .chain(gen.G.iter())
                 .chain(gen.H.iter()),
@@ -129,7 +172,7 @@ impl CircuitProof {
 
         // A_O = <a_O, G> + o_blinding * B_blinding
         let A_O = RistrettoPoint::multiscalar_mul(
-            iter::once(&o_blinding).chain(a_O.iter()),
+            iter::once(&o_blinding).chain(prover_input.a_O.iter()),
             iter::once(&gen.pedersen_generators.B_blinding).chain(gen.G.iter()),
         ).compress();
 
@@ -161,15 +204,15 @@ impl CircuitProof {
         for i in 0..circuit.n {
             // l_poly.0 = 0
             // l_poly.1 = a_L + y^-n * (z * z^Q * W_R)
-            l_poly.1[i] = a_L[i] + exp_y_inv * z_zQ_WR[i];
+            l_poly.1[i] = prover_input.a_L[i] + exp_y_inv * z_zQ_WR[i];
             // l_poly.2 = a_O
-            l_poly.2[i] = a_O[i];
+            l_poly.2[i] = prover_input.a_O[i];
             // l_poly.3 = s_L
             l_poly.3[i] = s_L[i];
             // r_poly.0 = (z * z^Q * W_O) - y^n
             r_poly.0[i] = z_zQ_WO[i] - exp_y;
             // r_poly.1 = y^n * a_R + (z * z^Q * W_L)
-            r_poly.1[i] = exp_y * a_R[i] + z_zQ_WL[i];
+            r_poly.1[i] = exp_y * prover_input.a_R[i] + z_zQ_WL[i];
             // r_poly.2 = 0
             // r_poly.3 = y^n * s_R
             r_poly.3[i] = exp_y * s_R[i];
@@ -220,7 +263,7 @@ impl CircuitProof {
             .W_V
             .iter()
             .zip(util::exp_iter(z))
-            .map(|(W_V_i, exp_z)| z * exp_z * inner_product(&W_V_i, &v_blinding))
+            .map(|(W_V_i, exp_z)| z * exp_z * inner_product(&W_V_i, &prover_input.v_blinding))
             .sum();
 
         let t_blinding_poly = util::Poly6 {
@@ -278,10 +321,10 @@ impl CircuitProof {
         transcript: &mut ProofTranscript,
         rng: &mut R,
         circuit: &Circuit,
-        V: Vec<RistrettoPoint>, // Vector of commitments, length m
+        verifier_input: &VerifierInput,
     ) -> Result<(), &'static str> {
         circuit.check_parameters()?;
-        if V.len() != circuit.m {
+        if verifier_input.V.len() != circuit.m {
             return Err("Commitments vector size doesn't match specified parameters.");
         }
         if gen.n != circuit.n {
@@ -420,7 +463,7 @@ impl CircuitProof {
                 .chain(gen.H.iter())
                 .chain(Ls.iter())
                 .chain(Rs.iter())
-                .chain(V.iter())
+                .chain(verifier_input.V.iter())
                 .chain(T_points.iter()),
         );
 
@@ -481,31 +524,29 @@ mod tests {
         let generators = Generators::new(PedersenGenerators::default(), n, 1);
         let mut proof_transcript = ProofTranscript::new(b"CircuitProofTest");
         let mut rng = OsRng::new().unwrap();
-        let circuit = Circuit {
-            n,
-            m,
-            q,
-            c,
-            W_L,
-            W_R,
-            W_O,
-            W_V,
-        };
+        let circuit = Circuit::new(n, m, q, c, W_L, W_R, W_O, W_V);
+
+        let prover_input = ProverInput::new(a_L, a_R, a_O, v_blinding);
 
         let circuit_proof = CircuitProof::prove(
             &generators,
             &mut proof_transcript,
             &mut rng,
             &circuit.clone(),
-            a_L,
-            a_R,
-            a_O,
-            v_blinding,
+            &prover_input,
         ).unwrap();
 
         let mut verify_transcript = ProofTranscript::new(b"CircuitProofTest");
 
-        circuit_proof.verify(&generators, &mut verify_transcript, &mut rng, &circuit, V)
+        let verifier_input = VerifierInput { V };
+
+        circuit_proof.verify(
+            &generators,
+            &mut verify_transcript,
+            &mut rng,
+            &circuit,
+            &verifier_input,
+        )
     }
 
     fn blinding_helper(v: &Vec<Scalar>) -> (Vec<RistrettoPoint>, Vec<Scalar>) {
