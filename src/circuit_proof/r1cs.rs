@@ -8,7 +8,7 @@ use generators::{Generators, PedersenGenerators};
 use proof_transcript::ProofTranscript;
 
 // use circuit::{Circuit, ProverInput, VerifierInput};
-use super::circuit::{Circuit, ProverInput, VerifierInput, CircuitProof};
+use super::circuit::{Circuit, CircuitProof, ProverInput, VerifierInput};
 
 // This is a stripped-down version of the Bellman r1cs representation, for the purposes of
 // learning / understanding. The eventual goal is to write this as a BulletproofsConstraintSystem
@@ -189,29 +189,12 @@ impl ConstraintSystem {
         (circuit, prover_input, verifier_input)
     }
 
-    pub fn prove<R: Rng + CryptoRng>(
-        mut self,
-        gen: &Generators,
-        transcript: &mut ProofTranscript,
-        rng: &mut R,
-    ) -> Result<CircuitProof, &'static str> {
-        use std::iter;
-
-        use util;
-        use inner_product_proof::{inner_product, InnerProductProof};
-        use curve25519_dalek::ristretto::RistrettoPoint;
-        use curve25519_dalek::traits::MultiscalarMul;
+    fn get_flattened_matrices(
+        &self,
+        z: Scalar,
+        n: usize,
+    ) -> Result<(Vec<Scalar>, Vec<Scalar>, Vec<Scalar>), &'static str> {
         use super::circuit::matrix_flatten;
-
-        // CREATE CIRCUIT PARAMS
-        if !(self.a.len() == 0 || self.a.len().is_power_of_two()) {
-            let pad = n.next_power_of_two() - n;
-            self.a.append(&mut vec![LinearCombination::zero(); pad]);
-            self.b.append(&mut vec![LinearCombination::zero(); pad]);
-            self.c.append(&mut vec![LinearCombination::zero(); pad]);
-        }
-        let n = self.a.len();
-        let m = self.var_assignment.len();
         let q = self.a.len() * 3;
 
         // Linear constraints are ordered as follows:
@@ -228,6 +211,38 @@ impl ConstraintSystem {
             W_O[i + 2 * n][i] = one;
         }
 
+        let z_zQ_WL: Vec<Scalar> = matrix_flatten(&W_L, z, n)?;
+        let z_zQ_WR: Vec<Scalar> = matrix_flatten(&W_R, z, n)?;
+        let z_zQ_WO: Vec<Scalar> = matrix_flatten(&W_O, z, n)?;
+        Ok((z_zQ_WL, z_zQ_WR, z_zQ_WO))
+    }
+
+    pub fn prove<R: Rng + CryptoRng>(
+        mut self,
+        gen: &Generators,
+        transcript: &mut ProofTranscript,
+        rng: &mut R,
+    ) -> Result<CircuitProof, &'static str> {
+        use std::iter;
+
+        use curve25519_dalek::ristretto::RistrettoPoint;
+        use curve25519_dalek::traits::MultiscalarMul;
+        use inner_product_proof::{inner_product, InnerProductProof};
+        use util;
+
+        // CREATE CIRCUIT PARAMS
+        let n_temp = self.a.len();
+        if !(n_temp == 0 || n_temp.is_power_of_two()) {
+            let pad = n_temp.next_power_of_two() - n_temp;
+            self.a.append(&mut vec![LinearCombination::zero(); pad]);
+            self.b.append(&mut vec![LinearCombination::zero(); pad]);
+            self.c.append(&mut vec![LinearCombination::zero(); pad]);
+        }
+        let n = self.a.len();
+        let m = self.var_assignment.len();
+        let q = self.a.len() * 3;
+
+        let zer = Scalar::zero();
         // TODO: create / append to c on the fly instead
         let mut c = vec![zer; q]; // length q vector of constants.
         let mut W_V = vec![vec![zer; m]; q]; // qxm matrix of commitments.
@@ -263,9 +278,7 @@ impl ConstraintSystem {
 
         // A_I = <a_L, G> + <a_R, H> + i_blinding * B_blinding
         let A_I = RistrettoPoint::multiscalar_mul(
-            iter::once(&i_blinding)
-                .chain(a_L.iter())
-                .chain(a_R.iter()),
+            iter::once(&i_blinding).chain(a_L.iter()).chain(a_R.iter()),
             iter::once(&gen.pedersen_gens.B_blinding)
                 .chain(gen.G.iter())
                 .chain(gen.H.iter()),
@@ -294,9 +307,7 @@ impl ConstraintSystem {
         let mut l_poly = util::VecPoly3::zero(n);
         let mut r_poly = util::VecPoly3::zero(n);
 
-        let z_zQ_WL: Vec<Scalar> = matrix_flatten(&W_L, z, n)?;
-        let z_zQ_WR: Vec<Scalar> = matrix_flatten(&W_R, z, n)?;
-        let z_zQ_WO: Vec<Scalar> = matrix_flatten(&W_O, z, n)?;
+        let (z_zQ_WL, z_zQ_WR, z_zQ_WO) = self.get_flattened_matrices(z, n)?;
 
         let mut exp_y = Scalar::one(); // y^n starting at n=0
         let mut exp_y_inv = Scalar::one(); // y^-n starting at n=0
@@ -398,7 +409,7 @@ impl ConstraintSystem {
             e_blinding,
             ipp_proof,
         ))
-    }  
+    }
 }
 
 #[cfg(test)]
@@ -435,28 +446,6 @@ mod tests {
             &circuit,
             &verifier_input,
         )
-    }
-
-    fn create_proof_helper(
-        cs: &ConstraintSystem,
-    ) -> CircuitProof {
-        let n = cs.a.len();
-        let generators = Generators::new(PedersenGenerators::default(), n, 1);
-        let mut proof_transcript = ProofTranscript::new(b"CircuitProofTest");
-        let mut rng = OsRng::new().unwrap();
-
-        let circuit_proof = cs.prove(
-            &generators,
-            &mut proof_transcript,
-            &mut rng,
-        ).unwrap();
-    }
-
-    fn verify_proof_helper(
-        proof: &CircuitProof,
-        cs: &ConstraintSystem,
-    ) -> Result<(), &'static str> {
-        unimplemented!()
     }
 
     #[test]

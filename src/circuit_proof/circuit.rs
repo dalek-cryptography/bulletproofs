@@ -141,7 +141,7 @@ impl CircuitProof {
         ipp_proof: InnerProductProof,
     ) -> Self {
         CircuitProof {
-            A_I, 
+            A_I,
             A_O,
             S,
             T_1,
