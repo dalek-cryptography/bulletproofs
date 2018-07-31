@@ -203,7 +203,7 @@ impl InnerProductProof {
     {
         let (u_sq, u_inv_sq, s) = self.verification_scalars(transcript);
 
-        let a_times_s = s.iter().map(|s_i| self.a * s_i);
+        let a_times_s = s.iter().map(|s_i| self.a * s_i).take(G.len());
 
         // 1/s[i] is s[!i], and !i runs from n-1 to 0 as i runs from 0 to n-1
         let inv_s = s.iter().rev();
@@ -385,7 +385,7 @@ mod tests {
         let mut verifier = ProofTranscript::new(b"innerproducttest");
         assert!(
             proof
-                .verify(&mut verifier, util::exp_iter(y_inv), &P, &Q, &G, &H)
+                .verify(&mut verifier, util::exp_iter(y_inv).take(n), &P, &Q, &G, &H)
                 .is_ok()
         );
 
@@ -393,7 +393,7 @@ mod tests {
         let mut verifier = ProofTranscript::new(b"innerproducttest");
         assert!(
             proof
-                .verify(&mut verifier, util::exp_iter(y_inv), &P, &Q, &G, &H)
+                .verify(&mut verifier, util::exp_iter(y_inv).take(n), &P, &Q, &G, &H)
                 .is_ok()
         );
     }
