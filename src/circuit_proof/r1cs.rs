@@ -1,3 +1,5 @@
+#![allow(non_snake_case)]
+
 use rand::{CryptoRng, Rng};
 
 use curve25519_dalek::ristretto::RistrettoPoint;
@@ -5,7 +7,8 @@ use curve25519_dalek::scalar::Scalar;
 use generators::PedersenGenerators;
 use std::iter::FromIterator;
 
-use circuit_proof::{Circuit, ProverInput, VerifierInput};
+// use circuit::{Circuit, ProverInput, VerifierInput};
+use super::circuit::{Circuit, ProverInput, VerifierInput};
 
 // This is a stripped-down version of the Bellman r1cs representation, for the purposes of
 // learning / understanding. The eventual goal is to write this as a BulletproofsConstraintSystem
@@ -112,7 +115,7 @@ impl ConstraintSystem {
             .zip(v_blinding)
             .map(|(v_i, v_blinding_i)| pedersen_generators.commit(*v_i, *v_blinding_i))
             .collect();
-        VerifierInput { V }
+        VerifierInput::new(V)
     }
 
     fn create_prover_input(&self, v_blinding: &Vec<Scalar>) -> ProverInput {
@@ -120,12 +123,7 @@ impl ConstraintSystem {
         let a_L: Vec<Scalar> = self.a.iter().map(|lc| self.eval_lc(&lc)).collect();
         let a_R: Vec<Scalar> = self.b.iter().map(|lc| self.eval_lc(&lc)).collect();
         let a_O: Vec<Scalar> = self.c.iter().map(|lc| self.eval_lc(&lc)).collect();
-        ProverInput {
-            a_L,
-            a_R,
-            a_O,
-            v_blinding: v_blinding.to_vec(),
-        }
+        ProverInput::new(a_L, a_R, a_O, v_blinding.to_vec())
     }
 
     fn create_circuit(&self) -> Circuit {
@@ -163,16 +161,7 @@ impl ConstraintSystem {
             c[i] = lc.get_constant();
         }
 
-        Circuit {
-            n,
-            m,
-            q,
-            c,
-            W_L,
-            W_R,
-            W_O,
-            W_V,
-        }
+        Circuit::new(n, m, q, c, W_L, W_R, W_O, W_V)
     }
 
     // This function can only be called once per ConstraintSystem instance.
@@ -203,8 +192,8 @@ impl ConstraintSystem {
 
 #[cfg(test)]
 mod tests {
+    use super::super::circuit::CircuitProof;
     use super::*;
-    use circuit_proof::CircuitProof;
     use generators::Generators;
     use proof_transcript::ProofTranscript;
     use rand::rngs::OsRng;
@@ -223,10 +212,7 @@ mod tests {
             &mut proof_transcript,
             &mut rng,
             &circuit.clone(),
-            prover_input.a_L,
-            prover_input.a_R,
-            prover_input.a_O,
-            prover_input.v_blinding,
+            &prover_input,
         ).unwrap();
 
         let mut verify_transcript = ProofTranscript::new(b"CircuitProofTest");
@@ -236,7 +222,7 @@ mod tests {
             &mut verify_transcript,
             &mut rng,
             &circuit,
-            verifier_input.V,
+            &verifier_input,
         )
     }
 
