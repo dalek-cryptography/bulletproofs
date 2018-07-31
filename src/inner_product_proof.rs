@@ -203,7 +203,7 @@ impl InnerProductProof {
     {
         let (u_sq, u_inv_sq, s) = self.verification_scalars(transcript);
 
-        let a_times_s = s.iter().map(|s_i| self.a * s_i);
+        let a_times_s = s.iter().map(|s_i| self.a * s_i).take(G.len());
 
         // 1/s[i] is s[!i], and !i runs from n-1 to 0 as i runs from 0 to n-1
         let inv_s = s.iter().rev();
@@ -335,7 +335,7 @@ mod tests {
     use super::*;
 
     use rand::OsRng;
-    use sha2::Sha512;
+    use sha3::Sha3_512;
     use util;
 
     fn test_helper_create(n: usize) {
@@ -347,7 +347,7 @@ mod tests {
         let H = gens.share(0).H.to_vec();
 
         // Q would be determined upstream in the protocol, so we pick a random one.
-        let Q = RistrettoPoint::hash_from_bytes::<Sha512>(b"test point");
+        let Q = RistrettoPoint::hash_from_bytes::<Sha3_512>(b"test point");
 
         // a and b are the vectors for which we want to prove c = <a,b>
         let a: Vec<_> = (0..n).map(|_| Scalar::random(&mut rng)).collect();
@@ -385,7 +385,7 @@ mod tests {
         let mut verifier = ProofTranscript::new(b"innerproducttest");
         assert!(
             proof
-                .verify(&mut verifier, util::exp_iter(y_inv), &P, &Q, &G, &H)
+                .verify(&mut verifier, util::exp_iter(y_inv).take(n), &P, &Q, &G, &H)
                 .is_ok()
         );
 
@@ -393,7 +393,7 @@ mod tests {
         let mut verifier = ProofTranscript::new(b"innerproducttest");
         assert!(
             proof
-                .verify(&mut verifier, util::exp_iter(y_inv), &P, &Q, &G, &H)
+                .verify(&mut verifier, util::exp_iter(y_inv).take(n), &P, &Q, &G, &H)
                 .is_ok()
         );
     }
@@ -431,17 +431,17 @@ mod tests {
     #[test]
     fn test_inner_product() {
         let a = vec![
-            Scalar::from_u64(1),
-            Scalar::from_u64(2),
-            Scalar::from_u64(3),
-            Scalar::from_u64(4),
+            Scalar::from(1u64),
+            Scalar::from(2u64),
+            Scalar::from(3u64),
+            Scalar::from(4u64),
         ];
         let b = vec![
-            Scalar::from_u64(2),
-            Scalar::from_u64(3),
-            Scalar::from_u64(4),
-            Scalar::from_u64(5),
+            Scalar::from(2u64),
+            Scalar::from(3u64),
+            Scalar::from(4u64),
+            Scalar::from(5u64),
         ];
-        assert_eq!(Scalar::from_u64(40), inner_product(&a, &b));
+        assert_eq!(Scalar::from(40u64), inner_product(&a, &b));
     }
 }

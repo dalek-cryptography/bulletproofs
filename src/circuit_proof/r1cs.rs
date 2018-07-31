@@ -107,13 +107,13 @@ impl ConstraintSystem {
     fn create_verifier_input(
         &self,
         v_blinding: &Vec<Scalar>,
-        pedersen_generators: &PedersenGenerators,
+        pedersen_gens: &PedersenGenerators,
     ) -> VerifierInput {
         let V: Vec<RistrettoPoint> = self
             .var_assignment
             .iter()
             .zip(v_blinding)
-            .map(|(v_i, v_blinding_i)| pedersen_generators.commit(*v_i, *v_blinding_i))
+            .map(|(v_i, v_blinding_i)| pedersen_gens.commit(*v_i, *v_blinding_i))
             .collect();
         VerifierInput::new(V)
     }
@@ -167,7 +167,7 @@ impl ConstraintSystem {
     // This function can only be called once per ConstraintSystem instance.
     pub fn create_proof_input<R: Rng + CryptoRng>(
         mut self,
-        pedersen_generators: &PedersenGenerators,
+        pedersen_gens: &PedersenGenerators,
         rng: &mut R,
     ) -> (Circuit, ProverInput, VerifierInput) {
         // If `n`, the number of multiplications, is not 0 or 2, then pad the circuit.
@@ -184,7 +184,7 @@ impl ConstraintSystem {
 
         let circuit = self.create_circuit();
         let prover_input = self.create_prover_input(&v_blinding);
-        let verifier_input = self.create_verifier_input(&v_blinding, pedersen_generators);
+        let verifier_input = self.create_verifier_input(&v_blinding, pedersen_gens);
 
         (circuit, prover_input, verifier_input)
     }
@@ -230,16 +230,16 @@ mod tests {
     // 3 (const) * 4 (const) = 12 (const)
     fn mul_circuit_constants_succeed() {
         let mut rng = OsRng::new().unwrap();
-        let pedersen_generators = PedersenGenerators::default();
+        let pedersen_gens = PedersenGenerators::default();
         let mut cs = ConstraintSystem::new();
 
-        let lc_a = LinearCombination::new(vec![], Scalar::from_u64(3));
-        let lc_b = LinearCombination::new(vec![], Scalar::from_u64(4));
-        let lc_c = LinearCombination::new(vec![], Scalar::from_u64(12));
+        let lc_a = LinearCombination::new(vec![], Scalar::from(3u64));
+        let lc_b = LinearCombination::new(vec![], Scalar::from(4u64));
+        let lc_c = LinearCombination::new(vec![], Scalar::from(12u64));
         assert!(cs.constrain(lc_a, lc_b, lc_c).is_ok());
 
         let (circuit, prover_input, verifier_input) =
-            cs.create_proof_input(&pedersen_generators, &mut rng);
+            cs.create_proof_input(&pedersen_gens, &mut rng);
         assert!(create_and_verify_helper(circuit, prover_input, verifier_input).is_ok());
     }
 
@@ -247,16 +247,16 @@ mod tests {
     // 3 (const) * 4 (const) != 10 (const)
     fn mul_circuit_constants_fail() {
         let mut rng = OsRng::new().unwrap();
-        let pedersen_generators = PedersenGenerators::default();
+        let pedersen_gens = PedersenGenerators::default();
         let mut cs = ConstraintSystem::new();
 
-        let lc_a = LinearCombination::new(vec![], Scalar::from_u64(3));
-        let lc_b = LinearCombination::new(vec![], Scalar::from_u64(4));
-        let lc_c = LinearCombination::new(vec![], Scalar::from_u64(10));
+        let lc_a = LinearCombination::new(vec![], Scalar::from(3u64));
+        let lc_b = LinearCombination::new(vec![], Scalar::from(4u64));
+        let lc_c = LinearCombination::new(vec![], Scalar::from(10u64));
         assert!(cs.constrain(lc_a, lc_b, lc_c).is_ok());
 
         let (circuit, prover_input, verifier_input) =
-            cs.create_proof_input(&pedersen_generators, &mut rng);
+            cs.create_proof_input(&pedersen_gens, &mut rng);
         assert!(create_and_verify_helper(circuit, prover_input, verifier_input).is_err());
     }
 
@@ -264,12 +264,12 @@ mod tests {
     // 3 (var) * 4 (var) = 12 (var)
     fn mul_circuit_variables_succeed() {
         let mut rng = OsRng::new().unwrap();
-        let pedersen_generators = PedersenGenerators::default();
+        let pedersen_gens = PedersenGenerators::default();
         let mut cs = ConstraintSystem::new();
 
-        let var_a = cs.alloc_variable(Scalar::from_u64(3));
-        let var_b = cs.alloc_variable(Scalar::from_u64(4));
-        let var_c = cs.alloc_variable(Scalar::from_u64(12));
+        let var_a = cs.alloc_variable(Scalar::from(3u64));
+        let var_b = cs.alloc_variable(Scalar::from(4u64));
+        let var_c = cs.alloc_variable(Scalar::from(12u64));
 
         let lc_a = LinearCombination::new(vec![(var_a, Scalar::one())], Scalar::zero());
         let lc_b = LinearCombination::new(vec![(var_b, Scalar::one())], Scalar::zero());
@@ -277,7 +277,7 @@ mod tests {
         assert!(cs.constrain(lc_a, lc_b, lc_c).is_ok());
 
         let (circuit, prover_input, verifier_input) =
-            cs.create_proof_input(&pedersen_generators, &mut rng);
+            cs.create_proof_input(&pedersen_gens, &mut rng);
         assert!(create_and_verify_helper(circuit, prover_input, verifier_input).is_ok());
     }
 
@@ -285,12 +285,12 @@ mod tests {
     // 3 (var) * 4 (var) != 10 (var)
     fn mul_circuit_variables_fail() {
         let mut rng = OsRng::new().unwrap();
-        let pedersen_generators = PedersenGenerators::default();
+        let pedersen_gens = PedersenGenerators::default();
         let mut cs = ConstraintSystem::new();
 
-        let var_a = cs.alloc_variable(Scalar::from_u64(3));
-        let var_b = cs.alloc_variable(Scalar::from_u64(4));
-        let var_c = cs.alloc_variable(Scalar::from_u64(10));
+        let var_a = cs.alloc_variable(Scalar::from(3u64));
+        let var_b = cs.alloc_variable(Scalar::from(4u64));
+        let var_c = cs.alloc_variable(Scalar::from(10u64));
 
         let lc_a = LinearCombination::new(vec![(var_a, Scalar::one())], Scalar::zero());
         let lc_b = LinearCombination::new(vec![(var_b, Scalar::one())], Scalar::zero());
@@ -298,7 +298,7 @@ mod tests {
         assert!(cs.constrain(lc_a, lc_b, lc_c).is_ok());
 
         let (circuit, prover_input, verifier_input) =
-            cs.create_proof_input(&pedersen_generators, &mut rng);
+            cs.create_proof_input(&pedersen_gens, &mut rng);
         assert!(create_and_verify_helper(circuit, prover_input, verifier_input).is_err());
     }
 
@@ -306,20 +306,20 @@ mod tests {
     // ( 3 (var) * 2 (const) ) * ( 4 (var) * 5 (const) ) = 120 (var)
     fn mul_circuit_mixed_succeed() {
         let mut rng = OsRng::new().unwrap();
-        let pedersen_generators = PedersenGenerators::default();
+        let pedersen_gens = PedersenGenerators::default();
         let mut cs = ConstraintSystem::new();
 
-        let var_a = cs.alloc_variable(Scalar::from_u64(3));
-        let var_b = cs.alloc_variable(Scalar::from_u64(4));
-        let var_c = cs.alloc_variable(Scalar::from_u64(120));
+        let var_a = cs.alloc_variable(Scalar::from(3u64));
+        let var_b = cs.alloc_variable(Scalar::from(4u64));
+        let var_c = cs.alloc_variable(Scalar::from(120u64));
 
-        let lc_a = LinearCombination::new(vec![(var_a, Scalar::from_u64(2))], Scalar::zero());
-        let lc_b = LinearCombination::new(vec![(var_b, Scalar::from_u64(5))], Scalar::zero());
+        let lc_a = LinearCombination::new(vec![(var_a, Scalar::from(2u64))], Scalar::zero());
+        let lc_b = LinearCombination::new(vec![(var_b, Scalar::from(5u64))], Scalar::zero());
         let lc_c = LinearCombination::new(vec![(var_c, Scalar::one())], Scalar::zero());
         assert!(cs.constrain(lc_a, lc_b, lc_c).is_ok());
 
         let (circuit, prover_input, verifier_input) =
-            cs.create_proof_input(&pedersen_generators, &mut rng);
+            cs.create_proof_input(&pedersen_gens, &mut rng);
         assert!(create_and_verify_helper(circuit, prover_input, verifier_input).is_ok());
     }
 
@@ -327,20 +327,20 @@ mod tests {
     // ( 3 (var) * 2 (const) ) * ( 4 (var) * 5 (const) ) != 121 (var)
     fn mul_circuit_mixed_fail() {
         let mut rng = OsRng::new().unwrap();
-        let pedersen_generators = PedersenGenerators::default();
+        let pedersen_gens = PedersenGenerators::default();
         let mut cs = ConstraintSystem::new();
 
-        let var_a = cs.alloc_variable(Scalar::from_u64(3));
-        let var_b = cs.alloc_variable(Scalar::from_u64(4));
-        let var_c = cs.alloc_variable(Scalar::from_u64(121));
+        let var_a = cs.alloc_variable(Scalar::from(3u64));
+        let var_b = cs.alloc_variable(Scalar::from(4u64));
+        let var_c = cs.alloc_variable(Scalar::from(121u64));
 
-        let lc_a = LinearCombination::new(vec![(var_a, Scalar::from_u64(2))], Scalar::zero());
-        let lc_b = LinearCombination::new(vec![(var_b, Scalar::from_u64(5))], Scalar::zero());
+        let lc_a = LinearCombination::new(vec![(var_a, Scalar::from(2u64))], Scalar::zero());
+        let lc_b = LinearCombination::new(vec![(var_b, Scalar::from(5u64))], Scalar::zero());
         let lc_c = LinearCombination::new(vec![(var_c, Scalar::one())], Scalar::zero());
         assert!(cs.constrain(lc_a, lc_b, lc_c).is_ok());
 
         let (circuit, prover_input, verifier_input) =
-            cs.create_proof_input(&pedersen_generators, &mut rng);
+            cs.create_proof_input(&pedersen_gens, &mut rng);
         assert!(create_and_verify_helper(circuit, prover_input, verifier_input).is_err());
     }
 
@@ -348,12 +348,12 @@ mod tests {
     // 3 (var) + 4 (var) = 7 (var)
     fn add_circuit_variables_succeed() {
         let mut rng = OsRng::new().unwrap();
-        let pedersen_generators = PedersenGenerators::default();
+        let pedersen_gens = PedersenGenerators::default();
         let mut cs = ConstraintSystem::new();
 
-        let var_a = cs.alloc_variable(Scalar::from_u64(3));
-        let var_b = cs.alloc_variable(Scalar::from_u64(4));
-        let var_c = cs.alloc_variable(Scalar::from_u64(7));
+        let var_a = cs.alloc_variable(Scalar::from(3u64));
+        let var_b = cs.alloc_variable(Scalar::from(4u64));
+        let var_c = cs.alloc_variable(Scalar::from(7u64));
 
         let lc_a = LinearCombination::new(
             vec![
@@ -368,7 +368,7 @@ mod tests {
         assert!(cs.constrain(lc_a, lc_b, lc_c).is_ok());
 
         let (circuit, prover_input, verifier_input) =
-            cs.create_proof_input(&pedersen_generators, &mut rng);
+            cs.create_proof_input(&pedersen_gens, &mut rng);
         assert!(create_and_verify_helper(circuit, prover_input, verifier_input).is_ok());
     }
 
@@ -376,12 +376,12 @@ mod tests {
     // 3 (var) + 4 (var) != 10 (var)
     fn add_circuit_variables_fail() {
         let mut rng = OsRng::new().unwrap();
-        let pedersen_generators = PedersenGenerators::default();
+        let pedersen_gens = PedersenGenerators::default();
         let mut cs = ConstraintSystem::new();
 
-        let var_a = cs.alloc_variable(Scalar::from_u64(3));
-        let var_b = cs.alloc_variable(Scalar::from_u64(4));
-        let var_c = cs.alloc_variable(Scalar::from_u64(10));
+        let var_a = cs.alloc_variable(Scalar::from(3u64));
+        let var_b = cs.alloc_variable(Scalar::from(4u64));
+        let var_c = cs.alloc_variable(Scalar::from(10u64));
 
         let lc_a = LinearCombination::new(
             vec![
@@ -396,7 +396,7 @@ mod tests {
         assert!(cs.constrain(lc_a, lc_b, lc_c).is_ok());
 
         let (circuit, prover_input, verifier_input) =
-            cs.create_proof_input(&pedersen_generators, &mut rng);
+            cs.create_proof_input(&pedersen_gens, &mut rng);
         assert!(create_and_verify_helper(circuit, prover_input, verifier_input).is_err());
     }
 
@@ -404,12 +404,12 @@ mod tests {
     // 3 (var) + 4 (var) + 8 (const) = 15 (var)
     fn add_circuit_mixed_succeed() {
         let mut rng = OsRng::new().unwrap();
-        let pedersen_generators = PedersenGenerators::default();
+        let pedersen_gens = PedersenGenerators::default();
         let mut cs = ConstraintSystem::new();
 
-        let var_a = cs.alloc_variable(Scalar::from_u64(3));
-        let var_b = cs.alloc_variable(Scalar::from_u64(4));
-        let var_c = cs.alloc_variable(Scalar::from_u64(15));
+        let var_a = cs.alloc_variable(Scalar::from(3u64));
+        let var_b = cs.alloc_variable(Scalar::from(4u64));
+        let var_c = cs.alloc_variable(Scalar::from(15u64));
 
         let lc_a = LinearCombination::new(
             vec![
@@ -417,14 +417,14 @@ mod tests {
                 (var_b, Scalar::one()),
                 (var_c, -Scalar::one()),
             ],
-            Scalar::from_u64(8),
+            Scalar::from(8u64),
         );
         let lc_b = LinearCombination::new(vec![], Scalar::one());
         let lc_c = LinearCombination::new(vec![], Scalar::zero());
         assert!(cs.constrain(lc_a, lc_b, lc_c).is_ok());
 
         let (circuit, prover_input, verifier_input) =
-            cs.create_proof_input(&pedersen_generators, &mut rng);
+            cs.create_proof_input(&pedersen_gens, &mut rng);
         assert!(create_and_verify_helper(circuit, prover_input, verifier_input).is_ok());
     }
 
@@ -432,12 +432,12 @@ mod tests {
     // 3 (var) + 4 (var) + 8 (const) != 16 (var)
     fn add_circuit_mixed_fail() {
         let mut rng = OsRng::new().unwrap();
-        let pedersen_generators = PedersenGenerators::default();
+        let pedersen_gens = PedersenGenerators::default();
         let mut cs = ConstraintSystem::new();
 
-        let var_a = cs.alloc_variable(Scalar::from_u64(3));
-        let var_b = cs.alloc_variable(Scalar::from_u64(4));
-        let var_c = cs.alloc_variable(Scalar::from_u64(16));
+        let var_a = cs.alloc_variable(Scalar::from(3u64));
+        let var_b = cs.alloc_variable(Scalar::from(4u64));
+        let var_c = cs.alloc_variable(Scalar::from(16u64));
 
         let lc_a = LinearCombination::new(
             vec![
@@ -445,14 +445,14 @@ mod tests {
                 (var_b, Scalar::one()),
                 (var_c, -Scalar::one()),
             ],
-            Scalar::from_u64(8),
+            Scalar::from(8u64),
         );
         let lc_b = LinearCombination::new(vec![], Scalar::one());
         let lc_c = LinearCombination::new(vec![], Scalar::zero());
         assert!(cs.constrain(lc_a, lc_b, lc_c).is_ok());
 
         let (circuit, prover_input, verifier_input) =
-            cs.create_proof_input(&pedersen_generators, &mut rng);
+            cs.create_proof_input(&pedersen_gens, &mut rng);
         assert!(create_and_verify_helper(circuit, prover_input, verifier_input).is_err());
     }
 
@@ -460,12 +460,12 @@ mod tests {
     // ( 3 (var) + 4 (var) + 8 (const) - 13 (var) ) * 2 (const) = 1 (var) * 4 (const)
     fn add_and_multiply_circuit_succeed() {
         let mut rng = OsRng::new().unwrap();
-        let pedersen_generators = PedersenGenerators::default();
+        let pedersen_gens = PedersenGenerators::default();
         let mut cs = ConstraintSystem::new();
 
-        let var_a = cs.alloc_variable(Scalar::from_u64(3));
-        let var_b = cs.alloc_variable(Scalar::from_u64(4));
-        let var_c = cs.alloc_variable(Scalar::from_u64(13));
+        let var_a = cs.alloc_variable(Scalar::from(3u64));
+        let var_b = cs.alloc_variable(Scalar::from(4u64));
+        let var_c = cs.alloc_variable(Scalar::from(13u64));
         let var_d = cs.alloc_variable(Scalar::one());
 
         let lc_a = LinearCombination::new(
@@ -474,14 +474,14 @@ mod tests {
                 (var_b, Scalar::one()),
                 (var_c, -Scalar::one()),
             ],
-            Scalar::from_u64(8),
+            Scalar::from(8u64),
         );
-        let lc_b = LinearCombination::new(vec![], Scalar::from_u64(2));
-        let lc_c = LinearCombination::new(vec![(var_d, Scalar::from_u64(4))], Scalar::zero());
+        let lc_b = LinearCombination::new(vec![], Scalar::from(2u64));
+        let lc_c = LinearCombination::new(vec![(var_d, Scalar::from(4u64))], Scalar::zero());
         assert!(cs.constrain(lc_a, lc_b, lc_c).is_ok());
 
         let (circuit, prover_input, verifier_input) =
-            cs.create_proof_input(&pedersen_generators, &mut rng);
+            cs.create_proof_input(&pedersen_gens, &mut rng);
         assert!(create_and_verify_helper(circuit, prover_input, verifier_input).is_ok());
     }
 
@@ -489,12 +489,12 @@ mod tests {
     // ( 3 (var) + 4 (var) + 8 (const) - 13 (var) ) * 2 (const) = 1 (var) * 3 (const)
     fn add_and_multiply_circuit_fail() {
         let mut rng = OsRng::new().unwrap();
-        let pedersen_generators = PedersenGenerators::default();
+        let pedersen_gens = PedersenGenerators::default();
         let mut cs = ConstraintSystem::new();
 
-        let var_a = cs.alloc_variable(Scalar::from_u64(3));
-        let var_b = cs.alloc_variable(Scalar::from_u64(4));
-        let var_c = cs.alloc_variable(Scalar::from_u64(13));
+        let var_a = cs.alloc_variable(Scalar::from(3u64));
+        let var_b = cs.alloc_variable(Scalar::from(4u64));
+        let var_c = cs.alloc_variable(Scalar::from(13u64));
         let var_d = cs.alloc_variable(Scalar::one());
 
         let lc_a = LinearCombination::new(
@@ -503,14 +503,14 @@ mod tests {
                 (var_b, Scalar::one()),
                 (var_c, -Scalar::one()),
             ],
-            Scalar::from_u64(8),
+            Scalar::from(8u64),
         );
-        let lc_b = LinearCombination::new(vec![], Scalar::from_u64(2));
-        let lc_c = LinearCombination::new(vec![(var_d, Scalar::from_u64(3))], Scalar::zero());
+        let lc_b = LinearCombination::new(vec![], Scalar::from(2u64));
+        let lc_c = LinearCombination::new(vec![(var_d, Scalar::from(3u64))], Scalar::zero());
         assert!(cs.constrain(lc_a, lc_b, lc_c).is_ok());
 
         let (circuit, prover_input, verifier_input) =
-            cs.create_proof_input(&pedersen_generators, &mut rng);
+            cs.create_proof_input(&pedersen_gens, &mut rng);
         assert!(create_and_verify_helper(circuit, prover_input, verifier_input).is_err());
     }
 
@@ -520,30 +520,30 @@ mod tests {
     // 10 (var) * 20 (var) = 200 (const)
     fn n_not_power_of_two() {
         let mut rng = OsRng::new().unwrap();
-        let pedersen_generators = PedersenGenerators::default();
+        let pedersen_gens = PedersenGenerators::default();
         let mut cs = ConstraintSystem::new();
 
-        let var_five = cs.alloc_variable(Scalar::from_u64(5));
-        let var_ten = cs.alloc_variable(Scalar::from_u64(10));
-        let var_twenty = cs.alloc_variable(Scalar::from_u64(20));
+        let var_five = cs.alloc_variable(Scalar::from(5u64));
+        let var_ten = cs.alloc_variable(Scalar::from(10u64));
+        let var_twenty = cs.alloc_variable(Scalar::from(20u64));
 
-        let lc_a_1 = LinearCombination::new(vec![], Scalar::from_u64(3));
-        let lc_b_1 = LinearCombination::new(vec![], Scalar::from_u64(4));
-        let lc_c_1 = LinearCombination::new(vec![], Scalar::from_u64(12));
+        let lc_a_1 = LinearCombination::new(vec![], Scalar::from(3u64));
+        let lc_b_1 = LinearCombination::new(vec![], Scalar::from(4u64));
+        let lc_c_1 = LinearCombination::new(vec![], Scalar::from(12u64));
         assert!(cs.constrain(lc_a_1, lc_b_1, lc_c_1).is_ok());
 
-        let lc_a_2 = LinearCombination::new(vec![], Scalar::from_u64(2));
+        let lc_a_2 = LinearCombination::new(vec![], Scalar::from(2u64));
         let lc_b_2 = LinearCombination::new(vec![(var_five, Scalar::one())], Scalar::zero());
         let lc_c_2 = LinearCombination::new(vec![(var_ten, Scalar::one())], Scalar::zero());
         assert!(cs.constrain(lc_a_2, lc_b_2, lc_c_2).is_ok());
 
         let lc_a_3 = LinearCombination::new(vec![(var_ten, Scalar::one())], Scalar::zero());
         let lc_b_3 = LinearCombination::new(vec![(var_twenty, Scalar::one())], Scalar::zero());
-        let lc_c_3 = LinearCombination::new(vec![], Scalar::from_u64(200));
+        let lc_c_3 = LinearCombination::new(vec![], Scalar::from(200u64));
         assert!(cs.constrain(lc_a_3, lc_b_3, lc_c_3).is_ok());
 
         let (circuit, prover_input, verifier_input) =
-            cs.create_proof_input(&pedersen_generators, &mut rng);
+            cs.create_proof_input(&pedersen_gens, &mut rng);
         assert!(create_and_verify_helper(circuit, prover_input, verifier_input).is_ok());
     }
 
@@ -555,7 +555,7 @@ mod tests {
         out_1: Scalar,
     ) -> Result<(), &'static str> {
         let mut rng = OsRng::new().unwrap();
-        let pedersen_generators = PedersenGenerators::default();
+        let pedersen_gens = PedersenGenerators::default();
         let mut cs = ConstraintSystem::new();
         let z = Scalar::random(&mut rng);
 
@@ -578,15 +578,15 @@ mod tests {
         assert!(cs.constrain(lc_1_a, lc_1_b, lc_1_c).is_ok());
 
         let (circuit, prover_input, verifier_input) =
-            cs.create_proof_input(&pedersen_generators, &mut rng);
+            cs.create_proof_input(&pedersen_gens, &mut rng);
         create_and_verify_helper(circuit, prover_input, verifier_input)
     }
 
     #[test]
     // Test that a 2 in 2 out shuffle circuit behaves as expected
     fn shuffle_circuit() {
-        let three = Scalar::from_u64(3);
-        let seven = Scalar::from_u64(7);
+        let three = Scalar::from(3u64);
+        let seven = Scalar::from(7u64);
         assert!(shuffle_circuit_helper(three, seven, three, seven).is_ok());
         assert!(shuffle_circuit_helper(three, seven, seven, three).is_ok());
         assert!(shuffle_circuit_helper(three, seven, seven, seven).is_err());
@@ -607,7 +607,7 @@ mod tests {
         val_out_1: Scalar,
     ) -> Result<(), &'static str> {
         let mut rng = OsRng::new().unwrap();
-        let pedersen_generators = PedersenGenerators::default();
+        let pedersen_gens = PedersenGenerators::default();
         let mut cs = ConstraintSystem::new();
         let c = Scalar::random(&mut rng);
 
@@ -645,17 +645,17 @@ mod tests {
         assert!(cs.constrain(lc_a, lc_b, lc_c).is_ok());
 
         let (circuit, prover_input, verifier_input) =
-            cs.create_proof_input(&pedersen_generators, &mut rng);
+            cs.create_proof_input(&pedersen_gens, &mut rng);
         create_and_verify_helper(circuit, prover_input, verifier_input)
     }
 
     #[test]
     fn merge_circuit() {
-        let buck = Scalar::from_u64(32);
-        let yuan = Scalar::from_u64(86);
-        let a = Scalar::from_u64(24);
-        let b = Scalar::from_u64(76);
-        let a_plus_b = Scalar::from_u64(100);
+        let buck = Scalar::from(32u64);
+        let yuan = Scalar::from(86u64);
+        let a = Scalar::from(24u64);
+        let b = Scalar::from(76u64);
+        let a_plus_b = Scalar::from(100u64);
         let zero = Scalar::zero();
 
         assert!(merge_circuit_helper(buck, buck, a, a, a, a).is_ok());
