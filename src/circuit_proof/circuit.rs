@@ -126,6 +126,35 @@ pub struct CircuitProof {
 }
 
 impl CircuitProof {
+    pub fn new(
+        A_I: CompressedRistretto,
+        A_O: CompressedRistretto,
+        S: CompressedRistretto,
+        T_1: CompressedRistretto,
+        T_3: CompressedRistretto,
+        T_4: CompressedRistretto,
+        T_5: CompressedRistretto,
+        T_6: CompressedRistretto,
+        t_x: Scalar,
+        t_x_blinding: Scalar,
+        e_blinding: Scalar,
+        ipp_proof: InnerProductProof,
+    ) -> Self {
+        CircuitProof {
+            A_I, 
+            A_O,
+            S,
+            T_1,
+            T_3,
+            T_4,
+            T_5,
+            T_6,
+            t_x,
+            t_x_blinding,
+            e_blinding,
+            ipp_proof,
+        }
+    }
     /// Create a circuit proof.
     /// `circuit.n` must be either 0 or a power of 2, for the inner product proof to work.
     pub fn prove<R: Rng + CryptoRng>(

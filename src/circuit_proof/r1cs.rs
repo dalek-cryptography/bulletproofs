@@ -4,11 +4,11 @@ use rand::{CryptoRng, Rng};
 
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
-use generators::PedersenGenerators;
-use std::iter::FromIterator;
+use generators::{Generators, PedersenGenerators};
+use proof_transcript::ProofTranscript;
 
 // use circuit::{Circuit, ProverInput, VerifierInput};
-use super::circuit::{Circuit, ProverInput, VerifierInput};
+use super::circuit::{Circuit, ProverInput, VerifierInput, CircuitProof};
 
 // This is a stripped-down version of the Bellman r1cs representation, for the purposes of
 // learning / understanding. The eventual goal is to write this as a BulletproofsConstraintSystem
@@ -188,6 +188,211 @@ impl ConstraintSystem {
 
         (circuit, prover_input, verifier_input)
     }
+
+    pub fn prove<R: Rng + CryptoRng>(
+        &self,
+        gen: &Generators,
+        transcript: &mut ProofTranscript,
+        rng: &mut R,
+    ) -> Result<CircuitProof, &'static str> {
+        use std::iter;
+
+        use util;
+        use inner_product_proof::{inner_product, InnerProductProof};
+        use curve25519_dalek::ristretto::RistrettoPoint;
+        use curve25519_dalek::traits::MultiscalarMul;
+        use super::circuit::matrix_flatten;
+
+        // CREATE CIRCUIT PARAMS
+        let n = self.a.len();
+        let m = self.var_assignment.len();
+        let q = self.a.len() * 3;
+
+        // Linear constraints are ordered as follows:
+        // a[0], a[1], ... b[0], b[1], ... c[0], c[1], ...
+        // s.t. W_L || W_R || W_O || c || W_V matrix is in reduced row echelon form
+        let zer = Scalar::zero();
+        let one = Scalar::one();
+        let mut W_L = vec![vec![zer; n]; q]; // qxn matrix which corresponds to a.
+        let mut W_R = vec![vec![zer; n]; q]; // qxn matrix which corresponds to b.
+        let mut W_O = vec![vec![zer; n]; q]; // qxn matrix which corresponds to c.
+        for i in 0..n {
+            W_L[i][i] = one;
+            W_R[i + n][i] = one;
+            W_O[i + 2 * n][i] = one;
+        }
+
+        // TODO: create / append to c on the fly instead
+        let mut c = vec![zer; q]; // length q vector of constants.
+        let mut W_V = vec![vec![zer; m]; q]; // qxm matrix of commitments.
+        for (i, lc) in self
+            .a
+            .iter()
+            .chain(self.b.iter())
+            .chain(self.c.iter())
+            .enumerate()
+        {
+            for (var, scalar) in lc.get_variables() {
+                W_V[i][var.0] = scalar;
+            }
+            c[i] = lc.get_constant();
+        }
+
+        // CREATE PROVER INPUTS
+        let a_L: Vec<Scalar> = self.a.iter().map(|lc| self.eval_lc(&lc)).collect();
+        let a_R: Vec<Scalar> = self.b.iter().map(|lc| self.eval_lc(&lc)).collect();
+        let a_O: Vec<Scalar> = self.c.iter().map(|lc| self.eval_lc(&lc)).collect();
+        let v_blinding: Vec<Scalar> = (0..m).map(|_| Scalar::random(rng)).collect();
+
+        // CREATE THE PROOF
+        transcript.commit_u64(n as u64);
+        transcript.commit_u64(m as u64);
+        transcript.commit_u64(q as u64);
+
+        let i_blinding = Scalar::random(rng);
+        let o_blinding = Scalar::random(rng);
+        let s_blinding = Scalar::random(rng);
+        let s_L: Vec<Scalar> = (0..n).map(|_| Scalar::random(rng)).collect();
+        let s_R: Vec<Scalar> = (0..n).map(|_| Scalar::random(rng)).collect();
+
+        // A_I = <a_L, G> + <a_R, H> + i_blinding * B_blinding
+        let A_I = RistrettoPoint::multiscalar_mul(
+            iter::once(&i_blinding)
+                .chain(a_L.iter())
+                .chain(a_R.iter()),
+            iter::once(&gen.pedersen_gens.B_blinding)
+                .chain(gen.G.iter())
+                .chain(gen.H.iter()),
+        ).compress();
+
+        // A_O = <a_O, G> + o_blinding * B_blinding
+        let A_O = RistrettoPoint::multiscalar_mul(
+            iter::once(&o_blinding).chain(a_O.iter()),
+            iter::once(&gen.pedersen_gens.B_blinding).chain(gen.G.iter()),
+        ).compress();
+
+        // S = <s_L, G> + <s_R, H> + s_blinding * B_blinding
+        let S = RistrettoPoint::multiscalar_mul(
+            iter::once(&s_blinding).chain(s_L.iter()).chain(s_R.iter()),
+            iter::once(&gen.pedersen_gens.B_blinding)
+                .chain(gen.G.iter())
+                .chain(gen.H.iter()),
+        ).compress();
+
+        transcript.commit(A_I.as_bytes());
+        transcript.commit(A_O.as_bytes());
+        transcript.commit(S.as_bytes());
+        let y = transcript.challenge_scalar();
+        let z = transcript.challenge_scalar();
+
+        let mut l_poly = util::VecPoly3::zero(n);
+        let mut r_poly = util::VecPoly3::zero(n);
+
+        let z_zQ_WL: Vec<Scalar> = matrix_flatten(&W_L, z, n)?;
+        let z_zQ_WR: Vec<Scalar> = matrix_flatten(&W_R, z, n)?;
+        let z_zQ_WO: Vec<Scalar> = matrix_flatten(&W_O, z, n)?;
+
+        let mut exp_y = Scalar::one(); // y^n starting at n=0
+        let mut exp_y_inv = Scalar::one(); // y^-n starting at n=0
+        let y_inv = y.invert();
+
+        for i in 0..n {
+            // l_poly.0 = 0
+            // l_poly.1 = a_L + y^-n * (z * z^Q * W_R)
+            l_poly.1[i] = a_L[i] + exp_y_inv * z_zQ_WR[i];
+            // l_poly.2 = a_O
+            l_poly.2[i] = a_O[i];
+            // l_poly.3 = s_L
+            l_poly.3[i] = s_L[i];
+            // r_poly.0 = (z * z^Q * W_O) - y^n
+            r_poly.0[i] = z_zQ_WO[i] - exp_y;
+            // r_poly.1 = y^n * a_R + (z * z^Q * W_L)
+            r_poly.1[i] = exp_y * a_R[i] + z_zQ_WL[i];
+            // r_poly.2 = 0
+            // r_poly.3 = y^n * s_R
+            r_poly.3[i] = exp_y * s_R[i];
+
+            exp_y = exp_y * y; // y^i -> y^(i+1)
+            exp_y_inv = exp_y_inv * y_inv; // y^-i -> y^-(i+1)
+        }
+
+        let t_poly = l_poly.inner_product(&r_poly);
+
+        let t_1_blinding = Scalar::random(rng);
+        let t_3_blinding = Scalar::random(rng);
+        let t_4_blinding = Scalar::random(rng);
+        let t_5_blinding = Scalar::random(rng);
+        let t_6_blinding = Scalar::random(rng);
+
+        let T_1 = gen.pedersen_gens.commit(t_poly.t1, t_1_blinding).compress();
+        let T_3 = gen.pedersen_gens.commit(t_poly.t3, t_3_blinding).compress();
+        let T_4 = gen.pedersen_gens.commit(t_poly.t4, t_4_blinding).compress();
+        let T_5 = gen.pedersen_gens.commit(t_poly.t5, t_5_blinding).compress();
+        let T_6 = gen.pedersen_gens.commit(t_poly.t6, t_6_blinding).compress();
+
+        transcript.commit(T_1.as_bytes());
+        transcript.commit(T_3.as_bytes());
+        transcript.commit(T_4.as_bytes());
+        transcript.commit(T_5.as_bytes());
+        transcript.commit(T_6.as_bytes());
+        let x = transcript.challenge_scalar();
+
+        // t_2_blinding = <z*z^Q, W_V * v_blinding>
+        // in the t_x_blinding calculations, line 76.
+        let t_2_blinding = W_V
+            .iter()
+            .zip(util::exp_iter(z))
+            .map(|(W_V_i, exp_z)| z * exp_z * inner_product(&W_V_i, &v_blinding))
+            .sum();
+
+        let t_blinding_poly = util::Poly6 {
+            t1: t_1_blinding,
+            t2: t_2_blinding,
+            t3: t_3_blinding,
+            t4: t_4_blinding,
+            t5: t_5_blinding,
+            t6: t_6_blinding,
+        };
+
+        let t_x = t_poly.eval(x);
+        let t_x_blinding = t_blinding_poly.eval(x);
+        let l_vec = l_poly.eval(x);
+        let r_vec = r_poly.eval(x);
+        let e_blinding = x * (i_blinding + x * (o_blinding + x * s_blinding));
+
+        transcript.commit(t_x.as_bytes());
+        transcript.commit(t_x_blinding.as_bytes());
+        transcript.commit(e_blinding.as_bytes());
+
+        // Get a challenge value to combine statements for the IPP
+        let w = transcript.challenge_scalar();
+        let Q = w * gen.pedersen_gens.B;
+
+        let ipp_proof = InnerProductProof::create(
+            transcript,
+            &Q,
+            util::exp_iter(y.invert()),
+            gen.G.to_vec(),
+            gen.H.to_vec(),
+            l_vec.clone(),
+            r_vec.clone(),
+        );
+
+        Ok(CircuitProof::new(
+            A_I,
+            A_O,
+            S,
+            T_1,
+            T_3,
+            T_4,
+            T_5,
+            T_6,
+            t_x,
+            t_x_blinding,
+            e_blinding,
+            ipp_proof,
+        ))
+    }  
 }
 
 #[cfg(test)]
