@@ -8,7 +8,7 @@ use generators::{Generators, PedersenGenerators};
 use proof_transcript::ProofTranscript;
 
 // use circuit::{Circuit, ProverInput, VerifierInput};
-use super::circuit::{Circuit, CircuitProof, ProverInput, VerifierInput};
+use super::circuit::{Circuit, CircuitProof, ProverInput, VerifierInput, matrix_flatten};
 
 // This is a stripped-down version of the Bellman r1cs representation, for the purposes of
 // learning / understanding. The eventual goal is to write this as a BulletproofsConstraintSystem
@@ -222,7 +222,7 @@ impl ConstraintSystem {
         gen: &Generators,
         transcript: &mut ProofTranscript,
         rng: &mut R,
-    ) -> Result<CircuitProof, &'static str> {
+    ) -> Result<(CircuitProof, Vec<RistrettoPoint>), &'static str> {
         use std::iter;
 
         use curve25519_dalek::ristretto::RistrettoPoint;
@@ -395,7 +395,14 @@ impl ConstraintSystem {
             r_vec.clone(),
         );
 
-        Ok(CircuitProof::new(
+        let V: Vec<RistrettoPoint> = self
+            .var_assignment
+            .iter()
+            .zip(v_blinding)
+            .map(|(v_i, v_blinding_i)| gen.pedersen_gens.commit(*v_i, v_blinding_i))
+            .collect();
+
+        Ok((CircuitProof::new(
             A_I,
             A_O,
             S,
@@ -408,7 +415,7 @@ impl ConstraintSystem {
             t_x_blinding,
             e_blinding,
             ipp_proof,
-        ))
+        ), V))
     }
 }
 
@@ -419,6 +426,133 @@ mod tests {
     use generators::Generators;
     use proof_transcript::ProofTranscript;
     use rand::rngs::OsRng;
+
+    #[test]
+    fn merge_circuit_direct() {
+        let buck = Scalar::from(32u64);
+        let yuan = Scalar::from(86u64);
+        let a = Scalar::from(24u64);
+        let b = Scalar::from(76u64);
+        let a_plus_b = Scalar::from(100u64);
+        let zero = Scalar::zero();
+
+        assert!(merge_circuit_direct_helper(buck, buck, a, a, a, a).is_ok());
+        assert!(merge_circuit_direct_helper(buck, buck, a, b, zero, a_plus_b).is_ok());
+        assert!(merge_circuit_direct_helper(buck, yuan, a, b, a, b).is_ok());
+        assert!(merge_circuit_direct_helper(buck, buck, a, b, a, a_plus_b).is_err());
+        assert!(merge_circuit_direct_helper(buck, yuan, a, b, zero, a_plus_b).is_err());
+        assert!(merge_circuit_direct_helper(buck, buck, a, b, zero, zero).is_err());
+    }
+
+    fn merge_circuit_direct_helper(
+        type_0: Scalar,
+        type_1: Scalar,
+        val_in_0: Scalar,
+        val_in_1: Scalar,
+        val_out_0: Scalar,
+        val_out_1: Scalar,
+    ) -> Result<(), &'static str> {
+        let mut rng = OsRng::new().unwrap();
+        let pedersen_gens = PedersenGenerators::default();
+        let c = Scalar::random(&mut rng);
+
+        // Prover's work
+
+        let mut cs1 = ConstraintSystem::new();
+
+        let t_0 = cs1.alloc_variable(type_0);
+        let t_1 = cs1.alloc_variable(type_1);
+        let in_0 = cs1.alloc_variable(val_in_0);
+        let in_1 = cs1.alloc_variable(val_in_1);
+        let out_0 = cs1.alloc_variable(val_out_0);
+        let out_1 = cs1.alloc_variable(val_out_1);
+
+        // lc_a: in_0 * (-1) + in_1 * (-c) + out_0 + out_1 * (c)
+        let lc_a = LinearCombination::new(
+            vec![
+                (in_0.clone(), -Scalar::one()),
+                (in_1.clone(), -c),
+                (out_0.clone(), Scalar::one()),
+                (out_1.clone(), c),
+            ],
+            Scalar::zero(),
+        );
+        // lc_b: in_0 + in_1 + out_1 * (-1) + out_0 * (c) + t_0 * (-c*c) + t_1 * (c*c)
+        let lc_b = LinearCombination::new(
+            vec![
+                (in_0, Scalar::one()),
+                (in_1, Scalar::one()),
+                (out_1, -Scalar::one()),
+                (out_0, c),
+                (t_0, -c * c),
+                (t_1, c * c),
+            ],
+            Scalar::zero(),
+        );
+        let lc_c = LinearCombination::new(vec![], Scalar::zero());
+
+        assert!(cs1.constrain(lc_a, lc_b, lc_c).is_ok());
+
+        let generators = Generators::new(PedersenGenerators::default(), cs1.a.len(), 1);
+        let mut prover_transcript = ProofTranscript::new(b"CircuitProofTest");
+        let mut rng = OsRng::new().unwrap();
+        let (circuit_proof, V) = cs1.prove(
+            &generators, 
+            &mut prover_transcript, 
+            &mut rng
+        ).unwrap();
+
+
+        // Verifier's work
+
+        let mut cs2 = ConstraintSystem::new();
+
+        let t_0 = cs2.alloc_variable(type_0);
+        let t_1 = cs2.alloc_variable(type_1);
+        let in_0 = cs2.alloc_variable(val_in_0);
+        let in_1 = cs2.alloc_variable(val_in_1);
+        let out_0 = cs2.alloc_variable(val_out_0);
+        let out_1 = cs2.alloc_variable(val_out_1);
+
+        // lc_a: in_0 * (-1) + in_1 * (-c) + out_0 + out_1 * (c)
+        let lc_a = LinearCombination::new(
+            vec![
+                (in_0.clone(), -Scalar::one()),
+                (in_1.clone(), -c),
+                (out_0.clone(), Scalar::one()),
+                (out_1.clone(), c),
+            ],
+            Scalar::zero(),
+        );
+        // lc_b: in_0 + in_1 + out_1 * (-1) + out_0 * (c) + t_0 * (-c*c) + t_1 * (c*c)
+        let lc_b = LinearCombination::new(
+            vec![
+                (in_0, Scalar::one()),
+                (in_1, Scalar::one()),
+                (out_1, -Scalar::one()),
+                (out_0, c),
+                (t_0, -c * c),
+                (t_1, c * c),
+            ],
+            Scalar::zero(),
+        );
+        let lc_c = LinearCombination::new(vec![], Scalar::zero());
+
+        assert!(cs2.constrain(lc_a, lc_b, lc_c).is_ok());
+
+        let (circuit, _prover_input, _verifier_input) =
+            cs2.create_proof_input(&pedersen_gens, &mut rng);
+
+        let mut verify_transcript = ProofTranscript::new(b"CircuitProofTest");
+        let verifier_input = VerifierInput::new(V);
+        circuit_proof.verify(
+            &generators, 
+            &mut verify_transcript,
+            &mut rng,
+            &circuit,
+            &verifier_input,
+        ) 
+    }
 
     fn create_and_verify_helper(
         circuit: Circuit,
