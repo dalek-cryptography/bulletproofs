@@ -8,7 +8,7 @@ use generators::{Generators, PedersenGenerators};
 use proof_transcript::ProofTranscript;
 
 // use circuit::{Circuit, ProverInput, VerifierInput};
-use super::circuit::{matrix_flatten, Circuit, CircuitProof, ProverInput, VerifierInput};
+use super::circuit::{Circuit, CircuitProof, ProverInput, VerifierInput};
 
 // This is a stripped-down version of the Bellman r1cs representation, for the purposes of
 // learning / understanding. The eventual goal is to write this as a BulletproofsConstraintSystem
@@ -61,7 +61,7 @@ pub struct ConstraintSystem {
     c: Vec<LinearCombination>,
 
     // Assignments of variables
-    var_assignment: Vec<Scalar>,
+    var_assignment: Vec<Option<Scalar>>,
 }
 
 impl ConstraintSystem {
@@ -75,7 +75,7 @@ impl ConstraintSystem {
     }
     // Allocate a variable and do value assignment at the same time
     pub fn alloc_variable(&mut self, val: Scalar) -> Variable {
-        self.var_assignment.push(val);
+        self.var_assignment.push(Some(val));
         Variable(self.var_assignment.len() - 1)
     }
 
@@ -99,7 +99,7 @@ impl ConstraintSystem {
         let sum_vars: Scalar = lc
             .variables
             .iter()
-            .map(|(var, scalar)| scalar * self.var_assignment[var.0])
+            .map(|(var, scalar)| scalar * self.var_assignment[var.0].unwrap())
             .sum();
         sum_vars + lc.constant
     }
@@ -113,7 +113,7 @@ impl ConstraintSystem {
             .var_assignment
             .iter()
             .zip(v_blinding)
-            .map(|(v_i, v_blinding_i)| pedersen_gens.commit(*v_i, *v_blinding_i))
+            .map(|(v_i, v_blinding_i)| pedersen_gens.commit(v_i.unwrap(), *v_blinding_i))
             .collect();
         VerifierInput::new(V)
     }
@@ -263,7 +263,7 @@ impl ConstraintSystem {
             self.b.append(&mut vec![LinearCombination::zero(); pad]);
             self.c.append(&mut vec![LinearCombination::zero(); pad]);
         }
-        let (n, m, q, c, W_V) = self.get_circuit_params();
+        let (n, m, q, _c, W_V) = self.get_circuit_params();
 
         // CREATE PROVER INPUTS
         let a_L: Vec<Scalar> = self.a.iter().map(|lc| self.eval_lc(&lc)).collect();
@@ -405,7 +405,7 @@ impl ConstraintSystem {
             .var_assignment
             .iter()
             .zip(v_blinding)
-            .map(|(v_i, v_blinding_i)| gen.pedersen_gens.commit(*v_i, v_blinding_i))
+            .map(|(v_i, v_blinding_i)| gen.pedersen_gens.commit(v_i.unwrap(), v_blinding_i))
             .collect();
 
         Ok((
