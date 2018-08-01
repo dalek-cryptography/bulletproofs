@@ -8,7 +8,7 @@ use generators::{Generators, PedersenGenerators};
 use proof_transcript::ProofTranscript;
 
 // use circuit::{Circuit, ProverInput, VerifierInput};
-use super::circuit::{Circuit, CircuitProof, ProverInput, VerifierInput, matrix_flatten};
+use super::circuit::{matrix_flatten, Circuit, CircuitProof, ProverInput, VerifierInput};
 
 // This is a stripped-down version of the Bellman r1cs representation, for the purposes of
 // learning / understanding. The eventual goal is to write this as a BulletproofsConstraintSystem
@@ -189,6 +189,31 @@ impl ConstraintSystem {
         (circuit, prover_input, verifier_input)
     }
 
+    // for r1cs -> direct
+    fn get_circuit_params(&self) -> (usize, usize, usize, Vec<Scalar>, Vec<Vec<Scalar>>) {
+        let n = self.a.len();
+        let m = self.var_assignment.len();
+        let q = self.a.len() * 3;
+
+        let zer = Scalar::zero();
+        // TODO: create / append to c on the fly instead
+        let mut c = vec![zer; q]; // length q vector of constants.
+        let mut W_V = vec![vec![zer; m]; q]; // qxm matrix of commitments.
+        for (i, lc) in self
+            .a
+            .iter()
+            .chain(self.b.iter())
+            .chain(self.c.iter())
+            .enumerate()
+        {
+            for (var, scalar) in lc.get_variables() {
+                W_V[i][var.0] = scalar;
+            }
+            c[i] = lc.get_constant();
+        }
+        (n, m, q, c, W_V)
+    }
+
     fn get_flattened_matrices(
         &self,
         z: Scalar,
@@ -238,26 +263,7 @@ impl ConstraintSystem {
             self.b.append(&mut vec![LinearCombination::zero(); pad]);
             self.c.append(&mut vec![LinearCombination::zero(); pad]);
         }
-        let n = self.a.len();
-        let m = self.var_assignment.len();
-        let q = self.a.len() * 3;
-
-        let zer = Scalar::zero();
-        // TODO: create / append to c on the fly instead
-        let mut c = vec![zer; q]; // length q vector of constants.
-        let mut W_V = vec![vec![zer; m]; q]; // qxm matrix of commitments.
-        for (i, lc) in self
-            .a
-            .iter()
-            .chain(self.b.iter())
-            .chain(self.c.iter())
-            .enumerate()
-        {
-            for (var, scalar) in lc.get_variables() {
-                W_V[i][var.0] = scalar;
-            }
-            c[i] = lc.get_constant();
-        }
+        let (n, m, q, c, W_V) = self.get_circuit_params();
 
         // CREATE PROVER INPUTS
         let a_L: Vec<Scalar> = self.a.iter().map(|lc| self.eval_lc(&lc)).collect();
@@ -402,20 +408,23 @@ impl ConstraintSystem {
             .map(|(v_i, v_blinding_i)| gen.pedersen_gens.commit(*v_i, v_blinding_i))
             .collect();
 
-        Ok((CircuitProof::new(
-            A_I,
-            A_O,
-            S,
-            T_1,
-            T_3,
-            T_4,
-            T_5,
-            T_6,
-            t_x,
-            t_x_blinding,
-            e_blinding,
-            ipp_proof,
-        ), V))
+        Ok((
+            CircuitProof::new(
+                A_I,
+                A_O,
+                S,
+                T_1,
+                T_3,
+                T_4,
+                T_5,
+                T_6,
+                t_x,
+                t_x_blinding,
+                e_blinding,
+                ipp_proof,
+            ),
+            V,
+        ))
     }
 }
 
@@ -496,12 +505,9 @@ mod tests {
         let generators = Generators::new(PedersenGenerators::default(), cs1.a.len(), 1);
         let mut prover_transcript = ProofTranscript::new(b"CircuitProofTest");
         let mut rng = OsRng::new().unwrap();
-        let (circuit_proof, V) = cs1.prove(
-            &generators, 
-            &mut prover_transcript, 
-            &mut rng
-        ).unwrap();
-
+        let (circuit_proof, V) = cs1
+            .prove(&generators, &mut prover_transcript, &mut rng)
+            .unwrap();
 
         // Verifier's work
 
@@ -546,12 +552,12 @@ mod tests {
         let mut verify_transcript = ProofTranscript::new(b"CircuitProofTest");
         let verifier_input = VerifierInput::new(V);
         circuit_proof.verify(
-            &generators, 
+            &generators,
             &mut verify_transcript,
             &mut rng,
             &circuit,
             &verifier_input,
-        ) 
+        )
     }
 
     fn create_and_verify_helper(
