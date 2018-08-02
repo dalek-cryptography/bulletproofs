@@ -95,4 +95,13 @@ pub enum R1CSError {
     // When trying to access a variable that has an Err as its value assignment
     #[fail(display = "Variable does not have a value assignment.")]
     InvalidVariableAssignment,
+    // CircuitProof did not verify correctly for this R1CS instance
+    #[fail(display = "Circuit did not verify correctly.")]
+    VerificationError,
+    // Invalid proof point when decompressing
+    #[fail(display = "Invalid proof point when decompressing.")]
+    InvalidProofPoint,
+    // Incorrect input sizes (generator length, V length)
+    #[fail(display = "Incorrect input size.")]
+    IncorrectInputSize,
 }
