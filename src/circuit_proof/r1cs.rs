@@ -4,6 +4,7 @@ use rand::{CryptoRng, Rng};
 
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
+use errors::R1CSError;
 use generators::{Generators, PedersenGenerators};
 use proof_transcript::ProofTranscript;
 
@@ -61,7 +62,7 @@ pub struct ConstraintSystem {
     c: Vec<LinearCombination>,
 
     // Assignments of variables
-    var_assignment: Vec<Option<Scalar>>,
+    var_assignment: Vec<Result<Scalar, R1CSError>>,
 }
 
 impl ConstraintSystem {
@@ -75,7 +76,7 @@ impl ConstraintSystem {
     }
     // Allocate a variable and do value assignment at the same time
     pub fn alloc_variable(&mut self, val: Scalar) -> Variable {
-        self.var_assignment.push(Some(val));
+        self.var_assignment.push(Ok(val));
         Variable(self.var_assignment.len() - 1)
     }
 
@@ -95,35 +96,47 @@ impl ConstraintSystem {
         Ok(())
     }
 
-    fn eval_lc(&self, lc: &LinearCombination) -> Scalar {
-        let sum_vars: Scalar = lc
+    fn eval_lc(&self, lc: &LinearCombination) -> Result<Scalar, R1CSError> {
+        let sum_vars = lc
             .variables
             .iter()
-            .map(|(var, scalar)| scalar * self.var_assignment[var.0].unwrap())
-            .sum();
-        sum_vars + lc.constant
+            .map(|(var, scalar)| Ok(scalar * self.var_assignment[var.0].clone()?))
+            .sum::<Result<Scalar, R1CSError>>()?;
+        Ok(sum_vars + lc.constant)
     }
 
     fn create_verifier_input(
         &self,
         v_blinding: &Vec<Scalar>,
         pedersen_gens: &PedersenGenerators,
-    ) -> VerifierInput {
-        let V: Vec<RistrettoPoint> = self
+    ) -> Result<VerifierInput, R1CSError> {
+        let V = self
             .var_assignment
             .iter()
             .zip(v_blinding)
-            .map(|(v_i, v_blinding_i)| pedersen_gens.commit(v_i.unwrap(), *v_blinding_i))
-            .collect();
-        VerifierInput::new(V)
+            .map(|(v_i, v_blinding_i)| Ok(pedersen_gens.commit((v_i.clone())?, *v_blinding_i)))
+            .collect::<Result<Vec<RistrettoPoint>, R1CSError>>()?;
+        Ok(VerifierInput::new(V))
     }
 
-    fn create_prover_input(&self, v_blinding: &Vec<Scalar>) -> ProverInput {
+    fn create_prover_input(&self, v_blinding: &Vec<Scalar>) -> Result<ProverInput, R1CSError> {
         // eval a, b, c and assign results to a_L, a_R, a_O respectively
-        let a_L: Vec<Scalar> = self.a.iter().map(|lc| self.eval_lc(&lc)).collect();
-        let a_R: Vec<Scalar> = self.b.iter().map(|lc| self.eval_lc(&lc)).collect();
-        let a_O: Vec<Scalar> = self.c.iter().map(|lc| self.eval_lc(&lc)).collect();
-        ProverInput::new(a_L, a_R, a_O, v_blinding.to_vec())
+        let a_L = self
+            .a
+            .iter()
+            .map(|lc| Ok(self.eval_lc(&lc)?))
+            .collect::<Result<Vec<Scalar>, R1CSError>>()?;
+        let a_R = self
+            .b
+            .iter()
+            .map(|lc| Ok(self.eval_lc(&lc)?))
+            .collect::<Result<Vec<Scalar>, R1CSError>>()?;
+        let a_O = self
+            .c
+            .iter()
+            .map(|lc| Ok(self.eval_lc(&lc)?))
+            .collect::<Result<Vec<Scalar>, R1CSError>>()?;
+        Ok(ProverInput::new(a_L, a_R, a_O, v_blinding.to_vec()))
     }
 
     fn create_circuit(&self) -> Circuit {
@@ -169,7 +182,7 @@ impl ConstraintSystem {
         mut self,
         pedersen_gens: &PedersenGenerators,
         rng: &mut R,
-    ) -> (Circuit, ProverInput, VerifierInput) {
+    ) -> Result<(Circuit, ProverInput, VerifierInput), R1CSError> {
         // If `n`, the number of multiplications, is not 0 or 2, then pad the circuit.
         let n = self.a.len();
         if !(n == 0 || n.is_power_of_two()) {
@@ -186,7 +199,7 @@ impl ConstraintSystem {
         let prover_input = self.create_prover_input(&v_blinding);
         let verifier_input = self.create_verifier_input(&v_blinding, pedersen_gens);
 
-        (circuit, prover_input, verifier_input)
+        Ok((circuit, prover_input?, verifier_input?))
     }
 
     // for r1cs -> direct
@@ -214,12 +227,35 @@ impl ConstraintSystem {
         (n, m, q, c, W_V)
     }
 
+    // temporarily copied here as I am working out how to not need the matrices.
+    // Computes z * z^Q * W, where W is a qx(n or m) matrix and z is a scalar.
+    // Input: Qx(n or m) matrix of scalars and scalar z
+    // Output: length (n or m) vector of Scalars
+    // Note: output_dim parameter is necessary in case W is `qxn` where `q=0`,
+    //       such that it is not possible to derive `n` from looking at W.
+    pub fn matrix_flatten_temp(
+        &self,
+        W: &Vec<Vec<Scalar>>,
+        z: Scalar,
+        output_dim: usize,
+    ) -> Vec<Scalar>{
+        let mut result = vec![Scalar::zero(); output_dim];
+        let mut exp_z = z; // z^n starting at n=1
+
+        for row in 0..W.len() {
+            for col in 0..output_dim {
+                result[col] += exp_z * W[row][col];
+            }
+            exp_z = exp_z * z; // z^n -> z^(n+1)
+        }
+        result
+    }
+
     fn get_flattened_matrices(
         &self,
         z: Scalar,
         n: usize,
-    ) -> Result<(Vec<Scalar>, Vec<Scalar>, Vec<Scalar>), &'static str> {
-        use super::circuit::matrix_flatten;
+    ) -> (Vec<Scalar>, Vec<Scalar>, Vec<Scalar>) {
         let q = self.a.len() * 3;
 
         // Linear constraints are ordered as follows:
@@ -236,10 +272,10 @@ impl ConstraintSystem {
             W_O[i + 2 * n][i] = one;
         }
 
-        let z_zQ_WL: Vec<Scalar> = matrix_flatten(&W_L, z, n)?;
-        let z_zQ_WR: Vec<Scalar> = matrix_flatten(&W_R, z, n)?;
-        let z_zQ_WO: Vec<Scalar> = matrix_flatten(&W_O, z, n)?;
-        Ok((z_zQ_WL, z_zQ_WR, z_zQ_WO))
+        let z_zQ_WL: Vec<Scalar> = self.matrix_flatten_temp(&W_L, z, n);
+        let z_zQ_WR: Vec<Scalar> = self.matrix_flatten_temp(&W_R, z, n);
+        let z_zQ_WO: Vec<Scalar> = self.matrix_flatten_temp(&W_O, z, n);
+        (z_zQ_WL, z_zQ_WR, z_zQ_WO)
     }
 
     pub fn prove<R: Rng + CryptoRng>(
@@ -247,7 +283,7 @@ impl ConstraintSystem {
         gen: &Generators,
         transcript: &mut ProofTranscript,
         rng: &mut R,
-    ) -> Result<(CircuitProof, Vec<RistrettoPoint>), &'static str> {
+    ) -> Result<(CircuitProof, Vec<RistrettoPoint>), R1CSError> {
         use std::iter;
 
         use curve25519_dalek::ristretto::RistrettoPoint;
@@ -266,9 +302,21 @@ impl ConstraintSystem {
         let (n, m, q, _c, W_V) = self.get_circuit_params();
 
         // CREATE PROVER INPUTS
-        let a_L: Vec<Scalar> = self.a.iter().map(|lc| self.eval_lc(&lc)).collect();
-        let a_R: Vec<Scalar> = self.b.iter().map(|lc| self.eval_lc(&lc)).collect();
-        let a_O: Vec<Scalar> = self.c.iter().map(|lc| self.eval_lc(&lc)).collect();
+        let a_L = self
+            .a
+            .iter()
+            .map(|lc| Ok(self.eval_lc(&lc)?))
+            .collect::<Result<Vec<Scalar>, R1CSError>>()?;
+        let a_R = self
+            .b
+            .iter()
+            .map(|lc| Ok(self.eval_lc(&lc)?))
+            .collect::<Result<Vec<Scalar>, R1CSError>>()?;
+        let a_O = self
+            .c
+            .iter()
+            .map(|lc| Ok(self.eval_lc(&lc)?))
+            .collect::<Result<Vec<Scalar>, R1CSError>>()?;
         let v_blinding: Vec<Scalar> = (0..m).map(|_| Scalar::random(rng)).collect();
 
         // CREATE THE PROOF
@@ -313,7 +361,7 @@ impl ConstraintSystem {
         let mut l_poly = util::VecPoly3::zero(n);
         let mut r_poly = util::VecPoly3::zero(n);
 
-        let (z_zQ_WL, z_zQ_WR, z_zQ_WO) = self.get_flattened_matrices(z, n)?;
+        let (z_zQ_WL, z_zQ_WR, z_zQ_WO) = self.get_flattened_matrices(z, n);
 
         let mut exp_y = Scalar::one(); // y^n starting at n=0
         let mut exp_y_inv = Scalar::one(); // y^-n starting at n=0
@@ -401,12 +449,12 @@ impl ConstraintSystem {
             r_vec.clone(),
         );
 
-        let V: Vec<RistrettoPoint> = self
+        let V = self
             .var_assignment
             .iter()
             .zip(v_blinding)
-            .map(|(v_i, v_blinding_i)| gen.pedersen_gens.commit(v_i.unwrap(), v_blinding_i))
-            .collect();
+            .map(|(v_i, v_blinding_i)| Ok(gen.pedersen_gens.commit((v_i.clone())?, v_blinding_i)))
+            .collect::<Result<Vec<RistrettoPoint>, R1CSError>>()?;
 
         Ok((
             CircuitProof::new(
@@ -547,7 +595,7 @@ mod tests {
         assert!(cs2.constrain(lc_a, lc_b, lc_c).is_ok());
 
         let (circuit, _prover_input, _verifier_input) =
-            cs2.create_proof_input(&pedersen_gens, &mut rng);
+            cs2.create_proof_input(&pedersen_gens, &mut rng).unwrap();
 
         let mut verify_transcript = ProofTranscript::new(b"CircuitProofTest");
         let verifier_input = VerifierInput::new(V);
@@ -601,7 +649,7 @@ mod tests {
         assert!(cs.constrain(lc_a, lc_b, lc_c).is_ok());
 
         let (circuit, prover_input, verifier_input) =
-            cs.create_proof_input(&pedersen_gens, &mut rng);
+            cs.create_proof_input(&pedersen_gens, &mut rng).unwrap();
         assert!(create_and_verify_helper(circuit, prover_input, verifier_input).is_ok());
     }
 
@@ -618,7 +666,7 @@ mod tests {
         assert!(cs.constrain(lc_a, lc_b, lc_c).is_ok());
 
         let (circuit, prover_input, verifier_input) =
-            cs.create_proof_input(&pedersen_gens, &mut rng);
+            cs.create_proof_input(&pedersen_gens, &mut rng).unwrap();
         assert!(create_and_verify_helper(circuit, prover_input, verifier_input).is_err());
     }
 
@@ -639,7 +687,7 @@ mod tests {
         assert!(cs.constrain(lc_a, lc_b, lc_c).is_ok());
 
         let (circuit, prover_input, verifier_input) =
-            cs.create_proof_input(&pedersen_gens, &mut rng);
+            cs.create_proof_input(&pedersen_gens, &mut rng).unwrap();
         assert!(create_and_verify_helper(circuit, prover_input, verifier_input).is_ok());
     }
 
@@ -660,7 +708,7 @@ mod tests {
         assert!(cs.constrain(lc_a, lc_b, lc_c).is_ok());
 
         let (circuit, prover_input, verifier_input) =
-            cs.create_proof_input(&pedersen_gens, &mut rng);
+            cs.create_proof_input(&pedersen_gens, &mut rng).unwrap();
         assert!(create_and_verify_helper(circuit, prover_input, verifier_input).is_err());
     }
 
@@ -681,7 +729,7 @@ mod tests {
         assert!(cs.constrain(lc_a, lc_b, lc_c).is_ok());
 
         let (circuit, prover_input, verifier_input) =
-            cs.create_proof_input(&pedersen_gens, &mut rng);
+            cs.create_proof_input(&pedersen_gens, &mut rng).unwrap();
         assert!(create_and_verify_helper(circuit, prover_input, verifier_input).is_ok());
     }
 
@@ -702,7 +750,7 @@ mod tests {
         assert!(cs.constrain(lc_a, lc_b, lc_c).is_ok());
 
         let (circuit, prover_input, verifier_input) =
-            cs.create_proof_input(&pedersen_gens, &mut rng);
+            cs.create_proof_input(&pedersen_gens, &mut rng).unwrap();
         assert!(create_and_verify_helper(circuit, prover_input, verifier_input).is_err());
     }
 
@@ -730,7 +778,7 @@ mod tests {
         assert!(cs.constrain(lc_a, lc_b, lc_c).is_ok());
 
         let (circuit, prover_input, verifier_input) =
-            cs.create_proof_input(&pedersen_gens, &mut rng);
+            cs.create_proof_input(&pedersen_gens, &mut rng).unwrap();
         assert!(create_and_verify_helper(circuit, prover_input, verifier_input).is_ok());
     }
 
@@ -758,7 +806,7 @@ mod tests {
         assert!(cs.constrain(lc_a, lc_b, lc_c).is_ok());
 
         let (circuit, prover_input, verifier_input) =
-            cs.create_proof_input(&pedersen_gens, &mut rng);
+            cs.create_proof_input(&pedersen_gens, &mut rng).unwrap();
         assert!(create_and_verify_helper(circuit, prover_input, verifier_input).is_err());
     }
 
@@ -786,7 +834,7 @@ mod tests {
         assert!(cs.constrain(lc_a, lc_b, lc_c).is_ok());
 
         let (circuit, prover_input, verifier_input) =
-            cs.create_proof_input(&pedersen_gens, &mut rng);
+            cs.create_proof_input(&pedersen_gens, &mut rng).unwrap();
         assert!(create_and_verify_helper(circuit, prover_input, verifier_input).is_ok());
     }
 
@@ -814,7 +862,7 @@ mod tests {
         assert!(cs.constrain(lc_a, lc_b, lc_c).is_ok());
 
         let (circuit, prover_input, verifier_input) =
-            cs.create_proof_input(&pedersen_gens, &mut rng);
+            cs.create_proof_input(&pedersen_gens, &mut rng).unwrap();
         assert!(create_and_verify_helper(circuit, prover_input, verifier_input).is_err());
     }
 
@@ -843,7 +891,7 @@ mod tests {
         assert!(cs.constrain(lc_a, lc_b, lc_c).is_ok());
 
         let (circuit, prover_input, verifier_input) =
-            cs.create_proof_input(&pedersen_gens, &mut rng);
+            cs.create_proof_input(&pedersen_gens, &mut rng).unwrap();
         assert!(create_and_verify_helper(circuit, prover_input, verifier_input).is_ok());
     }
 
@@ -872,7 +920,7 @@ mod tests {
         assert!(cs.constrain(lc_a, lc_b, lc_c).is_ok());
 
         let (circuit, prover_input, verifier_input) =
-            cs.create_proof_input(&pedersen_gens, &mut rng);
+            cs.create_proof_input(&pedersen_gens, &mut rng).unwrap();
         assert!(create_and_verify_helper(circuit, prover_input, verifier_input).is_err());
     }
 
@@ -905,7 +953,7 @@ mod tests {
         assert!(cs.constrain(lc_a_3, lc_b_3, lc_c_3).is_ok());
 
         let (circuit, prover_input, verifier_input) =
-            cs.create_proof_input(&pedersen_gens, &mut rng);
+            cs.create_proof_input(&pedersen_gens, &mut rng).unwrap();
         assert!(create_and_verify_helper(circuit, prover_input, verifier_input).is_ok());
     }
 
@@ -940,7 +988,7 @@ mod tests {
         assert!(cs.constrain(lc_1_a, lc_1_b, lc_1_c).is_ok());
 
         let (circuit, prover_input, verifier_input) =
-            cs.create_proof_input(&pedersen_gens, &mut rng);
+            cs.create_proof_input(&pedersen_gens, &mut rng).unwrap();
         create_and_verify_helper(circuit, prover_input, verifier_input)
     }
 
@@ -1007,7 +1055,7 @@ mod tests {
         assert!(cs.constrain(lc_a, lc_b, lc_c).is_ok());
 
         let (circuit, prover_input, verifier_input) =
-            cs.create_proof_input(&pedersen_gens, &mut rng);
+            cs.create_proof_input(&pedersen_gens, &mut rng).unwrap();
         create_and_verify_helper(circuit, prover_input, verifier_input)
     }
 

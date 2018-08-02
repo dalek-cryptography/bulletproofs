@@ -85,3 +85,14 @@ pub enum MPCError {
         bad_shares: Vec<usize>,
     },
 }
+
+/// Represents an error during the proving or verifying of a constraint system.
+#[derive(Fail, Clone, Debug, Eq, PartialEq)]
+pub enum R1CSError {
+    // TODO: make better errors
+    #[fail(display = "Invalid R1CS construction.")]
+    InvalidR1CSConstruction,
+    // When trying to access a variable that has an Err as its value assignment
+    #[fail(display = "Variable does not have a value assignment.")]
+    InvalidVariableAssignment,
+}
