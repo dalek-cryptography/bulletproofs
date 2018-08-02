@@ -75,8 +75,15 @@ impl ConstraintSystem {
         }
     }
     // Allocate a variable and do value assignment at the same time
-    pub fn alloc_variable(&mut self, val: Scalar) -> Variable {
+    // Prover uses this function
+    pub fn alloc_assign_variable(&mut self, val: Scalar) -> Variable {
         self.var_assignment.push(Ok(val));
+        Variable(self.var_assignment.len() - 1)
+    }
+
+    pub fn alloc_variable(&mut self) -> Variable {
+        self.var_assignment
+            .push(Err(R1CSError::InvalidVariableAssignment));
         Variable(self.var_assignment.len() - 1)
     }
 
@@ -238,7 +245,7 @@ impl ConstraintSystem {
         W: &Vec<Vec<Scalar>>,
         z: Scalar,
         output_dim: usize,
-    ) -> Vec<Scalar>{
+    ) -> Vec<Scalar> {
         let mut result = vec![Scalar::zero(); output_dim];
         let mut exp_z = z; // z^n starting at n=1
 
@@ -517,12 +524,12 @@ mod tests {
 
         let mut cs1 = ConstraintSystem::new();
 
-        let t_0 = cs1.alloc_variable(type_0);
-        let t_1 = cs1.alloc_variable(type_1);
-        let in_0 = cs1.alloc_variable(val_in_0);
-        let in_1 = cs1.alloc_variable(val_in_1);
-        let out_0 = cs1.alloc_variable(val_out_0);
-        let out_1 = cs1.alloc_variable(val_out_1);
+        let t_0 = cs1.alloc_assign_variable(type_0);
+        let t_1 = cs1.alloc_assign_variable(type_1);
+        let in_0 = cs1.alloc_assign_variable(val_in_0);
+        let in_1 = cs1.alloc_assign_variable(val_in_1);
+        let out_0 = cs1.alloc_assign_variable(val_out_0);
+        let out_1 = cs1.alloc_assign_variable(val_out_1);
 
         // lc_a: in_0 * (-1) + in_1 * (-c) + out_0 + out_1 * (c)
         let lc_a = LinearCombination::new(
@@ -561,12 +568,12 @@ mod tests {
 
         let mut cs2 = ConstraintSystem::new();
 
-        let t_0 = cs2.alloc_variable(type_0);
-        let t_1 = cs2.alloc_variable(type_1);
-        let in_0 = cs2.alloc_variable(val_in_0);
-        let in_1 = cs2.alloc_variable(val_in_1);
-        let out_0 = cs2.alloc_variable(val_out_0);
-        let out_1 = cs2.alloc_variable(val_out_1);
+        let t_0 = cs2.alloc_assign_variable(type_0);
+        let t_1 = cs2.alloc_assign_variable(type_1);
+        let in_0 = cs2.alloc_assign_variable(val_in_0);
+        let in_1 = cs2.alloc_assign_variable(val_in_1);
+        let out_0 = cs2.alloc_assign_variable(val_out_0);
+        let out_1 = cs2.alloc_assign_variable(val_out_1);
 
         // lc_a: in_0 * (-1) + in_1 * (-c) + out_0 + out_1 * (c)
         let lc_a = LinearCombination::new(
@@ -677,9 +684,9 @@ mod tests {
         let pedersen_gens = PedersenGenerators::default();
         let mut cs = ConstraintSystem::new();
 
-        let var_a = cs.alloc_variable(Scalar::from(3u64));
-        let var_b = cs.alloc_variable(Scalar::from(4u64));
-        let var_c = cs.alloc_variable(Scalar::from(12u64));
+        let var_a = cs.alloc_assign_variable(Scalar::from(3u64));
+        let var_b = cs.alloc_assign_variable(Scalar::from(4u64));
+        let var_c = cs.alloc_assign_variable(Scalar::from(12u64));
 
         let lc_a = LinearCombination::new(vec![(var_a, Scalar::one())], Scalar::zero());
         let lc_b = LinearCombination::new(vec![(var_b, Scalar::one())], Scalar::zero());
@@ -698,9 +705,9 @@ mod tests {
         let pedersen_gens = PedersenGenerators::default();
         let mut cs = ConstraintSystem::new();
 
-        let var_a = cs.alloc_variable(Scalar::from(3u64));
-        let var_b = cs.alloc_variable(Scalar::from(4u64));
-        let var_c = cs.alloc_variable(Scalar::from(10u64));
+        let var_a = cs.alloc_assign_variable(Scalar::from(3u64));
+        let var_b = cs.alloc_assign_variable(Scalar::from(4u64));
+        let var_c = cs.alloc_assign_variable(Scalar::from(10u64));
 
         let lc_a = LinearCombination::new(vec![(var_a, Scalar::one())], Scalar::zero());
         let lc_b = LinearCombination::new(vec![(var_b, Scalar::one())], Scalar::zero());
@@ -719,9 +726,9 @@ mod tests {
         let pedersen_gens = PedersenGenerators::default();
         let mut cs = ConstraintSystem::new();
 
-        let var_a = cs.alloc_variable(Scalar::from(3u64));
-        let var_b = cs.alloc_variable(Scalar::from(4u64));
-        let var_c = cs.alloc_variable(Scalar::from(120u64));
+        let var_a = cs.alloc_assign_variable(Scalar::from(3u64));
+        let var_b = cs.alloc_assign_variable(Scalar::from(4u64));
+        let var_c = cs.alloc_assign_variable(Scalar::from(120u64));
 
         let lc_a = LinearCombination::new(vec![(var_a, Scalar::from(2u64))], Scalar::zero());
         let lc_b = LinearCombination::new(vec![(var_b, Scalar::from(5u64))], Scalar::zero());
@@ -740,9 +747,9 @@ mod tests {
         let pedersen_gens = PedersenGenerators::default();
         let mut cs = ConstraintSystem::new();
 
-        let var_a = cs.alloc_variable(Scalar::from(3u64));
-        let var_b = cs.alloc_variable(Scalar::from(4u64));
-        let var_c = cs.alloc_variable(Scalar::from(121u64));
+        let var_a = cs.alloc_assign_variable(Scalar::from(3u64));
+        let var_b = cs.alloc_assign_variable(Scalar::from(4u64));
+        let var_c = cs.alloc_assign_variable(Scalar::from(121u64));
 
         let lc_a = LinearCombination::new(vec![(var_a, Scalar::from(2u64))], Scalar::zero());
         let lc_b = LinearCombination::new(vec![(var_b, Scalar::from(5u64))], Scalar::zero());
@@ -761,9 +768,9 @@ mod tests {
         let pedersen_gens = PedersenGenerators::default();
         let mut cs = ConstraintSystem::new();
 
-        let var_a = cs.alloc_variable(Scalar::from(3u64));
-        let var_b = cs.alloc_variable(Scalar::from(4u64));
-        let var_c = cs.alloc_variable(Scalar::from(7u64));
+        let var_a = cs.alloc_assign_variable(Scalar::from(3u64));
+        let var_b = cs.alloc_assign_variable(Scalar::from(4u64));
+        let var_c = cs.alloc_assign_variable(Scalar::from(7u64));
 
         let lc_a = LinearCombination::new(
             vec![
@@ -789,9 +796,9 @@ mod tests {
         let pedersen_gens = PedersenGenerators::default();
         let mut cs = ConstraintSystem::new();
 
-        let var_a = cs.alloc_variable(Scalar::from(3u64));
-        let var_b = cs.alloc_variable(Scalar::from(4u64));
-        let var_c = cs.alloc_variable(Scalar::from(10u64));
+        let var_a = cs.alloc_assign_variable(Scalar::from(3u64));
+        let var_b = cs.alloc_assign_variable(Scalar::from(4u64));
+        let var_c = cs.alloc_assign_variable(Scalar::from(10u64));
 
         let lc_a = LinearCombination::new(
             vec![
@@ -817,9 +824,9 @@ mod tests {
         let pedersen_gens = PedersenGenerators::default();
         let mut cs = ConstraintSystem::new();
 
-        let var_a = cs.alloc_variable(Scalar::from(3u64));
-        let var_b = cs.alloc_variable(Scalar::from(4u64));
-        let var_c = cs.alloc_variable(Scalar::from(15u64));
+        let var_a = cs.alloc_assign_variable(Scalar::from(3u64));
+        let var_b = cs.alloc_assign_variable(Scalar::from(4u64));
+        let var_c = cs.alloc_assign_variable(Scalar::from(15u64));
 
         let lc_a = LinearCombination::new(
             vec![
@@ -845,9 +852,9 @@ mod tests {
         let pedersen_gens = PedersenGenerators::default();
         let mut cs = ConstraintSystem::new();
 
-        let var_a = cs.alloc_variable(Scalar::from(3u64));
-        let var_b = cs.alloc_variable(Scalar::from(4u64));
-        let var_c = cs.alloc_variable(Scalar::from(16u64));
+        let var_a = cs.alloc_assign_variable(Scalar::from(3u64));
+        let var_b = cs.alloc_assign_variable(Scalar::from(4u64));
+        let var_c = cs.alloc_assign_variable(Scalar::from(16u64));
 
         let lc_a = LinearCombination::new(
             vec![
@@ -873,10 +880,10 @@ mod tests {
         let pedersen_gens = PedersenGenerators::default();
         let mut cs = ConstraintSystem::new();
 
-        let var_a = cs.alloc_variable(Scalar::from(3u64));
-        let var_b = cs.alloc_variable(Scalar::from(4u64));
-        let var_c = cs.alloc_variable(Scalar::from(13u64));
-        let var_d = cs.alloc_variable(Scalar::one());
+        let var_a = cs.alloc_assign_variable(Scalar::from(3u64));
+        let var_b = cs.alloc_assign_variable(Scalar::from(4u64));
+        let var_c = cs.alloc_assign_variable(Scalar::from(13u64));
+        let var_d = cs.alloc_assign_variable(Scalar::one());
 
         let lc_a = LinearCombination::new(
             vec![
@@ -902,10 +909,10 @@ mod tests {
         let pedersen_gens = PedersenGenerators::default();
         let mut cs = ConstraintSystem::new();
 
-        let var_a = cs.alloc_variable(Scalar::from(3u64));
-        let var_b = cs.alloc_variable(Scalar::from(4u64));
-        let var_c = cs.alloc_variable(Scalar::from(13u64));
-        let var_d = cs.alloc_variable(Scalar::one());
+        let var_a = cs.alloc_assign_variable(Scalar::from(3u64));
+        let var_b = cs.alloc_assign_variable(Scalar::from(4u64));
+        let var_c = cs.alloc_assign_variable(Scalar::from(13u64));
+        let var_d = cs.alloc_assign_variable(Scalar::one());
 
         let lc_a = LinearCombination::new(
             vec![
@@ -933,9 +940,9 @@ mod tests {
         let pedersen_gens = PedersenGenerators::default();
         let mut cs = ConstraintSystem::new();
 
-        let var_five = cs.alloc_variable(Scalar::from(5u64));
-        let var_ten = cs.alloc_variable(Scalar::from(10u64));
-        let var_twenty = cs.alloc_variable(Scalar::from(20u64));
+        let var_five = cs.alloc_assign_variable(Scalar::from(5u64));
+        let var_ten = cs.alloc_assign_variable(Scalar::from(10u64));
+        let var_twenty = cs.alloc_assign_variable(Scalar::from(20u64));
 
         let lc_a_1 = LinearCombination::new(vec![], Scalar::from(3u64));
         let lc_b_1 = LinearCombination::new(vec![], Scalar::from(4u64));
@@ -969,11 +976,11 @@ mod tests {
         let mut cs = ConstraintSystem::new();
         let z = Scalar::random(&mut rng);
 
-        let var_in_0 = cs.alloc_variable(in_0);
-        let var_in_1 = cs.alloc_variable(in_1);
-        let var_out_0 = cs.alloc_variable(out_0);
-        let var_out_1 = cs.alloc_variable(out_1);
-        let var_mul = cs.alloc_variable((in_0 - z) * (in_1 - z));
+        let var_in_0 = cs.alloc_assign_variable(in_0);
+        let var_in_1 = cs.alloc_assign_variable(in_1);
+        let var_out_0 = cs.alloc_assign_variable(out_0);
+        let var_out_1 = cs.alloc_assign_variable(out_1);
+        let var_mul = cs.alloc_assign_variable((in_0 - z) * (in_1 - z));
 
         // lc_0: (var_in_0 - z) * (var_in_1 - z) = var_mul
         let lc_0_a = LinearCombination::new(vec![(var_in_0, Scalar::one())], -z);
@@ -1021,12 +1028,12 @@ mod tests {
         let mut cs = ConstraintSystem::new();
         let c = Scalar::random(&mut rng);
 
-        let t_0 = cs.alloc_variable(type_0);
-        let t_1 = cs.alloc_variable(type_1);
-        let in_0 = cs.alloc_variable(val_in_0);
-        let in_1 = cs.alloc_variable(val_in_1);
-        let out_0 = cs.alloc_variable(val_out_0);
-        let out_1 = cs.alloc_variable(val_out_1);
+        let t_0 = cs.alloc_assign_variable(type_0);
+        let t_1 = cs.alloc_assign_variable(type_1);
+        let in_0 = cs.alloc_assign_variable(val_in_0);
+        let in_1 = cs.alloc_assign_variable(val_in_1);
+        let out_0 = cs.alloc_assign_variable(val_out_0);
+        let out_1 = cs.alloc_assign_variable(val_out_1);
 
         // lc_a: in_0 * (-1) + in_1 * (-c) + out_0 + out_1 * (c)
         let lc_a = LinearCombination::new(
