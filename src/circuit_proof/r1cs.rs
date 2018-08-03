@@ -179,55 +179,35 @@ impl ConstraintSystem {
         (n, m, q, c, W_V)
     }
 
-    // temporarily copied here as I am working out how to not need the matrices.
-    // Computes z * z^Q * W, where W is a qx(n or m) matrix and z is a scalar.
-    // Input: Qx(n or m) matrix of scalars and scalar z
-    // Output: length (n or m) vector of Scalars
-    // Note: output_dim parameter is necessary in case W is `qxn` where `q=0`,
-    //       such that it is not possible to derive `n` from looking at W.
-    pub fn matrix_flatten_temp(
-        &self,
-        W: &Vec<Vec<Scalar>>,
-        z: Scalar,
-        output_dim: usize,
-    ) -> Vec<Scalar> {
-        let mut result = vec![Scalar::zero(); output_dim];
-        let mut exp_z = z; // z^n starting at n=1
-
-        for row in 0..W.len() {
-            for col in 0..output_dim {
-                result[col] += exp_z * W[row][col];
-            }
-            exp_z = exp_z * z; // z^n -> z^(n+1)
-        }
-        result
-    }
-
+    // Return flattened (rows multiplied by the vector z*z^q) versions of W_L, W_R, W_O
+    // Linear constraints are ordered as follows:
+    // a[0], a[1], ... b[0], b[1], ... c[0], c[1], ...
+    // s.t. W_L || W_R || W_O || c || W_V matrix is in reduced row echelon form
+    // Flattening only works if we have a diagonal matrix: naive R1CS -> matrix conversion
     fn get_flattened_matrices(
         &self,
         z: Scalar,
         n: usize,
     ) -> (Vec<Scalar>, Vec<Scalar>, Vec<Scalar>) {
         let q = self.a.len() * 3;
+        let mut W_L_flat = vec![Scalar::zero(); n];
+        let mut W_R_flat = vec![Scalar::zero(); n];
+        let mut W_O_flat = vec![Scalar::zero(); n];
 
-        // Linear constraints are ordered as follows:
-        // a[0], a[1], ... b[0], b[1], ... c[0], c[1], ...
-        // s.t. W_L || W_R || W_O || c || W_V matrix is in reduced row echelon form
-        let zer = Scalar::zero();
-        let one = Scalar::one();
-        let mut W_L = vec![vec![zer; n]; q]; // qxn matrix which corresponds to a.
-        let mut W_R = vec![vec![zer; n]; q]; // qxn matrix which corresponds to b.
-        let mut W_O = vec![vec![zer; n]; q]; // qxn matrix which corresponds to c.
+        let z_Q = z * util::exp_iter(z).take(n).last().unwrap(); // TODO: don't unwrap
+        let mut z_exp_W_L = z;
+        let mut z_exp_W_R = z * z_Q;
+        let mut z_exp_W_O = z * z_Q * z_Q;
         for i in 0..n {
-            W_L[i][i] = one;
-            W_R[i + n][i] = one;
-            W_O[i + 2 * n][i] = one;
+            W_L_flat[i] = z_exp_W_L;
+            W_R_flat[i] = z_exp_W_R;
+            W_O_flat[i] = z_exp_W_O;
+            z_exp_W_L = z_exp_W_L * z;
+            z_exp_W_R = z_exp_W_R * z;
+            z_exp_W_O = z_exp_W_O * z;
         }
 
-        let z_zQ_WL: Vec<Scalar> = self.matrix_flatten_temp(&W_L, z, n);
-        let z_zQ_WR: Vec<Scalar> = self.matrix_flatten_temp(&W_R, z, n);
-        let z_zQ_WO: Vec<Scalar> = self.matrix_flatten_temp(&W_O, z, n);
-        (z_zQ_WL, z_zQ_WR, z_zQ_WO)
+        (W_L_flat, W_R_flat, W_O_flat)
     }
 
     pub fn prove<R: Rng + CryptoRng>(
