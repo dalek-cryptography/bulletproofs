@@ -2,7 +2,6 @@
 
 use super::r1cs::{ConstraintSystem, LinearCombination, Variable};
 use curve25519_dalek::scalar::Scalar;
-use errors::R1CSError;
 use rand::rngs::OsRng;
 
 // TODO: make a trait that all circuit examples need to implement
@@ -156,6 +155,7 @@ impl Shuffle {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use errors::R1CSError;
     use generators::{Generators, PedersenGenerators};
     use proof_transcript::ProofTranscript;
     use rand::rngs::OsRng;

@@ -179,6 +179,30 @@ impl ConstraintSystem {
         (n, m, q, c, W_V)
     }
 
+    // temporarily copied over from `circuit.rs`, while working out how to get rid of matrices
+    // Computes z * z^Q * W, where W is a qx(n or m) matrix and z is a scalar.
+    // Input: Qx(n or m) matrix of scalars and scalar z
+    // Output: length (n or m) vector of Scalars
+    // Note: output_dim parameter is necessary in case W is `qxn` where `q=0`,
+    //       such that it is not possible to derive `n` from looking at W.
+    pub fn matrix_flatten_temp(
+        &self,
+        W: &Vec<Vec<Scalar>>,
+        z: Scalar,
+        output_dim: usize,
+    ) -> Vec<Scalar> {
+        let mut result = vec![Scalar::zero(); output_dim];
+        let mut exp_z = z; // z^n starting at n=1
+
+        for row in 0..W.len() {
+            for col in 0..output_dim {
+                result[col] += exp_z * W[row][col];
+            }
+            exp_z = exp_z * z; // z^n -> z^(n+1)
+        }
+        result
+    }
+
     // Return flattened (rows multiplied by the vector z*z^q) versions of W_L, W_R, W_O
     // Linear constraints are ordered as follows:
     // a[0], a[1], ... b[0], b[1], ... c[0], c[1], ...
@@ -194,7 +218,7 @@ impl ConstraintSystem {
         let mut W_R_flat = vec![Scalar::zero(); n];
         let mut W_O_flat = vec![Scalar::zero(); n];
 
-        let z_Q = z * util::exp_iter(z).take(n).last().unwrap(); // TODO: don't unwrap
+        let z_Q = z * util::exp_iter(z).take(n).last().unwrap(); // TODO: propogate err instead
         let mut z_exp_W_L = z;
         let mut z_exp_W_R = z * z_Q;
         let mut z_exp_W_O = z * z_Q * z_Q;
@@ -286,7 +310,7 @@ impl ConstraintSystem {
         let mut l_poly = util::VecPoly3::zero(n);
         let mut r_poly = util::VecPoly3::zero(n);
 
-        let (z_zQ_WL, z_zQ_WR, z_zQ_WO) = self.get_flattened_matrices(z, n);
+        let (W_L_flat, W_R_flat, W_O_flat) = self.get_flattened_matrices(z, n);
 
         let mut exp_y = Scalar::one(); // y^n starting at n=0
         let mut exp_y_inv = Scalar::one(); // y^-n starting at n=0
@@ -295,15 +319,15 @@ impl ConstraintSystem {
         for i in 0..n {
             // l_poly.0 = 0
             // l_poly.1 = a_L + y^-n * (z * z^Q * W_R)
-            l_poly.1[i] = a_L[i] + exp_y_inv * z_zQ_WR[i];
+            l_poly.1[i] = a_L[i] + exp_y_inv * W_R_flat[i];
             // l_poly.2 = a_O
             l_poly.2[i] = a_O[i];
             // l_poly.3 = s_L
             l_poly.3[i] = s_L[i];
             // r_poly.0 = (z * z^Q * W_O) - y^n
-            r_poly.0[i] = z_zQ_WO[i] - exp_y;
+            r_poly.0[i] = W_O_flat[i] - exp_y;
             // r_poly.1 = y^n * a_R + (z * z^Q * W_L)
-            r_poly.1[i] = exp_y * a_R[i] + z_zQ_WL[i];
+            r_poly.1[i] = exp_y * a_R[i] + W_L_flat[i];
             // r_poly.2 = 0
             // r_poly.3 = y^n * s_R
             r_poly.3[i] = exp_y * s_R[i];
@@ -418,7 +442,6 @@ impl ConstraintSystem {
         }
         let (n, m, q, c, W_V) = self.get_circuit_params();
 
-        // TODO: remove the matrix generation
         // Linear constraints are ordered as follows:
         // a[0], a[1], ... b[0], b[1], ... c[0], c[1], ...
         // s.t. W_L || W_R || W_O || c || W_V matrix is in reduced row echelon form
@@ -433,10 +456,7 @@ impl ConstraintSystem {
             W_O[i + 2 * n][i] = one;
         }
 
-        if V.len() != m {
-            return Err(R1CSError::IncorrectInputSize);
-        }
-        if gen.n != n {
+        if V.len() != m || gen.n != n {
             return Err(R1CSError::IncorrectInputSize);
         }
 
@@ -506,24 +526,22 @@ impl ConstraintSystem {
             .map(|(H_i, exp_y_inv)| H_i * exp_y_inv)
             .collect();
 
+        let (W_L_flat, W_R_flat, W_O_flat) = self.get_flattened_matrices(z, n);
+
         // W_L_point = <h * y^-n , z * z^Q * W_L>, line 81
-        let W_L_flatten: Vec<Scalar> = self.matrix_flatten_temp(&W_L, z, n);
-        let W_L_point =
-            RistrettoPoint::vartime_multiscalar_mul(W_L_flatten.clone(), H_prime.iter());
+        let W_L_point = RistrettoPoint::vartime_multiscalar_mul(W_L_flat.clone(), H_prime.iter());
 
         // W_R_point = <g , y^-n * z * z^Q * W_R>, line 82
-        let W_R_flatten: Vec<Scalar> = self.matrix_flatten_temp(&W_R, z, n);
-        let W_R_flatten_yinv: Vec<Scalar> = W_R_flatten
+        let W_R_flat_yinv: Vec<Scalar> = W_R_flat
             .iter()
             .zip(util::exp_iter(y.invert()))
             .map(|(W_R_right_i, exp_y_inv)| W_R_right_i * exp_y_inv)
             .collect();
         let W_R_point =
-            RistrettoPoint::vartime_multiscalar_mul(W_R_flatten_yinv.clone(), gen.G.iter());
+            RistrettoPoint::vartime_multiscalar_mul(W_R_flat_yinv.clone(), gen.G.iter());
 
         // W_O_point = <h * y^-n , z * z^Q * W_O>, line 83
-        let W_O_flatten: Vec<Scalar> = self.matrix_flatten_temp(&W_O, z, n);
-        let W_O_point = RistrettoPoint::vartime_multiscalar_mul(W_O_flatten, H_prime.iter());
+        let W_O_point = RistrettoPoint::vartime_multiscalar_mul(W_O_flat, H_prime.iter());
 
         // Get IPP variables
         let (x_sq, x_inv_sq, s) = proof.ipp_proof.verification_scalars(transcript);
@@ -538,7 +556,7 @@ impl ConstraintSystem {
             .map(|(s_i_inv, exp_y_inv)| -exp_y_inv * b * s_i_inv - Scalar::one());
 
         // define parameters for t check
-        let delta = inner_product(&W_R_flatten_yinv, &W_L_flatten);
+        let delta = inner_product(&W_R_flat_yinv, &W_L_flat);
         let powers_of_z: Vec<Scalar> = util::exp_iter(z).take(q).collect();
         let z_c = z * inner_product(&powers_of_z, &c);
         let W_V_flatten: Vec<Scalar> = self.matrix_flatten_temp(&W_V, z, m);
