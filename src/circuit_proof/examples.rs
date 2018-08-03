@@ -125,10 +125,7 @@ impl Shuffle {
         (cs, r)
     }
 
-    pub fn make_verifier_cs(
-        &self,
-        r: Scalar,
-    ) -> ConstraintSystem {
+    pub fn make_verifier_cs(&self, r: Scalar) -> ConstraintSystem {
         let mut cs = ConstraintSystem::new();
         let var_in_0 = cs.alloc_variable();
         let var_in_1 = cs.alloc_variable();
@@ -172,7 +169,27 @@ mod tests {
     use super::*;
     use rand::rngs::OsRng;
 
-    // fn create_and_verify_helper(prover_/)
+    fn create_and_verify_helper(
+        prover_cs: ConstraintSystem,
+        verifier_cs: ConstraintSystem,
+    ) -> Result<(), R1CSError> {
+        let generators = Generators::new(PedersenGenerators::default(), prover_cs.get_n(), 1);
+        let mut prover_transcript = ProofTranscript::new(b"R1CSExamplesTest");
+        let mut rng = OsRng::new().unwrap();
+
+        let (circuit_proof, V) = prover_cs
+            .prove(&generators, &mut prover_transcript, &mut rng)
+            .unwrap();
+
+        let mut verifier_transcript = ProofTranscript::new(b"R1CSExamplesTest");
+        verifier_cs.verify(
+            &circuit_proof,
+            &V,
+            &generators,
+            &mut verifier_transcript,
+            &mut rng,
+        )
+    }
 
     #[test]
     fn merge_circuit() {
@@ -201,25 +218,9 @@ mod tests {
     ) -> Result<(), R1CSError> {
         let (prover_cs, r) =
             Merge::new().make_prover_cs(type_0, type_1, val_in_0, val_in_1, val_out_0, val_out_1);
-
-        let generators = Generators::new(PedersenGenerators::default(), prover_cs.get_n(), 1);
-        let mut prover_transcript = ProofTranscript::new(b"MergeTest");
-        let mut rng = OsRng::new().unwrap();
-
-        let (circuit_proof, V) = prover_cs
-            .prove(&generators, &mut prover_transcript, &mut rng)
-            .unwrap();
-
         let verifier_cs = Merge::new().make_verifier_cs(r);
 
-        let mut verifier_transcript = ProofTranscript::new(b"MergeTest");
-        verifier_cs.verify(
-            &circuit_proof,
-            &V,
-            &generators,
-            &mut verifier_transcript,
-            &mut rng,
-        )
+        create_and_verify_helper(prover_cs, verifier_cs)
     }
 
     #[test]
@@ -229,7 +230,7 @@ mod tests {
         assert!(shuffle_circuit_helper(three, seven, three, seven).is_ok());
         assert!(shuffle_circuit_helper(three, seven, seven, three).is_ok());
         assert!(shuffle_circuit_helper(three, seven, seven, seven).is_err());
-        assert!(shuffle_circuit_helper(three, Scalar::one(), seven, three).is_err());        
+        assert!(shuffle_circuit_helper(three, Scalar::one(), seven, three).is_err());
     }
 
     fn shuffle_circuit_helper(
@@ -238,26 +239,9 @@ mod tests {
         out_0: Scalar,
         out_1: Scalar,
     ) -> Result<(), R1CSError> {
-        let (prover_cs, r) = 
-            Shuffle::new().make_prover_cs(in_0, in_1, out_0, out_1);
-
-        let generators = Generators::new(PedersenGenerators::default(), prover_cs.get_n(), 1);
-        let mut prover_transcript = ProofTranscript::new(b"ShuffleTest");
-        let mut rng = OsRng::new().unwrap();
-
-        let (circuit_proof, V) = prover_cs
-            .prove(&generators, &mut prover_transcript, &mut rng)
-            .unwrap();
-
+        let (prover_cs, r) = Shuffle::new().make_prover_cs(in_0, in_1, out_0, out_1);
         let verifier_cs = Shuffle::new().make_verifier_cs(r);
 
-        let mut verifier_transcript = ProofTranscript::new(b"ShuffleTest");
-        verifier_cs.verify(
-            &circuit_proof,
-            &V,
-            &generators,
-            &mut verifier_transcript,
-            &mut rng,
-        )
+        create_and_verify_helper(prover_cs, verifier_cs)
     }
 }
