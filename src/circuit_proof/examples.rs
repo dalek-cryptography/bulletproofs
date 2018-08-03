@@ -15,20 +15,20 @@ impl Merge {
         Merge {}
     }
 
-    pub fn make_prover_cs(
+    pub fn fill_prover_cs(
         &self,
+        cs: &mut ConstraintSystem,
         type_0: Scalar,
         type_1: Scalar,
         val_in_0: Scalar,
         val_in_1: Scalar,
         val_out_0: Scalar,
         val_out_1: Scalar,
-    ) -> (ConstraintSystem, Scalar) {
+    ) -> Scalar {
         // TODO: actually use a challenge variable for this - obviously unsafe
         let mut rng = OsRng::new().unwrap();
         let r = Scalar::random(&mut rng);
 
-        let mut cs = ConstraintSystem::new();
         let t_0 = cs.alloc_assign_variable(type_0);
         let t_1 = cs.alloc_assign_variable(type_1);
         let in_0 = cs.alloc_assign_variable(val_in_0);
@@ -36,12 +36,11 @@ impl Merge {
         let out_0 = cs.alloc_assign_variable(val_out_0);
         let out_1 = cs.alloc_assign_variable(val_out_1);
 
-        self.fill_cs(&mut cs, r, t_0, t_1, in_0, in_1, out_0, out_1);
-        (cs, r)
+        self.fill_cs(cs, r, t_0, t_1, in_0, in_1, out_0, out_1);
+        r
     }
 
-    pub fn make_verifier_cs(&self, c: Scalar) -> ConstraintSystem {
-        let mut cs = ConstraintSystem::new();
+    pub fn fill_verifier_cs(&self, cs: &mut ConstraintSystem, r: Scalar) {
         let t_0 = cs.alloc_variable();
         let t_1 = cs.alloc_variable();
         let in_0 = cs.alloc_variable();
@@ -49,8 +48,7 @@ impl Merge {
         let out_0 = cs.alloc_variable();
         let out_1 = cs.alloc_variable();
 
-        self.fill_cs(&mut cs, c, t_0, t_1, in_0, in_1, out_0, out_1);
-        cs
+        self.fill_cs(cs, r, t_0, t_1, in_0, in_1, out_0, out_1);
     }
 
     fn fill_cs(
@@ -100,17 +98,17 @@ impl Shuffle {
         Shuffle {}
     }
 
-    pub fn make_prover_cs(
+    pub fn fill_prover_cs(
         &self,
+        cs: &mut ConstraintSystem,
         val_in_0: Scalar,
         val_in_1: Scalar,
         val_out_0: Scalar,
         val_out_1: Scalar,
-    ) -> (ConstraintSystem, Scalar) {
+    ) -> Scalar {
         let mut rng = OsRng::new().unwrap();
         let r = Scalar::random(&mut rng);
 
-        let mut cs = ConstraintSystem::new();
         let var_in_0 = cs.alloc_assign_variable(val_in_0);
         let var_in_1 = cs.alloc_assign_variable(val_in_1);
         let var_out_0 = cs.alloc_assign_variable(val_out_0);
@@ -118,13 +116,12 @@ impl Shuffle {
         let var_mul = cs.alloc_assign_variable((val_in_0 - r) * (val_in_1 - r));
 
         self.fill_cs(
-            &mut cs, r, var_in_0, var_in_1, var_out_0, var_out_1, var_mul,
+            cs, r, var_in_0, var_in_1, var_out_0, var_out_1, var_mul,
         );
-        (cs, r)
+        r
     }
 
-    pub fn make_verifier_cs(&self, r: Scalar) -> ConstraintSystem {
-        let mut cs = ConstraintSystem::new();
+    pub fn fill_verifier_cs(&self, cs: &mut ConstraintSystem, r: Scalar) {
         let var_in_0 = cs.alloc_variable();
         let var_in_1 = cs.alloc_variable();
         let var_out_0 = cs.alloc_variable();
@@ -132,9 +129,8 @@ impl Shuffle {
         let var_mul = cs.alloc_variable();
 
         self.fill_cs(
-            &mut cs, r, var_in_0, var_in_1, var_out_0, var_out_1, var_mul,
+            cs, r, var_in_0, var_in_1, var_out_0, var_out_1, var_mul,
         );
-        cs
     }
 
     fn fill_cs(
@@ -215,9 +211,12 @@ mod tests {
         val_out_0: Scalar,
         val_out_1: Scalar,
     ) -> Result<(), R1CSError> {
-        let (prover_cs, r) =
-            Merge::new().make_prover_cs(type_0, type_1, val_in_0, val_in_1, val_out_0, val_out_1);
-        let verifier_cs = Merge::new().make_verifier_cs(r);
+        let mut prover_cs = ConstraintSystem::new();
+        let r =
+            Merge::new().fill_prover_cs(&mut prover_cs, type_0, type_1, val_in_0, val_in_1, val_out_0, val_out_1);
+
+        let mut verifier_cs = ConstraintSystem::new();
+        Merge::new().fill_verifier_cs(&mut verifier_cs, r);
 
         create_and_verify_helper(prover_cs, verifier_cs)
     }
@@ -238,8 +237,11 @@ mod tests {
         out_0: Scalar,
         out_1: Scalar,
     ) -> Result<(), R1CSError> {
-        let (prover_cs, r) = Shuffle::new().make_prover_cs(in_0, in_1, out_0, out_1);
-        let verifier_cs = Shuffle::new().make_verifier_cs(r);
+        let mut prover_cs = ConstraintSystem::new();
+        let r = Shuffle::new().fill_prover_cs(&mut prover_cs, in_0, in_1, out_0, out_1);
+
+        let mut verifier_cs = ConstraintSystem::new();
+        Shuffle::new().fill_verifier_cs(&mut verifier_cs, r);
 
         create_and_verify_helper(prover_cs, verifier_cs)
     }

@@ -5,7 +5,7 @@ use rand::{CryptoRng, Rng};
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
 use errors::R1CSError;
-use generators::{Generators, PedersenGenerators};
+use generators::Generators;
 use proof_transcript::ProofTranscript;
 
 use std::iter;
@@ -13,9 +13,6 @@ use std::iter;
 use curve25519_dalek::traits::{IsIdentity, MultiscalarMul, VartimeMultiscalarMul};
 use inner_product_proof::{inner_product, InnerProductProof};
 use util;
-
-// use circuit::{Circuit, ProverInput, VerifierInput};
-use super::circuit::{Circuit, ProverInput, VerifierInput};
 
 #[derive(Clone, Debug)]
 pub struct R1CSProof {
@@ -155,103 +152,6 @@ impl ConstraintSystem {
             .map(|(var, scalar)| Ok(scalar * self.var_assignment[var.0].clone()?))
             .sum::<Result<Scalar, R1CSError>>()?;
         Ok(sum_vars + lc.constant)
-    }
-
-    fn create_verifier_input(
-        &self,
-        v_blinding: &Vec<Scalar>,
-        pedersen_gens: &PedersenGenerators,
-    ) -> Result<VerifierInput, R1CSError> {
-        let V = self
-            .var_assignment
-            .iter()
-            .zip(v_blinding)
-            .map(|(v_i, v_blinding_i)| Ok(pedersen_gens.commit((v_i.clone())?, *v_blinding_i)))
-            .collect::<Result<Vec<RistrettoPoint>, R1CSError>>()?;
-        Ok(VerifierInput::new(V))
-    }
-
-    fn create_prover_input(&self, v_blinding: &Vec<Scalar>) -> Result<ProverInput, R1CSError> {
-        // eval a, b, c and assign results to a_L, a_R, a_O respectively
-        let a_L = self
-            .a
-            .iter()
-            .map(|lc| Ok(self.eval_lc(&lc)?))
-            .collect::<Result<Vec<Scalar>, R1CSError>>()?;
-        let a_R = self
-            .b
-            .iter()
-            .map(|lc| Ok(self.eval_lc(&lc)?))
-            .collect::<Result<Vec<Scalar>, R1CSError>>()?;
-        let a_O = self
-            .c
-            .iter()
-            .map(|lc| Ok(self.eval_lc(&lc)?))
-            .collect::<Result<Vec<Scalar>, R1CSError>>()?;
-        Ok(ProverInput::new(a_L, a_R, a_O, v_blinding.to_vec()))
-    }
-
-    fn create_circuit(&self) -> Circuit {
-        let n = self.a.len();
-        let m = self.var_assignment.len();
-        let q = self.a.len() * 3;
-
-        // Linear constraints are ordered as follows:
-        // a[0], a[1], ... b[0], b[1], ... c[0], c[1], ...
-        // s.t. W_L || W_R || W_O || c || W_V matrix is in reduced row echelon form
-        let zer = Scalar::zero();
-        let one = Scalar::one();
-        let mut W_L = vec![vec![zer; n]; q]; // qxn matrix which corresponds to a.
-        let mut W_R = vec![vec![zer; n]; q]; // qxn matrix which corresponds to b.
-        let mut W_O = vec![vec![zer; n]; q]; // qxn matrix which corresponds to c.
-        for i in 0..n {
-            W_L[i][i] = one;
-            W_R[i + n][i] = one;
-            W_O[i + 2 * n][i] = one;
-        }
-
-        // TODO: create / append to c on the fly instead
-        let mut c = vec![zer; q]; // length q vector of constants.
-        let mut W_V = vec![vec![zer; m]; q]; // qxm matrix of commitments.
-        for (i, lc) in self
-            .a
-            .iter()
-            .chain(self.b.iter())
-            .chain(self.c.iter())
-            .enumerate()
-        {
-            for (var, scalar) in lc.get_variables() {
-                W_V[i][var.0] = scalar;
-            }
-            c[i] = lc.get_constant();
-        }
-
-        Circuit::new(n, m, q, c, W_L, W_R, W_O, W_V)
-    }
-
-    // This function can only be called once per ConstraintSystem instance.
-    pub fn create_proof_input<R: Rng + CryptoRng>(
-        mut self,
-        pedersen_gens: &PedersenGenerators,
-        rng: &mut R,
-    ) -> Result<(Circuit, ProverInput, VerifierInput), R1CSError> {
-        // If `n`, the number of multiplications, is not 0 or 2, then pad the circuit.
-        let n = self.a.len();
-        if !(n == 0 || n.is_power_of_two()) {
-            let pad = n.next_power_of_two() - n;
-            self.a.append(&mut vec![LinearCombination::zero(); pad]);
-            self.b.append(&mut vec![LinearCombination::zero(); pad]);
-            self.c.append(&mut vec![LinearCombination::zero(); pad]);
-        }
-
-        let m = self.var_assignment.len();
-        let v_blinding: Vec<Scalar> = (0..m).map(|_| Scalar::random(rng)).collect();
-
-        let circuit = self.create_circuit();
-        let prover_input = self.create_prover_input(&v_blinding);
-        let verifier_input = self.create_verifier_input(&v_blinding, pedersen_gens);
-
-        Ok((circuit, prover_input?, verifier_input?))
     }
 
     // for r1cs -> direct
@@ -732,6 +632,7 @@ impl ConstraintSystem {
 mod tests {
     use super::*;
     use rand::rngs::OsRng;
+    use generators::PedersenGenerators;
 
     fn create_and_verify_helper(
         prover_cs: ConstraintSystem,
