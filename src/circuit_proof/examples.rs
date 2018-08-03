@@ -115,9 +115,7 @@ impl Shuffle {
         let var_out_1 = cs.alloc_assign_variable(val_out_1);
         let var_mul = cs.alloc_assign_variable((val_in_0 - r) * (val_in_1 - r));
 
-        self.fill_cs(
-            cs, r, var_in_0, var_in_1, var_out_0, var_out_1, var_mul,
-        );
+        self.fill_cs(cs, r, var_in_0, var_in_1, var_out_0, var_out_1, var_mul);
         r
     }
 
@@ -128,9 +126,7 @@ impl Shuffle {
         let var_out_1 = cs.alloc_variable();
         let var_mul = cs.alloc_variable();
 
-        self.fill_cs(
-            cs, r, var_in_0, var_in_1, var_out_0, var_out_1, var_mul,
-        );
+        self.fill_cs(cs, r, var_in_0, var_in_1, var_out_0, var_out_1, var_mul);
     }
 
     fn fill_cs(
@@ -212,8 +208,15 @@ mod tests {
         val_out_1: Scalar,
     ) -> Result<(), R1CSError> {
         let mut prover_cs = ConstraintSystem::new();
-        let r =
-            Merge::new().fill_prover_cs(&mut prover_cs, type_0, type_1, val_in_0, val_in_1, val_out_0, val_out_1);
+        let r = Merge::new().fill_prover_cs(
+            &mut prover_cs,
+            type_0,
+            type_1,
+            val_in_0,
+            val_in_1,
+            val_out_0,
+            val_out_1,
+        );
 
         let mut verifier_cs = ConstraintSystem::new();
         Merge::new().fill_verifier_cs(&mut verifier_cs, r);

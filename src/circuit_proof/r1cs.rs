@@ -126,7 +126,7 @@ impl ConstraintSystem {
         let n = self.a.len();
         if n == 0 || n.is_power_of_two() {
             return n;
-        } 
+        }
         return n.next_power_of_two();
     }
 
@@ -631,8 +631,8 @@ impl ConstraintSystem {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rand::rngs::OsRng;
     use generators::PedersenGenerators;
+    use rand::rngs::OsRng;
 
     fn create_and_verify_helper(
         prover_cs: ConstraintSystem,
