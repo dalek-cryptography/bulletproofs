@@ -28,7 +28,7 @@ impl Merge {
     ) -> (ConstraintSystem, Scalar) {
         // TODO: actually use a challenge variable for this - obviously unsafe
         let mut rng = OsRng::new().unwrap();
-        let c = Scalar::random(&mut rng);
+        let r = Scalar::random(&mut rng);
 
         let mut cs = ConstraintSystem::new();
         let t_0 = cs.alloc_assign_variable(type_0);
@@ -38,8 +38,8 @@ impl Merge {
         let out_0 = cs.alloc_assign_variable(val_out_0);
         let out_1 = cs.alloc_assign_variable(val_out_1);
 
-        self.fill_cs(&mut cs, c, t_0, t_1, in_0, in_1, out_0, out_1);
-        (cs, c)
+        self.fill_cs(&mut cs, r, t_0, t_1, in_0, in_1, out_0, out_1);
+        (cs, r)
     }
 
     pub fn make_verifier_cs(&self, c: Scalar) -> ConstraintSystem {
@@ -58,7 +58,7 @@ impl Merge {
     fn fill_cs(
         &self,
         cs: &mut ConstraintSystem,
-        c: Scalar,
+        r: Scalar,
         t_0: Variable,
         t_1: Variable,
         in_0: Variable,
@@ -70,9 +70,9 @@ impl Merge {
         let lc_a = LinearCombination::new(
             vec![
                 (in_0.clone(), -Scalar::one()),
-                (in_1.clone(), -c),
+                (in_1.clone(), -r),
                 (out_0.clone(), Scalar::one()),
-                (out_1.clone(), c),
+                (out_1.clone(), r),
             ],
             Scalar::zero(),
         );
@@ -82,9 +82,9 @@ impl Merge {
                 (in_0, Scalar::one()),
                 (in_1, Scalar::one()),
                 (out_1, -Scalar::one()),
-                (out_0, c),
-                (t_0, -c * c),
-                (t_1, c * c),
+                (out_0, r),
+                (t_0, -r * r),
+                (t_1, r * r),
             ],
             Scalar::zero(),
         );
@@ -94,11 +94,85 @@ impl Merge {
     }
 }
 
+// 2-in 2-out shuffle circuit
+pub struct Shuffle {}
+
+impl Shuffle {
+    pub fn new() -> Self {
+        Shuffle {}
+    }
+
+    pub fn make_prover_cs(
+        &self,
+        val_in_0: Scalar,
+        val_in_1: Scalar,
+        val_out_0: Scalar,
+        val_out_1: Scalar,
+    ) -> (ConstraintSystem, Scalar) {
+        let mut rng = OsRng::new().unwrap();
+        let r = Scalar::random(&mut rng);
+
+        let mut cs = ConstraintSystem::new();
+        let var_in_0 = cs.alloc_assign_variable(val_in_0);
+        let var_in_1 = cs.alloc_assign_variable(val_in_1);
+        let var_out_0 = cs.alloc_assign_variable(val_out_0);
+        let var_out_1 = cs.alloc_assign_variable(val_out_1);
+        let var_mul = cs.alloc_assign_variable((val_in_0 - r) * (val_in_1 - r));
+
+        self.fill_cs(
+            &mut cs, r, var_in_0, var_in_1, var_out_0, var_out_1, var_mul,
+        );
+        (cs, r)
+    }
+
+    pub fn make_verifier_cs(
+        &self,
+        r: Scalar,
+    ) -> ConstraintSystem {
+        let mut cs = ConstraintSystem::new();
+        let var_in_0 = cs.alloc_variable();
+        let var_in_1 = cs.alloc_variable();
+        let var_out_0 = cs.alloc_variable();
+        let var_out_1 = cs.alloc_variable();
+        let var_mul = cs.alloc_variable();
+
+        self.fill_cs(
+            &mut cs, r, var_in_0, var_in_1, var_out_0, var_out_1, var_mul,
+        );
+        cs
+    }
+
+    fn fill_cs(
+        &self,
+        cs: &mut ConstraintSystem,
+        r: Scalar,
+        in_0: Variable,
+        in_1: Variable,
+        out_0: Variable,
+        out_1: Variable,
+        mul: Variable,
+    ) {
+        // lc_0: (var_in_0 - z) * (var_in_1 - z) = var_mul
+        let lc_0_a = LinearCombination::new(vec![(in_0, Scalar::one())], -r);
+        let lc_0_b = LinearCombination::new(vec![(in_1, Scalar::one())], -r);
+        let lc_0_c = LinearCombination::new(vec![(mul.clone(), Scalar::one())], Scalar::zero());
+        cs.constrain(lc_0_a, lc_0_b, lc_0_c);
+
+        // lc_1: (var_out_0 - z) * (var_out_1 - z) = var_mul
+        let lc_1_a = LinearCombination::new(vec![(out_0, Scalar::one())], -r);
+        let lc_1_b = LinearCombination::new(vec![(out_1, Scalar::one())], -r);
+        let lc_1_c = LinearCombination::new(vec![(mul, Scalar::one())], Scalar::zero());
+        cs.constrain(lc_1_a, lc_1_b, lc_1_c);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::circuit::CircuitProof;
     use super::*;
     use rand::rngs::OsRng;
+
+    // fn create_and_verify_helper(prover_/)
 
     #[test]
     fn merge_circuit() {
@@ -125,25 +199,64 @@ mod tests {
         val_out_0: Scalar,
         val_out_1: Scalar,
     ) -> Result<(), R1CSError> {
-        let (prover_cs, c) =
+        let (prover_cs, r) =
             Merge::new().make_prover_cs(type_0, type_1, val_in_0, val_in_1, val_out_0, val_out_1);
 
         let generators = Generators::new(PedersenGenerators::default(), prover_cs.get_n(), 1);
-        let mut prover_transcript = ProofTranscript::new(b"CircuitProofTest");
+        let mut prover_transcript = ProofTranscript::new(b"MergeTest");
         let mut rng = OsRng::new().unwrap();
 
         let (circuit_proof, V) = prover_cs
             .prove(&generators, &mut prover_transcript, &mut rng)
             .unwrap();
 
-        let verifier_cs = Merge::new().make_verifier_cs(c);
+        let verifier_cs = Merge::new().make_verifier_cs(r);
 
-        let mut verify_transcript = ProofTranscript::new(b"CircuitProofTest");
+        let mut verifier_transcript = ProofTranscript::new(b"MergeTest");
         verifier_cs.verify(
             &circuit_proof,
             &V,
             &generators,
-            &mut verify_transcript,
+            &mut verifier_transcript,
+            &mut rng,
+        )
+    }
+
+    #[test]
+    fn shuffle_circuit() {
+        let three = Scalar::from(3u64);
+        let seven = Scalar::from(7u64);
+        assert!(shuffle_circuit_helper(three, seven, three, seven).is_ok());
+        assert!(shuffle_circuit_helper(three, seven, seven, three).is_ok());
+        assert!(shuffle_circuit_helper(three, seven, seven, seven).is_err());
+        assert!(shuffle_circuit_helper(three, Scalar::one(), seven, three).is_err());        
+    }
+
+    fn shuffle_circuit_helper(
+        in_0: Scalar,
+        in_1: Scalar,
+        out_0: Scalar,
+        out_1: Scalar,
+    ) -> Result<(), R1CSError> {
+        let (prover_cs, r) = 
+            Shuffle::new().make_prover_cs(in_0, in_1, out_0, out_1);
+
+        let generators = Generators::new(PedersenGenerators::default(), prover_cs.get_n(), 1);
+        let mut prover_transcript = ProofTranscript::new(b"ShuffleTest");
+        let mut rng = OsRng::new().unwrap();
+
+        let (circuit_proof, V) = prover_cs
+            .prove(&generators, &mut prover_transcript, &mut rng)
+            .unwrap();
+
+        let verifier_cs = Shuffle::new().make_verifier_cs(r);
+
+        let mut verifier_transcript = ProofTranscript::new(b"ShuffleTest");
+        verifier_cs.verify(
+            &circuit_proof,
+            &V,
+            &generators,
+            &mut verifier_transcript,
             &mut rng,
         )
     }
