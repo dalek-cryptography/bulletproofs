@@ -2,7 +2,7 @@
 
 use super::r1cs::{ConstraintSystem, LinearCombination, Variable};
 use curve25519_dalek::scalar::Scalar;
-use rand::rngs::OsRng;
+use rand::{CryptoRng, Rng};
 
 // TODO: make a trait that all circuit examples need to implement
 
@@ -14,8 +14,9 @@ impl Merge {
         Merge {}
     }
 
-    pub fn fill_prover_cs(
+    pub fn fill_prover_cs<R: Rng + CryptoRng>(
         &self,
+        rng: &mut R,
         cs: &mut ConstraintSystem,
         type_0: Scalar,
         type_1: Scalar,
@@ -23,10 +24,9 @@ impl Merge {
         val_in_1: Scalar,
         val_out_0: Scalar,
         val_out_1: Scalar,
-    ) -> Scalar {
+    ) -> (Vec<Scalar>, Scalar) {
         // TODO: actually use a challenge variable for this - obviously unsafe
-        let mut rng = OsRng::new().unwrap();
-        let r = Scalar::random(&mut rng);
+        let r = Scalar::random(rng);
 
         let t_0 = cs.alloc_assign_variable(type_0);
         let t_1 = cs.alloc_assign_variable(type_1);
@@ -36,7 +36,9 @@ impl Merge {
         let out_1 = cs.alloc_assign_variable(val_out_1);
 
         self.fill_cs(cs, r, t_0, t_1, in_0, in_1, out_0, out_1);
-        r
+        let v_blinding: Vec<Scalar> = (0..cs.get_m()).map(|_| Scalar::random(rng)).collect();
+
+        (v_blinding, r)
     }
 
     pub fn fill_verifier_cs(&self, cs: &mut ConstraintSystem, r: Scalar) {
@@ -97,16 +99,17 @@ impl Shuffle {
         Shuffle {}
     }
 
-    pub fn fill_prover_cs(
+    pub fn fill_prover_cs<R: Rng + CryptoRng>(
         &self,
+        rng: &mut R,
         cs: &mut ConstraintSystem,
         val_in_0: Scalar,
         val_in_1: Scalar,
         val_out_0: Scalar,
         val_out_1: Scalar,
-    ) -> Scalar {
-        let mut rng = OsRng::new().unwrap();
-        let r = Scalar::random(&mut rng);
+    ) -> (Vec<Scalar>, Scalar) {
+        let r = Scalar::random(rng);
+        let v_blinding: Vec<Scalar> = (0..5).map(|_| Scalar::random(rng)).collect();
 
         let var_in_0 = cs.alloc_assign_variable(val_in_0);
         let var_in_1 = cs.alloc_assign_variable(val_in_1);
@@ -115,7 +118,7 @@ impl Shuffle {
         let var_mul = cs.alloc_assign_variable((val_in_0 - r) * (val_in_1 - r));
 
         self.fill_cs(cs, r, var_in_0, var_in_1, var_out_0, var_out_1, var_mul);
-        r
+        (v_blinding, r)
     }
 
     pub fn fill_verifier_cs(&self, cs: &mut ConstraintSystem, r: Scalar) {
@@ -161,17 +164,16 @@ mod tests {
     use rand::rngs::OsRng;
 
     fn create_and_verify_helper(
+        rng: &mut OsRng,
         prover_cs: ConstraintSystem,
+        v_blinding: Vec<Scalar>,
         verifier_cs: ConstraintSystem,
     ) -> Result<(), R1CSError> {
         let generators = Generators::new(PedersenGenerators::default(), prover_cs.get_n(), 1);
         let mut prover_transcript = ProofTranscript::new(b"R1CSExamplesTest");
-        let mut rng = OsRng::new().unwrap();
-
-        let v_blinding: Vec<Scalar> = (0..prover_cs.get_m()).map(|_| Scalar::random(&mut rng)).collect();
 
         let (circuit_proof, V) = prover_cs
-            .prove(&generators, &mut prover_transcript, &mut rng, v_blinding)
+            .prove(&generators, &mut prover_transcript, rng, v_blinding)
             .unwrap();
 
         let mut verifier_transcript = ProofTranscript::new(b"R1CSExamplesTest");
@@ -180,7 +182,7 @@ mod tests {
             &V,
             &generators,
             &mut verifier_transcript,
-            &mut rng,
+            rng,
         )
     }
 
@@ -210,7 +212,10 @@ mod tests {
         val_out_1: Scalar,
     ) -> Result<(), R1CSError> {
         let mut prover_cs = ConstraintSystem::new();
-        let r = Merge::new().fill_prover_cs(
+        let mut rng = OsRng::new().unwrap();
+
+        let (v_blinding, r) = Merge::new().fill_prover_cs(
+            &mut rng,
             &mut prover_cs,
             type_0,
             type_1,
@@ -223,7 +228,7 @@ mod tests {
         let mut verifier_cs = ConstraintSystem::new();
         Merge::new().fill_verifier_cs(&mut verifier_cs, r);
 
-        create_and_verify_helper(prover_cs, verifier_cs)
+        create_and_verify_helper(&mut rng, prover_cs, v_blinding, verifier_cs)
     }
 
     #[test]
@@ -243,11 +248,13 @@ mod tests {
         out_1: Scalar,
     ) -> Result<(), R1CSError> {
         let mut prover_cs = ConstraintSystem::new();
-        let r = Shuffle::new().fill_prover_cs(&mut prover_cs, in_0, in_1, out_0, out_1);
+        let mut rng = OsRng::new().unwrap();
+
+        let (v_blinding, r) = Shuffle::new().fill_prover_cs(&mut rng, &mut prover_cs, in_0, in_1, out_0, out_1);
 
         let mut verifier_cs = ConstraintSystem::new();
         Shuffle::new().fill_verifier_cs(&mut verifier_cs, r);
 
-        create_and_verify_helper(prover_cs, verifier_cs)
+        create_and_verify_helper(&mut rng, prover_cs, v_blinding, verifier_cs)
     }
 }
