@@ -93,8 +93,8 @@ pub struct ConstraintSystem {
     b: Vec<LinearCombination>,
     c: Vec<LinearCombination>,
 
-    // Assignments of variables
-    var_assignment: Vec<Result<Scalar, R1CSError>>,
+    // Assignments of witness variables
+    witness_assignment: Vec<Result<Scalar, R1CSError>>,
 }
 
 impl ConstraintSystem {
@@ -103,22 +103,23 @@ impl ConstraintSystem {
             a: vec![],
             b: vec![],
             c: vec![],
-            var_assignment: vec![],
+            witness_assignment: vec![],
         }
     }
+
     // Allocate a variable and do value assignment at the same time
     // Prover uses this function
     pub fn alloc_assign_variable(&mut self, val: Scalar) -> Variable {
-        self.var_assignment.push(Ok(val));
-        Variable(self.var_assignment.len() - 1)
+        self.witness_assignment.push(Ok(val));
+        Variable(self.witness_assignment.len() - 1)
     }
 
     // Allocate a variable with an Err value
     // Verifier uses this function
     pub fn alloc_variable(&mut self) -> Variable {
-        self.var_assignment
+        self.witness_assignment
             .push(Err(R1CSError::InvalidVariableAssignment));
-        Variable(self.var_assignment.len() - 1)
+        Variable(self.witness_assignment.len() - 1)
     }
 
     // get number of multiplications
@@ -149,7 +150,7 @@ impl ConstraintSystem {
         let sum_vars = lc
             .variables
             .iter()
-            .map(|(var, scalar)| Ok(scalar * self.var_assignment[var.0].clone()?))
+            .map(|(var, scalar)| Ok(scalar * self.witness_assignment[var.0].clone()?))
             .sum::<Result<Scalar, R1CSError>>()?;
         Ok(sum_vars + lc.constant)
     }
@@ -157,7 +158,7 @@ impl ConstraintSystem {
     // for r1cs -> direct
     fn get_circuit_params(&self) -> (usize, usize, usize, Vec<Scalar>, Vec<Vec<Scalar>>) {
         let n = self.a.len();
-        let m = self.var_assignment.len();
+        let m = self.witness_assignment.len();
         let q = self.a.len() * 3;
 
         let zer = Scalar::zero();
@@ -399,7 +400,7 @@ impl ConstraintSystem {
         );
 
         let V = self
-            .var_assignment
+            .witness_assignment
             .iter()
             .zip(v_blinding)
             .map(|(v_i, v_blinding_i)| Ok(gen.pedersen_gens.commit((v_i.clone())?, v_blinding_i)))
