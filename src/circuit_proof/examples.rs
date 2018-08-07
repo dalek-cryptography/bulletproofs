@@ -2,7 +2,10 @@
 
 use super::r1cs::{ConstraintSystem, LinearCombination, Variable};
 use curve25519_dalek::scalar::Scalar;
+use generators::Generators;
+use proof_transcript::ProofTranscript;
 use rand::{CryptoRng, Rng};
+use curve25519_dalek::ristretto::RistrettoPoint;
 
 // TODO: make a trait that all circuit examples need to implement
 
@@ -16,7 +19,9 @@ impl Merge {
 
     pub fn fill_prover_cs<R: Rng + CryptoRng>(
         &self,
+        gen: &Generators,
         rng: &mut R,
+        transcript: &mut ProofTranscript,
         cs: &mut ConstraintSystem,
         type_0: Scalar,
         type_1: Scalar,
@@ -24,10 +29,7 @@ impl Merge {
         val_in_1: Scalar,
         val_out_0: Scalar,
         val_out_1: Scalar,
-    ) -> (Vec<Scalar>, Scalar) {
-        // TODO: actually use a challenge variable for this - obviously unsafe
-        let r = Scalar::random(rng);
-
+    ) -> (Vec<Scalar>, Vec<RistrettoPoint>) {
         let t_0 = cs.alloc_assign_variable(type_0);
         let t_1 = cs.alloc_assign_variable(type_1);
         let in_0 = cs.alloc_assign_variable(val_in_0);
@@ -35,13 +37,25 @@ impl Merge {
         let out_0 = cs.alloc_assign_variable(val_out_0);
         let out_1 = cs.alloc_assign_variable(val_out_1);
 
-        self.fill_cs(cs, r, t_0, t_1, in_0, in_1, out_0, out_1);
         let v_blinding: Vec<Scalar> = (0..cs.get_m()).map(|_| Scalar::random(rng)).collect();
+        // todo: propogate error
+        let V = cs.make_V(gen, &v_blinding).unwrap();
+        for V_i in V.iter() {
+            transcript.commit(V_i.compress().as_bytes());
+        }
+        let r = transcript.challenge_scalar();
 
-        (v_blinding, r)
+        self.fill_cs(cs, r, t_0, t_1, in_0, in_1, out_0, out_1);
+
+        (v_blinding, V)
     }
 
-    pub fn fill_verifier_cs(&self, cs: &mut ConstraintSystem, r: Scalar) {
+    pub fn fill_verifier_cs(&self, transcript: &mut ProofTranscript, cs: &mut ConstraintSystem, V: &Vec<RistrettoPoint>) {
+        for V_i in V.iter() {
+            transcript.commit(V_i.compress().as_bytes());
+        }
+        let r = transcript.challenge_scalar();
+
         let t_0 = cs.alloc_variable();
         let t_1 = cs.alloc_variable();
         let in_0 = cs.alloc_variable();
@@ -159,9 +173,8 @@ impl Shuffle {
 mod tests {
     use super::*;
     use errors::R1CSError;
-    use generators::{Generators, PedersenGenerators};
-    use proof_transcript::ProofTranscript;
     use rand::rngs::OsRng;
+    use generators::PedersenGenerators;
 
     fn create_and_verify_helper(
         rng: &mut OsRng,
@@ -213,9 +226,13 @@ mod tests {
     ) -> Result<(), R1CSError> {
         let mut prover_cs = ConstraintSystem::new();
         let mut rng = OsRng::new().unwrap();
+        let generators = Generators::new(PedersenGenerators::default(), prover_cs.get_n(), 1);
+        let mut prover_transcript = ProofTranscript::new(b"R1CSExamplesTest");
 
-        let (v_blinding, r) = Merge::new().fill_prover_cs(
+        let (v_blinding, V) = Merge::new().fill_prover_cs(
+            &generators,
             &mut rng,
+            &mut prover_transcript,
             &mut prover_cs,
             type_0,
             type_1,
@@ -226,7 +243,8 @@ mod tests {
         );
 
         let mut verifier_cs = ConstraintSystem::new();
-        Merge::new().fill_verifier_cs(&mut verifier_cs, r);
+        let mut verifier_transcript = ProofTranscript::new(b"R1CSExamplesTest");
+        Merge::new().fill_verifier_cs(&mut verifier_transcript, &mut verifier_cs, &V);
 
         create_and_verify_helper(&mut rng, prover_cs, v_blinding, verifier_cs)
     }
@@ -250,7 +268,8 @@ mod tests {
         let mut prover_cs = ConstraintSystem::new();
         let mut rng = OsRng::new().unwrap();
 
-        let (v_blinding, r) = Shuffle::new().fill_prover_cs(&mut rng, &mut prover_cs, in_0, in_1, out_0, out_1);
+        let (v_blinding, r) =
+            Shuffle::new().fill_prover_cs(&mut rng, &mut prover_cs, in_0, in_1, out_0, out_1);
 
         let mut verifier_cs = ConstraintSystem::new();
         Shuffle::new().fill_verifier_cs(&mut verifier_cs, r);

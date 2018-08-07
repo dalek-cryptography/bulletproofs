@@ -135,6 +135,21 @@ impl ConstraintSystem {
         self.witness_assignment.len()
     }
 
+    pub fn make_V(
+        &self,
+        gen: &Generators,
+        v_blinding: &Vec<Scalar>,
+    ) -> Result<Vec<RistrettoPoint>, R1CSError> {
+        if v_blinding.len() != self.witness_assignment.len() {
+            return Err(R1CSError::IncorrectInputSize);
+        }
+        self.witness_assignment
+            .iter()
+            .zip(v_blinding)
+            .map(|(v_i, v_blinding_i)| Ok(gen.pedersen_gens.commit((v_i.clone())?, *v_blinding_i)))
+            .collect()
+    }
+
     // Push one set of linear constraints (a, b, c) to the constraint system.
     // Pushing a, b, c together prevents mismatched constraints.
     pub fn constrain(
@@ -644,7 +659,9 @@ mod tests {
         let mut prover_transcript = ProofTranscript::new(b"R1CSExamplesTest");
         let mut rng = OsRng::new().unwrap();
 
-        let v_blinding: Vec<Scalar> = (0..prover_cs.get_m()).map(|_| Scalar::random(&mut rng)).collect();
+        let v_blinding: Vec<Scalar> = (0..prover_cs.get_m())
+            .map(|_| Scalar::random(&mut rng))
+            .collect();
 
         let (circuit_proof, V) = prover_cs
             .prove(&generators, &mut prover_transcript, &mut rng, v_blinding)
