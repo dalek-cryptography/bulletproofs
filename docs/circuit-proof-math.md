@@ -44,7 +44,7 @@ Combining statements using challenge variables
 ----------------------------------------------
 
 We can rewrite the statement about multiplication gates into an inner product equation, using the challenge variable \\(y\\). We can do this for a random challenge \\(y\\) because \\({\mathbf{b}} = {\mathbf{0}}\\) if and only
-if[^4] \\({\langle {\mathbf{b}}, {\mathbf{y}}^{n} \rangle} = 0\\). The equation \\(\textbf{a}\_L \circ \textbf{a}\_R = \textbf{a}\_O\\) becomes:
+if[^1] \\({\langle {\mathbf{b}}, {\mathbf{y}}^{n} \rangle} = 0\\). The equation \\(\textbf{a}\_L \circ \textbf{a}\_R = \textbf{a}\_O\\) becomes:
 
 \\[
 \langle \textbf{a}\_L \circ \textbf{a}\_R - \textbf{a}\_O ,
@@ -85,7 +85,7 @@ We can combine these two inner product equations, since they are offset by diffe
 \rangle = 0
 \\]
 
-[^4]: This is because the polynomial in terms of \\(y\\) is zero at every point
+[^1]: This is because the polynomial in terms of \\(y\\) is zero at every point
 if and only if every term of it is zero. The verifier is going to sample
 a random \\(y\\) after the prover commits to all the values forming the terms of
 that polynomial, making the probability that the prover cheated negligible.
@@ -339,7 +339,7 @@ The prover forms these commitments, and sends them to the verifier. These commit
 
 Notice that the sum of each column is a commitment to the variable in the top row using the blinding factor in the second row. The sum of all of the columns is
 \\(t(x) B + {\tilde{t}}(x) {\widetilde{B}}\\), a commitment to the value
-of \\(t\\) at the point \\(x\\), using the synthetic blinding factor[^5]:
+of \\(t\\) at the point \\(x\\), using the synthetic blinding factor[^2]:
 \\[
   {\tilde{t}}(x) = x^2 \langle z \textbf{z}^Q , \textbf{W}\_v \cdot \tilde{\textbf{v}} \rangle + x {\tilde{t}}\_{1} + \sum\_{i=3}^{6} x^i \tilde{t\_{i}} 
 \\]
@@ -352,7 +352,7 @@ bottom row of the diagram to check consistency:
   t(x) B + {\tilde{t}}(x) {\widetilde{B}} \stackrel{?}{=} x^2 \langle z \textbf{z}^Q , \textbf{W}\_v \cdot \textbf{V} \rangle + x^2 \big(\langle  z \textbf{z}^Q , \textbf{c} \rangle + \delta(y,z)\big) B + x T\_{1} + \sum\_{i=3}^{6} x^i T\_{i}
 \\]
 
-[^5]: The blinding factor is synthetic in the sense that it is
+[^2]: The blinding factor is synthetic in the sense that it is
     synthesized from the blinding factors of the other commitments.
 
 Proving that \\(\textbf{l}(x)\\), \\(\textbf{r}(x)\\) are correct
