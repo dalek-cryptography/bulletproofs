@@ -131,6 +131,10 @@ impl ConstraintSystem {
         return n.next_power_of_two();
     }
 
+    pub fn get_m(&self) -> usize {
+        self.witness_assignment.len()
+    }
+
     // Push one set of linear constraints (a, b, c) to the constraint system.
     // Pushing a, b, c together prevents mismatched constraints.
     pub fn constrain(
@@ -214,7 +218,6 @@ impl ConstraintSystem {
         z: Scalar,
         n: usize,
     ) -> (Vec<Scalar>, Vec<Scalar>, Vec<Scalar>) {
-        let q = self.a.len() * 3;
         let mut W_L_flat = vec![Scalar::zero(); n];
         let mut W_R_flat = vec![Scalar::zero(); n];
         let mut W_O_flat = vec![Scalar::zero(); n];
@@ -240,6 +243,7 @@ impl ConstraintSystem {
         gen: &Generators,
         transcript: &mut ProofTranscript,
         rng: &mut R,
+        v_blinding: Vec<Scalar>,
     ) -> Result<(R1CSProof, Vec<RistrettoPoint>), R1CSError> {
         // CREATE CIRCUIT PARAMS
         let n_temp = self.a.len();
@@ -267,7 +271,6 @@ impl ConstraintSystem {
             .iter()
             .map(|lc| Ok(self.eval_lc(&lc)?))
             .collect::<Result<Vec<Scalar>, R1CSError>>()?;
-        let v_blinding: Vec<Scalar> = (0..m).map(|_| Scalar::random(rng)).collect();
 
         // CREATE THE PROOF
         transcript.commit_u64(n as u64);
@@ -641,8 +644,10 @@ mod tests {
         let mut prover_transcript = ProofTranscript::new(b"R1CSExamplesTest");
         let mut rng = OsRng::new().unwrap();
 
+        let v_blinding: Vec<Scalar> = (0..prover_cs.get_m()).map(|_| Scalar::random(&mut rng)).collect();
+
         let (circuit_proof, V) = prover_cs
-            .prove(&generators, &mut prover_transcript, &mut rng)
+            .prove(&generators, &mut prover_transcript, &mut rng, v_blinding)
             .unwrap();
 
         let mut verifier_transcript = ProofTranscript::new(b"R1CSExamplesTest");

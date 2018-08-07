@@ -168,8 +168,10 @@ mod tests {
         let mut prover_transcript = ProofTranscript::new(b"R1CSExamplesTest");
         let mut rng = OsRng::new().unwrap();
 
+        let v_blinding: Vec<Scalar> = (0..prover_cs.get_m()).map(|_| Scalar::random(&mut rng)).collect();
+
         let (circuit_proof, V) = prover_cs
-            .prove(&generators, &mut prover_transcript, &mut rng)
+            .prove(&generators, &mut prover_transcript, &mut rng, v_blinding)
             .unwrap();
 
         let mut verifier_transcript = ProofTranscript::new(b"R1CSExamplesTest");
