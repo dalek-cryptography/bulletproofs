@@ -1,11 +1,11 @@
 #![allow(non_snake_case)]
 
 use super::r1cs::{ConstraintSystem, LinearCombination, Variable};
+use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
 use generators::Generators;
 use proof_transcript::ProofTranscript;
 use rand::{CryptoRng, Rng};
-use curve25519_dalek::ristretto::RistrettoPoint;
 
 // TODO: make a trait that all circuit examples need to implement
 
@@ -50,7 +50,12 @@ impl Merge {
         (v_blinding, V)
     }
 
-    pub fn fill_verifier_cs(&self, transcript: &mut ProofTranscript, cs: &mut ConstraintSystem, V: &Vec<RistrettoPoint>) {
+    pub fn fill_verifier_cs(
+        &self,
+        transcript: &mut ProofTranscript,
+        cs: &mut ConstraintSystem,
+        V: &Vec<RistrettoPoint>,
+    ) {
         for V_i in V.iter() {
             transcript.commit(V_i.compress().as_bytes());
         }
@@ -173,30 +178,24 @@ impl Shuffle {
 mod tests {
     use super::*;
     use errors::R1CSError;
-    use rand::rngs::OsRng;
     use generators::PedersenGenerators;
+    use rand::rngs::OsRng;
 
     fn create_and_verify_helper(
         rng: &mut OsRng,
+        prover_transcript: &mut ProofTranscript,
+        verifier_transcript: &mut ProofTranscript,
         prover_cs: ConstraintSystem,
         v_blinding: Vec<Scalar>,
         verifier_cs: ConstraintSystem,
     ) -> Result<(), R1CSError> {
         let generators = Generators::new(PedersenGenerators::default(), prover_cs.get_n(), 1);
-        let mut prover_transcript = ProofTranscript::new(b"R1CSExamplesTest");
 
         let (circuit_proof, V) = prover_cs
-            .prove(&generators, &mut prover_transcript, rng, v_blinding)
+            .prove(&generators, prover_transcript, rng, v_blinding)
             .unwrap();
 
-        let mut verifier_transcript = ProofTranscript::new(b"R1CSExamplesTest");
-        verifier_cs.verify(
-            &circuit_proof,
-            &V,
-            &generators,
-            &mut verifier_transcript,
-            rng,
-        )
+        verifier_cs.verify(&circuit_proof, &V, &generators, verifier_transcript, rng)
     }
 
     #[test]
@@ -246,7 +245,14 @@ mod tests {
         let mut verifier_transcript = ProofTranscript::new(b"R1CSExamplesTest");
         Merge::new().fill_verifier_cs(&mut verifier_transcript, &mut verifier_cs, &V);
 
-        create_and_verify_helper(&mut rng, prover_cs, v_blinding, verifier_cs)
+        create_and_verify_helper(
+            &mut rng,
+            &mut prover_transcript,
+            &mut verifier_transcript,
+            prover_cs,
+            v_blinding,
+            verifier_cs,
+        )
     }
 
     #[test]
@@ -267,13 +273,22 @@ mod tests {
     ) -> Result<(), R1CSError> {
         let mut prover_cs = ConstraintSystem::new();
         let mut rng = OsRng::new().unwrap();
+        let mut prover_transcript = ProofTranscript::new(b"R1CSExamplesTest");
 
         let (v_blinding, r) =
             Shuffle::new().fill_prover_cs(&mut rng, &mut prover_cs, in_0, in_1, out_0, out_1);
 
         let mut verifier_cs = ConstraintSystem::new();
+        let mut verifier_transcript = ProofTranscript::new(b"R1CSExamplesTest");
         Shuffle::new().fill_verifier_cs(&mut verifier_cs, r);
 
-        create_and_verify_helper(&mut rng, prover_cs, v_blinding, verifier_cs)
+        create_and_verify_helper(
+            &mut rng,
+            &mut prover_transcript,
+            &mut verifier_transcript,
+            prover_cs,
+            v_blinding,
+            verifier_cs,
+        )
     }
 }
