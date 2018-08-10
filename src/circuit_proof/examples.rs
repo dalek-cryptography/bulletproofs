@@ -120,27 +120,46 @@ impl Shuffle {
 
     pub fn fill_prover_cs<R: Rng + CryptoRng>(
         &self,
+        gen: &Generators,
         rng: &mut R,
+        transcript: &mut ProofTranscript,
         cs: &mut ConstraintSystem,
         val_in_0: Scalar,
         val_in_1: Scalar,
         val_out_0: Scalar,
         val_out_1: Scalar,
-    ) -> (Vec<Scalar>, Scalar) {
-        let r = Scalar::random(rng);
+    ) -> (Vec<Scalar>, Vec<RistrettoPoint>) {
         let v_blinding: Vec<Scalar> = (0..5).map(|_| Scalar::random(rng)).collect();
 
         let var_in_0 = cs.alloc_assign_variable(val_in_0);
         let var_in_1 = cs.alloc_assign_variable(val_in_1);
         let var_out_0 = cs.alloc_assign_variable(val_out_0);
         let var_out_1 = cs.alloc_assign_variable(val_out_1);
+
+        // todo: propogate error
+        let V = cs.make_V(gen, &v_blinding[..4].to_vec()).unwrap();
+        for V_i in V.iter() {
+            transcript.commit(V_i.compress().as_bytes());
+        }
+        let r = transcript.challenge_scalar();
         let var_mul = cs.alloc_assign_variable((val_in_0 - r) * (val_in_1 - r));
 
         self.fill_cs(cs, r, var_in_0, var_in_1, var_out_0, var_out_1, var_mul);
-        (v_blinding, r)
+        let V = cs.make_V(gen, &v_blinding).unwrap();
+        (v_blinding, V)
     }
 
-    pub fn fill_verifier_cs(&self, cs: &mut ConstraintSystem, r: Scalar) {
+    pub fn fill_verifier_cs(
+        &self,
+        transcript: &mut ProofTranscript,
+        cs: &mut ConstraintSystem,
+        V: &Vec<RistrettoPoint>,
+    ) {
+        for V_i in V[..4].iter() {
+            transcript.commit(V_i.compress().as_bytes());
+        }
+        let r = transcript.challenge_scalar();
+
         let var_in_0 = cs.alloc_variable();
         let var_in_1 = cs.alloc_variable();
         let var_out_0 = cs.alloc_variable();
@@ -223,10 +242,10 @@ mod tests {
         val_out_0: Scalar,
         val_out_1: Scalar,
     ) -> Result<(), R1CSError> {
-        let mut prover_cs = ConstraintSystem::new();
+        let generators = Generators::new(PedersenGenerators::default(), 1, 1);
         let mut rng = OsRng::new().unwrap();
-        let generators = Generators::new(PedersenGenerators::default(), prover_cs.get_n(), 1);
         let mut prover_transcript = ProofTranscript::new(b"R1CSExamplesTest");
+        let mut prover_cs = ConstraintSystem::new();
 
         let (v_blinding, V) = Merge::new().fill_prover_cs(
             &generators,
@@ -271,16 +290,26 @@ mod tests {
         out_0: Scalar,
         out_1: Scalar,
     ) -> Result<(), R1CSError> {
-        let mut prover_cs = ConstraintSystem::new();
+        // todo: how to get the generator length from prover_cs / without hardcoding?
+        let generators = Generators::new(PedersenGenerators::default(), 1, 1);
         let mut rng = OsRng::new().unwrap();
         let mut prover_transcript = ProofTranscript::new(b"R1CSExamplesTest");
+        let mut prover_cs = ConstraintSystem::new();
 
-        let (v_blinding, r) =
-            Shuffle::new().fill_prover_cs(&mut rng, &mut prover_cs, in_0, in_1, out_0, out_1);
+        let (v_blinding, V) = Shuffle::new().fill_prover_cs(
+            &generators,
+            &mut rng,
+            &mut prover_transcript,
+            &mut prover_cs,
+            in_0,
+            in_1,
+            out_0,
+            out_1,
+        );
 
         let mut verifier_cs = ConstraintSystem::new();
         let mut verifier_transcript = ProofTranscript::new(b"R1CSExamplesTest");
-        Shuffle::new().fill_verifier_cs(&mut verifier_cs, r);
+        Shuffle::new().fill_verifier_cs(&mut verifier_transcript, &mut verifier_cs, &V);
 
         create_and_verify_helper(
             &mut rng,
