@@ -10,7 +10,7 @@ extern crate curve25519_dalek;
 use curve25519_dalek::scalar::Scalar;
 
 extern crate bulletproofs;
-use bulletproofs::ProofTranscript;
+use bulletproofs::Transcript;
 use bulletproofs::RangeProof;
 use bulletproofs::{Generators, PedersenGenerators};
 
@@ -31,7 +31,7 @@ fn create_aggregated_rangeproof_helper(n: usize, c: &mut Criterion) {
 
             b.iter(|| {
                 // Each proof creation requires a clean transcript.
-                let mut transcript = ProofTranscript::new(b"AggregateRangeProofBenchmark");
+                let mut transcript = Transcript::new(b"AggregateRangeProofBenchmark");
 
                 RangeProof::prove_multiple(
                     &generators,
@@ -76,7 +76,7 @@ fn verify_aggregated_rangeproof_helper(n: usize, c: &mut Criterion) {
             let values: Vec<u64> = (0..m).map(|_| rng.gen_range(min, max)).collect();
             let blindings: Vec<Scalar> = (0..m).map(|_| Scalar::random(&mut rng)).collect();
 
-            let mut transcript = ProofTranscript::new(b"AggregateRangeProofBenchmark");
+            let mut transcript = Transcript::new(b"AggregateRangeProofBenchmark");
             let proof = RangeProof::prove_multiple(
                 &generators,
                 &mut transcript,
@@ -96,7 +96,7 @@ fn verify_aggregated_rangeproof_helper(n: usize, c: &mut Criterion) {
 
             b.iter(|| {
                 // Each proof creation requires a clean transcript.
-                let mut transcript = ProofTranscript::new(b"AggregateRangeProofBenchmark");
+                let mut transcript = Transcript::new(b"AggregateRangeProofBenchmark");
 
                 proof.verify(
                     &value_commitments,

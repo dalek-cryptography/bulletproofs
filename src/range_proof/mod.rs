@@ -8,11 +8,12 @@ use std::iter;
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::{IsIdentity, VartimeMultiscalarMul};
+use merlin::Transcript;
 
 use errors::ProofError;
 use generators::Generators;
 use inner_product_proof::InnerProductProof;
-use proof_transcript::ProofTranscript;
+use transcript::TranscriptProtocol;
 use util;
 
 use serde::de::Visitor;
@@ -52,7 +53,7 @@ impl RangeProof {
     /// XXX add doctests
     pub fn prove_single<R: Rng + CryptoRng>(
         generators: &Generators,
-        transcript: &mut ProofTranscript,
+        transcript: &mut Transcript,
         rng: &mut R,
         v: u64,
         v_blinding: &Scalar,
@@ -66,7 +67,7 @@ impl RangeProof {
     /// XXX add doctests
     pub fn prove_multiple<R: Rng + CryptoRng>(
         generators: &Generators,
-        transcript: &mut ProofTranscript,
+        transcript: &mut Transcript,
         rng: &mut R,
         values: &[u64],
         blindings: &[Scalar],
@@ -125,7 +126,7 @@ impl RangeProof {
         &self,
         V: &RistrettoPoint,
         gens: &Generators,
-        transcript: &mut ProofTranscript,
+        transcript: &mut Transcript,
         rng: &mut R,
         n: usize,
     ) -> Result<(), ProofError> {
@@ -139,7 +140,7 @@ impl RangeProof {
         &self,
         value_commitments: &[RistrettoPoint],
         gens: &Generators,
-        transcript: &mut ProofTranscript,
+        transcript: &mut Transcript,
         rng: &mut R,
         n: usize,
     ) -> Result<(), ProofError> {
@@ -148,32 +149,33 @@ impl RangeProof {
 
         let m = value_commitments.len();
 
-        transcript.commit_u64(n as u64);
-        transcript.commit_u64(m as u64);
+        // XXX check n, m parameters
+
+        transcript.rangeproof_domain_sep(n as u64, m as u64);
 
         // TODO: allow user to supply compressed commitments
         // to avoid unnecessary compression
         for V in value_commitments.iter() {
-            transcript.commit(V.compress().as_bytes());
+            transcript.commit_point(b"V", &V.compress());
         }
-        transcript.commit(self.A.as_bytes());
-        transcript.commit(self.S.as_bytes());
+        transcript.commit_point(b"A", &self.A);
+        transcript.commit_point(b"S", &self.S);
 
-        let y = transcript.challenge_scalar();
-        let z = transcript.challenge_scalar();
+        let y = transcript.challenge_scalar(b"y");
+        let z = transcript.challenge_scalar(b"z");
         let zz = z * z;
         let minus_z = -z;
 
-        transcript.commit(self.T_1.as_bytes());
-        transcript.commit(self.T_2.as_bytes());
+        transcript.commit_point(b"T_1", &self.T_1);
+        transcript.commit_point(b"T_2", &self.T_2);
 
-        let x = transcript.challenge_scalar();
+        let x = transcript.challenge_scalar(b"x");
 
-        transcript.commit(self.t_x.as_bytes());
-        transcript.commit(self.t_x_blinding.as_bytes());
-        transcript.commit(self.e_blinding.as_bytes());
+        transcript.commit_scalar(b"t_x", &self.t_x);
+        transcript.commit_scalar(b"t_x_blinding", &self.t_x_blinding);
+        transcript.commit_scalar(b"e_blinding", &self.e_blinding);
 
-        let w = transcript.challenge_scalar();
+        let w = transcript.challenge_scalar(b"w");
 
         // Challenge value for batching statements to be verified
         let c = Scalar::random(rng);
@@ -404,7 +406,7 @@ mod tests {
             // 1. Generate the proof
 
             let mut rng = OsRng::new().unwrap();
-            let mut transcript = ProofTranscript::new(b"AggregatedRangeProofTest");
+            let mut transcript = Transcript::new(b"AggregatedRangeProofTest");
 
             let (min, max) = (0u64, ((1u128 << n) - 1) as u64);
             let values: Vec<u64> = (0..m).map(|_| rng.gen_range(min, max)).collect();
@@ -446,7 +448,7 @@ mod tests {
 
             // 4. Verify with the same customization label as above
             let mut rng = OsRng::new().unwrap();
-            let mut transcript = ProofTranscript::new(b"AggregatedRangeProofTest");
+            let mut transcript = Transcript::new(b"AggregatedRangeProofTest");
 
             assert!(
                 proof
@@ -516,7 +518,7 @@ mod tests {
         let generators = Generators::new(PedersenGenerators::default(), n, m);
 
         let mut rng = OsRng::new().unwrap();
-        let mut transcript = ProofTranscript::new(b"AggregatedRangeProofTest");
+        let mut transcript = Transcript::new(b"AggregatedRangeProofTest");
 
         // Parties 0, 2 are honest and use a 32-bit value
         let v0 = rng.gen::<u32>() as u64;
@@ -586,7 +588,7 @@ mod tests {
         let generators = Generators::new(PedersenGenerators::default(), n, m);
 
         let mut rng = OsRng::new().unwrap();
-        let mut transcript = ProofTranscript::new(b"AggregatedRangeProofTest");
+        let mut transcript = Transcript::new(b"AggregatedRangeProofTest");
 
         let v0 = rng.gen::<u32>() as u64;
         let v0_blinding = Scalar::random(&mut rng);

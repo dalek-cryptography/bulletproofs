@@ -1,5 +1,4 @@
 #![allow(non_snake_case)]
-
 #![doc(include = "../docs/inner-product-protocol.md")]
 
 use std::borrow::Borrow;
@@ -8,10 +7,10 @@ use std::iter;
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::VartimeMultiscalarMul;
-
-use proof_transcript::ProofTranscript;
+use merlin::Transcript;
 
 use errors::ProofError;
+use transcript::TranscriptProtocol;
 
 #[derive(Clone, Debug)]
 pub struct InnerProductProof {
@@ -34,7 +33,7 @@ impl InnerProductProof {
     /// The lengths of the vectors must all be the same, and must all be
     /// either 0 or a power of 2.
     pub fn create<I>(
-        verifier: &mut ProofTranscript,
+        transcript: &mut Transcript,
         Q: &RistrettoPoint,
         Hprime_factors: I,
         mut G_vec: Vec<RistrettoPoint>,
@@ -65,6 +64,8 @@ impl InnerProductProof {
         // All of the input vectors must have a length that is a power of two.
         assert!(n.is_power_of_two());
 
+        transcript.innerproduct_domain_sep(n as u64);
+
         // XXX save these scalar mults by unrolling them into the
         // first iteration of the loop below
         for (H_i, h_i) in H.iter_mut().zip(Hprime_factors.into_iter()) {
@@ -88,20 +89,20 @@ impl InnerProductProof {
             let L = RistrettoPoint::vartime_multiscalar_mul(
                 a_L.iter().chain(b_R.iter()).chain(iter::once(&c_L)),
                 G_R.iter().chain(H_L.iter()).chain(iter::once(Q)),
-            );
+            ).compress();
 
             let R = RistrettoPoint::vartime_multiscalar_mul(
                 a_R.iter().chain(b_L.iter()).chain(iter::once(&c_R)),
                 G_L.iter().chain(H_R.iter()).chain(iter::once(Q)),
-            );
+            ).compress();
 
-            L_vec.push(L.compress());
-            R_vec.push(R.compress());
+            L_vec.push(L);
+            R_vec.push(R);
 
-            verifier.commit(L.compress().as_bytes());
-            verifier.commit(R.compress().as_bytes());
+            transcript.commit_point(b"L", &L);
+            transcript.commit_point(b"R", &R);
 
-            let u = verifier.challenge_scalar();
+            let u = transcript.challenge_scalar(b"u");
             let u_inv = u.invert();
 
             for i in 0..n {
@@ -129,18 +130,20 @@ impl InnerProductProof {
     /// in a parent protocol. See [inner product protocol notes](index.html#verification-equation) for details.
     pub(crate) fn verification_scalars(
         &self,
-        transcript: &mut ProofTranscript,
+        transcript: &mut Transcript,
     ) -> (Vec<Scalar>, Vec<Scalar>, Vec<Scalar>) {
         let lg_n = self.L_vec.len();
         let n = 1 << lg_n;
+
+        transcript.innerproduct_domain_sep(n as u64);
 
         // 1. Recompute x_k,...,x_1 based on the proof transcript
 
         let mut challenges = Vec::with_capacity(lg_n);
         for (L, R) in self.L_vec.iter().zip(self.R_vec.iter()) {
-            transcript.commit(L.as_bytes());
-            transcript.commit(R.as_bytes());
-            challenges.push(transcript.challenge_scalar());
+            transcript.commit_point(b"L", L);
+            transcript.commit_point(b"R", R);
+            challenges.push(transcript.challenge_scalar(b"u"));
         }
 
         // 2. Compute 1/(u_k...u_1) and 1/u_k, ..., 1/u_1
@@ -181,7 +184,7 @@ impl InnerProductProof {
     #[allow(dead_code)]
     pub fn verify<I>(
         &self,
-        transcript: &mut ProofTranscript,
+        transcript: &mut Transcript,
         Hprime_factors: I,
         P: &RistrettoPoint,
         Q: &RistrettoPoint,
@@ -362,7 +365,7 @@ mod tests {
             G.iter().chain(H.iter()).chain(iter::once(&Q)),
         );
 
-        let mut verifier = ProofTranscript::new(b"innerproducttest");
+        let mut verifier = Transcript::new(b"innerproducttest");
         let proof = InnerProductProof::create(
             &mut verifier,
             &Q,
@@ -373,7 +376,7 @@ mod tests {
             b.clone(),
         );
 
-        let mut verifier = ProofTranscript::new(b"innerproducttest");
+        let mut verifier = Transcript::new(b"innerproducttest");
         assert!(
             proof
                 .verify(&mut verifier, util::exp_iter(y_inv), &P, &Q, &G, &H)
@@ -381,7 +384,7 @@ mod tests {
         );
 
         let proof = InnerProductProof::from_bytes(proof.to_bytes().as_slice()).unwrap();
-        let mut verifier = ProofTranscript::new(b"innerproducttest");
+        let mut verifier = Transcript::new(b"innerproducttest");
         assert!(
             proof
                 .verify(&mut verifier, util::exp_iter(y_inv), &P, &Q, &G, &H)

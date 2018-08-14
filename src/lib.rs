@@ -14,6 +14,7 @@ extern crate curve25519_dalek;
 extern crate digest;
 #[macro_use]
 extern crate failure;
+extern crate merlin;
 extern crate rand;
 extern crate sha3;
 extern crate subtle;
@@ -34,12 +35,13 @@ mod notes {}
 mod errors;
 mod generators;
 mod inner_product_proof;
-mod proof_transcript;
+mod transcript;
 mod range_proof;
+
+pub use merlin::Transcript;
 
 pub use errors::ProofError;
 pub use generators::{Generators, GeneratorsView, PedersenGenerators};
-pub use proof_transcript::ProofTranscript;
 pub use range_proof::RangeProof;
 
 #[doc(include = "../docs/aggregation-api.md")]
