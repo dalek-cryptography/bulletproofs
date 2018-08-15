@@ -21,6 +21,9 @@ pub enum ProofError {
     /// proof with non-power-of-two aggregation size.
     #[fail(display = "Invalid aggregation size, m must be a power of 2")]
     InvalidAggregation,
+    /// This error occurs when the generators are of the wrong length.
+    #[fail(display = "Invalid generators length, must be equal to n.")]
+    InvalidGeneratorsLength,
     /// This error results from an internal error during proving.
     ///
     /// The single-party prover is implemented by performing
