@@ -128,7 +128,7 @@ The dealer creates the aggregated vector polynomials \\(\mathbf{l}(x), \mathbf{r
 \end{aligned}
 \\]
 
-The the dealer then performs the [inner product argument](../inner_product_proof/index.html) to prove the relation:
+The dealer then performs the [inner product argument](../inner_product_proof/index.html) to prove the relation:
 \\[
 \operatorname{PK}\left\\{
   ({\mathbf{G}}, {\mathbf{H}}' \in {\mathbb G}^{n \cdot m}, P', Q \in {\mathbb G}; {\mathbf{l}}, {\mathbf{r}} \in {\mathbb Z\_p}^{n\cdot m})
