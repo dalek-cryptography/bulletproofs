@@ -10,8 +10,8 @@ extern crate curve25519_dalek;
 use curve25519_dalek::scalar::Scalar;
 
 extern crate bulletproofs;
-use bulletproofs::Transcript;
 use bulletproofs::RangeProof;
+use bulletproofs::Transcript;
 use bulletproofs::{Generators, PedersenGenerators};
 
 static AGGREGATION_SIZES: [usize; 6] = [1, 2, 4, 8, 16, 32];

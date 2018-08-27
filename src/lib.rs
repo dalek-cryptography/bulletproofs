@@ -35,8 +35,8 @@ mod notes {}
 mod errors;
 mod generators;
 mod inner_product_proof;
-mod transcript;
 mod range_proof;
+mod transcript;
 
 pub use merlin::Transcript;
 

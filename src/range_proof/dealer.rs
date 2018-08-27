@@ -205,7 +205,8 @@ impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
         let e_blinding: Scalar = proof_shares.iter().map(|ps| ps.e_blinding).sum();
 
         self.transcript.commit_scalar(b"t_x", &t_x);
-        self.transcript.commit_scalar(b"t_x_blinding", &t_x_blinding);
+        self.transcript
+            .commit_scalar(b"t_x_blinding", &t_x_blinding);
         self.transcript.commit_scalar(b"e_blinding", &e_blinding);
 
         // Get a challenge value to combine statements for the IPP
