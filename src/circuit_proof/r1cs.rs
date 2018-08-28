@@ -43,17 +43,24 @@ pub struct R1CSProof {
     ipp_proof: InnerProductProof,
 }
 
-// This is a stripped-down version of the Bellman r1cs representation, for the purposes of
-// learning / understanding. The eventual goal is to write this as a BulletproofsConstraintSystem
-// that implements the Bellman ConstraintSystem trait, so we can use that code/logic.
-// (That would require the bellman code to be decoupled from the underlying pairings.)
-
-/// Represents a variable in our constraint system, where the value represents the index.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub struct Variable(usize);
+pub enum VariableType {
+    v,
+    aL, 
+    aR, 
+    aO,
+}
+
+/// Represents a V variable in our constraint system, where the value represents the index.
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+pub struct Variable {
+    var_type: VariableType, 
+    index: usize,
+}
 
 /// Represents a linear combination of some variables multiplied with their scalar coefficients,
-/// plus a scalar. E.g. LC = variable[0]*scalar[0] + variable[1]*scalar[1] + scalar
+/// plus a scalar. The linear combination is supposed to evaluate to zero. 
+/// E.g. LC = 0 = variable[0]*scalar[0] + variable[1]*scalar[1] + scalar
 #[derive(Clone, Debug)]
 pub struct LinearCombination {
     variables: Vec<(Variable, Scalar)>,
@@ -86,41 +93,65 @@ impl LinearCombination {
     }
 }
 
-/// Represents a vector of groups of 3 linear combinations, where a * b = c
 pub struct ConstraintSystem {
-    // a[i] * b[i] = c[i] for all i
-    a: Vec<LinearCombination>,
-    b: Vec<LinearCombination>,
-    c: Vec<LinearCombination>,
+    lc_list: Vec<LinearCombination>,
 
-    // Assignments of witness variables
-    witness_assignment: Vec<Result<Scalar, R1CSError>>,
+    // variable assignments
+    aL_assignment: Vec<Result<Scalar, R1CSError>>,
+    aR_assignment: Vec<Result<Scalar, R1CSError>>,
+    aO_assignment: Vec<Result<Scalar, R1CSError>>,
+    v_assignment: Vec<Result<Scalar, R1CSError>>,
 }
 
 impl ConstraintSystem {
     pub fn new() -> Self {
         ConstraintSystem {
-            a: vec![],
-            b: vec![],
-            c: vec![],
-            witness_assignment: vec![],
+            lc_list: vec![],
+            aL_assignment: vec![],
+            aR_assignment: vec![],
+            aO_assignment: vec![],
+            v_assignment: vec![],
         }
     }
 
     // Allocate a variable and do value assignment at the same time
     // Prover uses this function
-    pub fn alloc_assign_variable(&mut self, val: Scalar) -> Variable {
-        self.witness_assignment.push(Ok(val));
-        Variable(self.witness_assignment.len() - 1)
+    pub fn alloc_assign_variable(&mut self, var_type: VariableType, value: Scalar) -> Variable {
+        self.make_variable(var_type, Ok(value))
     }
 
     // Allocate a variable with an Err value
     // Verifier uses this function
-    pub fn alloc_variable(&mut self) -> Variable {
-        self.witness_assignment
-            .push(Err(R1CSError::InvalidVariableAssignment));
-        Variable(self.witness_assignment.len() - 1)
+    pub fn alloc_variable(&mut self, var_type: VariableType) -> Variable {
+        self.make_variable(var_type, Err(R1CSError::InvalidVariableAssignment))
     }
+
+    fn make_variable(&mut self, var_type: VariableType, value: Result<Scalar, R1CSError>) -> Variable {
+        let index = match var_type {
+            VariableType::aL => {
+                self.aL_assignment.push(value);
+                self.aL_assignment.len() - 1
+            }
+            VariableType::aR => {
+                self.aR_assignment.push(value);
+                self.aR_assignment.len() - 1
+            }
+            VariableType::aO => {
+                self.aO_assignment.push(value);
+                self.aO_assignment.len() - 1
+            }
+            VariableType::v => {
+                self.v_assignment.push(value);
+                self.v_assignment.len() - 1
+            }
+        };
+        Variable {
+            var_type,
+            index,
+        }
+    }
+
+/*
 
     // get number of multiplications
     pub fn get_n(&self) -> usize {
@@ -888,4 +919,5 @@ mod tests {
 
         assert!(create_and_verify_helper(prover_cs, verifier_cs).is_ok());
     }
+*/
 }
