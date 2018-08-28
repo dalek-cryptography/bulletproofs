@@ -79,6 +79,12 @@ impl RangeProof {
         if values.len() != blindings.len() {
             return Err(ProofError::WrongNumBlindingFactors);
         }
+        if generators.n != n {
+            return Err(ProofError::InvalidGeneratorsLength);
+        }
+        if !(n == 8 || n == 16 || n == 32 || n == 64) {
+            return Err(ProofError::InvalidBitsize);
+        }
 
         let dealer = Dealer::new(generators, n, values.len(), transcript)?;
 
@@ -146,6 +152,12 @@ impl RangeProof {
     ) -> Result<(), ProofError> {
         // First, replay the "interactive" protocol using the proof
         // data to recompute all challenges.
+        if gens.n != n {
+            return Err(ProofError::InvalidGeneratorsLength);
+        }
+        if !(n == 8 || n == 16 || n == 32 || n == 64) {
+            return Err(ProofError::InvalidBitsize);
+        }
 
         let m = value_commitments.len();
 
