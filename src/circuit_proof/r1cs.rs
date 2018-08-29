@@ -1,4 +1,5 @@
 #![allow(non_snake_case)]
+#![allow(non_camel_case_types)]
 
 use rand::{CryptoRng, Rng};
 
@@ -94,7 +95,7 @@ impl LinearCombination {
 }
 
 pub struct ConstraintSystem {
-    lc_list: Vec<LinearCombination>,
+    lc_vec: Vec<LinearCombination>,
 
     // variable assignments
     aL_assignment: Vec<Result<Scalar, R1CSError>>,
@@ -106,7 +107,7 @@ pub struct ConstraintSystem {
 impl ConstraintSystem {
     pub fn new() -> Self {
         ConstraintSystem {
-            lc_list: vec![],
+            lc_vec: vec![],
             aL_assignment: vec![],
             aR_assignment: vec![],
             aO_assignment: vec![],
@@ -151,6 +152,31 @@ impl ConstraintSystem {
         }
     }
 
+    pub fn get_m(&self) -> usize {
+        self.v_assignment.len()
+    }
+
+    pub fn make_V(
+        &self,
+        gen: &Generators,
+        v_blinding: &Vec<Scalar>,
+    ) -> Result<Vec<RistrettoPoint>, R1CSError> {
+        if v_blinding.len() != self.v_assignment.len() {
+            return Err(R1CSError::IncorrectInputSize);
+        }
+        self.v_assignment
+            .iter()
+            .zip(v_blinding)
+            .map(|(v_i, v_blinding_i)| Ok(gen.pedersen_gens.commit((v_i.clone())?, *v_blinding_i)))
+            .collect()
+    }
+
+    pub fn constrain(&mut self, lc: LinearCombination) {
+        // TODO: check that the linear combinations are valid
+        // (e.g. that variables are valid, that the linear combination evals to 0 for prover, etc).
+        self.lc_vec.push(lc);        
+    }
+
 /*
 
     // get number of multiplications
@@ -162,40 +188,6 @@ impl ConstraintSystem {
         return n.next_power_of_two();
     }
 
-    pub fn get_m(&self) -> usize {
-        self.witness_assignment.len()
-    }
-
-    pub fn make_V(
-        &self,
-        gen: &Generators,
-        v_blinding: &Vec<Scalar>,
-    ) -> Result<Vec<RistrettoPoint>, R1CSError> {
-        if v_blinding.len() != self.witness_assignment.len() {
-            return Err(R1CSError::IncorrectInputSize);
-        }
-        self.witness_assignment
-            .iter()
-            .zip(v_blinding)
-            .map(|(v_i, v_blinding_i)| Ok(gen.pedersen_gens.commit((v_i.clone())?, *v_blinding_i)))
-            .collect()
-    }
-
-    // Push one set of linear constraints (a, b, c) to the constraint system.
-    // Pushing a, b, c together prevents mismatched constraints.
-    pub fn constrain(
-        &mut self,
-        lc_a: LinearCombination,
-        lc_b: LinearCombination,
-        lc_c: LinearCombination,
-    ) {
-        // TODO: check that the linear combinations are valid
-        // (e.g. that variables are valid, belong to this constraint system).
-        self.a.push(lc_a);
-        self.b.push(lc_b);
-        self.c.push(lc_c);
-    }
-
     fn eval_lc(&self, lc: &LinearCombination) -> Result<Scalar, R1CSError> {
         let sum_vars = lc
             .variables
@@ -203,31 +195,6 @@ impl ConstraintSystem {
             .map(|(var, scalar)| Ok(scalar * self.witness_assignment[var.0].clone()?))
             .sum::<Result<Scalar, R1CSError>>()?;
         Ok(sum_vars + lc.constant)
-    }
-
-    // for r1cs -> direct
-    fn get_circuit_params(&self) -> (usize, usize, usize, Vec<Scalar>, Vec<Vec<Scalar>>) {
-        let n = self.a.len();
-        let m = self.witness_assignment.len();
-        let q = self.a.len() * 3;
-
-        let zer = Scalar::zero();
-        // TODO: create / append to c on the fly instead
-        let mut c = vec![zer; q]; // length q vector of constants.
-        let mut W_V = vec![vec![zer; m]; q]; // qxm matrix of commitments.
-        for (i, lc) in self
-            .a
-            .iter()
-            .chain(self.b.iter())
-            .chain(self.c.iter())
-            .enumerate()
-        {
-            for (var, scalar) in lc.get_variables() {
-                W_V[i][var.0] = scalar;
-            }
-            c[i] = lc.get_constant();
-        }
-        (n, m, q, c, W_V)
     }
 
     // temporarily copied over from `circuit.rs`, while working out how to get rid of matrices
