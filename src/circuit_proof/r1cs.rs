@@ -47,20 +47,20 @@ pub struct R1CSProof {
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub enum VariableType {
     v,
-    aL, 
-    aR, 
+    aL,
+    aR,
     aO,
 }
 
 /// Represents a V variable in our constraint system, where the value represents the index.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub struct Variable {
-    var_type: VariableType, 
+    var_type: VariableType,
     index: usize,
 }
 
 /// Represents a linear combination of some variables multiplied with their scalar coefficients,
-/// plus a scalar. The linear combination is supposed to evaluate to zero. 
+/// plus a scalar. The linear combination is supposed to evaluate to zero.
 /// E.g. LC = 0 = variable[0]*scalar[0] + variable[1]*scalar[1] + scalar
 #[derive(Clone, Debug)]
 pub struct LinearCombination {
@@ -115,19 +115,46 @@ impl ConstraintSystem {
         }
     }
 
-    // Allocate a variable and do value assignment at the same time
-    // Prover uses this function
-    pub fn alloc_assign_variable(&mut self, var_type: VariableType, value: Scalar) -> Variable {
-        self.make_variable(var_type, Ok(value))
+    // Allocate and do value assignment for aL, aR, aO.
+    // Prover uses this function.
+    pub fn assign_a(
+        &mut self,
+        aL_val: Scalar,
+        aR_val: Scalar,
+        aO_val: Scalar,
+    ) -> (Variable, Variable, Variable) {
+        let aL_var = self.make_variable(VariableType::aL, Ok(aL_val));
+        let aR_var = self.make_variable(VariableType::aR, Ok(aR_val));
+        let aO_var = self.make_variable(VariableType::aO, Ok(aO_val));
+        (aL_var, aR_var, aO_var)
     }
 
-    // Allocate a variable with an Err value
-    // Verifier uses this function
-    pub fn alloc_variable(&mut self, var_type: VariableType) -> Variable {
-        self.make_variable(var_type, Err(R1CSError::InvalidVariableAssignment))
+    // Allocate and do value assignment for v.
+    // Prover uses this function.
+    pub fn assign_v(&mut self, v_val: Scalar) -> Variable {
+        self.make_variable(VariableType::v, Ok(v_val))
     }
 
-    fn make_variable(&mut self, var_type: VariableType, value: Result<Scalar, R1CSError>) -> Variable {
+    // Allocate a variable with an Err value for aL, aR, aO.
+    // Verifier uses this function.
+    pub fn allocate_a(&mut self) -> (Variable, Variable, Variable) {
+        let aL = self.make_variable(VariableType::aL, Err(R1CSError::InvalidVariableAssignment));
+        let aR = self.make_variable(VariableType::aR, Err(R1CSError::InvalidVariableAssignment));
+        let aO = self.make_variable(VariableType::aO, Err(R1CSError::InvalidVariableAssignment));
+        (aL, aR, aO)
+    }
+
+    // Allocate a variable with an Err value for v.
+    // Verifier uses this function.
+    pub fn allocate_v(&mut self) -> Variable {
+        self.make_variable(VariableType::v, Err(R1CSError::InvalidVariableAssignment))
+    }
+
+    fn make_variable(
+        &mut self,
+        var_type: VariableType,
+        value: Result<Scalar, R1CSError>,
+    ) -> Variable {
         let index = match var_type {
             VariableType::aL => {
                 self.aL_assignment.push(value);
@@ -146,10 +173,7 @@ impl ConstraintSystem {
                 self.v_assignment.len() - 1
             }
         };
-        Variable {
-            var_type,
-            index,
-        }
+        Variable { var_type, index }
     }
 
     pub fn get_m(&self) -> usize {
@@ -174,10 +198,10 @@ impl ConstraintSystem {
     pub fn constrain(&mut self, lc: LinearCombination) {
         // TODO: check that the linear combinations are valid
         // (e.g. that variables are valid, that the linear combination evals to 0 for prover, etc).
-        self.lc_vec.push(lc);        
+        self.lc_vec.push(lc);
     }
 
-/*
+    /*
 
     // get number of multiplications
     pub fn get_n(&self) -> usize {
