@@ -393,12 +393,42 @@ mod tests {
         // test multiplication without coefficients
         mul_circuit_helper(3, 1, 4, 1, 12, 1, Ok(())); // (3*1) * (4*1) = (12*1)
         mul_circuit_helper(3, 1, 4, 1, 10, 1, Err(())); // (3*1) * (4*1) != (10*1)
-                                                        // test multiplication with coefficients
+
+        // test multiplication with coefficients
         mul_circuit_helper(3, 2, 4, 5, 120, 1, Ok(())); // (3*2) * (4*5) = (120*1)
         mul_circuit_helper(3, 2, 4, 5, 121, 1, Err(())); // (3*2) * (4*5) != (121*1)
-                                                         // test multiplication with zeros
+
+        // test multiplication with zeros
         mul_circuit_helper(0, 2, 4, 5, 120, 0, Ok(())); // (0*2) * (4*5) = (120*0)
         mul_circuit_helper(0, 2, 4, 5, 120, 1, Err(())); // (0*2) * (4*5) = (120*1)
+    }
+
+    // a + b =? c
+    // The purpose of this test is to see how a circuit with no multiplication gates,
+    // and one addition gate, behaves.
+    fn add_circuit_basic_helper(a: u64, b: u64, c: u64, expected_result: Result<(), ()>) {
+        let one = Scalar::one();
+        let zer = Scalar::zero();
+
+        let mut prover_cs = ConstraintSystem::new();
+        let v_a = prover_cs.assign_v(Ok(Scalar::from(a)));
+        let v_b = prover_cs.assign_v(Ok(Scalar::from(b)));
+        let v_c = prover_cs.assign_v(Ok(Scalar::from(c)));
+        prover_cs.constrain(LinearCombination::new(vec![(v_a, one), (v_b, one), (v_c, -one)], zer));
+
+        let mut verifier_cs = ConstraintSystem::new();
+        let v_a = verifier_cs.assign_v(Err(R1CSError::InvalidVariableAssignment));
+        let v_b = verifier_cs.assign_v(Err(R1CSError::InvalidVariableAssignment));
+        let v_c = verifier_cs.assign_v(Err(R1CSError::InvalidVariableAssignment));
+        verifier_cs.constrain(LinearCombination::new(vec![(v_a, one), (v_b, one), (v_c, -one)], zer));
+
+        assert!(create_and_verify_helper(prover_cs, verifier_cs, expected_result).is_ok());
+    }
+
+    #[test]
+    fn add_circuit_basic() {
+        add_circuit_basic_helper(3, 4, 7, Ok(())); // 3 + 4 = 7
+        add_circuit_basic_helper(3, 4, 10, Err(())); // 3 + 4 != 10
     }
 
 }
