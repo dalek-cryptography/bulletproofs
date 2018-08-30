@@ -236,7 +236,7 @@ impl ConstraintSystem {
         mut self,
         pedersen_gens: &PedersenGenerators,
         rng: &mut R,
-    ) -> Result<(Circuit, ProverInput, VerifierInput), R1CSError> {
+    ) -> (Circuit, Result<ProverInput, R1CSError>, Result<VerifierInput, R1CSError>) {
         // If `n`, the number of multiplications, is not 0 or 2, then pad the circuit.
         let n = self.get_n();
         if !(n == 0 || n.is_power_of_two()) {
@@ -249,10 +249,10 @@ impl ConstraintSystem {
         let v_blinding: Vec<Scalar> = (0..m).map(|_| Scalar::random(rng)).collect();
 
         let circuit = self.create_circuit();
-        let prover_input = self.create_prover_input(&v_blinding)?;
-        let verifier_input = self.create_verifier_input(pedersen_gens, &v_blinding)?;
+        let prover_input = self.create_prover_input(&v_blinding);
+        let verifier_input = self.create_verifier_input(pedersen_gens, &v_blinding);
 
-        Ok((circuit, prover_input, verifier_input))
+        (circuit, prover_input, verifier_input)
     }
 }
 
@@ -264,33 +264,63 @@ mod tests {
     use proof_transcript::ProofTranscript;
     use rand::rngs::OsRng;
 
-    fn create_and_verify_helper(cs: ConstraintSystem, expected_result: bool) {
+    fn create_and_verify_helper(
+        prover_cs: ConstraintSystem,
+        verifier_cs: ConstraintSystem,
+        expected_result: Result<(), ()>,
+    ) {
         let mut rng = OsRng::new().unwrap();
         let pedersen_gens = PedersenGenerators::default();
-        let generators = Generators::new(pedersen_gens, cs.get_n(), 1);
+        let generators = Generators::new(pedersen_gens, prover_cs.get_n(), 1);
 
-        let (circuit, prover_input, verifier_input) =
-            cs.create_proof_input(&pedersen_gens, &mut rng);
+        let (prover_circuit, prover_input, _) =
+            prover_cs.create_proof_input(&pedersen_gens, &mut rng);
 
-        let mut proof_transcript = ProofTranscript::new(b"CircuitProofTest");        
+        let mut prover_transcript = ProofTranscript::new(b"CircuitProofTest");
         let circuit_proof = CircuitProof::prove(
             &generators,
-            &mut proof_transcript,
+            &mut prover_transcript,
             &mut rng,
-            &circuit.clone(),
-            &prover_input,
+            &prover_circuit,
+            &prover_input.unwrap(),
         ).unwrap();
-        
-        let mut verify_transcript = ProofTranscript::new(b"CircuitProofTest");
+
+        let (verifier_circuit, _, verifier_input) =
+            verifier_cs.create_proof_input(&pedersen_gens, &mut rng);
+
+        assert_eq!(prover_circuit, verifier_circuit);
+
+        let mut verifier_transcript = ProofTranscript::new(b"CircuitProofTest");
         let actual_result = circuit_proof.verify(
             &generators,
-            &mut verify_transcript,
+            &mut verifier_transcript,
             &mut rng,
-            &circuit,
-            &verifier_input,
+            &verifier_circuit,
+            &verifier_input.unwrap(),
         );
 
-        assert_eq!(expected_result, actual_result);
+        match expected_result {
+            Ok(_) => assert!(actual_result.is_ok()),
+            Err(_) => assert!(actual_result.is_err()),
+        }
+    }
+
+    fn mul_circuit_helper(a: u64, b: u64, c: u64, expected_result: Result<(), ()>) {
+        let mut prover_cs = ConstraintSystem::new();
+        prover_cs.assign_a(Scalar::from(a), Scalar::from(b), Scalar::from(c));
+
+        let mut verifier_cs = ConstraintSystem::new();
+        verifier_cs.allocate_a();
+
+        create_and_verify_helper(prover_cs, verifier_cs, expected_result);
+    }
+
+    #[test]
+    fn mul_circuit() {
+        // 3 * 4 = 12
+        mul_circuit_helper(3, 4, 12, Ok(()));
+        // 3 * 4 != 10
+        mul_circuit_helper(3, 4, 10, Err(()));
     }
 }
 
@@ -304,37 +334,6 @@ mod tests {
         Ok(sum_vars + lc.constant)
     }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use generators::PedersenGenerators;
-    use rand::rngs::OsRng;
-
-    fn create_and_verify_helper(
-        prover_cs: ConstraintSystem,
-        verifier_cs: ConstraintSystem,
-    ) -> Result<(), R1CSError> {
-        let generators = Generators::new(PedersenGenerators::default(), prover_cs.get_n(), 1);
-        let mut prover_transcript = ProofTranscript::new(b"R1CSExamplesTest");
-        let mut rng = OsRng::new().unwrap();
-
-        let v_blinding: Vec<Scalar> = (0..prover_cs.get_m())
-            .map(|_| Scalar::random(&mut rng))
-            .collect();
-
-        let (circuit_proof, V) = prover_cs
-            .prove(&generators, &mut prover_transcript, &mut rng, v_blinding)
-            .unwrap();
-
-        let mut verifier_transcript = ProofTranscript::new(b"R1CSExamplesTest");
-        verifier_cs.verify(
-            &circuit_proof,
-            &V,
-            &generators,
-            &mut verifier_transcript,
-            &mut rng,
-        )
-    }
 
     // Trivial case: a(const) * b(const) = c(const)
     // Purpose of this test is to see how a cs with no variables behaves

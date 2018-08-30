@@ -12,7 +12,7 @@ use inner_product_proof::{inner_product, InnerProductProof};
 use proof_transcript::ProofTranscript;
 use util;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Circuit {
     pub n: usize,
     m: usize,
