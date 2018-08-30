@@ -25,15 +25,15 @@ pub struct Variable {
 }
 
 #[derive(Clone)]
-pub struct WireValue(Result<Scalar, R1CSError>);
+pub struct Wire(Result<Scalar, R1CSError>);
 
-impl WireValue {
-    pub fn new_ok(scalar: Scalar) -> Self {
-        WireValue(Ok(scalar))
+impl Wire {
+    pub fn with_secret(scalar: Scalar) -> Self {
+        Wire(Ok(scalar))
     }
 
-    pub fn new_err() -> Self {
-        WireValue(Err(R1CSError::InvalidVariableAssignment))
+    pub fn without_secret() -> Self {
+        Wire(Err(R1CSError::InvalidVariableAssignment))
     }
 }
 
@@ -76,10 +76,10 @@ pub struct ConstraintSystem {
     lc_vec: Vec<LinearCombination>,
 
     // variable assignments
-    aL_assignment: Vec<WireValue>,
-    aR_assignment: Vec<WireValue>,
-    aO_assignment: Vec<WireValue>,
-    v_assignment: Vec<WireValue>,
+    aL_assignment: Vec<Wire>,
+    aR_assignment: Vec<Wire>,
+    aO_assignment: Vec<Wire>,
+    v_assignment: Vec<Wire>,
 }
 
 impl ConstraintSystem {
@@ -97,9 +97,9 @@ impl ConstraintSystem {
     // Prover will pass in Ok(Scalar)s, and Verifier will pass in R1CSErrors.
     pub fn assign_a(
         &mut self,
-        aL_val: WireValue,
-        aR_val: WireValue,
-        aO_val: WireValue,
+        aL_val: Wire,
+        aR_val: Wire,
+        aO_val: Wire,
     ) -> (Variable, Variable, Variable) {
         let aL_var = self.make_variable(VariableType::aL, aL_val);
         let aR_var = self.make_variable(VariableType::aR, aR_val);
@@ -109,14 +109,14 @@ impl ConstraintSystem {
 
     // Allocate a variable for v, and assign it the Result value passed in.
     // Prover will pass in Ok(Scalar), and Verifier will pass in R1CSError.
-    pub fn assign_v(&mut self, v_val: WireValue) -> Variable {
+    pub fn assign_v(&mut self, v_val: Wire) -> Variable {
         self.make_variable(VariableType::v, v_val)
     }
 
     fn make_variable(
         &mut self,
         var_type: VariableType,
-        value: WireValue,
+        value: Wire,
     ) -> Variable {
         let index = match var_type {
             VariableType::aL => {
@@ -243,7 +243,7 @@ impl ConstraintSystem {
         let n = self.get_n();
         if !(n == 0 || n.is_power_of_two()) {
             let pad = n.next_power_of_two() - n;
-            let zer_wire = WireValue::new_ok(Scalar::zero());
+            let zer_wire = Wire::with_secret(Scalar::zero());
             for _ in 0..pad {
                 self.assign_a(zer_wire.clone(), zer_wire.clone(), zer_wire.clone());
             }
@@ -317,16 +317,16 @@ mod tests {
     fn mul_circuit_basic_helper(a: u64, b: u64, c: u64, expected_result: Result<(), ()>) {
         let mut prover_cs = ConstraintSystem::new();
         prover_cs.assign_a(
-            WireValue::new_ok(Scalar::from(a)),
-            WireValue::new_ok(Scalar::from(b)),
-            WireValue::new_ok(Scalar::from(c)),
+            Wire::with_secret(Scalar::from(a)),
+            Wire::with_secret(Scalar::from(b)),
+            Wire::with_secret(Scalar::from(c)),
         );
 
         let mut verifier_cs = ConstraintSystem::new();
         verifier_cs.assign_a(
-            WireValue::new_err(),
-            WireValue::new_err(),
-            WireValue::new_err(),
+            Wire::without_secret(),
+            Wire::without_secret(),
+            Wire::without_secret(),
         );
 
         assert!(create_and_verify_helper(prover_cs, verifier_cs, expected_result).is_ok());
@@ -354,13 +354,13 @@ mod tests {
 
         let mut prover_cs = ConstraintSystem::new();
         let (aL, aR, aO) = prover_cs.assign_a(
-            WireValue::new_ok(Scalar::from(a) * Scalar::from(a_coeff)),
-            WireValue::new_ok(Scalar::from(b) * Scalar::from(b_coeff)),
-            WireValue::new_ok(Scalar::from(c) * Scalar::from(c_coeff)),
+            Wire::with_secret(Scalar::from(a) * Scalar::from(a_coeff)),
+            Wire::with_secret(Scalar::from(b) * Scalar::from(b_coeff)),
+            Wire::with_secret(Scalar::from(c) * Scalar::from(c_coeff)),
         );
-        let v_a = prover_cs.assign_v(WireValue::new_ok(Scalar::from(a)));
-        let v_b = prover_cs.assign_v(WireValue::new_ok(Scalar::from(b)));
-        let v_c = prover_cs.assign_v(WireValue::new_ok(Scalar::from(c)));
+        let v_a = prover_cs.assign_v(Wire::with_secret(Scalar::from(a)));
+        let v_b = prover_cs.assign_v(Wire::with_secret(Scalar::from(b)));
+        let v_c = prover_cs.assign_v(Wire::with_secret(Scalar::from(c)));
 
         prover_cs.constrain(LinearCombination::new(
             vec![(aL, -one), (v_a, Scalar::from(a_coeff))],
@@ -377,13 +377,13 @@ mod tests {
 
         let mut verifier_cs = ConstraintSystem::new();
         let (aL, aR, aO) = verifier_cs.assign_a(
-            WireValue::new_err(),
-            WireValue::new_err(),
-            WireValue::new_err(),
+            Wire::without_secret(),
+            Wire::without_secret(),
+            Wire::without_secret(),
         );
-        let v_a = verifier_cs.assign_v(WireValue::new_err());
-        let v_b = verifier_cs.assign_v(WireValue::new_err());
-        let v_c = verifier_cs.assign_v(WireValue::new_err());
+        let v_a = verifier_cs.assign_v(Wire::without_secret());
+        let v_b = verifier_cs.assign_v(Wire::without_secret());
+        let v_c = verifier_cs.assign_v(Wire::without_secret());
 
         verifier_cs.constrain(LinearCombination::new(
             vec![(aL, -one), (v_a, Scalar::from(a_coeff))],
@@ -424,18 +424,18 @@ mod tests {
         let zer = Scalar::zero();
 
         let mut prover_cs = ConstraintSystem::new();
-        let v_a = prover_cs.assign_v(WireValue::new_ok(Scalar::from(a)));
-        let v_b = prover_cs.assign_v(WireValue::new_ok(Scalar::from(b)));
-        let v_c = prover_cs.assign_v(WireValue::new_ok(Scalar::from(c)));
+        let v_a = prover_cs.assign_v(Wire::with_secret(Scalar::from(a)));
+        let v_b = prover_cs.assign_v(Wire::with_secret(Scalar::from(b)));
+        let v_c = prover_cs.assign_v(Wire::with_secret(Scalar::from(c)));
         prover_cs.constrain(LinearCombination::new(
             vec![(v_a, one), (v_b, one), (v_c, -one)],
             zer,
         ));
 
         let mut verifier_cs = ConstraintSystem::new();
-        let v_a = verifier_cs.assign_v(WireValue::new_err());
-        let v_b = verifier_cs.assign_v(WireValue::new_err());
-        let v_c = verifier_cs.assign_v(WireValue::new_err());
+        let v_a = verifier_cs.assign_v(Wire::without_secret());
+        let v_b = verifier_cs.assign_v(Wire::without_secret());
+        let v_c = verifier_cs.assign_v(Wire::without_secret());
         verifier_cs.constrain(LinearCombination::new(
             vec![(v_a, one), (v_b, one), (v_c, -one)],
             zer,
