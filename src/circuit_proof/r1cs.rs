@@ -24,17 +24,10 @@ pub struct Variable {
     index: usize,
 }
 
-#[derive(Clone)]
-pub struct Wire(Result<Scalar, R1CSError>);
+pub type Assignment = Result<Scalar, R1CSError>;
 
-impl Wire {
-    pub fn with_secret(scalar: Scalar) -> Self {
-        Wire(Ok(scalar))
-    }
-
-    pub fn without_secret() -> Self {
-        Wire(Err(R1CSError::InvalidVariableAssignment))
-    }
+pub fn new_err_assignment() -> Assignment {
+    Err(R1CSError::InvalidVariableAssignment)
 }
 
 /// Represents a linear combination of some variables multiplied with their scalar coefficients,
@@ -76,10 +69,10 @@ pub struct ConstraintSystem {
     lc_vec: Vec<LinearCombination>,
 
     // variable assignments
-    aL_assignment: Vec<Wire>,
-    aR_assignment: Vec<Wire>,
-    aO_assignment: Vec<Wire>,
-    v_assignment: Vec<Wire>,
+    aL_assignment: Vec<Assignment>,
+    aR_assignment: Vec<Assignment>,
+    aO_assignment: Vec<Assignment>,
+    v_assignment: Vec<Assignment>,
 }
 
 impl ConstraintSystem {
@@ -97,9 +90,9 @@ impl ConstraintSystem {
     // Prover will pass in Ok(Scalar)s, and Verifier will pass in R1CSErrors.
     pub fn assign_a(
         &mut self,
-        aL_val: Wire,
-        aR_val: Wire,
-        aO_val: Wire,
+        aL_val: Assignment,
+        aR_val: Assignment,
+        aO_val: Assignment,
     ) -> (Variable, Variable, Variable) {
         let aL_var = self.make_variable(VariableType::aL, aL_val);
         let aR_var = self.make_variable(VariableType::aR, aR_val);
@@ -109,15 +102,11 @@ impl ConstraintSystem {
 
     // Allocate a variable for v, and assign it the Result value passed in.
     // Prover will pass in Ok(Scalar), and Verifier will pass in R1CSError.
-    pub fn assign_v(&mut self, v_val: Wire) -> Variable {
+    pub fn assign_v(&mut self, v_val: Assignment) -> Variable {
         self.make_variable(VariableType::v, v_val)
     }
 
-    fn make_variable(
-        &mut self,
-        var_type: VariableType,
-        value: Wire,
-    ) -> Variable {
+    fn make_variable(&mut self, var_type: VariableType, value: Assignment) -> Variable {
         let index = match var_type {
             VariableType::aL => {
                 self.aL_assignment.push(value);
@@ -164,7 +153,7 @@ impl ConstraintSystem {
         self.v_assignment
             .iter()
             .zip(v_blinding)
-            .map(|(v_i, v_blinding_i)| Ok(pedersen_gens.commit(v_i.0.clone()?, *v_blinding_i)))
+            .map(|(v_i, v_blinding_i)| Ok(pedersen_gens.commit(v_i.clone()?, *v_blinding_i)))
             .collect()
     }
 
@@ -178,17 +167,17 @@ impl ConstraintSystem {
         let aL = self
             .aL_assignment
             .iter()
-            .map(|aL_i| aL_i.0.clone())
-             .collect::<Result<Vec<_>, _>>()?;
+            .cloned()
+            .collect::<Result<Vec<_>, _>>()?;
         let aR = self
             .aR_assignment
             .iter()
-            .map(|aR_i| aR_i.0.clone())
+            .cloned()
             .collect::<Result<Vec<_>, _>>()?;
         let aO = self
             .aO_assignment
             .iter()
-            .map(|aO_i| aO_i.0.clone())
+            .cloned()
             .collect::<Result<Vec<_>, _>>()?;
 
         Ok(ProverInput::new(aL, aR, aO, v_blinding.to_vec()))
@@ -243,9 +232,9 @@ impl ConstraintSystem {
         let n = self.get_n();
         if !(n == 0 || n.is_power_of_two()) {
             let pad = n.next_power_of_two() - n;
-            let zer_wire = Wire::with_secret(Scalar::zero());
+            let zer = Scalar::zero();
             for _ in 0..pad {
-                self.assign_a(zer_wire.clone(), zer_wire.clone(), zer_wire.clone());
+                self.assign_a(Ok(zer), Ok(zer), Ok(zer));
             }
         }
         let m = self.get_m();
@@ -317,16 +306,16 @@ mod tests {
     fn mul_circuit_basic_helper(a: u64, b: u64, c: u64, expected_result: Result<(), ()>) {
         let mut prover_cs = ConstraintSystem::new();
         prover_cs.assign_a(
-            Wire::with_secret(Scalar::from(a)),
-            Wire::with_secret(Scalar::from(b)),
-            Wire::with_secret(Scalar::from(c)),
+            Ok(Scalar::from(a)),
+            Ok(Scalar::from(b)),
+            Ok(Scalar::from(c)),
         );
 
         let mut verifier_cs = ConstraintSystem::new();
         verifier_cs.assign_a(
-            Wire::without_secret(),
-            Wire::without_secret(),
-            Wire::without_secret(),
+            new_err_assignment(),
+            new_err_assignment(),
+            new_err_assignment(),
         );
 
         assert!(create_and_verify_helper(prover_cs, verifier_cs, expected_result).is_ok());
@@ -354,13 +343,13 @@ mod tests {
 
         let mut prover_cs = ConstraintSystem::new();
         let (aL, aR, aO) = prover_cs.assign_a(
-            Wire::with_secret(Scalar::from(a) * Scalar::from(a_coeff)),
-            Wire::with_secret(Scalar::from(b) * Scalar::from(b_coeff)),
-            Wire::with_secret(Scalar::from(c) * Scalar::from(c_coeff)),
+            Ok(Scalar::from(a) * Scalar::from(a_coeff)),
+            Ok(Scalar::from(b) * Scalar::from(b_coeff)),
+            Ok(Scalar::from(c) * Scalar::from(c_coeff)),
         );
-        let v_a = prover_cs.assign_v(Wire::with_secret(Scalar::from(a)));
-        let v_b = prover_cs.assign_v(Wire::with_secret(Scalar::from(b)));
-        let v_c = prover_cs.assign_v(Wire::with_secret(Scalar::from(c)));
+        let v_a = prover_cs.assign_v(Ok(Scalar::from(a)));
+        let v_b = prover_cs.assign_v(Ok(Scalar::from(b)));
+        let v_c = prover_cs.assign_v(Ok(Scalar::from(c)));
 
         prover_cs.constrain(LinearCombination::new(
             vec![(aL, -one), (v_a, Scalar::from(a_coeff))],
@@ -377,13 +366,13 @@ mod tests {
 
         let mut verifier_cs = ConstraintSystem::new();
         let (aL, aR, aO) = verifier_cs.assign_a(
-            Wire::without_secret(),
-            Wire::without_secret(),
-            Wire::without_secret(),
+            new_err_assignment(),
+            new_err_assignment(),
+            new_err_assignment(),
         );
-        let v_a = verifier_cs.assign_v(Wire::without_secret());
-        let v_b = verifier_cs.assign_v(Wire::without_secret());
-        let v_c = verifier_cs.assign_v(Wire::without_secret());
+        let v_a = verifier_cs.assign_v(new_err_assignment());
+        let v_b = verifier_cs.assign_v(new_err_assignment());
+        let v_c = verifier_cs.assign_v(new_err_assignment());
 
         verifier_cs.constrain(LinearCombination::new(
             vec![(aL, -one), (v_a, Scalar::from(a_coeff))],
@@ -424,18 +413,18 @@ mod tests {
         let zer = Scalar::zero();
 
         let mut prover_cs = ConstraintSystem::new();
-        let v_a = prover_cs.assign_v(Wire::with_secret(Scalar::from(a)));
-        let v_b = prover_cs.assign_v(Wire::with_secret(Scalar::from(b)));
-        let v_c = prover_cs.assign_v(Wire::with_secret(Scalar::from(c)));
+        let v_a = prover_cs.assign_v(Ok(Scalar::from(a)));
+        let v_b = prover_cs.assign_v(Ok(Scalar::from(b)));
+        let v_c = prover_cs.assign_v(Ok(Scalar::from(c)));
         prover_cs.constrain(LinearCombination::new(
             vec![(v_a, one), (v_b, one), (v_c, -one)],
             zer,
         ));
 
         let mut verifier_cs = ConstraintSystem::new();
-        let v_a = verifier_cs.assign_v(Wire::without_secret());
-        let v_b = verifier_cs.assign_v(Wire::without_secret());
-        let v_c = verifier_cs.assign_v(Wire::without_secret());
+        let v_a = verifier_cs.assign_v(new_err_assignment());
+        let v_b = verifier_cs.assign_v(new_err_assignment());
+        let v_c = verifier_cs.assign_v(new_err_assignment());
         verifier_cs.constrain(LinearCombination::new(
             vec![(v_a, one), (v_b, one), (v_c, -one)],
             zer,
@@ -604,9 +593,9 @@ mod tests {
 
 #[derive(Clone, Debug)]
 pub struct R1CSProof {
-    /// Commitment to the values of input wires
+    /// Commitment to the values of input Assignments
     A_I: CompressedRistretto,
-    /// Commitment to the values of output wires
+    /// Commitment to the values of output Assignments
     A_O: CompressedRistretto,
     /// Commitment to the blinding factors
     S: CompressedRistretto,
