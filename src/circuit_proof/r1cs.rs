@@ -6,7 +6,7 @@ use rand::{CryptoRng, Rng};
 use curve25519_dalek::ristretto::{RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
 use errors::R1CSError;
-use generators::Generators;
+use generators::{Generators, PedersenGenerators};
 use super::circuit::{Circuit, ProverInput, VerifierInput};
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
@@ -155,23 +155,19 @@ impl ConstraintSystem {
         self.v_assignment.len()
     }
 
-    // TODO: use try/catch for v = error type, instead of unwrapping
-    pub fn make_V<R: Rng + CryptoRng>(
+    pub fn make_V(
         &self,
-        gen: &Generators,
-        rng: &mut R,
-    ) -> (Vec<RistrettoPoint>, Vec<Scalar>) {
-        let v_blinding: Vec<Scalar> = (0..self.v_assignment.len())
-            .map(|_| Scalar::random(rng))
-            .collect();
-
-        let V = self.v_assignment
+        pedersen_gens: &PedersenGenerators,
+        v_blinding: &Vec<Scalar>,
+    ) -> Result<Vec<RistrettoPoint>, R1CSError> {
+        if v_blinding.len() != self.v_assignment.len() {
+            return Err(R1CSError::IncorrectInputSize);
+        }
+        self.v_assignment
             .iter()
-            .zip(v_blinding.clone())
-            .map(|(v_i, v_blinding_i)| gen.pedersen_gens.commit(v_i.clone().unwrap(), v_blinding_i))
-            .collect();
-
-        (V, v_blinding)
+            .zip(v_blinding)
+            .map(|(v_i, v_blinding_i)| Ok(pedersen_gens.commit((v_i.clone())?, *v_blinding_i)))
+            .collect()
     }
 
     pub fn constrain(&mut self, lc: LinearCombination) {
@@ -186,6 +182,14 @@ impl ConstraintSystem {
         let aO = self.aO_assignment.iter().cloned().collect::<Result<Vec<_>, _>>()?;
 
         Ok(ProverInput::new(aL, aR, aO, v_blinding))
+    }
+
+    fn create_verifier_input(
+        &self,
+        pedersen_gens: &PedersenGenerators,
+        v_blinding: &Vec<Scalar>,
+    ) -> Result<VerifierInput, R1CSError> {
+        Ok(VerifierInput::new(self.make_V(pedersen_gens, v_blinding)?))
     }
 
     fn create_circuit(&self) -> Circuit {
@@ -214,6 +218,8 @@ impl ConstraintSystem {
 
         Circuit::new(n, m, q, c, W_L, W_R, W_O, W_V)
     }
+
+
 
     /*
 
