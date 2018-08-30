@@ -3,46 +3,11 @@
 
 use rand::{CryptoRng, Rng};
 
-use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
+use curve25519_dalek::ristretto::{RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
 use errors::R1CSError;
 use generators::Generators;
-use proof_transcript::ProofTranscript;
-
-use std::iter;
-
-use curve25519_dalek::traits::{IsIdentity, MultiscalarMul, VartimeMultiscalarMul};
-use inner_product_proof::{inner_product, InnerProductProof};
-use util;
-
-#[derive(Clone, Debug)]
-pub struct R1CSProof {
-    /// Commitment to the values of input wires
-    A_I: CompressedRistretto,
-    /// Commitment to the values of output wires
-    A_O: CompressedRistretto,
-    /// Commitment to the blinding factors
-    S: CompressedRistretto,
-    /// Commitment to the \\(t_1\\) coefficient of \\( t(x) \\)
-    T_1: CompressedRistretto,
-    /// Commitment to the \\(t_3\\) coefficient of \\( t(x) \\)
-    T_3: CompressedRistretto,
-    /// Commitment to the \\(t_4\\) coefficient of \\( t(x) \\)
-    T_4: CompressedRistretto,
-    /// Commitment to the \\(t_5\\) coefficient of \\( t(x) \\)
-    T_5: CompressedRistretto,
-    /// Commitment to the \\(t_6\\) coefficient of \\( t(x) \\)
-    T_6: CompressedRistretto,
-    /// Evaluation of the polynomial \\(t(x)\\) at the challenge point \\(x\\)
-    t_x: Scalar,
-    /// Blinding factor for the synthetic commitment to \\( t(x) \\)
-    t_x_blinding: Scalar,
-    /// Blinding factor for the synthetic commitment to the
-    /// inner-product arguments
-    e_blinding: Scalar,
-    /// Proof data for the inner-product argument.
-    ipp_proof: InnerProductProof,
-}
+use super::circuit::{Circuit, ProverInput, VerifierInput};
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub enum VariableType {
@@ -176,23 +141,37 @@ impl ConstraintSystem {
         Variable { var_type, index }
     }
 
+    // Get number of multiplications.
+    pub fn get_n(&self) -> usize {
+        let n = self.aL_assignment.len();
+        if n == 0 || n.is_power_of_two() {
+            return n;
+        }
+        return n.next_power_of_two();
+    }
+
+    // Get number of high-level witness variables.
     pub fn get_m(&self) -> usize {
         self.v_assignment.len()
     }
 
-    pub fn make_V(
+    // TODO: use try/catch for v = error type, instead of unwrapping
+    pub fn make_V<R: Rng + CryptoRng>(
         &self,
         gen: &Generators,
-        v_blinding: &Vec<Scalar>,
-    ) -> Result<Vec<RistrettoPoint>, R1CSError> {
-        if v_blinding.len() != self.v_assignment.len() {
-            return Err(R1CSError::IncorrectInputSize);
-        }
-        self.v_assignment
+        rng: &mut R,
+    ) -> (Vec<RistrettoPoint>, Vec<Scalar>) {
+        let v_blinding: Vec<Scalar> = (0..self.v_assignment.len())
+            .map(|_| Scalar::random(rng))
+            .collect();
+
+        let V = self.v_assignment
             .iter()
-            .zip(v_blinding)
-            .map(|(v_i, v_blinding_i)| Ok(gen.pedersen_gens.commit((v_i.clone())?, *v_blinding_i)))
-            .collect()
+            .zip(v_blinding.clone())
+            .map(|(v_i, v_blinding_i)| gen.pedersen_gens.commit(v_i.clone().unwrap(), v_blinding_i))
+            .collect();
+
+        (V, v_blinding)
     }
 
     pub fn constrain(&mut self, lc: LinearCombination) {
@@ -201,16 +180,42 @@ impl ConstraintSystem {
         self.lc_vec.push(lc);
     }
 
-    /*
+    fn create_prover_input(&self, v_blinding: Vec<Scalar>) -> Result<ProverInput, R1CSError> {
+        let aL = self.aL_assignment.iter().cloned().collect::<Result<Vec<_>, _>>()?;
+        let aR = self.aR_assignment.iter().cloned().collect::<Result<Vec<_>, _>>()?;
+        let aO = self.aO_assignment.iter().cloned().collect::<Result<Vec<_>, _>>()?;
 
-    // get number of multiplications
-    pub fn get_n(&self) -> usize {
-        let n = self.a.len();
-        if n == 0 || n.is_power_of_two() {
-            return n;
-        }
-        return n.next_power_of_two();
+        Ok(ProverInput::new(aL, aR, aO, v_blinding))
     }
+
+    fn create_circuit(&self) -> Circuit {
+        let n = self.get_n();
+        let m = self.v_assignment.len();
+        let q = self.lc_vec.len();
+
+        let zer = Scalar::zero();
+        let mut W_L = vec![vec![zer; n]; q]; // qxn matrix which corresponds to a.
+        let mut W_R = vec![vec![zer; n]; q]; // qxn matrix which corresponds to b.
+        let mut W_O = vec![vec![zer; n]; q]; // qxn matrix which corresponds to c.
+        let mut W_V = vec![vec![zer; m]; q]; // qxm matrix which corresponds to v
+        let mut c = vec![zer; q]; // length q vector of constants.
+
+        for (index, lc) in self.lc_vec.iter().enumerate() {
+            for (var, coeff) in lc.variables.clone() {
+                match var.var_type {
+                    VariableType::aL => W_L[index][var.index] = coeff,
+                    VariableType::aR => W_R[index][var.index] = coeff,
+                    VariableType::aO => W_O[index][var.index] = coeff,
+                    VariableType::v => W_V[index][var.index] = coeff,
+                };
+            }
+            c[index] = lc.constant
+        }
+
+        Circuit::new(n, m, q, c, W_L, W_R, W_O, W_V)
+    }
+
+    /*
 
     fn eval_lc(&self, lc: &LinearCombination) -> Result<Scalar, R1CSError> {
         let sum_vars = lc
@@ -910,5 +915,34 @@ mod tests {
 
         assert!(create_and_verify_helper(prover_cs, verifier_cs).is_ok());
     }
+
+#[derive(Clone, Debug)]
+pub struct R1CSProof {
+    /// Commitment to the values of input wires
+    A_I: CompressedRistretto,
+    /// Commitment to the values of output wires
+    A_O: CompressedRistretto,
+    /// Commitment to the blinding factors
+    S: CompressedRistretto,
+    /// Commitment to the \\(t_1\\) coefficient of \\( t(x) \\)
+    T_1: CompressedRistretto,
+    /// Commitment to the \\(t_3\\) coefficient of \\( t(x) \\)
+    T_3: CompressedRistretto,
+    /// Commitment to the \\(t_4\\) coefficient of \\( t(x) \\)
+    T_4: CompressedRistretto,
+    /// Commitment to the \\(t_5\\) coefficient of \\( t(x) \\)
+    T_5: CompressedRistretto,
+    /// Commitment to the \\(t_6\\) coefficient of \\( t(x) \\)
+    T_6: CompressedRistretto,
+    /// Evaluation of the polynomial \\(t(x)\\) at the challenge point \\(x\\)
+    t_x: Scalar,
+    /// Blinding factor for the synthetic commitment to \\( t(x) \\)
+    t_x_blinding: Scalar,
+    /// Blinding factor for the synthetic commitment to the
+    /// inner-product arguments
+    e_blinding: Scalar,
+    /// Proof data for the inner-product argument.
+    ipp_proof: InnerProductProof,
+}
 */
 }
