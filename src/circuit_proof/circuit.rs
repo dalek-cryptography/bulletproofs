@@ -63,6 +63,7 @@ impl Circuit {
     }
 }
 
+#[derive(Debug)]
 pub struct ProverInput {
     a_L: Vec<Scalar>,
     a_R: Vec<Scalar>,
@@ -86,6 +87,7 @@ impl ProverInput {
     }
 }
 
+#[derive(Debug)]
 pub struct VerifierInput {
     V: Vec<RistrettoPoint>,
 }

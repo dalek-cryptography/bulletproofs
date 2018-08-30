@@ -160,7 +160,7 @@ impl ConstraintSystem {
         pedersen_gens: &PedersenGenerators,
         v_blinding: &Vec<Scalar>,
     ) -> Result<Vec<RistrettoPoint>, R1CSError> {
-        if v_blinding.len() != self.v_assignment.len() {
+        if v_blinding.len() != self.get_m() {
             return Err(R1CSError::IncorrectInputSize);
         }
         self.v_assignment
@@ -219,9 +219,9 @@ impl ConstraintSystem {
         for (index, lc) in self.lc_vec.iter().enumerate() {
             for (var, coeff) in lc.variables.clone() {
                 match var.var_type {
-                    VariableType::aL => W_L[index][var.index] = coeff,
-                    VariableType::aR => W_R[index][var.index] = coeff,
-                    VariableType::aO => W_O[index][var.index] = coeff,
+                    VariableType::aL => W_L[index][var.index] = -coeff,
+                    VariableType::aR => W_R[index][var.index] = -coeff,
+                    VariableType::aO => W_O[index][var.index] = -coeff,
                     VariableType::v => W_V[index][var.index] = coeff,
                 };
             }
@@ -236,7 +236,11 @@ impl ConstraintSystem {
         mut self,
         pedersen_gens: &PedersenGenerators,
         rng: &mut R,
-    ) -> (Circuit, Result<ProverInput, R1CSError>, Result<VerifierInput, R1CSError>) {
+    ) -> (
+        Circuit,
+        Result<ProverInput, R1CSError>,
+        Result<VerifierInput, R1CSError>,
+    ) {
         // If `n`, the number of multiplications, is not 0 or 2, then pad the circuit.
         let n = self.get_n();
         if !(n == 0 || n.is_power_of_two()) {
@@ -268,12 +272,12 @@ mod tests {
         prover_cs: ConstraintSystem,
         verifier_cs: ConstraintSystem,
         expected_result: Result<(), ()>,
-    ) {
+    ) -> Result<(), R1CSError> {
         let mut rng = OsRng::new().unwrap();
         let pedersen_gens = PedersenGenerators::default();
         let generators = Generators::new(pedersen_gens, prover_cs.get_n(), 1);
 
-        let (prover_circuit, prover_input, _) =
+        let (prover_circuit, prover_input, verifier_input) =
             prover_cs.create_proof_input(&pedersen_gens, &mut rng);
 
         let mut prover_transcript = ProofTranscript::new(b"CircuitProofTest");
@@ -282,45 +286,82 @@ mod tests {
             &mut prover_transcript,
             &mut rng,
             &prover_circuit,
-            &prover_input.unwrap(),
-        ).unwrap();
+            &prover_input?,
+        );
 
-        let (verifier_circuit, _, verifier_input) =
-            verifier_cs.create_proof_input(&pedersen_gens, &mut rng);
+        let (verifier_circuit, _, _) = verifier_cs.create_proof_input(&pedersen_gens, &mut rng);
 
         assert_eq!(prover_circuit, verifier_circuit);
 
         let mut verifier_transcript = ProofTranscript::new(b"CircuitProofTest");
-        let actual_result = circuit_proof.verify(
+        let actual_result = circuit_proof.unwrap().verify(
             &generators,
             &mut verifier_transcript,
             &mut rng,
             &verifier_circuit,
-            &verifier_input.unwrap(),
+            &verifier_input?,
         );
 
+        println!("expected result: {:?}", expected_result);
+        println!("actual result: {:?}", actual_result);
         match expected_result {
             Ok(_) => assert!(actual_result.is_ok()),
             Err(_) => assert!(actual_result.is_err()),
         }
+
+        Ok(())
     }
 
-    fn mul_circuit_helper(a: u64, b: u64, c: u64, expected_result: Result<(), ()>) {
+    // The purpose of this test is to see how a multiplication gate with no
+    // variables (no corresponding v commitments) and no linear constraints behaves.
+    fn mul_circuit_constants_helper(a: u64, b: u64, c: u64, expected_result: Result<(), ()>) {
         let mut prover_cs = ConstraintSystem::new();
         prover_cs.assign_a(Scalar::from(a), Scalar::from(b), Scalar::from(c));
 
         let mut verifier_cs = ConstraintSystem::new();
         verifier_cs.allocate_a();
 
-        create_and_verify_helper(prover_cs, verifier_cs, expected_result);
+        assert!(create_and_verify_helper(prover_cs, verifier_cs, expected_result).is_ok());
+    }
+
+    #[test]
+    fn mul_circuit_constants() {
+        mul_circuit_constants_helper(3, 4, 12, Ok(())); // 3 * 4 = 12
+        mul_circuit_constants_helper(3, 4, 10, Err(())); // 3 * 4 != 10
+    }
+
+    fn mul_circuit_helper(a: u64, b: u64, c: u64, expected_result: Result<(), ()>) {
+        let one = Scalar::one();
+        let zer = Scalar::zero();
+
+        let mut prover_cs = ConstraintSystem::new();
+        let (mul_a, mul_b, mul_c) =
+            prover_cs.assign_a(Scalar::from(a), Scalar::from(b), Scalar::from(c));
+        let v_a = prover_cs.assign_v(Scalar::from(a));
+        let v_b = prover_cs.assign_v(Scalar::from(b));
+        let v_c = prover_cs.assign_v(Scalar::from(c));
+
+        prover_cs.constrain(LinearCombination::new(vec![(mul_a, -one), (v_a, one)], zer));
+        prover_cs.constrain(LinearCombination::new(vec![(mul_b, -one), (v_b, one)], zer));
+        prover_cs.constrain(LinearCombination::new(vec![(mul_c, -one), (v_c, one)], zer));
+
+        let mut verifier_cs = ConstraintSystem::new();
+        let (mul_a, mul_b, mul_c) = verifier_cs.allocate_a();
+        let v_a = verifier_cs.allocate_v();
+        let v_b = verifier_cs.allocate_v();
+        let v_c = verifier_cs.allocate_v();
+
+        verifier_cs.constrain(LinearCombination::new(vec![(mul_a, -one), (v_a, one)], zer));
+        verifier_cs.constrain(LinearCombination::new(vec![(mul_b, -one), (v_b, one)], zer));
+        verifier_cs.constrain(LinearCombination::new(vec![(mul_c, -one), (v_c, one)], zer));
+
+        assert!(create_and_verify_helper(prover_cs, verifier_cs, expected_result).is_ok());
     }
 
     #[test]
     fn mul_circuit() {
-        // 3 * 4 = 12
-        mul_circuit_helper(3, 4, 12, Ok(()));
-        // 3 * 4 != 10
-        mul_circuit_helper(3, 4, 10, Err(()));
+        mul_circuit_helper(3, 4, 12, Ok(())); // 3 * 4 = 12
+        mul_circuit_helper(3, 4, 10, Err(())); // 3 * 4 != 10
     }
 }
 
@@ -332,33 +373,6 @@ mod tests {
             .map(|(var, scalar)| Ok(scalar * self.witness_assignment[var.0].clone()?))
             .sum::<Result<Scalar, R1CSError>>()?;
         Ok(sum_vars + lc.constant)
-    }
-
-
-    // Trivial case: a(const) * b(const) = c(const)
-    // Purpose of this test is to see how a cs with no variables behaves
-    fn mul_circuit_constants_helper(a: u64, b: u64, c: u64) -> Result<(), R1CSError> {
-        let mut prover_cs = ConstraintSystem::new();
-        let lc_a = LinearCombination::new(vec![], Scalar::from(a));
-        let lc_b = LinearCombination::new(vec![], Scalar::from(b));
-        let lc_c = LinearCombination::new(vec![], Scalar::from(c));
-        prover_cs.constrain(lc_a, lc_b, lc_c);
-
-        let mut verifier_cs = ConstraintSystem::new();
-        let lc_a = LinearCombination::new(vec![], Scalar::from(a));
-        let lc_b = LinearCombination::new(vec![], Scalar::from(b));
-        let lc_c = LinearCombination::new(vec![], Scalar::from(c));
-        verifier_cs.constrain(lc_a, lc_b, lc_c);
-
-        create_and_verify_helper(prover_cs, verifier_cs)
-    }
-
-    #[test]
-    fn mul_circuit_constants() {
-        // 3 (const) * 4 (const) = 12 (const)
-        assert!(mul_circuit_constants_helper(3u64, 4u64, 12u64).is_ok());
-        // 3 (const) * 4 (const) != 10 (const)
-        assert!(mul_circuit_constants_helper(3u64, 4u64, 10u64).is_err());
     }
 
     // ( a_v(var) * a_c(const) ) * ( b_v(var) * b_c(const) ) = ( c_v(var) * c_c(const) )
