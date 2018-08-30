@@ -312,6 +312,7 @@ mod tests {
         Ok(())
     }
 
+    // a * b =? c
     // The purpose of this test is to see how a multiplication gate with no
     // variables (no corresponding v commitments) and no linear constraints behaves.
     fn mul_circuit_constants_helper(a: u64, b: u64, c: u64, expected_result: Result<(), ()>) {
@@ -330,20 +331,32 @@ mod tests {
         mul_circuit_constants_helper(3, 4, 10, Err(())); // 3 * 4 != 10
     }
 
-    fn mul_circuit_helper(a: u64, b: u64, c: u64, expected_result: Result<(), ()>) {
+    // (a * a_coeff) * (b * b_coeff) =? c * c_coeff
+    fn mul_circuit_helper(
+        a: u64,
+        a_coeff: u64,
+        b: u64,
+        b_coeff: u64,
+        c: u64,
+        c_coeff: u64,
+        expected_result: Result<(), ()>,
+    ) {
         let one = Scalar::one();
         let zer = Scalar::zero();
 
         let mut prover_cs = ConstraintSystem::new();
-        let (mul_a, mul_b, mul_c) =
-            prover_cs.assign_a(Scalar::from(a), Scalar::from(b), Scalar::from(c));
+        let (aL, aR, aO) = prover_cs.assign_a(
+            Scalar::from(a) * Scalar::from(a_coeff),
+            Scalar::from(b) * Scalar::from(b_coeff),
+            Scalar::from(c) * Scalar::from(c_coeff),
+        );
         let v_a = prover_cs.assign_v(Scalar::from(a));
         let v_b = prover_cs.assign_v(Scalar::from(b));
         let v_c = prover_cs.assign_v(Scalar::from(c));
 
-        prover_cs.constrain(LinearCombination::new(vec![(mul_a, -one), (v_a, one)], zer));
-        prover_cs.constrain(LinearCombination::new(vec![(mul_b, -one), (v_b, one)], zer));
-        prover_cs.constrain(LinearCombination::new(vec![(mul_c, -one), (v_c, one)], zer));
+        prover_cs.constrain(LinearCombination::new(vec![(aL, -one), (v_a, Scalar::from(a_coeff))], zer));
+        prover_cs.constrain(LinearCombination::new(vec![(aR, -one), (v_b, Scalar::from(b_coeff))], zer));
+        prover_cs.constrain(LinearCombination::new(vec![(aO, -one), (v_c, Scalar::from(c_coeff))], zer));
 
         let mut verifier_cs = ConstraintSystem::new();
         let (mul_a, mul_b, mul_c) = verifier_cs.allocate_a();
@@ -351,17 +364,25 @@ mod tests {
         let v_b = verifier_cs.allocate_v();
         let v_c = verifier_cs.allocate_v();
 
-        verifier_cs.constrain(LinearCombination::new(vec![(mul_a, -one), (v_a, one)], zer));
-        verifier_cs.constrain(LinearCombination::new(vec![(mul_b, -one), (v_b, one)], zer));
-        verifier_cs.constrain(LinearCombination::new(vec![(mul_c, -one), (v_c, one)], zer));
+        verifier_cs.constrain(LinearCombination::new(vec![(mul_a, -one), (v_a, Scalar::from(a_coeff))], zer));
+        verifier_cs.constrain(LinearCombination::new(vec![(mul_b, -one), (v_b, Scalar::from(b_coeff))], zer));
+        verifier_cs.constrain(LinearCombination::new(vec![(mul_c, -one), (v_c, Scalar::from(c_coeff))], zer));
 
         assert!(create_and_verify_helper(prover_cs, verifier_cs, expected_result).is_ok());
     }
 
     #[test]
     fn mul_circuit() {
-        mul_circuit_helper(3, 4, 12, Ok(())); // 3 * 4 = 12
-        mul_circuit_helper(3, 4, 10, Err(())); // 3 * 4 != 10
+        // test multiplication without coefficients
+        mul_circuit_helper(3, 1, 4, 1, 12, 1, Ok(())); // (3*1) * (4*1) = (12*1)
+        mul_circuit_helper(3, 1, 4, 1, 10, 1, Err(())); // (3*1) * (4*1) != (10*1)
+        // test multiplication with coefficients
+        mul_circuit_helper(3, 2, 4, 5, 120, 1, Ok(())); // (3*2) * (4*5) = (120*1)
+        mul_circuit_helper(3, 2, 4, 5, 121, 1, Err(())); // (3*2) * (4*5) != (121*1)
+        // test multiplication with zeros
+        mul_circuit_helper(0, 2, 4, 5, 120, 0, Ok(())); // (0*2) * (4*5) = (120*0)
+        mul_circuit_helper(0, 2, 4, 5, 120, 1, Err(())); // (0*2) * (4*5) = (120*1)
+
     }
 }
 
@@ -374,53 +395,7 @@ mod tests {
             .sum::<Result<Scalar, R1CSError>>()?;
         Ok(sum_vars + lc.constant)
     }
-
-    // ( a_v(var) * a_c(const) ) * ( b_v(var) * b_c(const) ) = ( c_v(var) * c_c(const) )
-    fn mul_circuit_helper(
-        a_v: u64,
-        a_c: u64,
-        b_v: u64,
-        b_c: u64,
-        c_v: u64,
-        c_c: u64,
-    ) -> Result<(), R1CSError> {
-        let mut prover_cs = ConstraintSystem::new();
-        let var_a = prover_cs.alloc_assign_variable(Scalar::from(a_v));
-        let var_b = prover_cs.alloc_assign_variable(Scalar::from(b_v));
-        let var_c = prover_cs.alloc_assign_variable(Scalar::from(c_v));
-        let lc_a = LinearCombination::new(vec![(var_a, Scalar::from(a_c))], Scalar::zero());
-        let lc_b = LinearCombination::new(vec![(var_b, Scalar::from(b_c))], Scalar::zero());
-        let lc_c = LinearCombination::new(vec![(var_c, Scalar::from(c_c))], Scalar::zero());
-        prover_cs.constrain(lc_a, lc_b, lc_c);
-
-        let mut verifier_cs = ConstraintSystem::new();
-        let var_a = verifier_cs.alloc_variable();
-        let var_b = verifier_cs.alloc_variable();
-        let var_c = verifier_cs.alloc_variable();
-        let lc_a = LinearCombination::new(vec![(var_a, Scalar::from(a_c))], Scalar::zero());
-        let lc_b = LinearCombination::new(vec![(var_b, Scalar::from(b_c))], Scalar::zero());
-        let lc_c = LinearCombination::new(vec![(var_c, Scalar::from(c_c))], Scalar::zero());
-        verifier_cs.constrain(lc_a, lc_b, lc_c);
-
-        create_and_verify_helper(prover_cs, verifier_cs)
-    }
-
-    #[test]
-    fn mul_circuit_variables() {
-        // 3 (var) * 4 (var) = 12 (var)
-        assert!(mul_circuit_helper(3u64, 1u64, 4u64, 1u64, 12u64, 1u64).is_ok());
-        // 3 (var) * 4 (var) != 10 (var)
-        assert!(mul_circuit_helper(3u64, 1u64, 4u64, 1u64, 10u64, 1u64).is_err());
-    }
-
-    #[test]
-    fn mul_circuit_mixed() {
-        // ( 3 (var) * 2 (const) ) * ( 4 (var) * 5 (const) ) = 120 (var)
-        assert!(mul_circuit_helper(3u64, 2u64, 4u64, 5u64, 120u64, 1u64).is_ok());
-        // ( 3 (var) * 2 (const) ) * ( 4 (var) * 5 (const) ) != 121 (var)
-        assert!(mul_circuit_helper(3u64, 2u64, 4u64, 5u64, 121u64, 1u64).is_err());
-    }
-
+    
     // a (var) + b (var) + d (const) = c (var)
     fn add_circuit_helper(a: u64, b: u64, c: u64, d: u64) -> Result<(), R1CSError> {
         let mut prover_cs = ConstraintSystem::new();
