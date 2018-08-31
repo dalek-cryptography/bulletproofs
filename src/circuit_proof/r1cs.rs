@@ -3,7 +3,7 @@
 
 use rand::{CryptoRng, Rng};
 
-use super::circuit::{Circuit, ProverInput, VerifierInput, CircuitProof};
+use super::circuit::{Circuit, CircuitProof, ProverInput, VerifierInput};
 use curve25519_dalek::scalar::Scalar;
 use errors::R1CSError;
 use generators::{Generators, PedersenGenerators};
@@ -111,6 +111,14 @@ impl ConstraintSystem {
         self.v_assignments.len()
     }
 
+    pub fn multiplications_count(&self) -> usize {
+        let n = self.aL_assignments.len();
+        if n == 0 || n.is_power_of_two() {
+            return n;
+        }
+        return n.next_power_of_two();        
+    }
+
     pub fn add_constraint(&mut self, lc: LinearCombination) {
         // TODO: check that the linear combinations are valid
         // (e.g. that variables are valid, that the linear combination evals to 0 for prover, etc).
@@ -155,7 +163,17 @@ impl ConstraintSystem {
         Ok(VerifierInput::new(V))
     }
 
-    fn create_circuit(&self) -> Circuit {
+    fn create_circuit(&mut self) -> Circuit {
+        // If the number of multiplications, is not 0 or a power of 2, then pad the circuit.
+        let n = self.aL_assignments.len();
+        if !(n == 0 || n.is_power_of_two()) {
+            let pad = n.next_power_of_two() - n;
+            let zer = Scalar::zero();
+            for _ in 0..pad {
+                self.assign_multiplier(Ok(zer), Ok(zer), Ok(zer));
+            }
+        }
+
         let n = self.aL_assignments.len();
         let m = self.v_assignments.len();
         let q = self.constraints.len();
@@ -189,16 +207,6 @@ impl ConstraintSystem {
         transcript: &mut Transcript,
         rng: &mut R,
     ) -> Result<(CircuitProof, VerifierInput), R1CSError> {
-        // If the number of multiplications, is not 0 or a power of 2, then pad the circuit.
-        let n = self.aL_assignments.len();
-        if !(n == 0 || n.is_power_of_two()) {
-            let pad = n.next_power_of_two() - n;
-            let zer = Scalar::zero();
-            for _ in 0..pad {
-                self.assign_multiplier(Ok(zer), Ok(zer), Ok(zer));
-            }
-        }
-
         // create circuit params
         let v_blinding: Vec<Scalar> = (0..self.commitments_count())
             .map(|_| Scalar::random(rng))
@@ -207,15 +215,29 @@ impl ConstraintSystem {
         let prover_input = self.create_prover_input(&v_blinding)?;
         let verifier_input = self.create_verifier_input(&gen.pedersen_gens, &v_blinding)?;
 
-        let circuit_proof = CircuitProof::prove(
+        // TODO: use error handling instead of unwrap
+        let circuit_proof =
+            CircuitProof::prove(&gen, transcript, rng, &circuit, &prover_input).unwrap();
+
+        Ok((circuit_proof, verifier_input))
+    }
+
+    pub fn verify<R: Rng + CryptoRng>(
+        mut self,
+        proof: &CircuitProof,
+        verifier_input: &VerifierInput,
+        gen: &Generators,
+        transcript: &mut Transcript,
+        rng: &mut R,
+    ) -> Result<(), &'static str> {    
+        let circuit = self.create_circuit();
+        proof.verify(
             &gen,
             transcript,
             rng,
-            &circuit,
-            &prover_input
-        ).unwrap();
-
-        Ok((circuit_proof, verifier_input))
+            &circuit, 
+            verifier_input,
+        )
     }
 }
 
@@ -234,35 +256,13 @@ mod tests {
         expected_result: Result<(), ()>,
     ) -> Result<(), R1CSError> {
         let mut rng = OsRng::new().unwrap();
-        let pedersen_gens = PedersenGenerators::default();
+        let gen = Generators::new(PedersenGenerators::default(), prover_cs.multiplications_count(), 1);
 
-        let (prover_circuit, prover_input, verifier_input) =
-            prover_cs.create_proof_input(&pedersen_gens, &mut rng);
-        assert!(prover_input.is_ok());
-        assert!(verifier_input.is_ok());
-
-        let generators = Generators::new(pedersen_gens, prover_circuit.n, 1);
         let mut prover_transcript = Transcript::new(b"CircuitProofTest");
-        let circuit_proof = CircuitProof::prove(
-            &generators,
-            &mut prover_transcript,
-            &mut rng,
-            &prover_circuit,
-            &prover_input?,
-        );
-
-        let (verifier_circuit, _, _) = verifier_cs.create_proof_input(&pedersen_gens, &mut rng);
-
-        assert_eq!(prover_circuit, verifier_circuit);
+        let (proof, verifier_input) = prover_cs.prove(&gen, &mut prover_transcript, &mut rng)?;
 
         let mut verifier_transcript = Transcript::new(b"CircuitProofTest");
-        let actual_result = circuit_proof.unwrap().verify(
-            &generators,
-            &mut verifier_transcript,
-            &mut rng,
-            &verifier_circuit,
-            &verifier_input?,
-        );
+        let actual_result = verifier_cs.verify(&proof, &verifier_input, &gen, &mut verifier_transcript, &mut rng);
 
         println!("expected result: {:?}", expected_result);
         println!("actual result: {:?}", actual_result);
