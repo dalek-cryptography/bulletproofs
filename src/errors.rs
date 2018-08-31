@@ -15,12 +15,15 @@ pub enum ProofError {
     WrongNumBlindingFactors,
     /// This error occurs when attempting to create a proof with
     /// bitsize other than \\(8\\), \\(16\\), \\(32\\), or \\(64\\).
-    #[fail(display = "Invalid bitsize, must have n = 8,16,32,64")]
+    #[fail(display = "Invalid bitsize, must have n = 8,16,32,64.")]
     InvalidBitsize,
     /// This error occurs when attempting to create an aggregated
     /// proof with non-power-of-two aggregation size.
-    #[fail(display = "Invalid aggregation size, m must be a power of 2")]
+    #[fail(display = "Invalid aggregation size, m must be a power of 2.")]
     InvalidAggregation,
+    /// This error occurs when the generators are of the wrong length.
+    #[fail(display = "Invalid generators length, must be equal to n.")]
+    InvalidGeneratorsLength,
     /// This error results from an internal error during proving.
     ///
     /// The single-party prover is implemented by performing
