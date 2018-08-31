@@ -7,9 +7,11 @@ use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::{IsIdentity, MultiscalarMul, VartimeMultiscalarMul};
 
+use merlin::Transcript;
+use transcript::TranscriptProtocol;
+
 use generators::Generators;
 use inner_product_proof::{inner_product, InnerProductProof};
-use proof_transcript::ProofTranscript;
 use util;
 
 #[derive(Clone, Debug)]
@@ -130,7 +132,7 @@ impl CircuitProof {
     /// `circuit.n` must be either 0 or a power of 2, for the inner product proof to work.
     pub fn prove<R: Rng + CryptoRng>(
         gen: &Generators,
-        transcript: &mut ProofTranscript,
+        transcript: &mut Transcript,
         rng: &mut R,
         circuit: &Circuit,
         prover_input: &ProverInput,
@@ -150,9 +152,7 @@ impl CircuitProof {
             return Err("Circuit's n parameter must be either 0 or a power of 2.");
         }
 
-        transcript.commit_u64(circuit.n as u64);
-        transcript.commit_u64(circuit.m as u64);
-        transcript.commit_u64(circuit.q as u64);
+        transcript.circuit_domain_sep(circuit.n as u64, circuit.m as u64, circuit.q as u64);
 
         let i_blinding = Scalar::random(rng);
         let o_blinding = Scalar::random(rng);
@@ -184,11 +184,12 @@ impl CircuitProof {
                 .chain(gen.H.iter()),
         ).compress();
 
-        transcript.commit(A_I.as_bytes());
-        transcript.commit(A_O.as_bytes());
-        transcript.commit(S.as_bytes());
-        let y = transcript.challenge_scalar();
-        let z = transcript.challenge_scalar();
+        transcript.commit_point(b"A_I", &A_I);
+        transcript.commit_point(b"A_O", &A_O);
+        transcript.commit_point(b"S", &S);
+
+        let y = transcript.challenge_scalar(b"y");
+        let z = transcript.challenge_scalar(b"z");
 
         let mut l_poly = util::VecPoly3::zero(circuit.n);
         let mut r_poly = util::VecPoly3::zero(circuit.n);
@@ -235,12 +236,13 @@ impl CircuitProof {
         let T_5 = gen.pedersen_gens.commit(t_poly.t5, t_5_blinding).compress();
         let T_6 = gen.pedersen_gens.commit(t_poly.t6, t_6_blinding).compress();
 
-        transcript.commit(T_1.as_bytes());
-        transcript.commit(T_3.as_bytes());
-        transcript.commit(T_4.as_bytes());
-        transcript.commit(T_5.as_bytes());
-        transcript.commit(T_6.as_bytes());
-        let x = transcript.challenge_scalar();
+        transcript.commit_point(b"T_1", &T_1);
+        transcript.commit_point(b"T_3", &T_3);
+        transcript.commit_point(b"T_4", &T_4);
+        transcript.commit_point(b"T_5", &T_5);
+        transcript.commit_point(b"T_6", &T_6);
+
+        let x = transcript.challenge_scalar(b"x");
 
         // t_2_blinding = <z*z^Q, W_V * v_blinding>
         // in the t_x_blinding calculations, line 76.
@@ -266,12 +268,12 @@ impl CircuitProof {
         let r_vec = r_poly.eval(x);
         let e_blinding = x * (i_blinding + x * (o_blinding + x * s_blinding));
 
-        transcript.commit(t_x.as_bytes());
-        transcript.commit(t_x_blinding.as_bytes());
-        transcript.commit(e_blinding.as_bytes());
+        transcript.commit_scalar(b"t_x", &t_x);
+        transcript.commit_scalar(b"t_x_blinding", &t_x_blinding);
+        transcript.commit_scalar(b"e_blinding", &e_blinding);
 
         // Get a challenge value to combine statements for the IPP
-        let w = transcript.challenge_scalar();
+        let w = transcript.challenge_scalar(b"w");
         let Q = w * gen.pedersen_gens.B;
 
         let ipp_proof = InnerProductProof::create(
@@ -303,7 +305,7 @@ impl CircuitProof {
     pub fn verify<R: Rng + CryptoRng>(
         &self,
         gen: &Generators,
-        transcript: &mut ProofTranscript,
+        transcript: &mut Transcript,
         rng: &mut R,
         circuit: &Circuit,
         verifier_input: &VerifierInput,
@@ -316,26 +318,28 @@ impl CircuitProof {
             return Err("Generator length doesn't match specified parameters.");
         }
 
-        transcript.commit_u64(circuit.n as u64);
-        transcript.commit_u64(circuit.m as u64);
-        transcript.commit_u64(circuit.q as u64);
-        transcript.commit(self.A_I.as_bytes());
-        transcript.commit(self.A_O.as_bytes());
-        transcript.commit(self.S.as_bytes());
-        let y = transcript.challenge_scalar();
-        let z = transcript.challenge_scalar();
+        transcript.circuit_domain_sep(circuit.n as u64, circuit.m as u64, circuit.q as u64);
 
-        transcript.commit(self.T_1.as_bytes());
-        transcript.commit(self.T_3.as_bytes());
-        transcript.commit(self.T_4.as_bytes());
-        transcript.commit(self.T_5.as_bytes());
-        transcript.commit(self.T_6.as_bytes());
-        let x = transcript.challenge_scalar();
+        transcript.commit_point(b"A_I", &self.A_I);
+        transcript.commit_point(b"A_O", &self.A_O);
+        transcript.commit_point(b"S", &self.S);
 
-        transcript.commit(self.t_x.as_bytes());
-        transcript.commit(self.t_x_blinding.as_bytes());
-        transcript.commit(self.e_blinding.as_bytes());
-        let w = transcript.challenge_scalar();
+        let y = transcript.challenge_scalar(b"y");
+        let z = transcript.challenge_scalar(b"z");
+
+        transcript.commit_point(b"T_1", &self.T_1);
+        transcript.commit_point(b"T_3", &self.T_3);
+        transcript.commit_point(b"T_4", &self.T_4);
+        transcript.commit_point(b"T_5", &self.T_5);
+        transcript.commit_point(b"T_6", &self.T_6);
+
+        let x = transcript.challenge_scalar(b"x");
+
+        transcript.commit_scalar(b"t_x", &self.t_x);
+        transcript.commit_scalar(b"t_x_blinding", &self.t_x_blinding);
+        transcript.commit_scalar(b"e_blinding", &self.e_blinding);
+
+        let w = transcript.challenge_scalar(b"w");
 
         let r = Scalar::random(rng);
         let xx = x * x;
@@ -507,7 +511,7 @@ mod tests {
         v_blinding: Vec<Scalar>,
     ) -> Result<(), &'static str> {
         let generators = Generators::new(PedersenGenerators::default(), n, 1);
-        let mut proof_transcript = ProofTranscript::new(b"CircuitProofTest");
+        let mut prover_transcript = Transcript::new(b"CircuitProofTest");
         let mut rng = OsRng::new().unwrap();
         let circuit = Circuit::new(n, m, q, c, W_L, W_R, W_O, W_V);
 
@@ -515,13 +519,13 @@ mod tests {
 
         let circuit_proof = CircuitProof::prove(
             &generators,
-            &mut proof_transcript,
+            &mut prover_transcript,
             &mut rng,
             &circuit.clone(),
             &prover_input,
         ).unwrap();
 
-        let mut verify_transcript = ProofTranscript::new(b"CircuitProofTest");
+        let mut verify_transcript = Transcript::new(b"CircuitProofTest");
 
         let verifier_input = VerifierInput { V };
 
