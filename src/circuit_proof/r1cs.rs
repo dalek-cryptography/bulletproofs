@@ -116,7 +116,7 @@ impl ConstraintSystem {
         if n == 0 || n.is_power_of_two() {
             return n;
         }
-        return n.next_power_of_two();        
+        return n.next_power_of_two();
     }
 
     pub fn add_constraint(&mut self, lc: LinearCombination) {
@@ -229,15 +229,9 @@ impl ConstraintSystem {
         gen: &Generators,
         transcript: &mut Transcript,
         rng: &mut R,
-    ) -> Result<(), &'static str> {    
+    ) -> Result<(), &'static str> {
         let circuit = self.create_circuit();
-        proof.verify(
-            &gen,
-            transcript,
-            rng,
-            &circuit, 
-            verifier_input,
-        )
+        proof.verify(&gen, transcript, rng, &circuit, verifier_input)
     }
 }
 
@@ -256,13 +250,23 @@ mod tests {
         expected_result: Result<(), ()>,
     ) -> Result<(), R1CSError> {
         let mut rng = OsRng::new().unwrap();
-        let gen = Generators::new(PedersenGenerators::default(), prover_cs.multiplications_count(), 1);
+        let gen = Generators::new(
+            PedersenGenerators::default(),
+            prover_cs.multiplications_count(),
+            1,
+        );
 
         let mut prover_transcript = Transcript::new(b"CircuitProofTest");
         let (proof, verifier_input) = prover_cs.prove(&gen, &mut prover_transcript, &mut rng)?;
 
         let mut verifier_transcript = Transcript::new(b"CircuitProofTest");
-        let actual_result = verifier_cs.verify(&proof, &verifier_input, &gen, &mut verifier_transcript, &mut rng);
+        let actual_result = verifier_cs.verify(
+            &proof,
+            &verifier_input,
+            &gen,
+            &mut verifier_transcript,
+            &mut rng,
+        );
 
         println!("expected result: {:?}", expected_result);
         println!("actual result: {:?}", actual_result);
