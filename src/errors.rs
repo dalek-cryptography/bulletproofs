@@ -97,7 +97,7 @@ pub enum R1CSError {
     InvalidR1CSConstruction,
     // When trying to access a variable that has an Err as its value assignment
     #[fail(display = "Variable does not have a value assignment.")]
-    InvalidVariableAssignment,
+    MissingAssignment,
     // CircuitProof did not verify correctly for this R1CS instance
     #[fail(display = "Circuit did not verify correctly.")]
     VerificationError,

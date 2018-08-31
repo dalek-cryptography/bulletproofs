@@ -20,7 +20,7 @@ pub enum Variable {
 pub type Assignment = Result<Scalar, R1CSError>;
 
 pub fn err_assignment() -> Assignment {
-    Err(R1CSError::InvalidVariableAssignment)
+    Err(R1CSError::MissingAssignment)
 }
 
 /// Represents a linear combination of some variables multiplied with their scalar coefficients,
@@ -234,7 +234,6 @@ mod tests {
     use rand::rngs::OsRng;
 
     use merlin::Transcript;
-    use transcript::TranscriptProtocol;
 
     fn create_and_verify_helper(
         prover_cs: ConstraintSystem,
