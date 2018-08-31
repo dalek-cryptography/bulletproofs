@@ -177,7 +177,7 @@ pub fn scalar_exp_vartime(x: &Scalar, mut n: u64) -> Scalar {
 }
 
 /// Takes the sum of all the powers of `x`, up to `n`
-/// If `n` is a power of 2, it uses the efficient algorithm with `2*lg n` multiplcations and additions.
+/// If `n` is a power of 2, it uses the efficient algorithm with `2*lg n` multiplications and additions.
 /// If `n` is not a power of 2, it uses the slow algorithm with `n` multiplications and additions.
 /// In the Bulletproofs case, all calls to `sum_of_powers` should have `n` as a power of 2.
 pub fn sum_of_powers(x: &Scalar, n: usize) -> Scalar {
