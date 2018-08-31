@@ -19,13 +19,13 @@ pub enum Variable {
 
 pub type Assignment = Result<Scalar, R1CSError>;
 
-pub fn err_assignment() -> Assignment {
+pub fn missing() -> Assignment {
     Err(R1CSError::MissingAssignment)
 }
 
 /// Represents a linear combination of some variables multiplied with their scalar coefficients,
-/// plus a scalar. The linear combination is supposed to evaluate to zero.
-/// E.g. LC = 0 = variable[0]*scalar[0] + variable[1]*scalar[1] + scalar
+/// plus a scalar. `ConstraintSystem` expects all linear combinations to evaluate to zero.
+/// E.g. LC = variable[0]*scalar[0] + variable[1]*scalar[1] + scalar
 #[derive(Clone, Debug)]
 pub struct LinearCombination {
     variables: Vec<(Variable, Scalar)>,
@@ -62,20 +62,20 @@ pub struct ConstraintSystem {
     constraints: Vec<LinearCombination>,
 
     // variable assignments
-    aL_assignment: Vec<Assignment>,
-    aR_assignment: Vec<Assignment>,
-    aO_assignment: Vec<Assignment>,
-    v_assignment: Vec<Assignment>,
+    aL_assignments: Vec<Assignment>,
+    aR_assignments: Vec<Assignment>,
+    aO_assignments: Vec<Assignment>,
+    v_assignments: Vec<Assignment>,
 }
 
 impl ConstraintSystem {
     pub fn new() -> Self {
         ConstraintSystem {
             constraints: vec![],
-            aL_assignment: vec![],
-            aR_assignment: vec![],
-            aO_assignment: vec![],
-            v_assignment: vec![],
+            aL_assignments: vec![],
+            aR_assignments: vec![],
+            aO_assignments: vec![],
+            v_assignments: vec![],
         }
     }
 
@@ -88,14 +88,14 @@ impl ConstraintSystem {
         right: Assignment,
         out: Assignment,
     ) -> (Variable, Variable, Variable) {
-        self.aL_assignment.push(left);
-        let left_var = Variable::MultiplierLeft(self.aL_assignment.len() - 1);
+        self.aL_assignments.push(left);
+        let left_var = Variable::MultiplierLeft(self.aL_assignments.len() - 1);
 
-        self.aR_assignment.push(right);
-        let right_var = Variable::MultiplierRight(self.aR_assignment.len() - 1);
+        self.aR_assignments.push(right);
+        let right_var = Variable::MultiplierRight(self.aR_assignments.len() - 1);
 
-        self.aO_assignment.push(out);
-        let out_var = Variable::MultiplierOutput(self.aO_assignment.len() - 1);
+        self.aO_assignments.push(out);
+        let out_var = Variable::MultiplierOutput(self.aO_assignments.len() - 1);
 
         (left_var, right_var, out_var)
     }
@@ -103,12 +103,12 @@ impl ConstraintSystem {
     // Allocate a committed variable, and assign it the Result value passed in.
     // Prover will pass in Ok(Scalar), and Verifier will pass in R1CSError.
     pub fn assign_committed_variable(&mut self, value: Assignment) -> Variable {
-        self.v_assignment.push(value);
-        Variable::Committed(self.v_assignment.len() - 1)
+        self.v_assignments.push(value);
+        Variable::Committed(self.v_assignments.len() - 1)
     }
 
     pub fn multipliers_count(&self) -> usize {
-        let n = self.aL_assignment.len();
+        let n = self.aL_assignments.len();
         if n == 0 || n.is_power_of_two() {
             return n;
         }
@@ -116,7 +116,7 @@ impl ConstraintSystem {
     }
 
     pub fn commitments_count(&self) -> usize {
-        self.v_assignment.len()
+        self.v_assignments.len()
     }
 
     pub fn make_V(
@@ -127,7 +127,7 @@ impl ConstraintSystem {
         if v_blinding.len() != self.commitments_count() {
             return Err(R1CSError::IncorrectInputSize);
         }
-        self.v_assignment
+        self.v_assignments
             .iter()
             .zip(v_blinding)
             .map(|(v_i, v_blinding_i)| Ok(pedersen_gens.commit(v_i.clone()?, *v_blinding_i)))
@@ -142,17 +142,17 @@ impl ConstraintSystem {
 
     fn create_prover_input(&self, v_blinding: &Vec<Scalar>) -> Result<ProverInput, R1CSError> {
         let aL = self
-            .aL_assignment
+            .aL_assignments
             .iter()
             .cloned()
             .collect::<Result<Vec<_>, _>>()?;
         let aR = self
-            .aR_assignment
+            .aR_assignments
             .iter()
             .cloned()
             .collect::<Result<Vec<_>, _>>()?;
         let aO = self
-            .aO_assignment
+            .aO_assignments
             .iter()
             .cloned()
             .collect::<Result<Vec<_>, _>>()?;
@@ -170,7 +170,7 @@ impl ConstraintSystem {
 
     fn create_circuit(&self) -> Circuit {
         let n = self.multipliers_count();
-        let m = self.v_assignment.len();
+        let m = self.v_assignments.len();
         let q = self.constraints.len();
 
         let zer = Scalar::zero();
@@ -206,7 +206,7 @@ impl ConstraintSystem {
         Result<VerifierInput, R1CSError>,
     ) {
         // If `n`, the number of multiplications, is not 0 or 2, then pad the circuit.
-        let n = self.aL_assignment.len();
+        let n = self.aL_assignments.len();
         if !(n == 0 || n.is_power_of_two()) {
             let pad = n.next_power_of_two() - n;
             let zer = Scalar::zero();
@@ -293,7 +293,7 @@ mod tests {
         );
 
         let mut verifier_cs = ConstraintSystem::new();
-        verifier_cs.assign_multiplier(err_assignment(), err_assignment(), err_assignment());
+        verifier_cs.assign_multiplier(missing(), missing(), missing());
 
         assert!(create_and_verify_helper(prover_cs, verifier_cs, expected_result).is_ok());
     }
@@ -345,10 +345,10 @@ mod tests {
 
         let mut verifier_cs = ConstraintSystem::new();
         let (aL, aR, aO) =
-            verifier_cs.assign_multiplier(err_assignment(), err_assignment(), err_assignment());
-        let v_a = verifier_cs.assign_committed_variable(err_assignment());
-        let v_b = verifier_cs.assign_committed_variable(err_assignment());
-        let v_c = verifier_cs.assign_committed_variable(err_assignment());
+            verifier_cs.assign_multiplier(missing(), missing(), missing());
+        let v_a = verifier_cs.assign_committed_variable(missing());
+        let v_b = verifier_cs.assign_committed_variable(missing());
+        let v_c = verifier_cs.assign_committed_variable(missing());
 
         verifier_cs.add_constraint(LinearCombination::new(
             vec![(aL, -one), (v_a, Scalar::from(a_coeff))],
@@ -398,9 +398,9 @@ mod tests {
         ));
 
         let mut verifier_cs = ConstraintSystem::new();
-        let v_a = verifier_cs.assign_committed_variable(err_assignment());
-        let v_b = verifier_cs.assign_committed_variable(err_assignment());
-        let v_c = verifier_cs.assign_committed_variable(err_assignment());
+        let v_a = verifier_cs.assign_committed_variable(missing());
+        let v_b = verifier_cs.assign_committed_variable(missing());
+        let v_c = verifier_cs.assign_committed_variable(missing());
         verifier_cs.add_constraint(LinearCombination::new(
             vec![(v_a, one), (v_b, one), (v_c, -one)],
             zer,
@@ -457,14 +457,14 @@ mod tests {
 
         let mut verifier_cs = ConstraintSystem::new();
         // Make high-level variables
-        let v_a = verifier_cs.assign_committed_variable(err_assignment());
-        let v_b = verifier_cs.assign_committed_variable(err_assignment());
-        let v_c = verifier_cs.assign_committed_variable(err_assignment());
+        let v_a = verifier_cs.assign_committed_variable(missing());
+        let v_b = verifier_cs.assign_committed_variable(missing());
+        let v_c = verifier_cs.assign_committed_variable(missing());
         // Make low-level variables (aL_0 = v_a, aR_0 = v_b, aL_1 = v_c)
         let (aL_0, aR_0, _) =
-            verifier_cs.assign_multiplier(err_assignment(), err_assignment(), err_assignment());
+            verifier_cs.assign_multiplier(missing(), missing(), missing());
         let (aL_1, _, _) =
-            verifier_cs.assign_multiplier(err_assignment(), err_assignment(), err_assignment());
+            verifier_cs.assign_multiplier(missing(), missing(), missing());
         // Tie high-level and low-level variables together
         verifier_cs.add_constraint(LinearCombination::new(
             vec![(aL_0.clone(), -one), (v_a, one)],
