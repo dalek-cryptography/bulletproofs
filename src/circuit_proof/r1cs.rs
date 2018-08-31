@@ -4,7 +4,6 @@
 use rand::{CryptoRng, Rng};
 
 use super::circuit::{Circuit, ProverInput, VerifierInput};
-use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
 use errors::R1CSError;
 use generators::PedersenGenerators;
@@ -111,21 +110,6 @@ impl ConstraintSystem {
         self.v_assignments.len()
     }
 
-    pub fn make_V(
-        &self,
-        pedersen_gens: &PedersenGenerators,
-        v_blinding: &Vec<Scalar>,
-    ) -> Result<Vec<RistrettoPoint>, R1CSError> {
-        if v_blinding.len() != self.commitments_count() {
-            return Err(R1CSError::IncorrectInputSize);
-        }
-        self.v_assignments
-            .iter()
-            .zip(v_blinding)
-            .map(|(v_i, v_blinding_i)| Ok(pedersen_gens.commit(v_i.clone()?, *v_blinding_i)))
-            .collect()
-    }
-
     pub fn add_constraint(&mut self, lc: LinearCombination) {
         // TODO: check that the linear combinations are valid
         // (e.g. that variables are valid, that the linear combination evals to 0 for prover, etc).
@@ -157,7 +141,17 @@ impl ConstraintSystem {
         pedersen_gens: &PedersenGenerators,
         v_blinding: &Vec<Scalar>,
     ) -> Result<VerifierInput, R1CSError> {
-        Ok(VerifierInput::new(self.make_V(pedersen_gens, v_blinding)?))
+        if v_blinding.len() != self.commitments_count() {
+            return Err(R1CSError::IncorrectInputSize);
+        }
+        let V = self
+            .v_assignments
+            .iter()
+            .zip(v_blinding)
+            .map(|(v_i, v_blinding_i)| Ok(pedersen_gens.commit(v_i.clone()?, *v_blinding_i)))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(VerifierInput::new(V))
     }
 
     fn create_circuit(&self) -> Circuit {
