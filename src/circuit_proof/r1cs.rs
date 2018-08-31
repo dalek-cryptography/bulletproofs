@@ -203,14 +203,15 @@ impl ConstraintSystem {
     // This function can only be called once per ConstraintSystem instance.
     pub fn prove<R: Rng + CryptoRng>(
         mut self,
+        v_blinding: &Vec<Scalar>,
         gen: &Generators,
         transcript: &mut Transcript,
         rng: &mut R,
     ) -> Result<(CircuitProof, VerifierInput), R1CSError> {
+        if v_blinding.len() != self.commitments_count() {
+            return Err(R1CSError::IncorrectInputSize);
+        }
         // create circuit params
-        let v_blinding: Vec<Scalar> = (0..self.commitments_count())
-            .map(|_| Scalar::random(rng))
-            .collect();
         let circuit = self.create_circuit();
         let prover_input = self.create_prover_input(&v_blinding)?;
         let verifier_input = self.create_verifier_input(&gen.pedersen_gens, &v_blinding)?;
@@ -257,7 +258,11 @@ mod tests {
         );
 
         let mut prover_transcript = Transcript::new(b"CircuitProofTest");
-        let (proof, verifier_input) = prover_cs.prove(&gen, &mut prover_transcript, &mut rng)?;
+        let v_blinding: Vec<Scalar> = (0..prover_cs.commitments_count())
+            .map(|_| Scalar::random(&mut rng))
+            .collect();
+        let (proof, verifier_input) =
+            prover_cs.prove(&v_blinding, &gen, &mut prover_transcript, &mut rng)?;
 
         let mut verifier_transcript = Transcript::new(b"CircuitProofTest");
         let actual_result = verifier_cs.verify(
