@@ -494,184 +494,83 @@ mod tests {
         add_circuit_helper(3, 4, 7, Ok(())); // 3 + 4 = 7
         add_circuit_helper(3, 4, 10, Err(())); // 3 + 4 != 10
     }
-}
 
-/*
-    fn eval_lc(&self, lc: &LinearCombination) -> Result<Scalar, R1CSError> {
-        let sum_vars = lc
-            .variables
-            .iter()
-            .map(|(var, scalar)| Ok(scalar * self.witness_assignment[var.0].clone()?))
-            .sum::<Result<Scalar, R1CSError>>()?;
-        Ok(sum_vars + lc.constant)
-    }
+    // (a1 + a2) * (b1 + b2) =? (c1 + c2)
+    // Where a1, a2, b1, b2, c1, c2 are all allocated as high-level variables
+    fn mixed_circuit_helper(
+        a1: u64,
+        a2: u64,
+        b1: u64,
+        b2: u64,
+        c1: u64,
+        c2: u64,
+        expected_result: Result<(), ()>,
+    ) {
+        let one = Scalar::one();
+        let zer = Scalar::zero();
 
-    // a (var) + b (var) + d (const) = c (var)
-    fn add_circuit_helper(a: u64, b: u64, c: u64, d: u64) -> Result<(), R1CSError> {
         let mut prover_cs = ConstraintSystem::new();
-        let var_a = prover_cs.alloc_assign_variable(Scalar::from(a));
-        let var_b = prover_cs.alloc_assign_variable(Scalar::from(b));
-        let var_c = prover_cs.alloc_assign_variable(Scalar::from(c));
-        let lc_a = LinearCombination::new(
-            vec![
-                (var_a, Scalar::one()),
-                (var_b, Scalar::one()),
-                (var_c, -Scalar::one()),
-            ],
-            Scalar::from(d),
+        // Make high-level variables
+        let v_a1 = prover_cs.assign_v(Ok(Scalar::from(a1)));
+        let v_a2 = prover_cs.assign_v(Ok(Scalar::from(a2)));
+        let v_b1 = prover_cs.assign_v(Ok(Scalar::from(b1)));
+        let v_b2 = prover_cs.assign_v(Ok(Scalar::from(b2)));
+        let v_c1 = prover_cs.assign_v(Ok(Scalar::from(c1)));
+        let v_c2 = prover_cs.assign_v(Ok(Scalar::from(c2)));
+        // Make low-level variables (aL = v_a1 + v_a2, aR = v_b1 + v_b2, aO = v_c1 + v_c2)
+        let (aL, aR, aO) = prover_cs.assign_a(
+            Ok(Scalar::from(a1 + a2)),
+            Ok(Scalar::from(b1 + b2)),
+            Ok(Scalar::from(c1 + c2)),
         );
-        let lc_b = LinearCombination::new(vec![], Scalar::one());
-        let lc_c = LinearCombination::new(vec![], Scalar::zero());
-        prover_cs.constrain(lc_a, lc_b, lc_c);
+        // Tie high-level and low-level variables together
+        prover_cs.constrain(LinearCombination::new(
+            vec![(aL, -one), (v_a1, one), (v_a2, one)],
+            zer,
+        ));
+        prover_cs.constrain(LinearCombination::new(
+            vec![(aR, -one), (v_b1, one), (v_b2, one)],
+            zer,
+        ));
+        prover_cs.constrain(LinearCombination::new(
+            vec![(aO, -one), (v_c1, one), (v_c2, one)],
+            zer,
+        ));
 
         let mut verifier_cs = ConstraintSystem::new();
-        let var_a = verifier_cs.alloc_variable();
-        let var_b = verifier_cs.alloc_variable();
-        let var_c = verifier_cs.alloc_variable();
-        let lc_a = LinearCombination::new(
-            vec![
-                (var_a, Scalar::one()),
-                (var_b, Scalar::one()),
-                (var_c, -Scalar::one()),
-            ],
-            Scalar::from(d),
+        // Make high-level variables
+        let v_a1 = verifier_cs.assign_v(Ok(Scalar::from(a1)));
+        let v_a2 = verifier_cs.assign_v(Ok(Scalar::from(a2)));
+        let v_b1 = verifier_cs.assign_v(Ok(Scalar::from(b1)));
+        let v_b2 = verifier_cs.assign_v(Ok(Scalar::from(b2)));
+        let v_c1 = verifier_cs.assign_v(Ok(Scalar::from(c1)));
+        let v_c2 = verifier_cs.assign_v(Ok(Scalar::from(c2)));
+        // Make low-level variables (aL = v_a1 + v_a2, aR = v_b1 + v_b2, aO = v_c1 + v_c2)
+        let (aL, aR, aO) = verifier_cs.assign_a(
+            Ok(Scalar::from(a1 + a2)),
+            Ok(Scalar::from(b1 + b2)),
+            Ok(Scalar::from(c1 + c2)),
         );
-        let lc_b = LinearCombination::new(vec![], Scalar::one());
-        let lc_c = LinearCombination::new(vec![], Scalar::zero());
-        verifier_cs.constrain(lc_a, lc_b, lc_c);
-        create_and_verify_helper(prover_cs, verifier_cs)
+        // Tie high-level and low-level variables together
+        verifier_cs.constrain(LinearCombination::new(
+            vec![(aL, -one), (v_a1, one), (v_a2, one)],
+            zer,
+        ));
+        verifier_cs.constrain(LinearCombination::new(
+            vec![(aR, -one), (v_b1, one), (v_b2, one)],
+            zer,
+        ));
+        verifier_cs.constrain(LinearCombination::new(
+            vec![(aO, -one), (v_c1, one), (v_c2, one)],
+            zer,
+        ));
+
+        assert!(create_and_verify_helper(prover_cs, verifier_cs, expected_result).is_ok());
     }
 
     #[test]
-    fn add_circuit_variables() {
-        // 3 (var) + 4 (var) = 7 (var)
-        assert!(add_circuit_helper(3u64, 4u64, 7u64, 0u64).is_ok());
-        // 3 (var) + 4 (var) != 10 (var)
-        assert!(add_circuit_helper(3u64, 4u64, 10u64, 0u64).is_err());
+    fn mixed_circuit() {
+        mixed_circuit_helper(3, 4, 6, 1, 40, 9, Ok(())); // (3 + 4) * (6 + 1) = (40 + 9)
+        mixed_circuit_helper(3, 4, 6, 1, 40, 10, Err(())); // (3 + 4) * (6 + 1) != (40 + 10)
     }
-
-    #[test]
-    fn add_circuit_mixed() {
-        // 3 (var) + 4 (var) + 8 (const) = 15 (var)
-        assert!(add_circuit_helper(3u64, 4u64, 15u64, 8u64).is_ok());
-        // 3 (var) + 4 (var) + 8 (const) != 16 (var)
-        assert!(add_circuit_helper(3u64, 4u64, 16u64, 8u64).is_err());
-    }
-
-    // ( a_v(var) + a_c(const) ) * ( b_v(var) + b_c(var) ) = c_v(var) + c_c(const)
-    fn add_and_multiply_helper(
-        a_v: u64,
-        a_c: u64,
-        b_v: u64,
-        b_c: u64,
-        c_v: u64,
-        c_c: u64,
-    ) -> Result<(), R1CSError> {
-        let mut prover_cs = ConstraintSystem::new();
-        let var_a = prover_cs.alloc_assign_variable(Scalar::from(a_v));
-        let var_b = prover_cs.alloc_assign_variable(Scalar::from(b_v));
-        let var_c = prover_cs.alloc_assign_variable(Scalar::from(c_v));
-        let lc_a = LinearCombination::new(vec![(var_a, Scalar::one())], Scalar::from(a_c));
-        let lc_b = LinearCombination::new(vec![(var_b, Scalar::one())], Scalar::from(b_c));
-        let lc_c = LinearCombination::new(vec![(var_c, Scalar::one())], Scalar::from(c_c));
-        prover_cs.constrain(lc_a, lc_b, lc_c);
-
-        let mut verifier_cs = ConstraintSystem::new();
-        let var_a = verifier_cs.alloc_variable();
-        let var_b = verifier_cs.alloc_variable();
-        let var_c = verifier_cs.alloc_variable();
-        let lc_a = LinearCombination::new(vec![(var_a, Scalar::one())], Scalar::from(a_c));
-        let lc_b = LinearCombination::new(vec![(var_b, Scalar::one())], Scalar::from(b_c));
-        let lc_c = LinearCombination::new(vec![(var_c, Scalar::one())], Scalar::from(c_c));
-        verifier_cs.constrain(lc_a, lc_b, lc_c);
-
-        create_and_verify_helper(prover_cs, verifier_cs)
-    }
-
-    #[test]
-    fn add_multiply_mixed() {
-        // ( 3(var) + 8(const) ) * ( 5(var) + 2 (const) ) = 1(var) + 76(const)
-        assert!(add_and_multiply_helper(3u64, 8u64, 5u64, 2u64, 1u64, 76u64).is_ok());
-        // ( 3(var) + 8(const) ) * ( 5(var) + 2 (const) ) != 1(var) + 75(const)
-        assert!(add_and_multiply_helper(3u64, 8u64, 5u64, 2u64, 1u64, 75u64).is_err());
-    }
-
-    #[test]
-    // 3 (const) * 4 (var) = 12 (const)
-    // 2 (const) * 5 (var) = 10 (const)
-    // 10 (var) * 20 (var) = 200 (const)
-    fn n_not_power_of_two() {
-        let mut prover_cs = ConstraintSystem::new();
-
-        let var_a = prover_cs.alloc_assign_variable(Scalar::from(4u64));
-        let var_b = prover_cs.alloc_assign_variable(Scalar::from(5u64));
-        let var_c = prover_cs.alloc_assign_variable(Scalar::from(20u64));
-
-        let lc_a_1 = LinearCombination::new(vec![], Scalar::from(3u64));
-        let lc_b_1 = LinearCombination::new(vec![(var_a, Scalar::one())], Scalar::zero());
-        let lc_c_1 = LinearCombination::new(vec![], Scalar::from(12u64));
-        prover_cs.constrain(lc_a_1, lc_b_1, lc_c_1);
-
-        let lc_a_2 = LinearCombination::new(vec![], Scalar::from(2u64));
-        let lc_b_2 = LinearCombination::new(vec![(var_b, Scalar::one())], Scalar::zero());
-        let lc_c_2 = LinearCombination::new(vec![], Scalar::from(10u64));
-        prover_cs.constrain(lc_a_2, lc_b_2, lc_c_2);
-
-        let lc_a_3 = LinearCombination::new(vec![], Scalar::from(10u64));
-        let lc_b_3 = LinearCombination::new(vec![(var_c, Scalar::one())], Scalar::zero());
-        let lc_c_3 = LinearCombination::new(vec![], Scalar::from(200u64));
-        prover_cs.constrain(lc_a_3, lc_b_3, lc_c_3);
-
-        let mut verifier_cs = ConstraintSystem::new();
-
-        let var_a = verifier_cs.alloc_variable();
-        let var_b = verifier_cs.alloc_variable();
-        let var_c = verifier_cs.alloc_variable();
-
-        let lc_a_1 = LinearCombination::new(vec![], Scalar::from(3u64));
-        let lc_b_1 = LinearCombination::new(vec![(var_a, Scalar::one())], Scalar::zero());
-        let lc_c_1 = LinearCombination::new(vec![], Scalar::from(12u64));
-        verifier_cs.constrain(lc_a_1, lc_b_1, lc_c_1);
-
-        let lc_a_2 = LinearCombination::new(vec![], Scalar::from(2u64));
-        let lc_b_2 = LinearCombination::new(vec![(var_b, Scalar::one())], Scalar::zero());
-        let lc_c_2 = LinearCombination::new(vec![], Scalar::from(10u64));
-        verifier_cs.constrain(lc_a_2, lc_b_2, lc_c_2);
-
-        let lc_a_3 = LinearCombination::new(vec![], Scalar::from(10u64));
-        let lc_b_3 = LinearCombination::new(vec![(var_c, Scalar::one())], Scalar::zero());
-        let lc_c_3 = LinearCombination::new(vec![], Scalar::from(200u64));
-        verifier_cs.constrain(lc_a_3, lc_b_3, lc_c_3);
-
-        assert!(create_and_verify_helper(prover_cs, verifier_cs).is_ok());
-    }
-
-#[derive(Clone, Debug)]
-pub struct R1CSProof {
-    /// Commitment to the values of input Assignments
-    A_I: CompressedRistretto,
-    /// Commitment to the values of output Assignments
-    A_O: CompressedRistretto,
-    /// Commitment to the blinding factors
-    S: CompressedRistretto,
-    /// Commitment to the \\(t_1\\) coefficient of \\( t(x) \\)
-    T_1: CompressedRistretto,
-    /// Commitment to the \\(t_3\\) coefficient of \\( t(x) \\)
-    T_3: CompressedRistretto,
-    /// Commitment to the \\(t_4\\) coefficient of \\( t(x) \\)
-    T_4: CompressedRistretto,
-    /// Commitment to the \\(t_5\\) coefficient of \\( t(x) \\)
-    T_5: CompressedRistretto,
-    /// Commitment to the \\(t_6\\) coefficient of \\( t(x) \\)
-    T_6: CompressedRistretto,
-    /// Evaluation of the polynomial \\(t(x)\\) at the challenge point \\(x\\)
-    t_x: Scalar,
-    /// Blinding factor for the synthetic commitment to \\( t(x) \\)
-    t_x_blinding: Scalar,
-    /// Blinding factor for the synthetic commitment to the
-    /// inner-product arguments
-    e_blinding: Scalar,
-    /// Proof data for the inner-product argument.
-    ipp_proof: InnerProductProof,
 }
-*/
