@@ -11,10 +11,10 @@ use generators::PedersenGenerators;
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub enum VariableType {
-    v,
-    aL,
-    aR,
-    aO,
+    v, // high-level variable
+    aL, // low-level variable, left input of multiplication gate
+    aR, // low-level variable, right input of multiplication gate
+    aO, // low-level variable, output multiplication gate
 }
 
 /// Represents a V variable in our constraint system, where the value represents the index.
@@ -26,7 +26,7 @@ pub struct Variable {
 
 pub type Assignment = Result<Scalar, R1CSError>;
 
-pub fn new_err_assignment() -> Assignment {
+pub fn err_assignment() -> Assignment {
     Err(R1CSError::InvalidVariableAssignment)
 }
 
@@ -229,7 +229,7 @@ impl ConstraintSystem {
         Result<VerifierInput, R1CSError>,
     ) {
         // If `n`, the number of multiplications, is not 0 or 2, then pad the circuit.
-        let n = self.get_n();
+        let n = self.aL_assignment.len();
         if !(n == 0 || n.is_power_of_two()) {
             let pad = n.next_power_of_two() - n;
             let zer = Scalar::zero();
@@ -237,8 +237,7 @@ impl ConstraintSystem {
                 self.assign_a(Ok(zer), Ok(zer), Ok(zer));
             }
         }
-        let m = self.get_m();
-        let v_blinding: Vec<Scalar> = (0..m).map(|_| Scalar::random(rng)).collect();
+        let v_blinding: Vec<Scalar> = (0..self.get_m()).map(|_| Scalar::random(rng)).collect();
 
         let circuit = self.create_circuit();
         let prover_input = self.create_prover_input(&v_blinding);
@@ -267,6 +266,8 @@ mod tests {
 
         let (prover_circuit, prover_input, verifier_input) =
             prover_cs.create_proof_input(&pedersen_gens, &mut rng);
+        assert!(prover_input.is_ok());
+        assert!(verifier_input.is_ok());
 
         let mut prover_transcript = ProofTranscript::new(b"CircuitProofTest");
         let circuit_proof = CircuitProof::prove(
@@ -312,11 +313,7 @@ mod tests {
         );
 
         let mut verifier_cs = ConstraintSystem::new();
-        verifier_cs.assign_a(
-            new_err_assignment(),
-            new_err_assignment(),
-            new_err_assignment(),
-        );
+        verifier_cs.assign_a(err_assignment(), err_assignment(), err_assignment());
 
         assert!(create_and_verify_helper(prover_cs, verifier_cs, expected_result).is_ok());
     }
@@ -365,14 +362,11 @@ mod tests {
         ));
 
         let mut verifier_cs = ConstraintSystem::new();
-        let (aL, aR, aO) = verifier_cs.assign_a(
-            new_err_assignment(),
-            new_err_assignment(),
-            new_err_assignment(),
-        );
-        let v_a = verifier_cs.assign_v(new_err_assignment());
-        let v_b = verifier_cs.assign_v(new_err_assignment());
-        let v_c = verifier_cs.assign_v(new_err_assignment());
+        let (aL, aR, aO) =
+            verifier_cs.assign_a(err_assignment(), err_assignment(), err_assignment());
+        let v_a = verifier_cs.assign_v(err_assignment());
+        let v_b = verifier_cs.assign_v(err_assignment());
+        let v_c = verifier_cs.assign_v(err_assignment());
 
         verifier_cs.constrain(LinearCombination::new(
             vec![(aL, -one), (v_a, Scalar::from(a_coeff))],
@@ -422,9 +416,9 @@ mod tests {
         ));
 
         let mut verifier_cs = ConstraintSystem::new();
-        let v_a = verifier_cs.assign_v(new_err_assignment());
-        let v_b = verifier_cs.assign_v(new_err_assignment());
-        let v_c = verifier_cs.assign_v(new_err_assignment());
+        let v_a = verifier_cs.assign_v(err_assignment());
+        let v_b = verifier_cs.assign_v(err_assignment());
+        let v_c = verifier_cs.assign_v(err_assignment());
         verifier_cs.constrain(LinearCombination::new(
             vec![(v_a, one), (v_b, one), (v_c, -one)],
             zer,
@@ -439,6 +433,65 @@ mod tests {
         add_circuit_basic_helper(3, 4, 10, Err(())); // 3 + 4 != 10
     }
 
+    // a + b =? c
+    // Where we define a, b, c as low-level variables (aL and aR variables) then then
+    // tie those to high-level variables (v variables). The purpose of this test is to
+    // check that low-level variable allocation works, and see that we can successfully
+    // tie the low-level and high-level variables together.
+    fn add_circuit_helper(a: u64, b: u64, c: u64, expected_result: Result<(), ()>) {
+        let one = Scalar::one();
+        let zer = Scalar::zero();
+
+        let mut prover_cs = ConstraintSystem::new();
+        // Make high-level variables
+        let v_a = prover_cs.assign_v(Ok(Scalar::from(a)));
+        let v_b = prover_cs.assign_v(Ok(Scalar::from(b)));
+        let v_c = prover_cs.assign_v(Ok(Scalar::from(c)));
+        // Make low-level variables (aL_0 = v_a, aR_0 = v_b, aL_1 = v_c)
+        let (aL_0, aR_0, _) = prover_cs.assign_a(
+            Ok(Scalar::from(a)),
+            Ok(Scalar::from(b)),
+            Ok(Scalar::from(a * b)),
+        );
+        let (aL_1, _, _) = prover_cs.assign_a(Ok(Scalar::from(c)), Ok(zer), Ok(zer));
+        // Tie high-level and low-level variables together
+        prover_cs.constrain(LinearCombination::new(vec![(aL_0, -one), (v_a, one)], zer));
+        prover_cs.constrain(LinearCombination::new(vec![(aR_0, -one), (v_b, one)], zer));
+        prover_cs.constrain(LinearCombination::new(vec![(aL_1, -one), (v_c, one)], zer));
+        // Addition logic (using low-level variables)
+        prover_cs.constrain(LinearCombination::new(
+            vec![(aL_0, one), (aR_0, one), (aL_1, -one)],
+            zer,
+        ));
+
+        let mut verifier_cs = ConstraintSystem::new();
+        // Make high-level variables
+        let v_a = verifier_cs.assign_v(err_assignment());
+        let v_b = verifier_cs.assign_v(err_assignment());
+        let v_c = verifier_cs.assign_v(err_assignment());
+        // Make low-level variables (aL_0 = v_a, aR_0 = v_b, aL_1 = v_c)
+        let (aL_0, aR_0, _) =
+            verifier_cs.assign_a(err_assignment(), err_assignment(), err_assignment());
+        let (aL_1, _, _) =
+            verifier_cs.assign_a(err_assignment(), err_assignment(), err_assignment());
+        // Tie high-level and low-level variables together
+        verifier_cs.constrain(LinearCombination::new(vec![(aL_0, -one), (v_a, one)], zer));
+        verifier_cs.constrain(LinearCombination::new(vec![(aR_0, -one), (v_b, one)], zer));
+        verifier_cs.constrain(LinearCombination::new(vec![(aL_1, -one), (v_c, one)], zer));
+        // Addition logic (using low-level variables)
+        verifier_cs.constrain(LinearCombination::new(
+            vec![(aL_0, one), (aR_0, one), (aL_1, -one)],
+            zer,
+        ));
+
+        assert!(create_and_verify_helper(prover_cs, verifier_cs, expected_result).is_ok());
+    }
+
+    #[test]
+    fn add_circuit() {
+        add_circuit_helper(3, 4, 7, Ok(())); // 3 + 4 = 7
+        add_circuit_helper(3, 4, 10, Err(())); // 3 + 4 != 10
+    }
 }
 
 /*
