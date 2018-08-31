@@ -3,10 +3,11 @@
 
 use rand::{CryptoRng, Rng};
 
-use super::circuit::{Circuit, ProverInput, VerifierInput};
+use super::circuit::{Circuit, ProverInput, VerifierInput, CircuitProof};
 use curve25519_dalek::scalar::Scalar;
 use errors::R1CSError;
-use generators::PedersenGenerators;
+use generators::{Generators, PedersenGenerators};
+use merlin::Transcript;
 
 #[derive(Clone, Debug)]
 pub enum Variable {
@@ -182,16 +183,13 @@ impl ConstraintSystem {
     }
 
     // This function can only be called once per ConstraintSystem instance.
-    pub fn create_proof_input<R: Rng + CryptoRng>(
+    pub fn prove<R: Rng + CryptoRng>(
         mut self,
-        pedersen_gens: &PedersenGenerators,
+        gen: &Generators,
+        transcript: &mut Transcript,
         rng: &mut R,
-    ) -> (
-        Circuit,
-        Result<ProverInput, R1CSError>,
-        Result<VerifierInput, R1CSError>,
-    ) {
-        // If `n`, the number of multiplications, is not 0 or 2, then pad the circuit.
+    ) -> Result<(CircuitProof, VerifierInput), R1CSError> {
+        // If the number of multiplications, is not 0 or a power of 2, then pad the circuit.
         let n = self.aL_assignments.len();
         if !(n == 0 || n.is_power_of_two()) {
             let pad = n.next_power_of_two() - n;
@@ -200,15 +198,24 @@ impl ConstraintSystem {
                 self.assign_multiplier(Ok(zer), Ok(zer), Ok(zer));
             }
         }
+
+        // create circuit params
         let v_blinding: Vec<Scalar> = (0..self.commitments_count())
             .map(|_| Scalar::random(rng))
             .collect();
-
         let circuit = self.create_circuit();
-        let prover_input = self.create_prover_input(&v_blinding);
-        let verifier_input = self.create_verifier_input(pedersen_gens, &v_blinding);
+        let prover_input = self.create_prover_input(&v_blinding)?;
+        let verifier_input = self.create_verifier_input(&gen.pedersen_gens, &v_blinding)?;
 
-        (circuit, prover_input, verifier_input)
+        let circuit_proof = CircuitProof::prove(
+            &gen,
+            transcript,
+            rng,
+            &circuit,
+            &prover_input
+        ).unwrap();
+
+        Ok((circuit_proof, verifier_input))
     }
 }
 
