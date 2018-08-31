@@ -66,7 +66,7 @@ impl LinearCombination {
 }
 
 pub struct ConstraintSystem {
-    lc_vec: Vec<LinearCombination>,
+    constraints: Vec<LinearCombination>,
 
     // variable assignments
     aL_assignment: Vec<Assignment>,
@@ -78,7 +78,7 @@ pub struct ConstraintSystem {
 impl ConstraintSystem {
     pub fn new() -> Self {
         ConstraintSystem {
-            lc_vec: vec![],
+            constraints: vec![],
             aL_assignment: vec![],
             aR_assignment: vec![],
             aO_assignment: vec![],
@@ -128,8 +128,7 @@ impl ConstraintSystem {
         Variable { var_type, index }
     }
 
-    // Get number of multiplications.
-    pub fn get_n(&self) -> usize {
+    pub fn multipliers_count(&self) -> usize {
         let n = self.aL_assignment.len();
         if n == 0 || n.is_power_of_two() {
             return n;
@@ -137,8 +136,7 @@ impl ConstraintSystem {
         return n.next_power_of_two();
     }
 
-    // Get number of high-level witness variables.
-    pub fn get_m(&self) -> usize {
+    pub fn commitments_count(&self) -> usize {
         self.v_assignment.len()
     }
 
@@ -147,7 +145,7 @@ impl ConstraintSystem {
         pedersen_gens: &PedersenGenerators,
         v_blinding: &Vec<Scalar>,
     ) -> Result<Vec<RistrettoPoint>, R1CSError> {
-        if v_blinding.len() != self.get_m() {
+        if v_blinding.len() != self.commitments_count() {
             return Err(R1CSError::IncorrectInputSize);
         }
         self.v_assignment
@@ -157,10 +155,10 @@ impl ConstraintSystem {
             .collect()
     }
 
-    pub fn constrain(&mut self, lc: LinearCombination) {
+    pub fn add_constraint(&mut self, lc: LinearCombination) {
         // TODO: check that the linear combinations are valid
         // (e.g. that variables are valid, that the linear combination evals to 0 for prover, etc).
-        self.lc_vec.push(lc);
+        self.constraints.push(lc);
     }
 
     fn create_prover_input(&self, v_blinding: &Vec<Scalar>) -> Result<ProverInput, R1CSError> {
@@ -192,9 +190,9 @@ impl ConstraintSystem {
     }
 
     fn create_circuit(&self) -> Circuit {
-        let n = self.get_n();
+        let n = self.multipliers_count();
         let m = self.v_assignment.len();
-        let q = self.lc_vec.len();
+        let q = self.constraints.len();
 
         let zer = Scalar::zero();
         let mut W_L = vec![vec![zer; n]; q]; // qxn matrix which corresponds to a.
@@ -203,7 +201,7 @@ impl ConstraintSystem {
         let mut W_V = vec![vec![zer; m]; q]; // qxm matrix which corresponds to v
         let mut c = vec![zer; q]; // length q vector of constants.
 
-        for (index, lc) in self.lc_vec.iter().enumerate() {
+        for (index, lc) in self.constraints.iter().enumerate() {
             for (var, coeff) in lc.variables.clone() {
                 match var.var_type {
                     VariableType::aL => W_L[index][var.index] = -coeff,
@@ -237,7 +235,7 @@ impl ConstraintSystem {
                 self.assign_a(Ok(zer), Ok(zer), Ok(zer));
             }
         }
-        let v_blinding: Vec<Scalar> = (0..self.get_m()).map(|_| Scalar::random(rng)).collect();
+        let v_blinding: Vec<Scalar> = (0..self.commitments_count()).map(|_| Scalar::random(rng)).collect();
 
         let circuit = self.create_circuit();
         let prover_input = self.create_prover_input(&v_blinding);
@@ -262,7 +260,7 @@ mod tests {
     ) -> Result<(), R1CSError> {
         let mut rng = OsRng::new().unwrap();
         let pedersen_gens = PedersenGenerators::default();
-        let generators = Generators::new(pedersen_gens, prover_cs.get_n(), 1);
+        let generators = Generators::new(pedersen_gens, prover_cs.multipliers_count(), 1);
 
         let (prover_circuit, prover_input, verifier_input) =
             prover_cs.create_proof_input(&pedersen_gens, &mut rng);
@@ -350,15 +348,15 @@ mod tests {
         let v_b = prover_cs.assign_v(Ok(Scalar::from(b)));
         let v_c = prover_cs.assign_v(Ok(Scalar::from(c)));
 
-        prover_cs.constrain(LinearCombination::new(
+        prover_cs.add_constraint(LinearCombination::new(
             vec![(aL, -one), (v_a, Scalar::from(a_coeff))],
             zer,
         ));
-        prover_cs.constrain(LinearCombination::new(
+        prover_cs.add_constraint(LinearCombination::new(
             vec![(aR, -one), (v_b, Scalar::from(b_coeff))],
             zer,
         ));
-        prover_cs.constrain(LinearCombination::new(
+        prover_cs.add_constraint(LinearCombination::new(
             vec![(aO, -one), (v_c, Scalar::from(c_coeff))],
             zer,
         ));
@@ -370,15 +368,15 @@ mod tests {
         let v_b = verifier_cs.assign_v(err_assignment());
         let v_c = verifier_cs.assign_v(err_assignment());
 
-        verifier_cs.constrain(LinearCombination::new(
+        verifier_cs.add_constraint(LinearCombination::new(
             vec![(aL, -one), (v_a, Scalar::from(a_coeff))],
             zer,
         ));
-        verifier_cs.constrain(LinearCombination::new(
+        verifier_cs.add_constraint(LinearCombination::new(
             vec![(aR, -one), (v_b, Scalar::from(b_coeff))],
             zer,
         ));
-        verifier_cs.constrain(LinearCombination::new(
+        verifier_cs.add_constraint(LinearCombination::new(
             vec![(aO, -one), (v_c, Scalar::from(c_coeff))],
             zer,
         ));
@@ -412,7 +410,7 @@ mod tests {
         let v_a = prover_cs.assign_v(Ok(Scalar::from(a)));
         let v_b = prover_cs.assign_v(Ok(Scalar::from(b)));
         let v_c = prover_cs.assign_v(Ok(Scalar::from(c)));
-        prover_cs.constrain(LinearCombination::new(
+        prover_cs.add_constraint(LinearCombination::new(
             vec![(v_a, one), (v_b, one), (v_c, -one)],
             zer,
         ));
@@ -421,7 +419,7 @@ mod tests {
         let v_a = verifier_cs.assign_v(err_assignment());
         let v_b = verifier_cs.assign_v(err_assignment());
         let v_c = verifier_cs.assign_v(err_assignment());
-        verifier_cs.constrain(LinearCombination::new(
+        verifier_cs.add_constraint(LinearCombination::new(
             vec![(v_a, one), (v_b, one), (v_c, -one)],
             zer,
         ));
@@ -457,11 +455,11 @@ mod tests {
         );
         let (aL_1, _, _) = prover_cs.assign_a(Ok(Scalar::from(c)), Ok(zer), Ok(zer));
         // Tie high-level and low-level variables together
-        prover_cs.constrain(LinearCombination::new(vec![(aL_0, -one), (v_a, one)], zer));
-        prover_cs.constrain(LinearCombination::new(vec![(aR_0, -one), (v_b, one)], zer));
-        prover_cs.constrain(LinearCombination::new(vec![(aL_1, -one), (v_c, one)], zer));
+        prover_cs.add_constraint(LinearCombination::new(vec![(aL_0, -one), (v_a, one)], zer));
+        prover_cs.add_constraint(LinearCombination::new(vec![(aR_0, -one), (v_b, one)], zer));
+        prover_cs.add_constraint(LinearCombination::new(vec![(aL_1, -one), (v_c, one)], zer));
         // Addition logic (using low-level variables)
-        prover_cs.constrain(LinearCombination::new(
+        prover_cs.add_constraint(LinearCombination::new(
             vec![(aL_0, one), (aR_0, one), (aL_1, -one)],
             zer,
         ));
@@ -477,11 +475,11 @@ mod tests {
         let (aL_1, _, _) =
             verifier_cs.assign_a(err_assignment(), err_assignment(), err_assignment());
         // Tie high-level and low-level variables together
-        verifier_cs.constrain(LinearCombination::new(vec![(aL_0, -one), (v_a, one)], zer));
-        verifier_cs.constrain(LinearCombination::new(vec![(aR_0, -one), (v_b, one)], zer));
-        verifier_cs.constrain(LinearCombination::new(vec![(aL_1, -one), (v_c, one)], zer));
+        verifier_cs.add_constraint(LinearCombination::new(vec![(aL_0, -one), (v_a, one)], zer));
+        verifier_cs.add_constraint(LinearCombination::new(vec![(aR_0, -one), (v_b, one)], zer));
+        verifier_cs.add_constraint(LinearCombination::new(vec![(aL_1, -one), (v_c, one)], zer));
         // Addition logic (using low-level variables)
-        verifier_cs.constrain(LinearCombination::new(
+        verifier_cs.add_constraint(LinearCombination::new(
             vec![(aL_0, one), (aR_0, one), (aL_1, -one)],
             zer,
         ));
@@ -524,15 +522,15 @@ mod tests {
             Ok(Scalar::from(c1 + c2)),
         );
         // Tie high-level and low-level variables together
-        prover_cs.constrain(LinearCombination::new(
+        prover_cs.add_constraint(LinearCombination::new(
             vec![(aL, -one), (v_a1, one), (v_a2, one)],
             zer,
         ));
-        prover_cs.constrain(LinearCombination::new(
+        prover_cs.add_constraint(LinearCombination::new(
             vec![(aR, -one), (v_b1, one), (v_b2, one)],
             zer,
         ));
-        prover_cs.constrain(LinearCombination::new(
+        prover_cs.add_constraint(LinearCombination::new(
             vec![(aO, -one), (v_c1, one), (v_c2, one)],
             zer,
         ));
@@ -552,15 +550,15 @@ mod tests {
             Ok(Scalar::from(c1 + c2)),
         );
         // Tie high-level and low-level variables together
-        verifier_cs.constrain(LinearCombination::new(
+        verifier_cs.add_constraint(LinearCombination::new(
             vec![(aL, -one), (v_a1, one), (v_a2, one)],
             zer,
         ));
-        verifier_cs.constrain(LinearCombination::new(
+        verifier_cs.add_constraint(LinearCombination::new(
             vec![(aR, -one), (v_b1, one), (v_b2, one)],
             zer,
         ));
-        verifier_cs.constrain(LinearCombination::new(
+        verifier_cs.add_constraint(LinearCombination::new(
             vec![(aO, -one), (v_c1, one), (v_c2, one)],
             zer,
         ));
