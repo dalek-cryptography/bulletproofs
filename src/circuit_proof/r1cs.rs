@@ -1,26 +1,30 @@
 #![allow(non_snake_case)]
+#![allow(non_camel_case_types)]
 
 use rand::{CryptoRng, Rng};
 
-use curve25519_dalek::ristretto::RistrettoPoint;
-use curve25519_dalek::scalar::Scalar;
-use generators::PedersenGenerators;
-use std::iter::FromIterator;
-
-// use circuit::{Circuit, ProverInput, VerifierInput};
 use super::circuit::{Circuit, ProverInput, VerifierInput};
+use curve25519_dalek::scalar::Scalar;
+use errors::R1CSError;
+use generators::PedersenGenerators;
 
-// This is a stripped-down version of the Bellman r1cs representation, for the purposes of
-// learning / understanding. The eventual goal is to write this as a BulletproofsConstraintSystem
-// that implements the Bellman ConstraintSystem trait, so we can use that code/logic.
-// (That would require the bellman code to be decoupled from the underlying pairings.)
+#[derive(Clone, Debug)]
+pub enum Variable {
+    Committed(usize),        // high-level variable
+    MultiplierLeft(usize),   // low-level variable, left input of multiplication gate
+    MultiplierRight(usize),  // low-level variable, right input of multiplication gate
+    MultiplierOutput(usize), // low-level variable, output multiplication gate
+}
 
-/// Represents a variable in our constraint system, where the value represents the index.
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub struct Variable(usize);
+pub type Assignment = Result<Scalar, R1CSError>;
+
+pub fn missing() -> Assignment {
+    Err(R1CSError::MissingAssignment)
+}
 
 /// Represents a linear combination of some variables multiplied with their scalar coefficients,
-/// plus a scalar. E.g. LC = variable[0]*scalar[0] + variable[1]*scalar[1] + scalar
+/// plus a scalar. `ConstraintSystem` expects all linear combinations to evaluate to zero.
+/// E.g. LC = variable[0]*scalar[0] + variable[1]*scalar[1] + scalar
 #[derive(Clone, Debug)]
 pub struct LinearCombination {
     variables: Vec<(Variable, Scalar)>,
@@ -53,112 +57,125 @@ impl LinearCombination {
     }
 }
 
-/// Represents a vector of groups of 3 linear combinations, where a * b = c
 pub struct ConstraintSystem {
-    // a[i] * b[i] = c[i] for all i
-    a: Vec<LinearCombination>,
-    b: Vec<LinearCombination>,
-    c: Vec<LinearCombination>,
+    constraints: Vec<LinearCombination>,
 
-    // Assignments of variables
-    var_assignment: Vec<Scalar>,
+    // variable assignments
+    aL_assignments: Vec<Assignment>,
+    aR_assignments: Vec<Assignment>,
+    aO_assignments: Vec<Assignment>,
+    v_assignments: Vec<Assignment>,
 }
 
 impl ConstraintSystem {
     pub fn new() -> Self {
         ConstraintSystem {
-            a: vec![],
-            b: vec![],
-            c: vec![],
-            var_assignment: vec![],
+            constraints: vec![],
+            aL_assignments: vec![],
+            aR_assignments: vec![],
+            aO_assignments: vec![],
+            v_assignments: vec![],
         }
     }
-    // Allocate a variable and do value assignment at the same time
-    pub fn alloc_variable(&mut self, val: Scalar) -> Variable {
-        self.var_assignment.push(val);
-        Variable(self.var_assignment.len() - 1)
-    }
 
-    // Push one set of linear constraints (a, b, c) to the constraint system.
-    // Pushing a, b, c together prevents mismatched constraints.
-    pub fn constrain(
+    // Allocate variables for left, right, and output wires of multiplication,
+    // and assign them the Result values that are passed in.
+    // Prover will pass in Ok(Scalar)s, and Verifier will pass in R1CSErrors.
+    pub fn assign_multiplier(
         &mut self,
-        lc_a: LinearCombination,
-        lc_b: LinearCombination,
-        lc_c: LinearCombination,
-    ) -> Result<(), &'static str> {
-        // TODO: check that the linear combinations are valid
-        // (e.g. that variables are valid, belong to this constraint system).
-        self.a.push(lc_a);
-        self.b.push(lc_b);
-        self.c.push(lc_c);
-        Ok(())
+        left: Assignment,
+        right: Assignment,
+        out: Assignment,
+    ) -> (Variable, Variable, Variable) {
+        self.aL_assignments.push(left);
+        let left_var = Variable::MultiplierLeft(self.aL_assignments.len() - 1);
+
+        self.aR_assignments.push(right);
+        let right_var = Variable::MultiplierRight(self.aR_assignments.len() - 1);
+
+        self.aO_assignments.push(out);
+        let out_var = Variable::MultiplierOutput(self.aO_assignments.len() - 1);
+
+        (left_var, right_var, out_var)
     }
 
-    fn eval_lc(&self, lc: &LinearCombination) -> Scalar {
-        let sum_vars: Scalar = lc
-            .variables
+    // Allocate a committed variable, and assign it the Result value passed in.
+    // Prover will pass in Ok(Scalar), and Verifier will pass in R1CSError.
+    pub fn assign_committed_variable(&mut self, value: Assignment) -> Variable {
+        self.v_assignments.push(value);
+        Variable::Committed(self.v_assignments.len() - 1)
+    }
+
+    pub fn commitments_count(&self) -> usize {
+        self.v_assignments.len()
+    }
+
+    pub fn add_constraint(&mut self, lc: LinearCombination) {
+        // TODO: check that the linear combinations are valid
+        // (e.g. that variables are valid, that the linear combination evals to 0 for prover, etc).
+        self.constraints.push(lc);
+    }
+
+    fn create_prover_input(&self, v_blinding: &Vec<Scalar>) -> Result<ProverInput, R1CSError> {
+        let aL = self
+            .aL_assignments
             .iter()
-            .map(|(var, scalar)| scalar * self.var_assignment[var.0])
-            .sum();
-        sum_vars + lc.constant
+            .cloned()
+            .collect::<Result<Vec<_>, _>>()?;
+        let aR = self
+            .aR_assignments
+            .iter()
+            .cloned()
+            .collect::<Result<Vec<_>, _>>()?;
+        let aO = self
+            .aO_assignments
+            .iter()
+            .cloned()
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(ProverInput::new(aL, aR, aO, v_blinding.to_vec()))
     }
 
     fn create_verifier_input(
         &self,
-        v_blinding: &Vec<Scalar>,
         pedersen_gens: &PedersenGenerators,
-    ) -> VerifierInput {
-        let V: Vec<RistrettoPoint> = self
-            .var_assignment
+        v_blinding: &Vec<Scalar>,
+    ) -> Result<VerifierInput, R1CSError> {
+        if v_blinding.len() != self.commitments_count() {
+            return Err(R1CSError::IncorrectInputSize);
+        }
+        let V = self
+            .v_assignments
             .iter()
             .zip(v_blinding)
-            .map(|(v_i, v_blinding_i)| pedersen_gens.commit(*v_i, *v_blinding_i))
-            .collect();
-        VerifierInput::new(V)
-    }
+            .map(|(v_i, v_blinding_i)| Ok(pedersen_gens.commit(v_i.clone()?, *v_blinding_i)))
+            .collect::<Result<Vec<_>, _>>()?;
 
-    fn create_prover_input(&self, v_blinding: &Vec<Scalar>) -> ProverInput {
-        // eval a, b, c and assign results to a_L, a_R, a_O respectively
-        let a_L: Vec<Scalar> = self.a.iter().map(|lc| self.eval_lc(&lc)).collect();
-        let a_R: Vec<Scalar> = self.b.iter().map(|lc| self.eval_lc(&lc)).collect();
-        let a_O: Vec<Scalar> = self.c.iter().map(|lc| self.eval_lc(&lc)).collect();
-        ProverInput::new(a_L, a_R, a_O, v_blinding.to_vec())
+        Ok(VerifierInput::new(V))
     }
 
     fn create_circuit(&self) -> Circuit {
-        let n = self.a.len();
-        let m = self.var_assignment.len();
-        let q = self.a.len() * 3;
+        let n = self.aL_assignments.len();
+        let m = self.v_assignments.len();
+        let q = self.constraints.len();
 
-        // Linear constraints are ordered as follows:
-        // a[0], a[1], ... b[0], b[1], ... c[0], c[1], ...
-        // s.t. W_L || W_R || W_O || c || W_V matrix is in reduced row echelon form
         let zer = Scalar::zero();
-        let one = Scalar::one();
         let mut W_L = vec![vec![zer; n]; q]; // qxn matrix which corresponds to a.
         let mut W_R = vec![vec![zer; n]; q]; // qxn matrix which corresponds to b.
         let mut W_O = vec![vec![zer; n]; q]; // qxn matrix which corresponds to c.
-        for i in 0..n {
-            W_L[i][i] = one;
-            W_R[i + n][i] = one;
-            W_O[i + 2 * n][i] = one;
-        }
-
-        // TODO: create / append to c on the fly instead
+        let mut W_V = vec![vec![zer; m]; q]; // qxm matrix which corresponds to v
         let mut c = vec![zer; q]; // length q vector of constants.
-        let mut W_V = vec![vec![zer; m]; q]; // qxm matrix of commitments.
-        for (i, lc) in self
-            .a
-            .iter()
-            .chain(self.b.iter())
-            .chain(self.c.iter())
-            .enumerate()
-        {
-            for (var, scalar) in lc.get_variables() {
-                W_V[i][var.0] = scalar;
+
+        for (lc_index, lc) in self.constraints.iter().enumerate() {
+            for (var, coeff) in lc.variables.clone() {
+                match var {
+                    Variable::MultiplierLeft(var_index) => W_L[lc_index][var_index] = -coeff,
+                    Variable::MultiplierRight(var_index) => W_R[lc_index][var_index] = -coeff,
+                    Variable::MultiplierOutput(var_index) => W_O[lc_index][var_index] = -coeff,
+                    Variable::Committed(var_index) => W_V[lc_index][var_index] = coeff,
+                };
             }
-            c[i] = lc.get_constant();
+            c[lc_index] = lc.constant
         }
 
         Circuit::new(n, m, q, c, W_L, W_R, W_O, W_V)
@@ -169,22 +186,27 @@ impl ConstraintSystem {
         mut self,
         pedersen_gens: &PedersenGenerators,
         rng: &mut R,
-    ) -> (Circuit, ProverInput, VerifierInput) {
+    ) -> (
+        Circuit,
+        Result<ProverInput, R1CSError>,
+        Result<VerifierInput, R1CSError>,
+    ) {
         // If `n`, the number of multiplications, is not 0 or 2, then pad the circuit.
-        let n = self.a.len();
+        let n = self.aL_assignments.len();
         if !(n == 0 || n.is_power_of_two()) {
             let pad = n.next_power_of_two() - n;
-            self.a.append(&mut vec![LinearCombination::zero(); pad]);
-            self.b.append(&mut vec![LinearCombination::zero(); pad]);
-            self.c.append(&mut vec![LinearCombination::zero(); pad]);
+            let zer = Scalar::zero();
+            for _ in 0..pad {
+                self.assign_multiplier(Ok(zer), Ok(zer), Ok(zer));
+            }
         }
-
-        let m = self.var_assignment.len();
-        let v_blinding: Vec<Scalar> = (0..m).map(|_| Scalar::random(rng)).collect();
+        let v_blinding: Vec<Scalar> = (0..self.commitments_count())
+            .map(|_| Scalar::random(rng))
+            .collect();
 
         let circuit = self.create_circuit();
         let prover_input = self.create_prover_input(&v_blinding);
-        let verifier_input = self.create_verifier_input(&v_blinding, pedersen_gens);
+        let verifier_input = self.create_verifier_input(pedersen_gens, &v_blinding);
 
         (circuit, prover_input, verifier_input)
     }
@@ -198,473 +220,338 @@ mod tests {
     use rand::rngs::OsRng;
 
     use merlin::Transcript;
-    use transcript::TranscriptProtocol;
 
     fn create_and_verify_helper(
-        circuit: Circuit,
-        prover_input: ProverInput,
-        verifier_input: VerifierInput,
-    ) -> Result<(), &'static str> {
-        let generators = Generators::new(PedersenGenerators::default(), circuit.n, 1);
-        let mut prover_transcript = Transcript::new(b"CircuitProofTest");
+        prover_cs: ConstraintSystem,
+        verifier_cs: ConstraintSystem,
+        expected_result: Result<(), ()>,
+    ) -> Result<(), R1CSError> {
         let mut rng = OsRng::new().unwrap();
+        let pedersen_gens = PedersenGenerators::default();
 
+        let (prover_circuit, prover_input, verifier_input) =
+            prover_cs.create_proof_input(&pedersen_gens, &mut rng);
+        assert!(prover_input.is_ok());
+        assert!(verifier_input.is_ok());
+
+        let generators = Generators::new(pedersen_gens, prover_circuit.n, 1);
+        let mut prover_transcript = Transcript::new(b"CircuitProofTest");
         let circuit_proof = CircuitProof::prove(
             &generators,
             &mut prover_transcript,
             &mut rng,
-            &circuit.clone(),
-            &prover_input,
-        ).unwrap();
+            &prover_circuit,
+            &prover_input?,
+        );
 
-        let mut verify_transcript = Transcript::new(b"CircuitProofTest");
+        let (verifier_circuit, _, _) = verifier_cs.create_proof_input(&pedersen_gens, &mut rng);
 
-        circuit_proof.verify(
+        assert_eq!(prover_circuit, verifier_circuit);
+
+        let mut verifier_transcript = Transcript::new(b"CircuitProofTest");
+        let actual_result = circuit_proof.unwrap().verify(
             &generators,
-            &mut verify_transcript,
+            &mut verifier_transcript,
             &mut rng,
-            &circuit,
-            &verifier_input,
-        )
-    }
-
-    #[test]
-    // 3 (const) * 4 (const) = 12 (const)
-    fn mul_circuit_constants_succeed() {
-        let mut rng = OsRng::new().unwrap();
-        let pedersen_gens = PedersenGenerators::default();
-        let mut cs = ConstraintSystem::new();
-
-        let lc_a = LinearCombination::new(vec![], Scalar::from(3u64));
-        let lc_b = LinearCombination::new(vec![], Scalar::from(4u64));
-        let lc_c = LinearCombination::new(vec![], Scalar::from(12u64));
-        assert!(cs.constrain(lc_a, lc_b, lc_c).is_ok());
-
-        let (circuit, prover_input, verifier_input) =
-            cs.create_proof_input(&pedersen_gens, &mut rng);
-        assert!(create_and_verify_helper(circuit, prover_input, verifier_input).is_ok());
-    }
-
-    #[test]
-    // 3 (const) * 4 (const) != 10 (const)
-    fn mul_circuit_constants_fail() {
-        let mut rng = OsRng::new().unwrap();
-        let pedersen_gens = PedersenGenerators::default();
-        let mut cs = ConstraintSystem::new();
-
-        let lc_a = LinearCombination::new(vec![], Scalar::from(3u64));
-        let lc_b = LinearCombination::new(vec![], Scalar::from(4u64));
-        let lc_c = LinearCombination::new(vec![], Scalar::from(10u64));
-        assert!(cs.constrain(lc_a, lc_b, lc_c).is_ok());
-
-        let (circuit, prover_input, verifier_input) =
-            cs.create_proof_input(&pedersen_gens, &mut rng);
-        assert!(create_and_verify_helper(circuit, prover_input, verifier_input).is_err());
-    }
-
-    #[test]
-    // 3 (var) * 4 (var) = 12 (var)
-    fn mul_circuit_variables_succeed() {
-        let mut rng = OsRng::new().unwrap();
-        let pedersen_gens = PedersenGenerators::default();
-        let mut cs = ConstraintSystem::new();
-
-        let var_a = cs.alloc_variable(Scalar::from(3u64));
-        let var_b = cs.alloc_variable(Scalar::from(4u64));
-        let var_c = cs.alloc_variable(Scalar::from(12u64));
-
-        let lc_a = LinearCombination::new(vec![(var_a, Scalar::one())], Scalar::zero());
-        let lc_b = LinearCombination::new(vec![(var_b, Scalar::one())], Scalar::zero());
-        let lc_c = LinearCombination::new(vec![(var_c, Scalar::one())], Scalar::zero());
-        assert!(cs.constrain(lc_a, lc_b, lc_c).is_ok());
-
-        let (circuit, prover_input, verifier_input) =
-            cs.create_proof_input(&pedersen_gens, &mut rng);
-        assert!(create_and_verify_helper(circuit, prover_input, verifier_input).is_ok());
-    }
-
-    #[test]
-    // 3 (var) * 4 (var) != 10 (var)
-    fn mul_circuit_variables_fail() {
-        let mut rng = OsRng::new().unwrap();
-        let pedersen_gens = PedersenGenerators::default();
-        let mut cs = ConstraintSystem::new();
-
-        let var_a = cs.alloc_variable(Scalar::from(3u64));
-        let var_b = cs.alloc_variable(Scalar::from(4u64));
-        let var_c = cs.alloc_variable(Scalar::from(10u64));
-
-        let lc_a = LinearCombination::new(vec![(var_a, Scalar::one())], Scalar::zero());
-        let lc_b = LinearCombination::new(vec![(var_b, Scalar::one())], Scalar::zero());
-        let lc_c = LinearCombination::new(vec![(var_c, Scalar::one())], Scalar::zero());
-        assert!(cs.constrain(lc_a, lc_b, lc_c).is_ok());
-
-        let (circuit, prover_input, verifier_input) =
-            cs.create_proof_input(&pedersen_gens, &mut rng);
-        assert!(create_and_verify_helper(circuit, prover_input, verifier_input).is_err());
-    }
-
-    #[test]
-    // ( 3 (var) * 2 (const) ) * ( 4 (var) * 5 (const) ) = 120 (var)
-    fn mul_circuit_mixed_succeed() {
-        let mut rng = OsRng::new().unwrap();
-        let pedersen_gens = PedersenGenerators::default();
-        let mut cs = ConstraintSystem::new();
-
-        let var_a = cs.alloc_variable(Scalar::from(3u64));
-        let var_b = cs.alloc_variable(Scalar::from(4u64));
-        let var_c = cs.alloc_variable(Scalar::from(120u64));
-
-        let lc_a = LinearCombination::new(vec![(var_a, Scalar::from(2u64))], Scalar::zero());
-        let lc_b = LinearCombination::new(vec![(var_b, Scalar::from(5u64))], Scalar::zero());
-        let lc_c = LinearCombination::new(vec![(var_c, Scalar::one())], Scalar::zero());
-        assert!(cs.constrain(lc_a, lc_b, lc_c).is_ok());
-
-        let (circuit, prover_input, verifier_input) =
-            cs.create_proof_input(&pedersen_gens, &mut rng);
-        assert!(create_and_verify_helper(circuit, prover_input, verifier_input).is_ok());
-    }
-
-    #[test]
-    // ( 3 (var) * 2 (const) ) * ( 4 (var) * 5 (const) ) != 121 (var)
-    fn mul_circuit_mixed_fail() {
-        let mut rng = OsRng::new().unwrap();
-        let pedersen_gens = PedersenGenerators::default();
-        let mut cs = ConstraintSystem::new();
-
-        let var_a = cs.alloc_variable(Scalar::from(3u64));
-        let var_b = cs.alloc_variable(Scalar::from(4u64));
-        let var_c = cs.alloc_variable(Scalar::from(121u64));
-
-        let lc_a = LinearCombination::new(vec![(var_a, Scalar::from(2u64))], Scalar::zero());
-        let lc_b = LinearCombination::new(vec![(var_b, Scalar::from(5u64))], Scalar::zero());
-        let lc_c = LinearCombination::new(vec![(var_c, Scalar::one())], Scalar::zero());
-        assert!(cs.constrain(lc_a, lc_b, lc_c).is_ok());
-
-        let (circuit, prover_input, verifier_input) =
-            cs.create_proof_input(&pedersen_gens, &mut rng);
-        assert!(create_and_verify_helper(circuit, prover_input, verifier_input).is_err());
-    }
-
-    #[test]
-    // 3 (var) + 4 (var) = 7 (var)
-    fn add_circuit_variables_succeed() {
-        let mut rng = OsRng::new().unwrap();
-        let pedersen_gens = PedersenGenerators::default();
-        let mut cs = ConstraintSystem::new();
-
-        let var_a = cs.alloc_variable(Scalar::from(3u64));
-        let var_b = cs.alloc_variable(Scalar::from(4u64));
-        let var_c = cs.alloc_variable(Scalar::from(7u64));
-
-        let lc_a = LinearCombination::new(
-            vec![
-                (var_a, Scalar::one()),
-                (var_b, Scalar::one()),
-                (var_c, -Scalar::one()),
-            ],
-            Scalar::zero(),
+            &verifier_circuit,
+            &verifier_input?,
         );
-        let lc_b = LinearCombination::new(vec![], Scalar::one());
-        let lc_c = LinearCombination::new(vec![], Scalar::zero());
-        assert!(cs.constrain(lc_a, lc_b, lc_c).is_ok());
 
-        let (circuit, prover_input, verifier_input) =
-            cs.create_proof_input(&pedersen_gens, &mut rng);
-        assert!(create_and_verify_helper(circuit, prover_input, verifier_input).is_ok());
+        println!("expected result: {:?}", expected_result);
+        println!("actual result: {:?}", actual_result);
+        match expected_result {
+            Ok(_) => assert!(actual_result.is_ok()),
+            Err(_) => assert!(actual_result.is_err()),
+        }
+
+        Ok(())
     }
 
-    #[test]
-    // 3 (var) + 4 (var) != 10 (var)
-    fn add_circuit_variables_fail() {
-        let mut rng = OsRng::new().unwrap();
-        let pedersen_gens = PedersenGenerators::default();
-        let mut cs = ConstraintSystem::new();
-
-        let var_a = cs.alloc_variable(Scalar::from(3u64));
-        let var_b = cs.alloc_variable(Scalar::from(4u64));
-        let var_c = cs.alloc_variable(Scalar::from(10u64));
-
-        let lc_a = LinearCombination::new(
-            vec![
-                (var_a, Scalar::one()),
-                (var_b, Scalar::one()),
-                (var_c, -Scalar::one()),
-            ],
-            Scalar::zero(),
+    // a * b =? c
+    // The purpose of this test is to see how a multiplication gate with no
+    // variables (no corresponding v commitments) and no linear constraints behaves.
+    fn mul_circuit_basic_helper(a: u64, b: u64, c: u64, expected_result: Result<(), ()>) {
+        let mut prover_cs = ConstraintSystem::new();
+        prover_cs.assign_multiplier(
+            Ok(Scalar::from(a)),
+            Ok(Scalar::from(b)),
+            Ok(Scalar::from(c)),
         );
-        let lc_b = LinearCombination::new(vec![], Scalar::one());
-        let lc_c = LinearCombination::new(vec![], Scalar::zero());
-        assert!(cs.constrain(lc_a, lc_b, lc_c).is_ok());
 
-        let (circuit, prover_input, verifier_input) =
-            cs.create_proof_input(&pedersen_gens, &mut rng);
-        assert!(create_and_verify_helper(circuit, prover_input, verifier_input).is_err());
+        let mut verifier_cs = ConstraintSystem::new();
+        verifier_cs.assign_multiplier(missing(), missing(), missing());
+
+        assert!(create_and_verify_helper(prover_cs, verifier_cs, expected_result).is_ok());
     }
 
     #[test]
-    // 3 (var) + 4 (var) + 8 (const) = 15 (var)
-    fn add_circuit_mixed_succeed() {
-        let mut rng = OsRng::new().unwrap();
-        let pedersen_gens = PedersenGenerators::default();
-        let mut cs = ConstraintSystem::new();
+    fn mul_circuit_basic() {
+        mul_circuit_basic_helper(3, 4, 12, Ok(())); // 3 * 4 = 12
+        mul_circuit_basic_helper(3, 4, 10, Err(())); // 3 * 4 != 10
+    }
 
-        let var_a = cs.alloc_variable(Scalar::from(3u64));
-        let var_b = cs.alloc_variable(Scalar::from(4u64));
-        let var_c = cs.alloc_variable(Scalar::from(15u64));
+    // (a * a_coeff) * (b * b_coeff) =? c * c_coeff
+    // Where we define a, b, c as low-level variables (aL and aR variables) then then
+    // tie those to high-level variables (v variables). The purpose of this test is to
+    // see if we can successfully tie the low-level and high-level variables together.
+    fn mul_circuit_helper(
+        a: u64,
+        a_coeff: u64,
+        b: u64,
+        b_coeff: u64,
+        c: u64,
+        c_coeff: u64,
+        expected_result: Result<(), ()>,
+    ) {
+        let one = Scalar::one();
+        let zer = Scalar::zero();
 
-        let lc_a = LinearCombination::new(
-            vec![
-                (var_a, Scalar::one()),
-                (var_b, Scalar::one()),
-                (var_c, -Scalar::one()),
-            ],
-            Scalar::from(8u64),
+        let mut prover_cs = ConstraintSystem::new();
+        let (aL, aR, aO) = prover_cs.assign_multiplier(
+            Ok(Scalar::from(a) * Scalar::from(a_coeff)),
+            Ok(Scalar::from(b) * Scalar::from(b_coeff)),
+            Ok(Scalar::from(c) * Scalar::from(c_coeff)),
         );
-        let lc_b = LinearCombination::new(vec![], Scalar::one());
-        let lc_c = LinearCombination::new(vec![], Scalar::zero());
-        assert!(cs.constrain(lc_a, lc_b, lc_c).is_ok());
+        let v_a = prover_cs.assign_committed_variable(Ok(Scalar::from(a)));
+        let v_b = prover_cs.assign_committed_variable(Ok(Scalar::from(b)));
+        let v_c = prover_cs.assign_committed_variable(Ok(Scalar::from(c)));
 
-        let (circuit, prover_input, verifier_input) =
-            cs.create_proof_input(&pedersen_gens, &mut rng);
-        assert!(create_and_verify_helper(circuit, prover_input, verifier_input).is_ok());
+        prover_cs.add_constraint(LinearCombination::new(
+            vec![(aL, -one), (v_a, Scalar::from(a_coeff))],
+            zer,
+        ));
+        prover_cs.add_constraint(LinearCombination::new(
+            vec![(aR, -one), (v_b, Scalar::from(b_coeff))],
+            zer,
+        ));
+        prover_cs.add_constraint(LinearCombination::new(
+            vec![(aO, -one), (v_c, Scalar::from(c_coeff))],
+            zer,
+        ));
+
+        let mut verifier_cs = ConstraintSystem::new();
+        let (aL, aR, aO) = verifier_cs.assign_multiplier(missing(), missing(), missing());
+        let v_a = verifier_cs.assign_committed_variable(missing());
+        let v_b = verifier_cs.assign_committed_variable(missing());
+        let v_c = verifier_cs.assign_committed_variable(missing());
+
+        verifier_cs.add_constraint(LinearCombination::new(
+            vec![(aL, -one), (v_a, Scalar::from(a_coeff))],
+            zer,
+        ));
+        verifier_cs.add_constraint(LinearCombination::new(
+            vec![(aR, -one), (v_b, Scalar::from(b_coeff))],
+            zer,
+        ));
+        verifier_cs.add_constraint(LinearCombination::new(
+            vec![(aO, -one), (v_c, Scalar::from(c_coeff))],
+            zer,
+        ));
+
+        assert!(create_and_verify_helper(prover_cs, verifier_cs, expected_result).is_ok());
     }
 
     #[test]
-    // 3 (var) + 4 (var) + 8 (const) != 16 (var)
-    fn add_circuit_mixed_fail() {
-        let mut rng = OsRng::new().unwrap();
-        let pedersen_gens = PedersenGenerators::default();
-        let mut cs = ConstraintSystem::new();
+    fn mul_circuit() {
+        // test multiplication without coefficients
+        mul_circuit_helper(3, 1, 4, 1, 12, 1, Ok(())); // (3*1) * (4*1) = (12*1)
+        mul_circuit_helper(3, 1, 4, 1, 10, 1, Err(())); // (3*1) * (4*1) != (10*1)
 
-        let var_a = cs.alloc_variable(Scalar::from(3u64));
-        let var_b = cs.alloc_variable(Scalar::from(4u64));
-        let var_c = cs.alloc_variable(Scalar::from(16u64));
+        // test multiplication with coefficients
+        mul_circuit_helper(3, 2, 4, 5, 120, 1, Ok(())); // (3*2) * (4*5) = (120*1)
+        mul_circuit_helper(3, 2, 4, 5, 121, 1, Err(())); // (3*2) * (4*5) != (121*1)
 
-        let lc_a = LinearCombination::new(
-            vec![
-                (var_a, Scalar::one()),
-                (var_b, Scalar::one()),
-                (var_c, -Scalar::one()),
-            ],
-            Scalar::from(8u64),
+        // test multiplication with zeros
+        mul_circuit_helper(0, 2, 4, 5, 120, 0, Ok(())); // (0*2) * (4*5) = (120*0)
+        mul_circuit_helper(0, 2, 4, 5, 120, 1, Err(())); // (0*2) * (4*5) = (120*1)
+    }
+
+    // a + b =? c
+    // The purpose of this test is to see how a circuit with no multiplication gates,
+    // and one addition gate, behaves.
+    fn add_circuit_basic_helper(a: u64, b: u64, c: u64, expected_result: Result<(), ()>) {
+        let one = Scalar::one();
+        let zer = Scalar::zero();
+
+        let mut prover_cs = ConstraintSystem::new();
+        let v_a = prover_cs.assign_committed_variable(Ok(Scalar::from(a)));
+        let v_b = prover_cs.assign_committed_variable(Ok(Scalar::from(b)));
+        let v_c = prover_cs.assign_committed_variable(Ok(Scalar::from(c)));
+        prover_cs.add_constraint(LinearCombination::new(
+            vec![(v_a, one), (v_b, one), (v_c, -one)],
+            zer,
+        ));
+
+        let mut verifier_cs = ConstraintSystem::new();
+        let v_a = verifier_cs.assign_committed_variable(missing());
+        let v_b = verifier_cs.assign_committed_variable(missing());
+        let v_c = verifier_cs.assign_committed_variable(missing());
+        verifier_cs.add_constraint(LinearCombination::new(
+            vec![(v_a, one), (v_b, one), (v_c, -one)],
+            zer,
+        ));
+
+        assert!(create_and_verify_helper(prover_cs, verifier_cs, expected_result).is_ok());
+    }
+
+    #[test]
+    fn add_circuit_basic() {
+        add_circuit_basic_helper(3, 4, 7, Ok(())); // 3 + 4 = 7
+        add_circuit_basic_helper(3, 4, 10, Err(())); // 3 + 4 != 10
+    }
+
+    // a + b =? c
+    // Where we define a, b, c as low-level variables (aL and aR variables) then then
+    // tie those to high-level variables (v variables). The purpose of this test is to
+    // check that low-level variable allocation works, and see that we can successfully
+    // tie the low-level and high-level variables together.
+    fn add_circuit_helper(a: u64, b: u64, c: u64, expected_result: Result<(), ()>) {
+        let one = Scalar::one();
+        let zer = Scalar::zero();
+
+        let mut prover_cs = ConstraintSystem::new();
+        // Make high-level variables
+        let v_a = prover_cs.assign_committed_variable(Ok(Scalar::from(a)));
+        let v_b = prover_cs.assign_committed_variable(Ok(Scalar::from(b)));
+        let v_c = prover_cs.assign_committed_variable(Ok(Scalar::from(c)));
+        // Make low-level variables (aL_0 = v_a, aR_0 = v_b, aL_1 = v_c)
+        let (aL_0, aR_0, _) = prover_cs.assign_multiplier(
+            Ok(Scalar::from(a)),
+            Ok(Scalar::from(b)),
+            Ok(Scalar::from(a * b)),
         );
-        let lc_b = LinearCombination::new(vec![], Scalar::one());
-        let lc_c = LinearCombination::new(vec![], Scalar::zero());
-        assert!(cs.constrain(lc_a, lc_b, lc_c).is_ok());
+        let (aL_1, _, _) = prover_cs.assign_multiplier(Ok(Scalar::from(c)), Ok(zer), Ok(zer));
+        // Tie high-level and low-level variables together
+        prover_cs.add_constraint(LinearCombination::new(
+            vec![(aL_0.clone(), -one), (v_a, one)],
+            zer,
+        ));
+        prover_cs.add_constraint(LinearCombination::new(
+            vec![(aR_0.clone(), -one), (v_b, one)],
+            zer,
+        ));
+        prover_cs.add_constraint(LinearCombination::new(
+            vec![(aL_1.clone(), -one), (v_c, one)],
+            zer,
+        ));
+        // Addition logic (using low-level variables)
+        prover_cs.add_constraint(LinearCombination::new(
+            vec![(aL_0, one), (aR_0, one), (aL_1, -one)],
+            zer,
+        ));
 
-        let (circuit, prover_input, verifier_input) =
-            cs.create_proof_input(&pedersen_gens, &mut rng);
-        assert!(create_and_verify_helper(circuit, prover_input, verifier_input).is_err());
+        let mut verifier_cs = ConstraintSystem::new();
+        // Make high-level variables
+        let v_a = verifier_cs.assign_committed_variable(missing());
+        let v_b = verifier_cs.assign_committed_variable(missing());
+        let v_c = verifier_cs.assign_committed_variable(missing());
+        // Make low-level variables (aL_0 = v_a, aR_0 = v_b, aL_1 = v_c)
+        let (aL_0, aR_0, _) = verifier_cs.assign_multiplier(missing(), missing(), missing());
+        let (aL_1, _, _) = verifier_cs.assign_multiplier(missing(), missing(), missing());
+        // Tie high-level and low-level variables together
+        verifier_cs.add_constraint(LinearCombination::new(
+            vec![(aL_0.clone(), -one), (v_a, one)],
+            zer,
+        ));
+        verifier_cs.add_constraint(LinearCombination::new(
+            vec![(aR_0.clone(), -one), (v_b, one)],
+            zer,
+        ));
+        verifier_cs.add_constraint(LinearCombination::new(
+            vec![(aL_1.clone(), -one), (v_c, one)],
+            zer,
+        ));
+        // Addition logic (using low-level variables)
+        verifier_cs.add_constraint(LinearCombination::new(
+            vec![(aL_0, one), (aR_0, one), (aL_1, -one)],
+            zer,
+        ));
+
+        assert!(create_and_verify_helper(prover_cs, verifier_cs, expected_result).is_ok());
     }
 
     #[test]
-    // ( 3 (var) + 4 (var) + 8 (const) - 13 (var) ) * 2 (const) = 1 (var) * 4 (const)
-    fn add_and_multiply_circuit_succeed() {
-        let mut rng = OsRng::new().unwrap();
-        let pedersen_gens = PedersenGenerators::default();
-        let mut cs = ConstraintSystem::new();
+    fn add_circuit() {
+        add_circuit_helper(3, 4, 7, Ok(())); // 3 + 4 = 7
+        add_circuit_helper(3, 4, 10, Err(())); // 3 + 4 != 10
+    }
 
-        let var_a = cs.alloc_variable(Scalar::from(3u64));
-        let var_b = cs.alloc_variable(Scalar::from(4u64));
-        let var_c = cs.alloc_variable(Scalar::from(13u64));
-        let var_d = cs.alloc_variable(Scalar::one());
+    // (a1 + a2) * (b1 + b2) =? (c1 + c2)
+    // Where a1, a2, b1, b2, c1, c2 are all allocated as high-level variables
+    fn mixed_circuit_helper(
+        a1: u64,
+        a2: u64,
+        b1: u64,
+        b2: u64,
+        c1: u64,
+        c2: u64,
+        expected_result: Result<(), ()>,
+    ) {
+        let one = Scalar::one();
+        let zer = Scalar::zero();
 
-        let lc_a = LinearCombination::new(
-            vec![
-                (var_a, Scalar::one()),
-                (var_b, Scalar::one()),
-                (var_c, -Scalar::one()),
-            ],
-            Scalar::from(8u64),
+        let mut prover_cs = ConstraintSystem::new();
+        // Make high-level variables
+        let v_a1 = prover_cs.assign_committed_variable(Ok(Scalar::from(a1)));
+        let v_a2 = prover_cs.assign_committed_variable(Ok(Scalar::from(a2)));
+        let v_b1 = prover_cs.assign_committed_variable(Ok(Scalar::from(b1)));
+        let v_b2 = prover_cs.assign_committed_variable(Ok(Scalar::from(b2)));
+        let v_c1 = prover_cs.assign_committed_variable(Ok(Scalar::from(c1)));
+        let v_c2 = prover_cs.assign_committed_variable(Ok(Scalar::from(c2)));
+        // Make low-level variables (aL = v_a1 + v_a2, aR = v_b1 + v_b2, aO = v_c1 + v_c2)
+        let (aL, aR, aO) = prover_cs.assign_multiplier(
+            Ok(Scalar::from(a1 + a2)),
+            Ok(Scalar::from(b1 + b2)),
+            Ok(Scalar::from(c1 + c2)),
         );
-        let lc_b = LinearCombination::new(vec![], Scalar::from(2u64));
-        let lc_c = LinearCombination::new(vec![(var_d, Scalar::from(4u64))], Scalar::zero());
-        assert!(cs.constrain(lc_a, lc_b, lc_c).is_ok());
+        // Tie high-level and low-level variables together
+        prover_cs.add_constraint(LinearCombination::new(
+            vec![(aL, -one), (v_a1, one), (v_a2, one)],
+            zer,
+        ));
+        prover_cs.add_constraint(LinearCombination::new(
+            vec![(aR, -one), (v_b1, one), (v_b2, one)],
+            zer,
+        ));
+        prover_cs.add_constraint(LinearCombination::new(
+            vec![(aO, -one), (v_c1, one), (v_c2, one)],
+            zer,
+        ));
 
-        let (circuit, prover_input, verifier_input) =
-            cs.create_proof_input(&pedersen_gens, &mut rng);
-        assert!(create_and_verify_helper(circuit, prover_input, verifier_input).is_ok());
-    }
-
-    #[test]
-    // ( 3 (var) + 4 (var) + 8 (const) - 13 (var) ) * 2 (const) = 1 (var) * 3 (const)
-    fn add_and_multiply_circuit_fail() {
-        let mut rng = OsRng::new().unwrap();
-        let pedersen_gens = PedersenGenerators::default();
-        let mut cs = ConstraintSystem::new();
-
-        let var_a = cs.alloc_variable(Scalar::from(3u64));
-        let var_b = cs.alloc_variable(Scalar::from(4u64));
-        let var_c = cs.alloc_variable(Scalar::from(13u64));
-        let var_d = cs.alloc_variable(Scalar::one());
-
-        let lc_a = LinearCombination::new(
-            vec![
-                (var_a, Scalar::one()),
-                (var_b, Scalar::one()),
-                (var_c, -Scalar::one()),
-            ],
-            Scalar::from(8u64),
+        let mut verifier_cs = ConstraintSystem::new();
+        // Make high-level variables
+        let v_a1 = verifier_cs.assign_committed_variable(Ok(Scalar::from(a1)));
+        let v_a2 = verifier_cs.assign_committed_variable(Ok(Scalar::from(a2)));
+        let v_b1 = verifier_cs.assign_committed_variable(Ok(Scalar::from(b1)));
+        let v_b2 = verifier_cs.assign_committed_variable(Ok(Scalar::from(b2)));
+        let v_c1 = verifier_cs.assign_committed_variable(Ok(Scalar::from(c1)));
+        let v_c2 = verifier_cs.assign_committed_variable(Ok(Scalar::from(c2)));
+        // Make low-level variables (aL = v_a1 + v_a2, aR = v_b1 + v_b2, aO = v_c1 + v_c2)
+        let (aL, aR, aO) = verifier_cs.assign_multiplier(
+            Ok(Scalar::from(a1 + a2)),
+            Ok(Scalar::from(b1 + b2)),
+            Ok(Scalar::from(c1 + c2)),
         );
-        let lc_b = LinearCombination::new(vec![], Scalar::from(2u64));
-        let lc_c = LinearCombination::new(vec![(var_d, Scalar::from(3u64))], Scalar::zero());
-        assert!(cs.constrain(lc_a, lc_b, lc_c).is_ok());
+        // Tie high-level and low-level variables together
+        verifier_cs.add_constraint(LinearCombination::new(
+            vec![(aL, -one), (v_a1, one), (v_a2, one)],
+            zer,
+        ));
+        verifier_cs.add_constraint(LinearCombination::new(
+            vec![(aR, -one), (v_b1, one), (v_b2, one)],
+            zer,
+        ));
+        verifier_cs.add_constraint(LinearCombination::new(
+            vec![(aO, -one), (v_c1, one), (v_c2, one)],
+            zer,
+        ));
 
-        let (circuit, prover_input, verifier_input) =
-            cs.create_proof_input(&pedersen_gens, &mut rng);
-        assert!(create_and_verify_helper(circuit, prover_input, verifier_input).is_err());
+        assert!(create_and_verify_helper(prover_cs, verifier_cs, expected_result).is_ok());
     }
 
     #[test]
-    // 3 (const) * 4 (const) = 12 (const)
-    // 2 (const) * 5 (var) = 10 (var)
-    // 10 (var) * 20 (var) = 200 (const)
-    fn n_not_power_of_two() {
-        let mut rng = OsRng::new().unwrap();
-        let pedersen_gens = PedersenGenerators::default();
-        let mut cs = ConstraintSystem::new();
-
-        let var_five = cs.alloc_variable(Scalar::from(5u64));
-        let var_ten = cs.alloc_variable(Scalar::from(10u64));
-        let var_twenty = cs.alloc_variable(Scalar::from(20u64));
-
-        let lc_a_1 = LinearCombination::new(vec![], Scalar::from(3u64));
-        let lc_b_1 = LinearCombination::new(vec![], Scalar::from(4u64));
-        let lc_c_1 = LinearCombination::new(vec![], Scalar::from(12u64));
-        assert!(cs.constrain(lc_a_1, lc_b_1, lc_c_1).is_ok());
-
-        let lc_a_2 = LinearCombination::new(vec![], Scalar::from(2u64));
-        let lc_b_2 = LinearCombination::new(vec![(var_five, Scalar::one())], Scalar::zero());
-        let lc_c_2 = LinearCombination::new(vec![(var_ten, Scalar::one())], Scalar::zero());
-        assert!(cs.constrain(lc_a_2, lc_b_2, lc_c_2).is_ok());
-
-        let lc_a_3 = LinearCombination::new(vec![(var_ten, Scalar::one())], Scalar::zero());
-        let lc_b_3 = LinearCombination::new(vec![(var_twenty, Scalar::one())], Scalar::zero());
-        let lc_c_3 = LinearCombination::new(vec![], Scalar::from(200u64));
-        assert!(cs.constrain(lc_a_3, lc_b_3, lc_c_3).is_ok());
-
-        let (circuit, prover_input, verifier_input) =
-            cs.create_proof_input(&pedersen_gens, &mut rng);
-        assert!(create_and_verify_helper(circuit, prover_input, verifier_input).is_ok());
-    }
-
-    // Creates a 2 in 2 out shuffle circuit.
-    fn shuffle_circuit_helper(
-        in_0: Scalar,
-        in_1: Scalar,
-        out_0: Scalar,
-        out_1: Scalar,
-    ) -> Result<(), &'static str> {
-        let mut rng = OsRng::new().unwrap();
-        let pedersen_gens = PedersenGenerators::default();
-        let mut cs = ConstraintSystem::new();
-        let z = Scalar::random(&mut rng);
-
-        let var_in_0 = cs.alloc_variable(in_0);
-        let var_in_1 = cs.alloc_variable(in_1);
-        let var_out_0 = cs.alloc_variable(out_0);
-        let var_out_1 = cs.alloc_variable(out_1);
-        let var_mul = cs.alloc_variable((in_0 - z) * (in_1 - z));
-
-        // lc_0: (var_in_0 - z) * (var_in_1 - z) = var_mul
-        let lc_0_a = LinearCombination::new(vec![(var_in_0, Scalar::one())], -z);
-        let lc_0_b = LinearCombination::new(vec![(var_in_1, Scalar::one())], -z);
-        let lc_0_c = LinearCombination::new(vec![(var_mul.clone(), Scalar::one())], Scalar::zero());
-        assert!(cs.constrain(lc_0_a, lc_0_b, lc_0_c).is_ok());
-
-        // lc_1: (var_out_0 - z) * (var_out_1 - z) = var_mul
-        let lc_1_a = LinearCombination::new(vec![(var_out_0, Scalar::one())], -z);
-        let lc_1_b = LinearCombination::new(vec![(var_out_1, Scalar::one())], -z);
-        let lc_1_c = LinearCombination::new(vec![(var_mul, Scalar::one())], Scalar::zero());
-        assert!(cs.constrain(lc_1_a, lc_1_b, lc_1_c).is_ok());
-
-        let (circuit, prover_input, verifier_input) =
-            cs.create_proof_input(&pedersen_gens, &mut rng);
-        create_and_verify_helper(circuit, prover_input, verifier_input)
-    }
-
-    #[test]
-    // Test that a 2 in 2 out shuffle circuit behaves as expected
-    fn shuffle_circuit() {
-        let three = Scalar::from(3u64);
-        let seven = Scalar::from(7u64);
-        assert!(shuffle_circuit_helper(three, seven, three, seven).is_ok());
-        assert!(shuffle_circuit_helper(three, seven, seven, three).is_ok());
-        assert!(shuffle_circuit_helper(three, seven, seven, seven).is_err());
-        assert!(shuffle_circuit_helper(three, Scalar::one(), seven, three).is_err());
-    }
-
-    // Creates a 2 in 2 out merge circuit.
-    // (Is equivalent to a split circuit if you switch inputs and outputs.)
-    // Either the assets are unaltered: ￥30 + $42 = ￥30 + $42
-    // Or the assets are merged. This is allowed when:
-    // the types are the same, the asset values are merged into out_1, and out_0 is zero: $30 + $42 = $0 + $72
-    fn merge_circuit_helper(
-        type_0: Scalar,
-        type_1: Scalar,
-        val_in_0: Scalar,
-        val_in_1: Scalar,
-        val_out_0: Scalar,
-        val_out_1: Scalar,
-    ) -> Result<(), &'static str> {
-        let mut rng = OsRng::new().unwrap();
-        let pedersen_gens = PedersenGenerators::default();
-        let mut cs = ConstraintSystem::new();
-        let c = Scalar::random(&mut rng);
-
-        let t_0 = cs.alloc_variable(type_0);
-        let t_1 = cs.alloc_variable(type_1);
-        let in_0 = cs.alloc_variable(val_in_0);
-        let in_1 = cs.alloc_variable(val_in_1);
-        let out_0 = cs.alloc_variable(val_out_0);
-        let out_1 = cs.alloc_variable(val_out_1);
-
-        // lc_a: in_0 * (-1) + in_1 * (-c) + out_0 + out_1 * (c)
-        let lc_a = LinearCombination::new(
-            vec![
-                (in_0.clone(), -Scalar::one()),
-                (in_1.clone(), -c),
-                (out_0.clone(), Scalar::one()),
-                (out_1.clone(), c),
-            ],
-            Scalar::zero(),
-        );
-        // lc_b: in_0 + in_1 + out_1 * (-1) + out_0 * (c) + t_0 * (-c*c) + t_1 * (c*c)
-        let lc_b = LinearCombination::new(
-            vec![
-                (in_0, Scalar::one()),
-                (in_1, Scalar::one()),
-                (out_1, -Scalar::one()),
-                (out_0, c),
-                (t_0, -c * c),
-                (t_1, c * c),
-            ],
-            Scalar::zero(),
-        );
-        let lc_c = LinearCombination::new(vec![], Scalar::zero());
-
-        assert!(cs.constrain(lc_a, lc_b, lc_c).is_ok());
-
-        let (circuit, prover_input, verifier_input) =
-            cs.create_proof_input(&pedersen_gens, &mut rng);
-        create_and_verify_helper(circuit, prover_input, verifier_input)
-    }
-
-    #[test]
-    fn merge_circuit() {
-        let buck = Scalar::from(32u64);
-        let yuan = Scalar::from(86u64);
-        let a = Scalar::from(24u64);
-        let b = Scalar::from(76u64);
-        let a_plus_b = Scalar::from(100u64);
-        let zero = Scalar::zero();
-
-        assert!(merge_circuit_helper(buck, buck, a, a, a, a).is_ok());
-        assert!(merge_circuit_helper(buck, buck, a, b, zero, a_plus_b).is_ok());
-        assert!(merge_circuit_helper(buck, yuan, a, b, a, b).is_ok());
-        assert!(merge_circuit_helper(buck, buck, a, b, a, a_plus_b).is_err());
-        assert!(merge_circuit_helper(buck, yuan, a, b, zero, a_plus_b).is_err());
-        assert!(merge_circuit_helper(buck, buck, a, b, zero, zero).is_err());
+    fn mixed_circuit() {
+        mixed_circuit_helper(3, 4, 6, 1, 40, 9, Ok(())); // (3 + 4) * (6 + 1) = (40 + 9)
+        mixed_circuit_helper(3, 4, 6, 1, 40, 10, Err(())); // (3 + 4) * (6 + 1) != (40 + 10)
     }
 }

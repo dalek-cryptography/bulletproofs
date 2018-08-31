@@ -33,7 +33,8 @@ mod util;
 
 #[doc(include = "../docs/notes.md")]
 mod notes {}
-mod circuit_proof;
+// XXX re-export selectively -- this suppresses dead code errors
+pub mod circuit_proof;
 mod errors;
 mod generators;
 mod inner_product_proof;

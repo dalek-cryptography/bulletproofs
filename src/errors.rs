@@ -88,3 +88,23 @@ pub enum MPCError {
         bad_shares: Vec<usize>,
     },
 }
+
+/// Represents an error during the proving or verifying of a constraint system.
+#[derive(Fail, Clone, Debug, Eq, PartialEq)]
+pub enum R1CSError {
+    // TODO: make better errors
+    #[fail(display = "Invalid R1CS construction.")]
+    InvalidR1CSConstruction,
+    // When trying to access a variable that has an Err as its value assignment
+    #[fail(display = "Variable does not have a value assignment.")]
+    MissingAssignment,
+    // CircuitProof did not verify correctly for this R1CS instance
+    #[fail(display = "Circuit did not verify correctly.")]
+    VerificationError,
+    // Invalid proof point when decompressing
+    #[fail(display = "Invalid proof point when decompressing.")]
+    InvalidProofPoint,
+    // Incorrect input sizes (generator length, V length)
+    #[fail(display = "Incorrect input size.")]
+    IncorrectInputSize,
+}
