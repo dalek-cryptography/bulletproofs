@@ -252,8 +252,10 @@ mod tests {
     use super::super::circuit::CircuitProof;
     use super::*;
     use generators::Generators;
-    use proof_transcript::ProofTranscript;
     use rand::rngs::OsRng;
+
+    use merlin::Transcript;
+    use transcript::TranscriptProtocol;
 
     fn create_and_verify_helper(
         prover_cs: ConstraintSystem,
@@ -269,7 +271,7 @@ mod tests {
         assert!(prover_input.is_ok());
         assert!(verifier_input.is_ok());
 
-        let mut prover_transcript = ProofTranscript::new(b"CircuitProofTest");
+        let mut prover_transcript = Transcript::new(b"CircuitProofTest");
         let circuit_proof = CircuitProof::prove(
             &generators,
             &mut prover_transcript,
@@ -282,7 +284,7 @@ mod tests {
 
         assert_eq!(prover_circuit, verifier_circuit);
 
-        let mut verifier_transcript = ProofTranscript::new(b"CircuitProofTest");
+        let mut verifier_transcript = Transcript::new(b"CircuitProofTest");
         let actual_result = circuit_proof.unwrap().verify(
             &generators,
             &mut verifier_transcript,
