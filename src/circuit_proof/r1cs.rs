@@ -195,8 +195,10 @@ mod tests {
     use super::super::circuit::CircuitProof;
     use super::*;
     use generators::Generators;
-    use proof_transcript::ProofTranscript;
     use rand::rngs::OsRng;
+
+    use merlin::Transcript;
+    use transcript::TranscriptProtocol;
 
     fn create_and_verify_helper(
         circuit: Circuit,
@@ -204,18 +206,18 @@ mod tests {
         verifier_input: VerifierInput,
     ) -> Result<(), &'static str> {
         let generators = Generators::new(PedersenGenerators::default(), circuit.n, 1);
-        let mut proof_transcript = ProofTranscript::new(b"CircuitProofTest");
+        let mut prover_transcript = Transcript::new(b"CircuitProofTest");
         let mut rng = OsRng::new().unwrap();
 
         let circuit_proof = CircuitProof::prove(
             &generators,
-            &mut proof_transcript,
+            &mut prover_transcript,
             &mut rng,
             &circuit.clone(),
             &prover_input,
         ).unwrap();
 
-        let mut verify_transcript = ProofTranscript::new(b"CircuitProofTest");
+        let mut verify_transcript = Transcript::new(b"CircuitProofTest");
 
         circuit_proof.verify(
             &generators,

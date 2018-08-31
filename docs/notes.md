@@ -383,8 +383,8 @@ to \\({\mathbf{a}}\_{L}\\), \\({\mathbf{a}}\_{R}\\), \\({\mathbf{s}}\_{L}\\), an
 we need commitments to \\({\mathbf{y}}^{n} \circ {\mathbf{a}}\_{R}\\) and
 \\({\mathbf{y}}^{n} \circ {\mathbf{s}}\_{R}\\). However, since the prover
 must form commitments before receiving the verifier’s challenge \\(y\\), the
-prover can only commit to \\({\mathbf{a}}\_{R}\\) and \\({\mathbf{s}}\_{R}\\). Since the prover’s
-commitments are to \\({\mathbf{a}}\_{R}\\) and \\({\mathbf{s}}\_{R}\\), the verifier needs to transmute
+prover can only commit to \\(a\_{R}\\) and \\(s\_{R}\\). Since the prover’s
+commitments are to \\(a\_{R}\\) and \\(s\_{R}\\), the verifier needs to transmute
 the prover’s commitment
 \\(
 \operatorname{Com}({\mathbf{a}}\_{L},{\mathbf{a}}\_{R}, {\widetilde{a}})
@@ -522,7 +522,7 @@ check the final equality directly.
 
 If the prover can demonstrate that the above \\(P'\\) has such structure
 over generators \\({\mathbf{G}}\\), \\({\mathbf{H}}\\) and \\(Q\\) for all
-\\(w \in {\mathbb Z\_{p}^{\*}}\\), then the original \\(P\\) and \\(c\\) must satisfy
+\\(w \in {\mathbb Z\_{p}^{*}}\\), then the original \\(P\\) and \\(c\\) must satisfy
 the original relation
 \\((P = {\langle {\mathbf{a}}, {\mathbf{G}} \rangle} + {\langle {\mathbf{b}}, {\mathbf{H}} \rangle}
 \wedge c = {\langle {\mathbf{a}}, {\mathbf{b}} \rangle})\\).
@@ -617,7 +617,7 @@ The Bulletproofs paper outlines two versions of multi-party computation aggregat
 
 For more information on how the aggregation protocol works and is implemented, see the [protocol notes](../range_proof/index.html). 
 
-The aggregated range proof has the same form as the individual range proof, in that the provers (the parties) still perform the same calculations to prove that \\(t(x) = \langle \mathbf{l}(x), \mathbf{r}(x) \rangle \\) and that \\(t_0, \mathbf{l}(x), \mathbf{r}(x)\\) are correct. The difference is that the challenge values are obtained from the dealer, which generates them by combining commitments from all the parties, and that the calculations of different parties are seperated by different powers of the challenge scalars \\(y\\) and \\(z\\).
+The aggregated range proof has the same form as the individual range proof, in that the provers (the parties) still perform the same calculations to prove that \\(t(x) = \langle \mathbf{l}(x), \mathbf{r}(x) \rangle \\) and that \\(t_0, \mathbf{l}(x), \mathbf{r}(x)\\) are correct. The difference is that the challenge values are obtained from the dealer, which generates them by combining commitments from all the parties, and that the calculations of different parties are separated by different powers of the challenge scalars \\(y\\) and \\(z\\).
 
 We will explain how one piece of the aggregated proof is generated for party \\(j\\), and then will show how all of the pieces for all of the \\(m\\) parties can be combined into one aggregated proof.
 
