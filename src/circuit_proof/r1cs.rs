@@ -438,9 +438,18 @@ mod tests {
         );
         let (aL_1, _, _) = prover_cs.assign_multiplier(Ok(Scalar::from(c)), Ok(zer), Ok(zer));
         // Tie high-level and low-level variables together
-        prover_cs.add_constraint(LinearCombination::new(vec![(aL_0.clone(), -one), (v_a, one)], zer));
-        prover_cs.add_constraint(LinearCombination::new(vec![(aR_0.clone(), -one), (v_b, one)], zer));
-        prover_cs.add_constraint(LinearCombination::new(vec![(aL_1.clone(), -one), (v_c, one)], zer));
+        prover_cs.add_constraint(LinearCombination::new(
+            vec![(aL_0.clone(), -one), (v_a, one)],
+            zer,
+        ));
+        prover_cs.add_constraint(LinearCombination::new(
+            vec![(aR_0.clone(), -one), (v_b, one)],
+            zer,
+        ));
+        prover_cs.add_constraint(LinearCombination::new(
+            vec![(aL_1.clone(), -one), (v_c, one)],
+            zer,
+        ));
         // Addition logic (using low-level variables)
         prover_cs.add_constraint(LinearCombination::new(
             vec![(aL_0, one), (aR_0, one), (aL_1, -one)],
@@ -458,9 +467,18 @@ mod tests {
         let (aL_1, _, _) =
             verifier_cs.assign_multiplier(err_assignment(), err_assignment(), err_assignment());
         // Tie high-level and low-level variables together
-        verifier_cs.add_constraint(LinearCombination::new(vec![(aL_0.clone(), -one), (v_a, one)], zer));
-        verifier_cs.add_constraint(LinearCombination::new(vec![(aR_0.clone(), -one), (v_b, one)], zer));
-        verifier_cs.add_constraint(LinearCombination::new(vec![(aL_1.clone(), -one), (v_c, one)], zer));
+        verifier_cs.add_constraint(LinearCombination::new(
+            vec![(aL_0.clone(), -one), (v_a, one)],
+            zer,
+        ));
+        verifier_cs.add_constraint(LinearCombination::new(
+            vec![(aR_0.clone(), -one), (v_b, one)],
+            zer,
+        ));
+        verifier_cs.add_constraint(LinearCombination::new(
+            vec![(aL_1.clone(), -one), (v_c, one)],
+            zer,
+        ));
         // Addition logic (using low-level variables)
         verifier_cs.add_constraint(LinearCombination::new(
             vec![(aL_0, one), (aR_0, one), (aL_1, -one)],
