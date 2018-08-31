@@ -107,14 +107,6 @@ impl ConstraintSystem {
         Variable::Committed(self.v_assignments.len() - 1)
     }
 
-    pub fn multipliers_count(&self) -> usize {
-        let n = self.aL_assignments.len();
-        if n == 0 || n.is_power_of_two() {
-            return n;
-        }
-        return n.next_power_of_two();
-    }
-
     pub fn commitments_count(&self) -> usize {
         self.v_assignments.len()
     }
@@ -169,7 +161,7 @@ impl ConstraintSystem {
     }
 
     fn create_circuit(&self) -> Circuit {
-        let n = self.multipliers_count();
+        let n = self.aL_assignments.len();
         let m = self.v_assignments.len();
         let q = self.constraints.len();
 
@@ -242,13 +234,13 @@ mod tests {
     ) -> Result<(), R1CSError> {
         let mut rng = OsRng::new().unwrap();
         let pedersen_gens = PedersenGenerators::default();
-        let generators = Generators::new(pedersen_gens, prover_cs.multipliers_count(), 1);
 
         let (prover_circuit, prover_input, verifier_input) =
             prover_cs.create_proof_input(&pedersen_gens, &mut rng);
         assert!(prover_input.is_ok());
         assert!(verifier_input.is_ok());
 
+        let generators = Generators::new(pedersen_gens, prover_circuit.n, 1);
         let mut prover_transcript = Transcript::new(b"CircuitProofTest");
         let circuit_proof = CircuitProof::prove(
             &generators,
@@ -344,8 +336,7 @@ mod tests {
         ));
 
         let mut verifier_cs = ConstraintSystem::new();
-        let (aL, aR, aO) =
-            verifier_cs.assign_multiplier(missing(), missing(), missing());
+        let (aL, aR, aO) = verifier_cs.assign_multiplier(missing(), missing(), missing());
         let v_a = verifier_cs.assign_committed_variable(missing());
         let v_b = verifier_cs.assign_committed_variable(missing());
         let v_c = verifier_cs.assign_committed_variable(missing());
@@ -461,10 +452,8 @@ mod tests {
         let v_b = verifier_cs.assign_committed_variable(missing());
         let v_c = verifier_cs.assign_committed_variable(missing());
         // Make low-level variables (aL_0 = v_a, aR_0 = v_b, aL_1 = v_c)
-        let (aL_0, aR_0, _) =
-            verifier_cs.assign_multiplier(missing(), missing(), missing());
-        let (aL_1, _, _) =
-            verifier_cs.assign_multiplier(missing(), missing(), missing());
+        let (aL_0, aR_0, _) = verifier_cs.assign_multiplier(missing(), missing(), missing());
+        let (aL_1, _, _) = verifier_cs.assign_multiplier(missing(), missing(), missing());
         // Tie high-level and low-level variables together
         verifier_cs.add_constraint(LinearCombination::new(
             vec![(aL_0.clone(), -one), (v_a, one)],
