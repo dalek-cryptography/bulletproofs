@@ -11,7 +11,7 @@ use generators::PedersenGenerators;
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub enum VariableType {
-    v, // high-level variable
+    v,  // high-level variable
     aL, // low-level variable, left input of multiplication gate
     aR, // low-level variable, right input of multiplication gate
     aO, // low-level variable, output multiplication gate
@@ -325,7 +325,9 @@ mod tests {
     }
 
     // (a * a_coeff) * (b * b_coeff) =? c * c_coeff
-    // Where a, b, c are committed as v_a, v_b, v_c
+    // Where we define a, b, c as low-level variables (aL and aR variables) then then
+    // tie those to high-level variables (v variables). The purpose of this test is to
+    // see if we can successfully tie the low-level and high-level variables together.
     fn mul_circuit_helper(
         a: u64,
         a_coeff: u64,
