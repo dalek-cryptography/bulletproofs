@@ -43,7 +43,7 @@ mod transcript;
 
 pub use merlin::Transcript;
 
-pub use errors::ProofError;
+pub use errors::{ProofError, R1CSError};
 pub use generators::{Generators, GeneratorsView, PedersenGenerators};
 pub use range_proof::RangeProof;
 

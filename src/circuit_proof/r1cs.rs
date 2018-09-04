@@ -118,6 +118,8 @@ impl ConstraintSystem {
         Variable::Committed(self.v_assignments.len() - 1)
     }
 
+    // Allocate two uncommitted variables, and assign to them the Result value passed in.
+    // Prover will pass in Ok(Scalar)s, and Verifier will pass in R1CSErrors.
     pub fn assign_uncommitted_variables(&mut self, val_1: Assignment, val_2: Assignment) -> (Variable, Variable) {
         let val_3 = mul_assignment(val_1.clone(), val_2.clone());
 
