@@ -22,12 +22,11 @@ pub enum Variable {
 // Provers create a `Scalar` assignment, while verifiers create an `R1CSError` assignment.
 pub type Assignment = Result<Scalar, R1CSError>;
 
-pub fn missing() -> Assignment {
+fn missing() -> Assignment {
     Err(R1CSError::MissingAssignment)
 }
 
-// TODO: implement the Mul trait on an Assignment struct?
-pub fn mul_assignment(lhs: Assignment, rhs: Assignment) -> Assignment {
+fn mul_assignment(lhs: Assignment, rhs: Assignment) -> Assignment {
     if lhs.is_err() || rhs.is_err() {
         return missing();
     }
@@ -452,8 +451,8 @@ mod tests {
         let v_b = prover_cs.assign_committed(Ok(Scalar::from(b)));
         let v_c = prover_cs.assign_committed(Ok(Scalar::from(c)));
         // Make low-level variables (aL_0 = v_a, aR_0 = v_b, aL_1 = v_c)
-        let (aL_0, aR_0) = prover_cs.assign_uncommitteds(Ok(Scalar::from(a)), Ok(Scalar::from(b)));
-        let (aL_1, _) = prover_cs.assign_uncommitteds(Ok(Scalar::from(c)), Ok(zer));
+        let (aL_0, aR_0) = prover_cs.assign_uncommitted(Ok(Scalar::from(a)), Ok(Scalar::from(b)));
+        let (aL_1, _) = prover_cs.assign_uncommitted(Ok(Scalar::from(c)), Ok(zer));
         // Tie high-level and low-level variables together
         prover_cs.add_constraint(LinearCombination::new(
             vec![(aL_0.clone(), -one), (v_a, one)],
@@ -479,8 +478,8 @@ mod tests {
         let v_b = verifier_cs.assign_committed(missing());
         let v_c = verifier_cs.assign_committed(missing());
         // Make low-level variables (aL_0 = v_a, aR_0 = v_b, aL_1 = v_c)
-        let (aL_0, aR_0) = verifier_cs.assign_uncommitteds(missing(), missing());
-        let (aL_1, _) = verifier_cs.assign_uncommitteds(missing(), missing());
+        let (aL_0, aR_0) = verifier_cs.assign_uncommitted(missing(), missing());
+        let (aL_1, _) = verifier_cs.assign_uncommitted(missing(), missing());
         // Tie high-level and low-level variables together
         verifier_cs.add_constraint(LinearCombination::new(
             vec![(aL_0.clone(), -one), (v_a, one)],
