@@ -3,12 +3,14 @@
 
 use rand::{CryptoRng, Rng};
 
+use curve25519_dalek::ristretto::RistrettoPoint;
 use super::circuit::{Circuit, CircuitProof, ProverInput, VerifierInput};
 use curve25519_dalek::scalar::Scalar;
 use errors::R1CSError;
 use generators::{Generators, PedersenGenerators};
 use merlin::Transcript;
 
+/// The variables used in the `LinearCombination` and `ConstraintSystem` structs.
 #[derive(Clone, Debug)]
 pub enum Variable {
     Committed(usize),        // high-level variable
@@ -17,6 +19,8 @@ pub enum Variable {
     MultiplierOutput(usize), // low-level variable, output multiplication gate
 }
 
+// The assignment value to a variable, as stored in `ConstraintSystem`.
+// Provers create a `Scalar` assignment, while verifiers create an `R1CSError` assignment.
 pub type Assignment = Result<Scalar, R1CSError>;
 
 pub fn missing() -> Assignment {
