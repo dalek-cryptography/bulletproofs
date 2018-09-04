@@ -113,14 +113,18 @@ impl ConstraintSystem {
 
     // Allocate a committed variable, and assign it the Result value passed in.
     // Prover will pass in Ok(Scalar), and Verifier will pass in R1CSError.
-    pub fn assign_committed_variable(&mut self, value: Assignment) -> Variable {
+    pub fn assign_committed(&mut self, value: Assignment) -> Variable {
         self.v_assignments.push(value);
         Variable::Committed(self.v_assignments.len() - 1)
     }
 
     // Allocate two uncommitted variables, and assign to them the Result value passed in.
     // Prover will pass in Ok(Scalar)s, and Verifier will pass in R1CSErrors.
-    pub fn assign_uncommitted_variables(&mut self, val_1: Assignment, val_2: Assignment) -> (Variable, Variable) {
+    pub fn assign_uncommitted(
+        &mut self,
+        val_1: Assignment,
+        val_2: Assignment,
+    ) -> (Variable, Variable) {
         let val_3 = mul_assignment(val_1.clone(), val_2.clone());
 
         let (left, right, _) = self.assign_multiplier(val_1, val_2, val_3);
@@ -345,9 +349,9 @@ mod tests {
             Ok(Scalar::from(b) * Scalar::from(b_coeff)),
             Ok(Scalar::from(c) * Scalar::from(c_coeff)),
         );
-        let v_a = prover_cs.assign_committed_variable(Ok(Scalar::from(a)));
-        let v_b = prover_cs.assign_committed_variable(Ok(Scalar::from(b)));
-        let v_c = prover_cs.assign_committed_variable(Ok(Scalar::from(c)));
+        let v_a = prover_cs.assign_committed(Ok(Scalar::from(a)));
+        let v_b = prover_cs.assign_committed(Ok(Scalar::from(b)));
+        let v_c = prover_cs.assign_committed(Ok(Scalar::from(c)));
 
         prover_cs.add_constraint(LinearCombination::new(
             vec![(aL, -one), (v_a, Scalar::from(a_coeff))],
@@ -364,9 +368,9 @@ mod tests {
 
         let mut verifier_cs = ConstraintSystem::new();
         let (aL, aR, aO) = verifier_cs.assign_multiplier(missing(), missing(), missing());
-        let v_a = verifier_cs.assign_committed_variable(missing());
-        let v_b = verifier_cs.assign_committed_variable(missing());
-        let v_c = verifier_cs.assign_committed_variable(missing());
+        let v_a = verifier_cs.assign_committed(missing());
+        let v_b = verifier_cs.assign_committed(missing());
+        let v_c = verifier_cs.assign_committed(missing());
 
         verifier_cs.add_constraint(LinearCombination::new(
             vec![(aL, -one), (v_a, Scalar::from(a_coeff))],
@@ -407,18 +411,18 @@ mod tests {
         let zer = Scalar::zero();
 
         let mut prover_cs = ConstraintSystem::new();
-        let v_a = prover_cs.assign_committed_variable(Ok(Scalar::from(a)));
-        let v_b = prover_cs.assign_committed_variable(Ok(Scalar::from(b)));
-        let v_c = prover_cs.assign_committed_variable(Ok(Scalar::from(c)));
+        let v_a = prover_cs.assign_committed(Ok(Scalar::from(a)));
+        let v_b = prover_cs.assign_committed(Ok(Scalar::from(b)));
+        let v_c = prover_cs.assign_committed(Ok(Scalar::from(c)));
         prover_cs.add_constraint(LinearCombination::new(
             vec![(v_a, one), (v_b, one), (v_c, -one)],
             zer,
         ));
 
         let mut verifier_cs = ConstraintSystem::new();
-        let v_a = verifier_cs.assign_committed_variable(missing());
-        let v_b = verifier_cs.assign_committed_variable(missing());
-        let v_c = verifier_cs.assign_committed_variable(missing());
+        let v_a = verifier_cs.assign_committed(missing());
+        let v_b = verifier_cs.assign_committed(missing());
+        let v_c = verifier_cs.assign_committed(missing());
         verifier_cs.add_constraint(LinearCombination::new(
             vec![(v_a, one), (v_b, one), (v_c, -one)],
             zer,
@@ -444,15 +448,12 @@ mod tests {
 
         let mut prover_cs = ConstraintSystem::new();
         // Make high-level variables
-        let v_a = prover_cs.assign_committed_variable(Ok(Scalar::from(a)));
-        let v_b = prover_cs.assign_committed_variable(Ok(Scalar::from(b)));
-        let v_c = prover_cs.assign_committed_variable(Ok(Scalar::from(c)));
+        let v_a = prover_cs.assign_committed(Ok(Scalar::from(a)));
+        let v_b = prover_cs.assign_committed(Ok(Scalar::from(b)));
+        let v_c = prover_cs.assign_committed(Ok(Scalar::from(c)));
         // Make low-level variables (aL_0 = v_a, aR_0 = v_b, aL_1 = v_c)
-        let (aL_0, aR_0) = prover_cs.assign_uncommitted_variables(
-            Ok(Scalar::from(a)),
-            Ok(Scalar::from(b)),
-        );
-        let (aL_1, _) = prover_cs.assign_uncommitted_variables(Ok(Scalar::from(c)), Ok(zer));
+        let (aL_0, aR_0) = prover_cs.assign_uncommitteds(Ok(Scalar::from(a)), Ok(Scalar::from(b)));
+        let (aL_1, _) = prover_cs.assign_uncommitteds(Ok(Scalar::from(c)), Ok(zer));
         // Tie high-level and low-level variables together
         prover_cs.add_constraint(LinearCombination::new(
             vec![(aL_0.clone(), -one), (v_a, one)],
@@ -474,12 +475,12 @@ mod tests {
 
         let mut verifier_cs = ConstraintSystem::new();
         // Make high-level variables
-        let v_a = verifier_cs.assign_committed_variable(missing());
-        let v_b = verifier_cs.assign_committed_variable(missing());
-        let v_c = verifier_cs.assign_committed_variable(missing());
+        let v_a = verifier_cs.assign_committed(missing());
+        let v_b = verifier_cs.assign_committed(missing());
+        let v_c = verifier_cs.assign_committed(missing());
         // Make low-level variables (aL_0 = v_a, aR_0 = v_b, aL_1 = v_c)
-        let (aL_0, aR_0) = verifier_cs.assign_uncommitted_variables(missing(), missing());
-        let (aL_1, _) = verifier_cs.assign_uncommitted_variables(missing(), missing());
+        let (aL_0, aR_0) = verifier_cs.assign_uncommitteds(missing(), missing());
+        let (aL_1, _) = verifier_cs.assign_uncommitteds(missing(), missing());
         // Tie high-level and low-level variables together
         verifier_cs.add_constraint(LinearCombination::new(
             vec![(aL_0.clone(), -one), (v_a, one)],
@@ -524,12 +525,12 @@ mod tests {
 
         let mut prover_cs = ConstraintSystem::new();
         // Make high-level variables
-        let v_a1 = prover_cs.assign_committed_variable(Ok(Scalar::from(a1)));
-        let v_a2 = prover_cs.assign_committed_variable(Ok(Scalar::from(a2)));
-        let v_b1 = prover_cs.assign_committed_variable(Ok(Scalar::from(b1)));
-        let v_b2 = prover_cs.assign_committed_variable(Ok(Scalar::from(b2)));
-        let v_c1 = prover_cs.assign_committed_variable(Ok(Scalar::from(c1)));
-        let v_c2 = prover_cs.assign_committed_variable(Ok(Scalar::from(c2)));
+        let v_a1 = prover_cs.assign_committed(Ok(Scalar::from(a1)));
+        let v_a2 = prover_cs.assign_committed(Ok(Scalar::from(a2)));
+        let v_b1 = prover_cs.assign_committed(Ok(Scalar::from(b1)));
+        let v_b2 = prover_cs.assign_committed(Ok(Scalar::from(b2)));
+        let v_c1 = prover_cs.assign_committed(Ok(Scalar::from(c1)));
+        let v_c2 = prover_cs.assign_committed(Ok(Scalar::from(c2)));
         // Make low-level variables (aL = v_a1 + v_a2, aR = v_b1 + v_b2, aO = v_c1 + v_c2)
         let (aL, aR, aO) = prover_cs.assign_multiplier(
             Ok(Scalar::from(a1 + a2)),
@@ -552,12 +553,12 @@ mod tests {
 
         let mut verifier_cs = ConstraintSystem::new();
         // Make high-level variables
-        let v_a1 = verifier_cs.assign_committed_variable(Ok(Scalar::from(a1)));
-        let v_a2 = verifier_cs.assign_committed_variable(Ok(Scalar::from(a2)));
-        let v_b1 = verifier_cs.assign_committed_variable(Ok(Scalar::from(b1)));
-        let v_b2 = verifier_cs.assign_committed_variable(Ok(Scalar::from(b2)));
-        let v_c1 = verifier_cs.assign_committed_variable(Ok(Scalar::from(c1)));
-        let v_c2 = verifier_cs.assign_committed_variable(Ok(Scalar::from(c2)));
+        let v_a1 = verifier_cs.assign_committed(Ok(Scalar::from(a1)));
+        let v_a2 = verifier_cs.assign_committed(Ok(Scalar::from(a2)));
+        let v_b1 = verifier_cs.assign_committed(Ok(Scalar::from(b1)));
+        let v_b2 = verifier_cs.assign_committed(Ok(Scalar::from(b2)));
+        let v_c1 = verifier_cs.assign_committed(Ok(Scalar::from(c1)));
+        let v_c2 = verifier_cs.assign_committed(Ok(Scalar::from(c2)));
         // Make low-level variables (aL = v_a1 + v_a2, aR = v_b1 + v_b2, aO = v_c1 + v_c2)
         let (aL, aR, aO) = verifier_cs.assign_multiplier(
             Ok(Scalar::from(a1 + a2)),
