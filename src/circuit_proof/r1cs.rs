@@ -4,7 +4,6 @@
 use rand::{CryptoRng, Rng};
 
 use super::circuit::{Circuit, CircuitProof, ProverInput, VerifierInput};
-use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
 use errors::R1CSError;
 use generators::{Generators, PedersenGenerators};
@@ -25,6 +24,14 @@ pub type Assignment = Result<Scalar, R1CSError>;
 
 pub fn missing() -> Assignment {
     Err(R1CSError::MissingAssignment)
+}
+
+// TODO: implement the Mul trait on an Assignment struct?
+pub fn mul_assignment(lhs: Assignment, rhs: Assignment) -> Assignment {
+    if lhs.is_err() || rhs.is_err() {
+        return missing();
+    }
+    Ok(lhs.unwrap() * rhs.unwrap())
 }
 
 /// Represents a linear combination of some variables multiplied with their scalar coefficients,
@@ -109,6 +116,13 @@ impl ConstraintSystem {
     pub fn assign_committed_variable(&mut self, value: Assignment) -> Variable {
         self.v_assignments.push(value);
         Variable::Committed(self.v_assignments.len() - 1)
+    }
+
+    pub fn assign_uncommitted_variables(&mut self, val_1: Assignment, val_2: Assignment) -> (Variable, Variable) {
+        let val_3 = mul_assignment(val_1.clone(), val_2.clone());
+
+        let (left, right, _) = self.assign_multiplier(val_1, val_2, val_3);
+        (left, right)
     }
 
     pub fn commitments_count(&self) -> usize {
@@ -243,12 +257,8 @@ impl ConstraintSystem {
 
 #[cfg(test)]
 mod tests {
-    use super::super::circuit::CircuitProof;
     use super::*;
-    use generators::Generators;
     use rand::rngs::OsRng;
-
-    use merlin::Transcript;
 
     fn create_and_verify_helper(
         prover_cs: ConstraintSystem,
@@ -436,12 +446,11 @@ mod tests {
         let v_b = prover_cs.assign_committed_variable(Ok(Scalar::from(b)));
         let v_c = prover_cs.assign_committed_variable(Ok(Scalar::from(c)));
         // Make low-level variables (aL_0 = v_a, aR_0 = v_b, aL_1 = v_c)
-        let (aL_0, aR_0, _) = prover_cs.assign_multiplier(
+        let (aL_0, aR_0) = prover_cs.assign_uncommitted_variables(
             Ok(Scalar::from(a)),
             Ok(Scalar::from(b)),
-            Ok(Scalar::from(a * b)),
         );
-        let (aL_1, _, _) = prover_cs.assign_multiplier(Ok(Scalar::from(c)), Ok(zer), Ok(zer));
+        let (aL_1, _) = prover_cs.assign_uncommitted_variables(Ok(Scalar::from(c)), Ok(zer));
         // Tie high-level and low-level variables together
         prover_cs.add_constraint(LinearCombination::new(
             vec![(aL_0.clone(), -one), (v_a, one)],
@@ -467,8 +476,8 @@ mod tests {
         let v_b = verifier_cs.assign_committed_variable(missing());
         let v_c = verifier_cs.assign_committed_variable(missing());
         // Make low-level variables (aL_0 = v_a, aR_0 = v_b, aL_1 = v_c)
-        let (aL_0, aR_0, _) = verifier_cs.assign_multiplier(missing(), missing(), missing());
-        let (aL_1, _, _) = verifier_cs.assign_multiplier(missing(), missing(), missing());
+        let (aL_0, aR_0) = verifier_cs.assign_uncommitted_variables(missing(), missing());
+        let (aL_1, _) = verifier_cs.assign_uncommitted_variables(missing(), missing());
         // Tie high-level and low-level variables together
         verifier_cs.add_constraint(LinearCombination::new(
             vec![(aL_0.clone(), -one), (v_a, one)],
