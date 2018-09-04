@@ -3,8 +3,8 @@
 
 use rand::{CryptoRng, Rng};
 
-use curve25519_dalek::ristretto::RistrettoPoint;
 use super::circuit::{Circuit, CircuitProof, ProverInput, VerifierInput};
+use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
 use errors::R1CSError;
 use generators::{Generators, PedersenGenerators};
@@ -227,6 +227,7 @@ impl ConstraintSystem {
         Ok((circuit_proof, verifier_input))
     }
 
+    // This function can only be called once per ConstraintSystem instance.
     pub fn verify<R: Rng + CryptoRng>(
         mut self,
         proof: &CircuitProof,
