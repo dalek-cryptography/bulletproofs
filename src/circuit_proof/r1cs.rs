@@ -358,7 +358,11 @@ mod tests {
         );
 
         let mut verifier_cs = ConstraintSystem::new();
-        verifier_cs.assign_multiplier(Assignment::Missing(), Assignment::Missing(), Assignment::Missing());
+        verifier_cs.assign_multiplier(
+            Assignment::Missing(),
+            Assignment::Missing(),
+            Assignment::Missing(),
+        );
 
         assert!(create_and_verify_helper(prover_cs, verifier_cs, expected_result).is_ok());
     }
@@ -409,7 +413,11 @@ mod tests {
         ));
 
         let mut verifier_cs = ConstraintSystem::new();
-        let (aL, aR, aO) = verifier_cs.assign_multiplier(Assignment::Missing(), Assignment::Missing(), Assignment::Missing());
+        let (aL, aR, aO) = verifier_cs.assign_multiplier(
+            Assignment::Missing(),
+            Assignment::Missing(),
+            Assignment::Missing(),
+        );
         let v_a = verifier_cs.assign_committed(Assignment::Missing());
         let v_b = verifier_cs.assign_committed(Assignment::Missing());
         let v_c = verifier_cs.assign_committed(Assignment::Missing());
@@ -494,7 +502,8 @@ mod tests {
         let v_b = prover_cs.assign_committed(Assignment::from_u64(b));
         let v_c = prover_cs.assign_committed(Assignment::from_u64(c));
         // Make low-level variables (aL_0 = v_a, aR_0 = v_b, aL_1 = v_c)
-        let (aL_0, aR_0) = prover_cs.assign_uncommitted(Assignment::from_u64(a), Assignment::from_u64(b));
+        let (aL_0, aR_0) =
+            prover_cs.assign_uncommitted(Assignment::from_u64(a), Assignment::from_u64(b));
         let (aL_1, _) = prover_cs.assign_uncommitted(Assignment::from_u64(c), Assignment::zero());
         // Tie high-level and low-level variables together
         prover_cs.add_constraint(LinearCombination::new(
@@ -521,8 +530,10 @@ mod tests {
         let v_b = verifier_cs.assign_committed(Assignment::Missing());
         let v_c = verifier_cs.assign_committed(Assignment::Missing());
         // Make low-level variables (aL_0 = v_a, aR_0 = v_b, aL_1 = v_c)
-        let (aL_0, aR_0) = verifier_cs.assign_uncommitted(Assignment::Missing(), Assignment::Missing());
-        let (aL_1, _) = verifier_cs.assign_uncommitted(Assignment::Missing(), Assignment::Missing());
+        let (aL_0, aR_0) =
+            verifier_cs.assign_uncommitted(Assignment::Missing(), Assignment::Missing());
+        let (aL_1, _) =
+            verifier_cs.assign_uncommitted(Assignment::Missing(), Assignment::Missing());
         // Tie high-level and low-level variables together
         verifier_cs.add_constraint(LinearCombination::new(
             vec![(aL_0.clone(), -one), (v_a, one)],
