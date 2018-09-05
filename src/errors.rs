@@ -90,7 +90,7 @@ pub enum MPCError {
 }
 
 /// Represents an error during the proving or verifying of a constraint system.
-#[derive(Fail, Clone, Debug, Eq, PartialEq)]
+#[derive(Fail, Copy, Clone, Debug, Eq, PartialEq)]
 pub enum R1CSError {
     // TODO: make better errors
     #[fail(display = "Invalid R1CS construction.")]
