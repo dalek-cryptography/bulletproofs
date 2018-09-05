@@ -8,7 +8,7 @@ use curve25519_dalek::scalar::Scalar;
 use errors::R1CSError;
 use generators::{Generators, PedersenGenerators};
 use merlin::Transcript;
-use std::ops::{Add, Sub, Mul, Div, Try};
+use std::ops::{Add, Div, Mul, Sub, Try};
 
 /// The variables used in the `LinearCombination` and `ConstraintSystem` structs.
 #[derive(Clone, Debug)]
@@ -79,12 +79,13 @@ impl Div for Assignment {
 
     fn div(self, rhs: Self) -> Self {
         match (self, rhs) {
-            (Assignment::Value(left), Assignment::Value(right)) => Assignment::Value(left * right.invert()),
+            (Assignment::Value(left), Assignment::Value(right)) => {
+                Assignment::Value(left * right.invert())
+            }
             (_, _) => Assignment::Missing(),
         }
     }
 }
-
 
 impl Try for Assignment {
     type Ok = Scalar;
