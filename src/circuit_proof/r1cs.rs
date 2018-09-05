@@ -21,7 +21,7 @@ pub enum Variable {
 
 // The assignment value to a variable, as stored in `ConstraintSystem`.
 // Provers create a `Scalar` assignment, while verifiers create an `R1CSError` assignment.
-#[derive(Clone, Debug)]
+#[derive(Copy, Clone, Debug)]
 pub enum Assignment {
     Value(Scalar),
     Missing(),
@@ -165,7 +165,7 @@ impl ConstraintSystem {
         val_1: Assignment,
         val_2: Assignment,
     ) -> (Variable, Variable) {
-        let val_3 = val_1.clone() * val_2.clone();
+        let val_3 = val_1 * val_2;
 
         let (left, right, _) = self.assign_multiplier(val_1, val_2, val_3);
         (left, right)
