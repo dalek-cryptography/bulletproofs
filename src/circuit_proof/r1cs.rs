@@ -77,8 +77,8 @@ impl ConstraintSystem {
     }
 
     // Allocate variables for left, right, and output wires of multiplication,
-    // and assign them the Result values that are passed in.
-    // Prover will pass in Ok(Scalar)s, and Verifier will pass in R1CSErrors.
+    // and assign them the Assignments that are passed in.
+    // Prover will pass in `Value(Scalar)`s, and Verifier will pass in `Missing`s.
     pub fn assign_multiplier(
         &mut self,
         left: Assignment,
@@ -97,15 +97,15 @@ impl ConstraintSystem {
         (left_var, right_var, out_var)
     }
 
-    // Allocate a committed variable, and assign it the Result value passed in.
-    // Prover will pass in Ok(Scalar), and Verifier will pass in R1CSError.
+    // Allocate a committed variable, and assign it the Assignment passed in.
+    // Prover will pass in `Value(Scalar)`s, and Verifier will pass in `Missing`.
     pub fn assign_committed(&mut self, value: Assignment) -> Variable {
         self.v_assignments.push(value);
         Variable::Committed(self.v_assignments.len() - 1)
     }
 
-    // Allocate two uncommitted variables, and assign to them the Result value passed in.
-    // Prover will pass in Ok(Scalar)s, and Verifier will pass in R1CSErrors.
+    // Allocate two uncommitted variables, and assign them the Assignments passed in.
+    // Prover will pass in `Value(Scalar)`s, and Verifier will pass in `Missing`s.
     pub fn assign_uncommitted(
         &mut self,
         val_1: Assignment,
@@ -121,6 +121,8 @@ impl ConstraintSystem {
         self.v_assignments.len()
     }
 
+    // Returns the number of multiplications in the circuit after the circuit has been
+    // padded (such that the number of multiplications is either 0 or a power of two.)
     pub fn multiplications_count(&self) -> usize {
         let n = self.aL_assignments.len();
         if n == 0 || n.is_power_of_two() {
@@ -177,10 +179,10 @@ impl ConstraintSystem {
     }
 
     fn create_circuit(&mut self) -> Circuit {
-        // If the number of multiplications, is not 0 or a power of 2, then pad the circuit.
-        let n = self.aL_assignments.len();
-        if !(n == 0 || n.is_power_of_two()) {
-            let pad = n.next_power_of_two() - n;
+        // If the number of multiplications is not 0 or a power of 2, then pad the circuit.
+        let temp_n = self.aL_assignments.len();
+        if !(temp_n == 0 || temp_n.is_power_of_two()) {
+            let pad = temp_n.next_power_of_two() - temp_n;
             for _ in 0..pad {
                 self.assign_multiplier(Assignment::zero(), Assignment::zero(), Assignment::zero());
             }
