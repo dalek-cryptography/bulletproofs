@@ -3,7 +3,7 @@ use errors::R1CSError;
 use std::ops::{Add, Div, Mul, Sub, Try};
 
 // The assignment value to a variable, as stored in `ConstraintSystem`.
-// Provers create a `Scalar` assignment, while verifiers create an `R1CSError` assignment.
+// Provers create a `Value` assignment, while verifiers create an `Missing` assignment.
 #[derive(Copy, Clone, Debug)]
 pub enum Assignment {
     Value(Scalar),
