@@ -3,6 +3,7 @@
 #![feature(test)]
 #![feature(external_doc)]
 #![feature(try_trait)]
+#![feature(use_extern_macros)]
 #![doc(include = "../README.md")]
 #![doc(html_logo_url = "https://doc.dalek.rs/assets/dalek-logo-clear.png")]
 
