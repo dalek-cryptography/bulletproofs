@@ -5,6 +5,7 @@ use rand::{CryptoRng, Rng};
 
 use super::assignment::Assignment;
 use super::circuit::{Circuit, CircuitProof, ProverInput, VerifierInput};
+use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
 use errors::R1CSError;
 use generators::{Generators, PedersenGenerators};
@@ -173,7 +174,7 @@ impl ConstraintSystem {
             .iter()
             .zip(v_blinding)
             .map(|(v_i, v_blinding_i)| Ok(pedersen_gens.commit(v_i.clone()?, *v_blinding_i)))
-            .collect::<Result<Vec<_>, _>>()?;
+            .collect::<Result<Vec<RistrettoPoint>, R1CSError>>()?;
 
         Ok(VerifierInput::new(V))
     }
@@ -230,9 +231,7 @@ impl ConstraintSystem {
         let prover_input = self.create_prover_input(&v_blinding)?;
         let verifier_input = self.create_verifier_input(&gen.pedersen_gens, &v_blinding)?;
 
-        // TODO: use error handling instead of unwrap
-        let circuit_proof =
-            CircuitProof::prove(&gen, transcript, rng, &circuit, &prover_input).unwrap();
+        let circuit_proof = CircuitProof::prove(&gen, transcript, rng, &circuit, &prover_input)?;
 
         Ok((circuit_proof, verifier_input))
     }

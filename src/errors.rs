@@ -98,6 +98,9 @@ pub enum R1CSError {
     // When trying to access a variable that has an Err as its value assignment
     #[fail(display = "Variable does not have a value assignment.")]
     MissingAssignment,
+    // TODO: remove this when we no longer use `CircuitProof` in the `R1CS` module
+    #[fail(display = "R1CSError from string error.")]
+    FromStringError,
     // CircuitProof did not verify correctly for this R1CS instance
     #[fail(display = "Circuit did not verify correctly.")]
     VerificationError,
@@ -107,4 +110,12 @@ pub enum R1CSError {
     // Incorrect input sizes (generator length, V length)
     #[fail(display = "Incorrect input size.")]
     IncorrectInputSize,
+}
+
+// TODO: remove this when we no longer use `CircuitProof` in the `R1CS` module
+impl From<&'static str> for R1CSError {
+    fn from(e: &'static str) -> R1CSError {
+        println!("{:?}", e);
+        R1CSError::FromStringError
+    }
 }
