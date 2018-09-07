@@ -124,8 +124,7 @@ impl Generators {
                 LittleEndian::write_u32(&mut label[1..5], party_index);
 
                 GeneratorsChain::new(&label).take(n)
-            })
-            .collect();
+            }).collect();
 
         let H = (0..m)
             .flat_map(|i| {
@@ -134,8 +133,7 @@ impl Generators {
                 LittleEndian::write_u32(&mut label[1..5], party_index);
 
                 GeneratorsChain::new(&label).take(n)
-            })
-            .collect();
+            }).collect();
 
         Generators {
             pedersen_gens,

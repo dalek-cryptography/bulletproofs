@@ -291,12 +291,12 @@ impl RangeProof {
         let T_1 = CompressedRistretto(read32(&slice[2 * 32..]));
         let T_2 = CompressedRistretto(read32(&slice[3 * 32..]));
 
-        let t_x =
-            Scalar::from_canonical_bytes(read32(&slice[4 * 32..])).ok_or(ProofError::FormatError)?;
-        let t_x_blinding =
-            Scalar::from_canonical_bytes(read32(&slice[5 * 32..])).ok_or(ProofError::FormatError)?;
-        let e_blinding =
-            Scalar::from_canonical_bytes(read32(&slice[6 * 32..])).ok_or(ProofError::FormatError)?;
+        let t_x = Scalar::from_canonical_bytes(read32(&slice[4 * 32..]))
+            .ok_or(ProofError::FormatError)?;
+        let t_x_blinding = Scalar::from_canonical_bytes(read32(&slice[5 * 32..]))
+            .ok_or(ProofError::FormatError)?;
+        let e_blinding = Scalar::from_canonical_bytes(read32(&slice[6 * 32..]))
+            .ok_or(ProofError::FormatError)?;
 
         let ipp_proof = InnerProductProof::from_bytes(&slice[7 * 32..])?;
 
@@ -470,8 +470,7 @@ mod tests {
                         &mut transcript,
                         &mut rng,
                         n
-                    )
-                    .is_ok()
+                    ).is_ok()
             );
         }
     }
