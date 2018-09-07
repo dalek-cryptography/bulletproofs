@@ -114,7 +114,7 @@ pub enum R1CSError {
 
 // TODO: remove this when we no longer use `CircuitProof` in the `R1CS` module
 impl From<&'static str> for R1CSError {
-    fn from(e: &'static str) -> R1CSError {
+    fn from(e: &'static str) -> Self {
         println!("{:?}", e);
         R1CSError::FromStringError
     }

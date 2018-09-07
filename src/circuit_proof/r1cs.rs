@@ -299,9 +299,9 @@ mod tests {
     fn mul_circuit_basic_helper(a: u64, b: u64, c: u64, expected_result: Result<(), ()>) {
         let mut prover_cs = ConstraintSystem::new();
         prover_cs.assign_multiplier(
-            Assignment::from_u64(a),
-            Assignment::from_u64(b),
-            Assignment::from_u64(c),
+            Assignment::from(a),
+            Assignment::from(b),
+            Assignment::from(c),
         );
 
         let mut verifier_cs = ConstraintSystem::new();
@@ -338,13 +338,13 @@ mod tests {
 
         let mut prover_cs = ConstraintSystem::new();
         let (aL, aR, aO) = prover_cs.assign_multiplier(
-            Assignment::from_u64(a * a_coeff),
-            Assignment::from_u64(b * b_coeff),
-            Assignment::from_u64(c * c_coeff),
+            Assignment::from(a * a_coeff),
+            Assignment::from(b * b_coeff),
+            Assignment::from(c * c_coeff),
         );
-        let v_a = prover_cs.assign_committed(Assignment::from_u64(a));
-        let v_b = prover_cs.assign_committed(Assignment::from_u64(b));
-        let v_c = prover_cs.assign_committed(Assignment::from_u64(c));
+        let v_a = prover_cs.assign_committed(Assignment::from(a));
+        let v_b = prover_cs.assign_committed(Assignment::from(b));
+        let v_c = prover_cs.assign_committed(Assignment::from(c));
 
         prover_cs.add_constraint(LinearCombination::new(
             vec![(aL, -one), (v_a, Scalar::from(a_coeff))],
@@ -408,9 +408,9 @@ mod tests {
         let zer = Scalar::zero();
 
         let mut prover_cs = ConstraintSystem::new();
-        let v_a = prover_cs.assign_committed(Assignment::from_u64(a));
-        let v_b = prover_cs.assign_committed(Assignment::from_u64(b));
-        let v_c = prover_cs.assign_committed(Assignment::from_u64(c));
+        let v_a = prover_cs.assign_committed(Assignment::from(a));
+        let v_b = prover_cs.assign_committed(Assignment::from(b));
+        let v_c = prover_cs.assign_committed(Assignment::from(c));
         prover_cs.add_constraint(LinearCombination::new(
             vec![(v_a, one), (v_b, one), (v_c, -one)],
             zer,
@@ -445,13 +445,12 @@ mod tests {
 
         let mut prover_cs = ConstraintSystem::new();
         // Make high-level variables
-        let v_a = prover_cs.assign_committed(Assignment::from_u64(a));
-        let v_b = prover_cs.assign_committed(Assignment::from_u64(b));
-        let v_c = prover_cs.assign_committed(Assignment::from_u64(c));
+        let v_a = prover_cs.assign_committed(Assignment::from(a));
+        let v_b = prover_cs.assign_committed(Assignment::from(b));
+        let v_c = prover_cs.assign_committed(Assignment::from(c));
         // Make low-level variables (aL_0 = v_a, aR_0 = v_b, aL_1 = v_c)
-        let (aL_0, aR_0) =
-            prover_cs.assign_uncommitted(Assignment::from_u64(a), Assignment::from_u64(b));
-        let (aL_1, _) = prover_cs.assign_uncommitted(Assignment::from_u64(c), Assignment::zero());
+        let (aL_0, aR_0) = prover_cs.assign_uncommitted(Assignment::from(a), Assignment::from(b));
+        let (aL_1, _) = prover_cs.assign_uncommitted(Assignment::from(c), Assignment::zero());
         // Tie high-level and low-level variables together
         prover_cs.add_constraint(LinearCombination::new(
             vec![(aL_0.clone(), -one), (v_a, one)],
@@ -525,17 +524,17 @@ mod tests {
 
         let mut prover_cs = ConstraintSystem::new();
         // Make high-level variables
-        let v_a1 = prover_cs.assign_committed(Assignment::from_u64(a1));
-        let v_a2 = prover_cs.assign_committed(Assignment::from_u64(a2));
-        let v_b1 = prover_cs.assign_committed(Assignment::from_u64(b1));
-        let v_b2 = prover_cs.assign_committed(Assignment::from_u64(b2));
-        let v_c1 = prover_cs.assign_committed(Assignment::from_u64(c1));
-        let v_c2 = prover_cs.assign_committed(Assignment::from_u64(c2));
+        let v_a1 = prover_cs.assign_committed(Assignment::from(a1));
+        let v_a2 = prover_cs.assign_committed(Assignment::from(a2));
+        let v_b1 = prover_cs.assign_committed(Assignment::from(b1));
+        let v_b2 = prover_cs.assign_committed(Assignment::from(b2));
+        let v_c1 = prover_cs.assign_committed(Assignment::from(c1));
+        let v_c2 = prover_cs.assign_committed(Assignment::from(c2));
         // Make low-level variables (aL = v_a1 + v_a2, aR = v_b1 + v_b2, aO = v_c1 + v_c2)
         let (aL, aR, aO) = prover_cs.assign_multiplier(
-            Assignment::from_u64(a1 + a2),
-            Assignment::from_u64(b1 + b2),
-            Assignment::from_u64(c1 + c2),
+            Assignment::from(a1 + a2),
+            Assignment::from(b1 + b2),
+            Assignment::from(c1 + c2),
         );
         // Tie high-level and low-level variables together
         prover_cs.add_constraint(LinearCombination::new(

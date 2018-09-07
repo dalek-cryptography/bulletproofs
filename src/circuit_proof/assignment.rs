@@ -11,16 +11,20 @@ pub enum Assignment {
 }
 
 impl Assignment {
-    pub fn new(scalar: Scalar) -> Self {
-        Assignment::Value(scalar)
-    }
-
     pub fn zero() -> Self {
         Assignment::Value(Scalar::zero())
     }
+}
 
-    pub fn from_u64(v: u64) -> Self {
-        Assignment::Value(Scalar::from(v))
+impl From<Scalar> for Assignment {
+    fn from(scalar: Scalar) -> Self {
+        Assignment::Value(scalar)
+    }
+}
+
+impl From<u64> for Assignment {
+    fn from(int: u64) -> Self {
+        Assignment::Value(Scalar::from(int))
     }
 }
 
