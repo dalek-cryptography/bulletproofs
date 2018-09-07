@@ -2,6 +2,7 @@
 #![feature(nll)]
 #![feature(test)]
 #![feature(external_doc)]
+#![feature(try_trait)]
 #![doc(include = "../README.md")]
 #![doc(html_logo_url = "https://doc.dalek.rs/assets/dalek-logo-clear.png")]
 
@@ -39,11 +40,11 @@ mod errors;
 mod generators;
 mod inner_product_proof;
 mod range_proof;
-mod transcript;
+pub mod transcript;
 
 pub use merlin::Transcript;
 
-pub use errors::ProofError;
+pub use errors::{ProofError, R1CSError};
 pub use generators::{Generators, GeneratorsView, PedersenGenerators};
 pub use range_proof::RangeProof;
 
