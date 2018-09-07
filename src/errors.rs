@@ -99,8 +99,8 @@ pub enum R1CSError {
     #[fail(display = "Variable does not have a value assignment.")]
     MissingAssignment,
     // TODO: remove this when we no longer use `CircuitProof` in the `R1CS` module
-    #[fail(display = "R1CSError from string error.")]
-    FromStringError,
+    #[fail(display = "R1CSError from string error: {:?}", string_err)]
+    FromStringError { string_err: &'static str },
     // CircuitProof did not verify correctly for this R1CS instance
     #[fail(display = "Circuit did not verify correctly.")]
     VerificationError,
@@ -115,7 +115,6 @@ pub enum R1CSError {
 // TODO: remove this when we no longer use `CircuitProof` in the `R1CS` module
 impl From<&'static str> for R1CSError {
     fn from(e: &'static str) -> Self {
-        println!("{:?}", e);
-        R1CSError::FromStringError
+        R1CSError::FromStringError { string_err: e }
     }
 }
