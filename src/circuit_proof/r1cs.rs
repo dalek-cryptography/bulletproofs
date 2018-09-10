@@ -151,7 +151,7 @@ impl ConstraintSystem {
 
     // Allocate a committed variable, and assign it the Assignment passed in.
     // Prover will pass in `Value(Scalar)`s, and Verifier will pass in `Missing`.
-    pub fn assign_committed(&mut self, value: Assignment) -> Variable {
+    fn assign_committed(&mut self, value: Assignment) -> Variable {
         self.v_assignments.push(value);
         Variable::Committed(self.v_assignments.len() - 1)
     }
@@ -349,12 +349,13 @@ mod tests {
         // empty commitments vec because there are no commitments in this test
         let v = vec![];
         let v_blinding = vec![];
-        let (mut prover_cs, _prover_committed_variables, commitments) = ConstraintSystem::prover_new(
-            prover_transcript,
-            v,
-            v_blinding.clone(),
-            PedersenGenerators::default(),
-        );
+        let (mut prover_cs, _prover_committed_variables, commitments) =
+            ConstraintSystem::prover_new(
+                prover_transcript,
+                v,
+                v_blinding.clone(),
+                PedersenGenerators::default(),
+            );
         prover_cs.assign_multiplier(
             Assignment::from(a),
             Assignment::from(b),
