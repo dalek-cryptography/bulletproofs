@@ -69,19 +69,63 @@ pub struct ConstraintSystem {
 }
 
 impl ConstraintSystem {
-    pub fn new(mut transcript: Transcript, commitments: Vec<RistrettoPoint>) -> Self {
-        for commitment in commitments {
-            transcript.commit_point(b"Initializing ConstraintSystem", &commitment.compress());
-        }
-
-        ConstraintSystem {
+    pub fn prover_new(
+        transcript: Transcript,
+        // TODO: encapsulate v, v_blinding, pedersen_gens into one "commitment" struct
+        v: Vec<Scalar>,
+        v_blinding: Vec<Scalar>,
+        pedersen_gens: PedersenGenerators,
+    ) -> (Self, Vec<Variable>, Vec<RistrettoPoint>) {
+        let mut cs = ConstraintSystem {
             transcript,
             constraints: vec![],
             aL_assignments: vec![],
             aR_assignments: vec![],
             aO_assignments: vec![],
             v_assignments: vec![],
+        };
+
+        // Add commitments to transcript
+        let commitments: Vec<RistrettoPoint> = v
+            .iter()
+            .zip(v_blinding)
+            .map(|(v_i, v_blinding_i)| pedersen_gens.commit(*v_i, v_blinding_i))
+            .collect();
+        for commitment in commitments.clone() {
+            cs.transcript
+                .commit_point(b"Initializing ConstraintSystem", &commitment.compress());
         }
+
+        // Create and return variables associated with v values
+        let mut variables = vec![];
+        for v_i in v {
+            variables.push(cs.assign_committed(Assignment::from(v_i)));
+        }
+
+        (cs, variables, commitments)
+    }
+
+    pub fn verifier_new(
+        transcript: Transcript,
+        commitments: Vec<RistrettoPoint>,
+    ) -> (Self, Vec<Variable>) {
+        let mut cs = ConstraintSystem {
+            transcript,
+            constraints: vec![],
+            aL_assignments: vec![],
+            aR_assignments: vec![],
+            aO_assignments: vec![],
+            v_assignments: vec![],
+        };
+
+        let mut variables = vec![];
+        for commitment in commitments {
+            cs.transcript
+                .commit_point(b"Initializing ConstraintSystem", &commitment.compress());
+            variables.push(cs.assign_committed(Assignment::Missing()));
+        }
+
+        (cs, variables)
     }
 
     // Allocate variables for left, right, and output wires of multiplication,
@@ -292,17 +336,9 @@ mod tests {
         Ok(())
     }
 
-    fn commitments_helper(v: Vec<Scalar>) -> (Vec<Scalar>, Vec<RistrettoPoint>) {
+    fn blinding_helper(len: usize) -> Vec<Scalar> {
         let mut rng = OsRng::new().unwrap();
-        let v_blinding: Vec<Scalar> = (0..v.len()).map(|_| Scalar::random(&mut rng)).collect();
-        let pedersen_gens = PedersenGenerators::default();
-        let V = v
-            .iter()
-            .zip(v_blinding.clone())
-            .map(|(v_i, v_blinding_i)| pedersen_gens.commit(*v_i, v_blinding_i))
-            .collect();
-
-        (v_blinding, V)
+        (0..len).map(|_| Scalar::random(&mut rng)).collect()
     }
 
     // a * b =? c
@@ -311,8 +347,14 @@ mod tests {
     fn mul_circuit_basic_helper(a: u64, b: u64, c: u64, expected_result: Result<(), ()>) {
         let prover_transcript = Transcript::new(b"CircuitProofTest");
         // empty commitments vec because there are no commitments in this test
-        let (v_blinding, commitments) = commitments_helper(vec![]);
-        let mut prover_cs = ConstraintSystem::new(prover_transcript, commitments.clone());
+        let v = vec![];
+        let v_blinding = vec![];
+        let (mut prover_cs, _prover_committed_variables, commitments) = ConstraintSystem::prover_new(
+            prover_transcript,
+            v,
+            v_blinding.clone(),
+            PedersenGenerators::default(),
+        );
         prover_cs.assign_multiplier(
             Assignment::from(a),
             Assignment::from(b),
@@ -320,7 +362,8 @@ mod tests {
         );
 
         let verifier_transcript = Transcript::new(b"CircuitProofTest");
-        let mut verifier_cs = ConstraintSystem::new(verifier_transcript, commitments);
+        let (mut verifier_cs, _verifier_committed_variables) =
+            ConstraintSystem::verifier_new(verifier_transcript, commitments);
         verifier_cs.assign_multiplier(
             Assignment::Missing(),
             Assignment::Missing(),
@@ -355,18 +398,23 @@ mod tests {
         let zer = Scalar::zero();
 
         let prover_transcript = Transcript::new(b"CircuitProofTest");
-        let (v_blinding, commitments) =
-            commitments_helper(vec![Scalar::from(a), Scalar::from(b), Scalar::from(c)]);
+        let v = vec![Scalar::from(a), Scalar::from(b), Scalar::from(c)];
+        let v_blinding = blinding_helper(v.len());
+        let (mut prover_cs, prover_committed_variables, commitments) = ConstraintSystem::prover_new(
+            prover_transcript,
+            v,
+            v_blinding.clone(),
+            PedersenGenerators::default(),
+        );
 
-        let mut prover_cs = ConstraintSystem::new(prover_transcript, commitments.clone());
         let (aL, aR, aO) = prover_cs.assign_multiplier(
             Assignment::from(a * a_coeff),
             Assignment::from(b * b_coeff),
             Assignment::from(c * c_coeff),
         );
-        let v_a = prover_cs.assign_committed(Assignment::from(a));
-        let v_b = prover_cs.assign_committed(Assignment::from(b));
-        let v_c = prover_cs.assign_committed(Assignment::from(c));
+        let v_a = prover_committed_variables[0];
+        let v_b = prover_committed_variables[1];
+        let v_c = prover_committed_variables[2];
 
         prover_cs.add_constraint(LinearCombination::new(
             vec![(aL, -one), (v_a, Scalar::from(a_coeff))],
@@ -382,15 +430,16 @@ mod tests {
         ));
 
         let verifier_transcript = Transcript::new(b"CircuitProofTest");
-        let mut verifier_cs = ConstraintSystem::new(verifier_transcript, commitments);
+        let (mut verifier_cs, verifier_committed_variables) =
+            ConstraintSystem::verifier_new(verifier_transcript, commitments);
         let (aL, aR, aO) = verifier_cs.assign_multiplier(
             Assignment::Missing(),
             Assignment::Missing(),
             Assignment::Missing(),
         );
-        let v_a = verifier_cs.assign_committed(Assignment::Missing());
-        let v_b = verifier_cs.assign_committed(Assignment::Missing());
-        let v_c = verifier_cs.assign_committed(Assignment::Missing());
+        let v_a = verifier_committed_variables[0];
+        let v_b = verifier_committed_variables[1];
+        let v_c = verifier_committed_variables[2];
 
         verifier_cs.add_constraint(LinearCombination::new(
             vec![(aL, -one), (v_a, Scalar::from(a_coeff))],
@@ -433,23 +482,29 @@ mod tests {
         let zer = Scalar::zero();
 
         let prover_transcript = Transcript::new(b"CircuitProofTest");
-        let (v_blinding, commitments) =
-            commitments_helper(vec![Scalar::from(a), Scalar::from(b), Scalar::from(c)]);
-        let mut prover_cs = ConstraintSystem::new(prover_transcript, commitments.clone());
+        let v = vec![Scalar::from(a), Scalar::from(b), Scalar::from(c)];
+        let v_blinding = blinding_helper(v.len());
+        let (mut prover_cs, prover_committed_variables, commitments) = ConstraintSystem::prover_new(
+            prover_transcript,
+            v,
+            v_blinding.clone(),
+            PedersenGenerators::default(),
+        );
 
-        let v_a = prover_cs.assign_committed(Assignment::from(a));
-        let v_b = prover_cs.assign_committed(Assignment::from(b));
-        let v_c = prover_cs.assign_committed(Assignment::from(c));
+        let v_a = prover_committed_variables[0];
+        let v_b = prover_committed_variables[1];
+        let v_c = prover_committed_variables[2];
         prover_cs.add_constraint(LinearCombination::new(
             vec![(v_a, one), (v_b, one), (v_c, -one)],
             zer,
         ));
 
         let verifier_transcript = Transcript::new(b"CircuitProofTest");
-        let mut verifier_cs = ConstraintSystem::new(verifier_transcript, commitments);
-        let v_a = verifier_cs.assign_committed(Assignment::Missing());
-        let v_b = verifier_cs.assign_committed(Assignment::Missing());
-        let v_c = verifier_cs.assign_committed(Assignment::Missing());
+        let (mut verifier_cs, verifier_committed_variables) =
+            ConstraintSystem::verifier_new(verifier_transcript, commitments);
+        let v_a = verifier_committed_variables[0];
+        let v_b = verifier_committed_variables[1];
+        let v_c = verifier_committed_variables[2];
         verifier_cs.add_constraint(LinearCombination::new(
             vec![(v_a, one), (v_b, one), (v_c, -one)],
             zer,
@@ -476,13 +531,18 @@ mod tests {
         let zer = Scalar::zero();
 
         let prover_transcript = Transcript::new(b"CircuitProofTest");
-        let (v_blinding, commitments) =
-            commitments_helper(vec![Scalar::from(a), Scalar::from(b), Scalar::from(c)]);
-        let mut prover_cs = ConstraintSystem::new(prover_transcript, commitments.clone());
+        let v = vec![Scalar::from(a), Scalar::from(b), Scalar::from(c)];
+        let v_blinding = blinding_helper(v.len());
+        let (mut prover_cs, prover_committed_variables, commitments) = ConstraintSystem::prover_new(
+            prover_transcript,
+            v,
+            v_blinding.clone(),
+            PedersenGenerators::default(),
+        );
         // Make high-level variables
-        let v_a = prover_cs.assign_committed(Assignment::from(a));
-        let v_b = prover_cs.assign_committed(Assignment::from(b));
-        let v_c = prover_cs.assign_committed(Assignment::from(c));
+        let v_a = prover_committed_variables[0];
+        let v_b = prover_committed_variables[1];
+        let v_c = prover_committed_variables[2];
         // Make low-level variables (aL_0 = v_a, aR_0 = v_b, aL_1 = v_c)
         let (aL_0, aR_0) = prover_cs.assign_uncommitted(Assignment::from(a), Assignment::from(b));
         let (aL_1, _) = prover_cs.assign_uncommitted(Assignment::from(c), Assignment::zero());
@@ -506,11 +566,12 @@ mod tests {
         ));
 
         let verifier_transcript = Transcript::new(b"CircuitProofTest");
-        let mut verifier_cs = ConstraintSystem::new(verifier_transcript, commitments);
+        let (mut verifier_cs, verifier_committed_variables) =
+            ConstraintSystem::verifier_new(verifier_transcript, commitments);
         // Make high-level variables
-        let v_a = verifier_cs.assign_committed(Assignment::Missing());
-        let v_b = verifier_cs.assign_committed(Assignment::Missing());
-        let v_c = verifier_cs.assign_committed(Assignment::Missing());
+        let v_a = verifier_committed_variables[0];
+        let v_b = verifier_committed_variables[1];
+        let v_c = verifier_committed_variables[2];
         // Make low-level variables (aL_0 = v_a, aR_0 = v_b, aL_1 = v_c)
         let (aL_0, aR_0) =
             verifier_cs.assign_uncommitted(Assignment::Missing(), Assignment::Missing());
@@ -561,22 +622,28 @@ mod tests {
         let zer = Scalar::zero();
 
         let prover_transcript = Transcript::new(b"CircuitProofTest");
-        let (v_blinding, commitments) = commitments_helper(vec![
+        let v = vec![
             Scalar::from(a1),
             Scalar::from(a2),
             Scalar::from(b1),
             Scalar::from(b2),
             Scalar::from(c1),
             Scalar::from(c2),
-        ]);
-        let mut prover_cs = ConstraintSystem::new(prover_transcript, commitments.clone());
+        ];
+        let v_blinding = blinding_helper(v.len());
+        let (mut prover_cs, prover_committed_variables, commitments) = ConstraintSystem::prover_new(
+            prover_transcript,
+            v,
+            v_blinding.clone(),
+            PedersenGenerators::default(),
+        );
         // Make high-level variables
-        let v_a1 = prover_cs.assign_committed(Assignment::from(a1));
-        let v_a2 = prover_cs.assign_committed(Assignment::from(a2));
-        let v_b1 = prover_cs.assign_committed(Assignment::from(b1));
-        let v_b2 = prover_cs.assign_committed(Assignment::from(b2));
-        let v_c1 = prover_cs.assign_committed(Assignment::from(c1));
-        let v_c2 = prover_cs.assign_committed(Assignment::from(c2));
+        let v_a1 = prover_committed_variables[0];
+        let v_a2 = prover_committed_variables[1];
+        let v_b1 = prover_committed_variables[2];
+        let v_b2 = prover_committed_variables[3];
+        let v_c1 = prover_committed_variables[4];
+        let v_c2 = prover_committed_variables[5];
         // Make low-level variables (aL = v_a1 + v_a2, aR = v_b1 + v_b2, aO = v_c1 + v_c2)
         let (aL, aR, aO) = prover_cs.assign_multiplier(
             Assignment::from(a1 + a2),
@@ -598,14 +665,15 @@ mod tests {
         ));
 
         let verifier_transcript = Transcript::new(b"CircuitProofTest");
-        let mut verifier_cs = ConstraintSystem::new(verifier_transcript, commitments);
+        let (mut verifier_cs, verifier_committed_variables) =
+            ConstraintSystem::verifier_new(verifier_transcript, commitments);
         // Make high-level variables
-        let v_a1 = verifier_cs.assign_committed(Assignment::Missing());
-        let v_a2 = verifier_cs.assign_committed(Assignment::Missing());
-        let v_b1 = verifier_cs.assign_committed(Assignment::Missing());
-        let v_b2 = verifier_cs.assign_committed(Assignment::Missing());
-        let v_c1 = verifier_cs.assign_committed(Assignment::Missing());
-        let v_c2 = verifier_cs.assign_committed(Assignment::Missing());
+        let v_a1 = verifier_committed_variables[0];
+        let v_a2 = verifier_committed_variables[1];
+        let v_b1 = verifier_committed_variables[2];
+        let v_b2 = verifier_committed_variables[3];
+        let v_c1 = verifier_committed_variables[4];
+        let v_c2 = verifier_committed_variables[5];
         // Make low-level variables (aL = v_a1 + v_a2, aR = v_b1 + v_b2, aO = v_c1 + v_c2)
         let (aL, aR, aO) = verifier_cs.assign_multiplier(
             Assignment::Missing(),
