@@ -1,16 +1,19 @@
 #![allow(non_snake_case)]
 #![allow(non_camel_case_types)]
 
+use std::ops::Try;
+
+use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
+use curve25519_dalek::scalar::Scalar;
+use merlin::Transcript;
 use rand::{CryptoRng, Rng};
 
 use super::assignment::Assignment;
 use super::circuit::{Circuit, CircuitProof, ProverInput, VerifierInput};
-use curve25519_dalek::ristretto::RistrettoPoint;
-use curve25519_dalek::scalar::Scalar;
+
 use errors::R1CSError;
 use generators::{Generators, PedersenGenerators};
-use merlin::Transcript;
-use std::ops::Try;
+use inner_product_proof::InnerProductProof;
 use transcript::TranscriptProtocol;
 
 /// The variables used in the `LinearCombination` and `ConstraintSystem` structs.
@@ -75,18 +78,23 @@ impl<'a> ConstraintSystem<'a> {
         v_blinding: Vec<Scalar>,
         pedersen_gens: PedersenGenerators,
     ) -> (Self, Vec<Variable>, Vec<RistrettoPoint>) {
-        let mut v_assignments = vec![];
-        let mut variables = vec![];
-        let mut commitments = vec![];
+        // Check that the input lengths are consistent
+        assert_eq!(v.len(), v_blinding.len());
+        let m = v.len();
+        transcript.r1cs_domain_sep(m as u64);
 
-        for (i, (v_i, v_i_blinding)) in v.iter().zip(v_blinding).enumerate() {
+        let mut v_assignments = Vec::with_capacity(m);
+        let mut variables = Vec::with_capacity(m);
+        let mut commitments = Vec::with_capacity(m);
+
+        for i in 0..m {
             // Generate pedersen commitment and commit it to the transcript
-            let V = pedersen_gens.commit(*v_i, v_i_blinding);
-            transcript.commit_point(b"Initializing ConstraintSystem", &V.compress());
+            let V = pedersen_gens.commit(v[i], v_blinding[i]);
+            transcript.commit_point(b"V", &V.compress());
             commitments.push(V);
 
             // Allocate and assign and return a variable for v_i
-            v_assignments.push(Assignment::from(*v_i));
+            v_assignments.push(Assignment::from(v[i]));
             variables.push(Variable::Committed(i));
         }
 
@@ -104,12 +112,16 @@ impl<'a> ConstraintSystem<'a> {
 
     pub fn verifier_new(
         transcript: &'a mut Transcript,
+        // XXX should these take compressed points?
         commitments: Vec<RistrettoPoint>,
     ) -> (Self, Vec<Variable>) {
-        let mut variables = vec![];
+        let m = commitments.len();
+        transcript.r1cs_domain_sep(m as u64);
+
+        let mut variables = Vec::with_capacity(m);
         for (i, commitment) in commitments.iter().enumerate() {
             // Commit the commitment to the transcript
-            transcript.commit_point(b"Initializing ConstraintSystem", &commitment.compress());
+            transcript.commit_point(b"V", &commitment.compress());
 
             // Allocate and return a variable for the commitment
             variables.push(Variable::Committed(i));
@@ -121,7 +133,7 @@ impl<'a> ConstraintSystem<'a> {
             aL_assignments: vec![],
             aR_assignments: vec![],
             aO_assignments: vec![],
-            v_assignments: vec![Assignment::Missing(); commitments.len()],
+            v_assignments: vec![Assignment::Missing(); m],
         };
 
         (cs, variables)

@@ -12,6 +12,8 @@ pub trait TranscriptProtocol {
     fn innerproduct_domain_sep(&mut self, n: u64);
     /// Commit a domain separator for a circuit.
     fn circuit_domain_sep(&mut self, n: u64, m: u64, q: u64);
+    /// Commit a domain separator for a constraint system.
+    fn r1cs_domain_sep(&mut self, m: u64);
     /// Commit a `scalar` with the given `label`.
     fn commit_scalar(&mut self, label: &'static [u8], scalar: &Scalar);
     /// Commit a `point` with the given `label`.
@@ -36,6 +38,11 @@ impl TranscriptProtocol for Transcript {
     fn innerproduct_domain_sep(&mut self, n: u64) {
         self.commit_bytes(b"dom-sep", b"ipp");
         self.commit_bytes(b"n", &le_u64(n));
+    }
+
+    fn r1cs_domain_sep(&mut self, m: u64) {
+        self.commit_bytes(b"dom-sep", b"r1cs");
+        self.commit_bytes(b"m", &le_u64(m));
     }
 
     fn circuit_domain_sep(&mut self, n: u64, m: u64, q: u64) {
