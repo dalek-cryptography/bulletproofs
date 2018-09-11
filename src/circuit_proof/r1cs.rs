@@ -69,6 +69,10 @@ pub struct ConstraintSystem<'a> {
     aR_assignments: Vec<Assignment>,
     aO_assignments: Vec<Assignment>,
     v_assignments: Vec<Assignment>,
+
+    /// Holds the blinding factors for the input wires, if used by the
+    /// prover.
+    v_blinding: Option<Vec<Scalar>>,
 }
 
 impl<'a> ConstraintSystem<'a> {
@@ -105,6 +109,7 @@ impl<'a> ConstraintSystem<'a> {
             aR_assignments: vec![],
             aO_assignments: vec![],
             v_assignments,
+            v_blinding: Some(v_blinding),
         };
 
         (cs, variables, commitments)
@@ -134,6 +139,7 @@ impl<'a> ConstraintSystem<'a> {
             aR_assignments: vec![],
             aO_assignments: vec![],
             v_assignments: vec![Assignment::Missing(); m],
+            v_blinding: None,
         };
 
         (cs, variables)
@@ -277,17 +283,17 @@ impl<'a> ConstraintSystem<'a> {
     // This function can only be called once per ConstraintSystem instance.
     pub fn prove<R: Rng + CryptoRng>(
         mut self,
-        v_blinding: &Vec<Scalar>,
         gen: &Generators,
         rng: &mut R,
     ) -> Result<(CircuitProof, VerifierInput), R1CSError> {
-        if v_blinding.len() != self.commitments_count() {
-            return Err(R1CSError::IncorrectInputSize);
-        }
+
         // create circuit params
         let circuit = self.create_circuit();
-        let prover_input = self.create_prover_input(&v_blinding)?;
-        let verifier_input = self.create_verifier_input(&gen.pedersen_gens, &v_blinding)?;
+        
+        let v_blinding = self.v_blinding.as_ref().unwrap();
+
+        let prover_input = self.create_prover_input(v_blinding)?;
+        let verifier_input = self.create_verifier_input(&gen.pedersen_gens, v_blinding)?;
 
         let circuit_proof =
             CircuitProof::prove(&gen, &mut self.transcript, rng, &circuit, &prover_input)?;
@@ -317,7 +323,6 @@ mod tests {
         prover_cs: ConstraintSystem,
         verifier_cs: ConstraintSystem,
         expected_result: Result<(), ()>,
-        v_blinding: Vec<Scalar>,
     ) -> Result<(), R1CSError> {
         let mut rng = OsRng::new().unwrap();
         let gen = Generators::new(
@@ -326,7 +331,7 @@ mod tests {
             1,
         );
 
-        let (proof, verifier_input) = prover_cs.prove(&v_blinding, &gen, &mut rng)?;
+        let (proof, verifier_input) = prover_cs.prove(&gen, &mut rng)?;
         let actual_result = verifier_cs.verify(&proof, &verifier_input, &gen, &mut rng);
 
         match expected_result {
@@ -354,7 +359,7 @@ mod tests {
             ConstraintSystem::prover_new(
                 &mut prover_transcript,
                 v,
-                v_blinding.clone(),
+                v_blinding,
                 PedersenGenerators::default(),
             );
         prover_cs.assign_multiplier(
@@ -373,7 +378,7 @@ mod tests {
         );
 
         assert!(
-            create_and_verify_helper(prover_cs, verifier_cs, expected_result, v_blinding).is_ok()
+            create_and_verify_helper(prover_cs, verifier_cs, expected_result).is_ok()
         );
     }
 
@@ -405,7 +410,7 @@ mod tests {
         let (mut prover_cs, prover_committed_variables, commitments) = ConstraintSystem::prover_new(
             &mut prover_transcript,
             v,
-            v_blinding.clone(),
+            v_blinding,
             PedersenGenerators::default(),
         );
 
@@ -457,7 +462,7 @@ mod tests {
         ));
 
         assert!(
-            create_and_verify_helper(prover_cs, verifier_cs, expected_result, v_blinding).is_ok()
+            create_and_verify_helper(prover_cs, verifier_cs, expected_result).is_ok()
         );
     }
 
@@ -489,7 +494,7 @@ mod tests {
         let (mut prover_cs, prover_committed_variables, commitments) = ConstraintSystem::prover_new(
             &mut prover_transcript,
             v,
-            v_blinding.clone(),
+            v_blinding,
             PedersenGenerators::default(),
         );
 
@@ -513,7 +518,7 @@ mod tests {
         ));
 
         assert!(
-            create_and_verify_helper(prover_cs, verifier_cs, expected_result, v_blinding).is_ok()
+            create_and_verify_helper(prover_cs, verifier_cs, expected_result).is_ok()
         );
     }
 
@@ -538,7 +543,7 @@ mod tests {
         let (mut prover_cs, prover_committed_variables, commitments) = ConstraintSystem::prover_new(
             &mut prover_transcript,
             v,
-            v_blinding.clone(),
+            v_blinding,
             PedersenGenerators::default(),
         );
         // Make high-level variables
@@ -599,7 +604,7 @@ mod tests {
         ));
 
         assert!(
-            create_and_verify_helper(prover_cs, verifier_cs, expected_result, v_blinding).is_ok()
+            create_and_verify_helper(prover_cs, verifier_cs, expected_result).is_ok()
         );
     }
 
@@ -636,7 +641,7 @@ mod tests {
         let (mut prover_cs, prover_committed_variables, commitments) = ConstraintSystem::prover_new(
             &mut prover_transcript,
             v,
-            v_blinding.clone(),
+            v_blinding,
             PedersenGenerators::default(),
         );
         // Make high-level variables
@@ -697,7 +702,7 @@ mod tests {
         ));
 
         assert!(
-            create_and_verify_helper(prover_cs, verifier_cs, expected_result, v_blinding).is_ok()
+            create_and_verify_helper(prover_cs, verifier_cs, expected_result).is_ok()
         );
     }
 
