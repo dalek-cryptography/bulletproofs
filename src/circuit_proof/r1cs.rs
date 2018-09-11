@@ -96,7 +96,7 @@ impl<'a> ConstraintSystem<'a> {
             aL_assignments: vec![],
             aR_assignments: vec![],
             aO_assignments: vec![],
-            v_assignments: v_assignments,
+            v_assignments,
         };
 
         (cs, variables, commitments)
@@ -315,11 +315,8 @@ mod tests {
         );
 
         let (proof, verifier_input) = prover_cs.prove(&v_blinding, &gen, &mut rng)?;
-
         let actual_result = verifier_cs.verify(&proof, &verifier_input, &gen, &mut rng);
 
-        println!("expected result: {:?}", expected_result);
-        println!("actual result: {:?}", actual_result);
         match expected_result {
             Ok(_) => assert!(actual_result.is_ok()),
             Err(_) => assert!(actual_result.is_err()),
