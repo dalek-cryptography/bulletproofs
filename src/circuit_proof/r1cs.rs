@@ -71,36 +71,33 @@ pub struct ConstraintSystem<'a> {
 impl<'a> ConstraintSystem<'a> {
     pub fn prover_new(
         transcript: &'a mut Transcript,
-        // TODO: encapsulate v, v_blinding, pedersen_gens into one "commitment" struct
         v: Vec<Scalar>,
         v_blinding: Vec<Scalar>,
         pedersen_gens: PedersenGenerators,
     ) -> (Self, Vec<Variable>, Vec<RistrettoPoint>) {
-        let mut cs = ConstraintSystem {
+        let mut v_assignments = vec![];
+        let mut variables = vec![];
+        let mut commitments = vec![];
+
+        for (i, (v_i, v_i_blinding)) in v.iter().zip(v_blinding).enumerate() {
+            // Generate pedersen commitment and commit it to the transcript
+            let V = pedersen_gens.commit(*v_i, v_i_blinding);
+            transcript.commit_point(b"Initializing ConstraintSystem", &V.compress());
+            commitments.push(V);
+
+            // Allocate and assign and return a variable for v_i
+            v_assignments.push(Assignment::from(*v_i));
+            variables.push(Variable::Committed(i));
+        }
+
+        let cs = ConstraintSystem {
             transcript,
             constraints: vec![],
             aL_assignments: vec![],
             aR_assignments: vec![],
             aO_assignments: vec![],
-            v_assignments: vec![],
+            v_assignments: v_assignments,
         };
-
-        // Add commitments to transcript
-        let commitments: Vec<RistrettoPoint> = v
-            .iter()
-            .zip(v_blinding)
-            .map(|(v_i, v_blinding_i)| pedersen_gens.commit(*v_i, v_blinding_i))
-            .collect();
-        for commitment in commitments.clone() {
-            cs.transcript
-                .commit_point(b"Initializing ConstraintSystem", &commitment.compress());
-        }
-
-        // Create and return variables associated with v values
-        let mut variables = vec![];
-        for v_i in v {
-            variables.push(cs.assign_committed(Assignment::from(v_i)));
-        }
 
         (cs, variables, commitments)
     }
@@ -109,21 +106,23 @@ impl<'a> ConstraintSystem<'a> {
         transcript: &'a mut Transcript,
         commitments: Vec<RistrettoPoint>,
     ) -> (Self, Vec<Variable>) {
-        let mut cs = ConstraintSystem {
+        let mut variables = vec![];
+        for (i, commitment) in commitments.iter().enumerate() {
+            // Commit the commitment to the transcript
+            transcript.commit_point(b"Initializing ConstraintSystem", &commitment.compress());
+
+            // Allocate and return a variable for the commitment
+            variables.push(Variable::Committed(i));
+        }
+
+        let cs = ConstraintSystem {
             transcript,
             constraints: vec![],
             aL_assignments: vec![],
             aR_assignments: vec![],
             aO_assignments: vec![],
-            v_assignments: vec![],
+            v_assignments: vec![Assignment::Missing(); commitments.len()],
         };
-
-        let mut variables = vec![];
-        for commitment in commitments {
-            cs.transcript
-                .commit_point(b"Initializing ConstraintSystem", &commitment.compress());
-            variables.push(cs.assign_committed(Assignment::Missing()));
-        }
 
         (cs, variables)
     }
@@ -147,13 +146,6 @@ impl<'a> ConstraintSystem<'a> {
         let out_var = Variable::MultiplierOutput(self.aO_assignments.len() - 1);
 
         (left_var, right_var, out_var)
-    }
-
-    // Allocate a committed variable, and assign it the Assignment passed in.
-    // Prover will pass in `Value(Scalar)`s, and Verifier will pass in `Missing`.
-    fn assign_committed(&mut self, value: Assignment) -> Variable {
-        self.v_assignments.push(value);
-        Variable::Committed(self.v_assignments.len() - 1)
     }
 
     // Allocate two uncommitted variables, and assign them the Assignments passed in.
