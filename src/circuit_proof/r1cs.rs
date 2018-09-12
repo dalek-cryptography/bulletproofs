@@ -235,47 +235,54 @@ impl<'a> ConstraintSystem<'a> {
         self.transcript.challenge_scalar(label)
     }
 
-    /// XXX refactor this
-    fn create_circuit_data(
+    /// Use a challenge, `z`, to flatten the constraints in the
+    /// constraint system into vectors used for proving and
+    /// verification.
+    ///
+    /// # Output
+    ///
+    /// Returns a tuple of
+    /// ```text
+    /// (z_zQ_WL, z_zQ_WR, z_zQ_WO, z_zQ_WV, z_zQ_c)
+    /// ```
+    /// where `z_zQ_WL` is \\( z \cdot z^Q \cdot W_L \\), etc.
+    fn flattened_constraints(
         &mut self,
         z: &Scalar,
-    ) -> (
-        Vec<Scalar>,
-        Vec<Scalar>,
-        Vec<Scalar>,
-        Vec<Scalar>,
-        Vec<Scalar>,
-    ) {
+    ) -> (Vec<Scalar>, Vec<Scalar>, Vec<Scalar>, Vec<Scalar>, Scalar) {
         let n = self.aL_assignments.len();
         let m = self.v_assignments.len();
-        let q = self.constraints.len();
 
-        let zer = Scalar::zero();
-        let mut W_L = vec![vec![zer; n]; q]; // qxn matrix which corresponds to a.
-        let mut W_R = vec![vec![zer; n]; q]; // qxn matrix which corresponds to b.
-        let mut W_O = vec![vec![zer; n]; q]; // qxn matrix which corresponds to c.
-        let mut W_V = vec![vec![zer; m]; q]; // qxm matrix which corresponds to v
-        let mut c = vec![zer; q]; // length q vector of constants.
+        let mut z_zQ_WL = vec![Scalar::zero(); n];
+        let mut z_zQ_WR = vec![Scalar::zero(); n];
+        let mut z_zQ_WO = vec![Scalar::zero(); n];
+        let mut z_zQ_WV = vec![Scalar::zero(); m];
+        let mut z_zQ_c = Scalar::zero();
 
-        for (lc_index, lc) in self.constraints.iter().enumerate() {
-            for (var, coeff) in lc.variables.clone() {
+        let mut exp_z = *z;
+        for lc in self.constraints.iter() {
+            for (var, coeff) in &lc.variables {
                 match var {
-                    Variable::MultiplierLeft(var_index) => W_L[lc_index][var_index] = -coeff,
-                    Variable::MultiplierRight(var_index) => W_R[lc_index][var_index] = -coeff,
-                    Variable::MultiplierOutput(var_index) => W_O[lc_index][var_index] = -coeff,
-                    Variable::Committed(var_index) => W_V[lc_index][var_index] = coeff,
-                };
+                    Variable::MultiplierLeft(i) => {
+                        z_zQ_WL[*i] += exp_z * coeff;
+                    }
+                    Variable::MultiplierRight(i) => {
+                        z_zQ_WR[*i] += exp_z * coeff;
+                    }
+                    Variable::MultiplierOutput(i) => {
+                        z_zQ_WO[*i] += exp_z * coeff;
+                    }
+                    Variable::Committed(i) => {
+                        z_zQ_WV[*i] -= exp_z * coeff;
+                    }
+                }
             }
-            c[lc_index] = lc.constant
+            z_zQ_c -= exp_z * lc.constant;
+
+            exp_z *= z;
         }
 
-        (
-            matrix_flatten(&W_L, z, n).unwrap(),
-            matrix_flatten(&W_R, z, n).unwrap(),
-            matrix_flatten(&W_O, z, n).unwrap(),
-            matrix_flatten(&W_V, z, m).unwrap(),
-            c,
-        )
+        (z_zQ_WL, z_zQ_WR, z_zQ_WO, z_zQ_WV, z_zQ_c)
     }
 
     /// Consume this `ConstraintSystem` to produce a proof.
@@ -373,7 +380,7 @@ impl<'a> ConstraintSystem<'a> {
         let z = self.transcript.challenge_scalar(b"z");
 
         // note: c is not used by the prover -- optimization opportunity?
-        let (z_zQ_WL, z_zQ_WR, z_zQ_WO, z_zQ_WV, _c) = self.create_circuit_data(&z);
+        let (z_zQ_WL, z_zQ_WR, z_zQ_WO, z_zQ_WV, _c) = self.flattened_constraints(&z);
 
         let mut l_poly = util::VecPoly3::zero(n);
         let mut r_poly = util::VecPoly3::zero(n);
@@ -513,7 +520,7 @@ impl<'a> ConstraintSystem<'a> {
         let y = self.transcript.challenge_scalar(b"y");
         let z = self.transcript.challenge_scalar(b"z");
 
-        let (z_zQ_WL, z_zQ_WR, z_zQ_WO, z_zQ_WV, c) = self.create_circuit_data(&z);
+        let (z_zQ_WL, z_zQ_WR, z_zQ_WO, z_zQ_WV, z_zQ_c) = self.flattened_constraints(&z);
 
         self.transcript.commit_point(b"T_1", &proof.T_1);
         self.transcript.commit_point(b"T_3", &proof.T_3);
@@ -603,10 +610,6 @@ impl<'a> ConstraintSystem<'a> {
 
         // define parameters for t check
         let delta = inner_product(&y_n_z_zQ_WR, &z_zQ_WL);
-        let z_c = z * util::exp_iter(z)
-            .zip(c.iter())
-            .map(|(a, b)| a * b)
-            .sum::<Scalar>();
         let rxx = r * xx;
         let V_coeff = z_zQ_WV.iter().map(|W_V_i| rxx * W_V_i);
 
@@ -636,7 +639,7 @@ impl<'a> ConstraintSystem<'a> {
                 .chain(iter::once(x)) // W_R_point
                 .chain(iter::once(Scalar::one())) // W_O_point
                 .chain(iter::once(x * xx)) // S
-                .chain(iter::once(w * (proof.t_x - a * b) + r * (xx * (delta + z_c) - proof.t_x))) // B
+                .chain(iter::once(w * (proof.t_x - a * b) + r * (xx * (delta + z_zQ_c) - proof.t_x))) // B
                 .chain(iter::once(-proof.e_blinding - r * proof.t_x_blinding)) // B_blinding
                 .chain(g) // G
                 .chain(h) // H
@@ -668,31 +671,6 @@ impl<'a> ConstraintSystem<'a> {
 
         Ok(())
     }
-}
-
-// Computes z * z^Q * W, where W is a qx(n or m) matrix and z is a scalar.
-// Input: Qx(n or m) matrix of scalars and scalar z
-// Output: length (n or m) vector of Scalars
-// Note: output_dim parameter is necessary in case W is `qxn` where `q=0`,
-//       such that it is not possible to derive `n` from looking at W.
-pub fn matrix_flatten(
-    W: &Vec<Vec<Scalar>>,
-    z: &Scalar,
-    output_dim: usize,
-) -> Result<Vec<Scalar>, &'static str> {
-    let mut result = vec![Scalar::zero(); output_dim];
-    let mut exp_z = *z; // z^n starting at n=1
-
-    for row in 0..W.len() {
-        if W[row].len() != output_dim {
-            return Err("Matrix size doesn't match specified parameters in matrix_flatten");
-        }
-        for col in 0..output_dim {
-            result[col] += exp_z * W[row][col];
-        }
-        exp_z = exp_z * z; // z^n -> z^(n+1)
-    }
-    Ok(result)
 }
 
 #[cfg(test)]
