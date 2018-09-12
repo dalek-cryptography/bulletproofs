@@ -5,16 +5,45 @@ use std::ops::Try;
 
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
+use curve25519_dalek::traits::{MultiscalarMul, VartimeMultiscalarMul};
 use merlin::Transcript;
 use rand::{CryptoRng, Rng};
 
 use super::assignment::Assignment;
-use super::circuit::{Circuit, CircuitProof, ProverInput, VerifierInput};
 
 use errors::R1CSError;
 use generators::{Generators, PedersenGenerators};
 use inner_product_proof::InnerProductProof;
 use transcript::TranscriptProtocol;
+
+#[derive(Clone, Debug)]
+pub struct R1CSProof {
+    /// Commitment to the values of input wires
+    A_I: CompressedRistretto,
+    /// Commitment to the values of output wires
+    A_O: CompressedRistretto,
+    /// Commitment to the blinding factors
+    S: CompressedRistretto,
+    /// Commitment to the \\(t_1\\) coefficient of \\( t(x) \\)
+    T_1: CompressedRistretto,
+    /// Commitment to the \\(t_3\\) coefficient of \\( t(x) \\)
+    T_3: CompressedRistretto,
+    /// Commitment to the \\(t_4\\) coefficient of \\( t(x) \\)
+    T_4: CompressedRistretto,
+    /// Commitment to the \\(t_5\\) coefficient of \\( t(x) \\)
+    T_5: CompressedRistretto,
+    /// Commitment to the \\(t_6\\) coefficient of \\( t(x) \\)
+    T_6: CompressedRistretto,
+    /// Evaluation of the polynomial \\(t(x)\\) at the challenge point \\(x\\)
+    t_x: Scalar,
+    /// Blinding factor for the synthetic commitment to \\( t(x) \\)
+    t_x_blinding: Scalar,
+    /// Blinding factor for the synthetic commitment to the
+    /// inner-product arguments
+    e_blinding: Scalar,
+    /// Proof data for the inner-product argument.
+    ipp_proof: InnerProductProof,
+}
 
 /// The variables used in the `LinearCombination` and `ConstraintSystem` structs.
 #[derive(Copy, Clone, Debug)]
@@ -73,6 +102,7 @@ pub struct ConstraintSystem<'a> {
     /// Holds the blinding factors for the input wires, if used by the
     /// prover.
     v_blinding: Option<Vec<Scalar>>,
+    V: Vec<RistrettoPoint>,
 }
 
 impl<'a> ConstraintSystem<'a> {
@@ -110,6 +140,7 @@ impl<'a> ConstraintSystem<'a> {
             aO_assignments: vec![],
             v_assignments,
             v_blinding: Some(v_blinding),
+            V: commitments.clone(),
         };
 
         (cs, variables, commitments)
@@ -140,6 +171,7 @@ impl<'a> ConstraintSystem<'a> {
             aO_assignments: vec![],
             v_assignments: vec![Assignment::Missing(); m],
             v_blinding: None,
+            V: commitments,
         };
 
         (cs, variables)
@@ -203,57 +235,17 @@ impl<'a> ConstraintSystem<'a> {
         self.transcript.challenge_scalar(label)
     }
 
-    fn create_prover_input(&self, v_blinding: &Vec<Scalar>) -> Result<ProverInput, R1CSError> {
-        let aL = self
-            .aL_assignments
-            .iter()
-            .cloned()
-            .map(Try::into_result)
-            .collect::<Result<Vec<_>, _>>()?;
-        let aR = self
-            .aR_assignments
-            .iter()
-            .cloned()
-            .map(Try::into_result)
-            .collect::<Result<Vec<_>, _>>()?;
-        let aO = self
-            .aO_assignments
-            .iter()
-            .cloned()
-            .map(Try::into_result)
-            .collect::<Result<Vec<_>, _>>()?;
-
-        Ok(ProverInput::new(aL, aR, aO, v_blinding.to_vec()))
-    }
-
-    fn create_verifier_input(
-        &self,
-        pedersen_gens: &PedersenGenerators,
-        v_blinding: &Vec<Scalar>,
-    ) -> Result<VerifierInput, R1CSError> {
-        if v_blinding.len() != self.commitments_count() {
-            return Err(R1CSError::IncorrectInputSize);
-        }
-        let V = self
-            .v_assignments
-            .iter()
-            .zip(v_blinding)
-            .map(|(v_i, v_blinding_i)| Ok(pedersen_gens.commit(v_i.clone()?, *v_blinding_i)))
-            .collect::<Result<Vec<RistrettoPoint>, R1CSError>>()?;
-
-        Ok(VerifierInput::new(V))
-    }
-
-    fn create_circuit(&mut self) -> Circuit {
-        // If the number of multiplications is not 0 or a power of 2, then pad the circuit.
-        let temp_n = self.aL_assignments.len();
-        if !(temp_n == 0 || temp_n.is_power_of_two()) {
-            let pad = temp_n.next_power_of_two() - temp_n;
-            for _ in 0..pad {
-                self.assign_multiplier(Assignment::zero(), Assignment::zero(), Assignment::zero());
-            }
-        }
-
+    /// XXX refactor this
+    fn create_circuit_data(
+        &mut self,
+        z: &Scalar,
+    ) -> (
+        Vec<Scalar>,
+        Vec<Scalar>,
+        Vec<Scalar>,
+        Vec<Scalar>,
+        Vec<Scalar>,
+    ) {
         let n = self.aL_assignments.len();
         let m = self.v_assignments.len();
         let q = self.constraints.len();
@@ -277,41 +269,430 @@ impl<'a> ConstraintSystem<'a> {
             c[lc_index] = lc.constant
         }
 
-        Circuit::new(n, m, q, c, W_L, W_R, W_O, W_V)
+        (
+            matrix_flatten(&W_L, z, n).unwrap(),
+            matrix_flatten(&W_R, z, n).unwrap(),
+            matrix_flatten(&W_O, z, n).unwrap(),
+            matrix_flatten(&W_V, z, m).unwrap(),
+            c,
+        )
     }
 
-    // This function can only be called once per ConstraintSystem instance.
-    pub fn prove<R: Rng + CryptoRng>(
-        mut self,
-        gen: &Generators,
-        rng: &mut R,
-    ) -> Result<(CircuitProof, VerifierInput), R1CSError> {
+    /// Consume this `ConstraintSystem` to produce a proof.
+    pub fn prove(mut self, gen: &Generators) -> Result<R1CSProof, R1CSError> {
+        use std::iter;
+        use util;
 
-        // create circuit params
-        let circuit = self.create_circuit();
-        
-        let v_blinding = self.v_blinding.as_ref().unwrap();
+        // 0. Pad zeros to the next power of two (or do that implicitly when creating vectors)
 
-        let prover_input = self.create_prover_input(v_blinding)?;
-        let verifier_input = self.create_verifier_input(&gen.pedersen_gens, v_blinding)?;
+        // If the number of multiplications is not 0 or a power of 2, then pad the circuit.
+        let temp_n = self.aL_assignments.len();
+        if !(temp_n == 0 || temp_n.is_power_of_two()) {
+            let pad = temp_n.next_power_of_two() - temp_n;
+            for _ in 0..pad {
+                self.assign_multiplier(Assignment::zero(), Assignment::zero(), Assignment::zero());
+            }
+        }
 
-        let circuit_proof =
-            CircuitProof::prove(&gen, &mut self.transcript, rng, &circuit, &prover_input)?;
+        let n = self.aL_assignments.len();
+        assert_eq!(n, gen.n);
 
-        Ok((circuit_proof, verifier_input))
+        // 1. Create a `TranscriptRng` from the high-level witness data
+
+        let mut rng = {
+            let mut ctor = self.transcript.fork_transcript();
+
+            // Commit the blinding factors for the input wires
+            for v_b in self.v_blinding.as_ref().unwrap() {
+                ctor = ctor.commit_witness_bytes(b"v_blinding", v_b.as_bytes());
+            }
+
+            use rand::thread_rng;
+            ctor.reseed_from_rng(&mut thread_rng())
+        };
+
+        // 2. Construct the low-level witness data a_L, a_R, a_O
+
+        let a_L = self
+            .aL_assignments
+            .iter()
+            .cloned()
+            .map(Try::into_result)
+            .collect::<Result<Vec<_>, _>>()?;
+        let a_R = self
+            .aR_assignments
+            .iter()
+            .cloned()
+            .map(Try::into_result)
+            .collect::<Result<Vec<_>, _>>()?;
+        let a_O = self
+            .aO_assignments
+            .iter()
+            .cloned()
+            .map(Try::into_result)
+            .collect::<Result<Vec<_>, _>>()?;
+
+        // 3. Choose blinding factors and form commitments to low-level witness data
+
+        let i_blinding = Scalar::random(&mut rng);
+        let o_blinding = Scalar::random(&mut rng);
+        let s_blinding = Scalar::random(&mut rng);
+
+        let s_L: Vec<Scalar> = (0..n).map(|_| Scalar::random(&mut rng)).collect();
+        let s_R: Vec<Scalar> = (0..n).map(|_| Scalar::random(&mut rng)).collect();
+
+        // A_I = <a_L, G> + <a_R, H> + i_blinding * B_blinding
+        let A_I = RistrettoPoint::multiscalar_mul(
+            iter::once(&i_blinding).chain(a_L.iter()).chain(a_R.iter()),
+            iter::once(&gen.pedersen_gens.B_blinding)
+                .chain(gen.G.iter())
+                .chain(gen.H.iter()),
+        ).compress();
+
+        // A_O = <a_O, G> + o_blinding * B_blinding
+        let A_O = RistrettoPoint::multiscalar_mul(
+            iter::once(&o_blinding).chain(a_O.iter()),
+            iter::once(&gen.pedersen_gens.B_blinding).chain(gen.G.iter()),
+        ).compress();
+
+        // S = <s_L, G> + <s_R, H> + s_blinding * B_blinding
+        let S = RistrettoPoint::multiscalar_mul(
+            iter::once(&s_blinding).chain(s_L.iter()).chain(s_R.iter()),
+            iter::once(&gen.pedersen_gens.B_blinding)
+                .chain(gen.G.iter())
+                .chain(gen.H.iter()),
+        ).compress();
+
+        self.transcript.commit_point(b"A_I", &A_I);
+        self.transcript.commit_point(b"A_O", &A_O);
+        self.transcript.commit_point(b"S", &S);
+
+        // 4. ???
+
+        let y = self.transcript.challenge_scalar(b"y");
+        let z = self.transcript.challenge_scalar(b"z");
+
+        // note: c is not used by the prover -- optimization opportunity?
+        let (z_zQ_WL, z_zQ_WR, z_zQ_WO, z_zQ_WV, _c) = self.create_circuit_data(&z);
+
+        let mut l_poly = util::VecPoly3::zero(n);
+        let mut r_poly = util::VecPoly3::zero(n);
+
+        let mut exp_y = Scalar::one(); // y^n starting at n=0
+        let mut exp_y_inv = Scalar::one(); // y^-n starting at n=0
+        let y_inv = y.invert();
+
+        for i in 0..n {
+            // l_poly.0 = 0
+            // l_poly.1 = a_L + y^-n * (z * z^Q * W_R)
+            l_poly.1[i] = a_L[i] + exp_y_inv * z_zQ_WR[i];
+            // l_poly.2 = a_O
+            l_poly.2[i] = a_O[i];
+            // l_poly.3 = s_L
+            l_poly.3[i] = s_L[i];
+            // r_poly.0 = (z * z^Q * W_O) - y^n
+            r_poly.0[i] = z_zQ_WO[i] - exp_y;
+            // r_poly.1 = y^n * a_R + (z * z^Q * W_L)
+            r_poly.1[i] = exp_y * a_R[i] + z_zQ_WL[i];
+            // r_poly.2 = 0
+            // r_poly.3 = y^n * s_R
+            r_poly.3[i] = exp_y * s_R[i];
+
+            exp_y = exp_y * y; // y^i -> y^(i+1)
+            exp_y_inv = exp_y_inv * y_inv; // y^-i -> y^-(i+1)
+        }
+
+        let t_poly = l_poly.inner_product(&r_poly);
+
+        let t_1_blinding = Scalar::random(&mut rng);
+        let t_3_blinding = Scalar::random(&mut rng);
+        let t_4_blinding = Scalar::random(&mut rng);
+        let t_5_blinding = Scalar::random(&mut rng);
+        let t_6_blinding = Scalar::random(&mut rng);
+
+        let pg = &gen.pedersen_gens;
+
+        let T_1 = pg.commit(t_poly.t1, t_1_blinding).compress();
+        let T_3 = pg.commit(t_poly.t3, t_3_blinding).compress();
+        let T_4 = pg.commit(t_poly.t4, t_4_blinding).compress();
+        let T_5 = pg.commit(t_poly.t5, t_5_blinding).compress();
+        let T_6 = pg.commit(t_poly.t6, t_6_blinding).compress();
+
+        self.transcript.commit_point(b"T_1", &T_1);
+        self.transcript.commit_point(b"T_3", &T_3);
+        self.transcript.commit_point(b"T_4", &T_4);
+        self.transcript.commit_point(b"T_5", &T_5);
+        self.transcript.commit_point(b"T_6", &T_6);
+
+        let x = self.transcript.challenge_scalar(b"x");
+
+        // t_2_blinding = <z*z^Q, W_V * v_blinding>
+        // in the t_x_blinding calculations, line 76.
+        let t_2_blinding = z_zQ_WV
+            .iter()
+            .zip(self.v_blinding.as_ref().unwrap().iter())
+            .map(|(c, v_blinding)| c * v_blinding)
+            .sum();
+
+        let t_blinding_poly = util::Poly6 {
+            t1: t_1_blinding,
+            t2: t_2_blinding,
+            t3: t_3_blinding,
+            t4: t_4_blinding,
+            t5: t_5_blinding,
+            t6: t_6_blinding,
+        };
+
+        let t_x = t_poly.eval(x);
+        let t_x_blinding = t_blinding_poly.eval(x);
+        let l_vec = l_poly.eval(x);
+        let r_vec = r_poly.eval(x);
+        let e_blinding = x * (i_blinding + x * (o_blinding + x * s_blinding));
+
+        self.transcript.commit_scalar(b"t_x", &t_x);
+        self.transcript
+            .commit_scalar(b"t_x_blinding", &t_x_blinding);
+        self.transcript.commit_scalar(b"e_blinding", &e_blinding);
+
+        // Get a challenge value to combine statements for the IPP
+        let w = self.transcript.challenge_scalar(b"w");
+        let Q = w * gen.pedersen_gens.B;
+
+        let ipp_proof = InnerProductProof::create(
+            self.transcript,
+            &Q,
+            util::exp_iter(y.invert()),
+            gen.G.to_vec(),
+            gen.H.to_vec(),
+            l_vec,
+            r_vec,
+        );
+
+        Ok(R1CSProof {
+            A_I,
+            A_O,
+            S,
+            T_1,
+            T_3,
+            T_4,
+            T_5,
+            T_6,
+            t_x,
+            t_x_blinding,
+            e_blinding,
+            ipp_proof,
+        })
     }
 
     // This function can only be called once per ConstraintSystem instance.
     pub fn verify<R: Rng + CryptoRng>(
         mut self,
-        proof: &CircuitProof,
-        verifier_input: &VerifierInput,
+        proof: &R1CSProof,
         gen: &Generators,
         rng: &mut R,
     ) -> Result<(), &'static str> {
-        let circuit = self.create_circuit();
-        proof.verify(&gen, &mut self.transcript, rng, &circuit, verifier_input)
+        let temp_n = self.aL_assignments.len();
+        if !(temp_n == 0 || temp_n.is_power_of_two()) {
+            let pad = temp_n.next_power_of_two() - temp_n;
+            for _ in 0..pad {
+                self.assign_multiplier(Assignment::zero(), Assignment::zero(), Assignment::zero());
+            }
+        }
+
+        use inner_product_proof::inner_product;
+        use std::iter;
+        use util;
+
+        let n = self.aL_assignments.len();
+        assert_eq!(n, gen.n);
+
+        self.transcript.commit_point(b"A_I", &proof.A_I);
+        self.transcript.commit_point(b"A_O", &proof.A_O);
+        self.transcript.commit_point(b"S", &proof.S);
+
+        let y = self.transcript.challenge_scalar(b"y");
+        let z = self.transcript.challenge_scalar(b"z");
+
+        let (z_zQ_WL, z_zQ_WR, z_zQ_WO, z_zQ_WV, c) = self.create_circuit_data(&z);
+
+        self.transcript.commit_point(b"T_1", &proof.T_1);
+        self.transcript.commit_point(b"T_3", &proof.T_3);
+        self.transcript.commit_point(b"T_4", &proof.T_4);
+        self.transcript.commit_point(b"T_5", &proof.T_5);
+        self.transcript.commit_point(b"T_6", &proof.T_6);
+
+        let x = self.transcript.challenge_scalar(b"x");
+
+        self.transcript.commit_scalar(b"t_x", &proof.t_x);
+        self.transcript
+            .commit_scalar(b"t_x_blinding", &proof.t_x_blinding);
+        self.transcript
+            .commit_scalar(b"e_blinding", &proof.e_blinding);
+
+        let w = self.transcript.challenge_scalar(b"w");
+
+        let r = Scalar::random(rng);
+        let xx = x * x;
+
+        // Decompress points
+        let S = proof.S.decompress().ok_or_else(|| "Invalid proof point")?;
+        let A_I = proof
+            .A_I
+            .decompress()
+            .ok_or_else(|| "Invalid proof point")?;
+        let A_O = proof
+            .A_O
+            .decompress()
+            .ok_or_else(|| "Invalid proof point")?;
+        let T_1 = proof
+            .T_1
+            .decompress()
+            .ok_or_else(|| "Invalid proof point")?;
+        let T_3 = proof
+            .T_3
+            .decompress()
+            .ok_or_else(|| "Invalid proof point")?;
+        let T_4 = proof
+            .T_4
+            .decompress()
+            .ok_or_else(|| "Invalid proof point")?;
+        let T_5 = proof
+            .T_5
+            .decompress()
+            .ok_or_else(|| "Invalid proof point")?;
+        let T_6 = proof
+            .T_6
+            .decompress()
+            .ok_or_else(|| "Invalid proof point")?;
+
+        let y_inv = y.invert();
+
+        // Calculate points that represent the matrices
+        let H_prime: Vec<RistrettoPoint> = gen
+            .H
+            .iter()
+            .zip(util::exp_iter(y_inv))
+            .map(|(H_i, exp_y_inv)| H_i * exp_y_inv)
+            .collect();
+
+        // W_L_point = <h * y^-n , z * z^Q * W_L>, line 81
+        let W_L_point = RistrettoPoint::vartime_multiscalar_mul(&z_zQ_WL, &H_prime);
+
+        // W_R_point = <g , y^-n * z * z^Q * W_R>, line 82
+        let y_n_z_zQ_WR = z_zQ_WR
+            .iter()
+            .zip(util::exp_iter(y.invert()))
+            .map(|(W_R_right_i, exp_y_inv)| W_R_right_i * exp_y_inv)
+            .collect::<Vec<Scalar>>();
+        let W_R_point = RistrettoPoint::vartime_multiscalar_mul(&y_n_z_zQ_WR, gen.G.iter());
+
+        // W_O_point = <h * y^-n , z * z^Q * W_O>, line 83
+        let W_O_point = RistrettoPoint::vartime_multiscalar_mul(&z_zQ_WO, &H_prime);
+
+        // Get IPP variables
+        let (x_sq, x_inv_sq, s) = proof.ipp_proof.verification_scalars(self.transcript);
+        let s_inv = s.iter().rev().take(n);
+        let a = proof.ipp_proof.a;
+        let b = proof.ipp_proof.b;
+
+        // define parameters for P check
+        let g = s.iter().take(n).map(|s_i| -a * s_i);
+        let h = s_inv
+            .zip(util::exp_iter(y.invert()))
+            .map(|(s_i_inv, exp_y_inv)| -exp_y_inv * b * s_i_inv - Scalar::one());
+
+        // define parameters for t check
+        let delta = inner_product(&y_n_z_zQ_WR, &z_zQ_WL);
+        let z_c = z * util::exp_iter(z)
+            .zip(c.iter())
+            .map(|(a, b)| a * b)
+            .sum::<Scalar>();
+        let rxx = r * xx;
+        let V_coeff = z_zQ_WV.iter().map(|W_V_i| rxx * W_V_i);
+
+        // group the T_scalars and T_points together
+        let T_scalars = [r * x, rxx * x, rxx * xx, rxx * xx * x, rxx * xx * xx];
+        let T_points = [T_1, T_3, T_4, T_5, T_6];
+
+        // Decompress L and R points from inner product proof
+        let Ls = proof
+            .ipp_proof
+            .L_vec
+            .iter()
+            .map(|p| p.decompress().ok_or("RangeProof's L point is invalid"))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let Rs = proof
+            .ipp_proof
+            .R_vec
+            .iter()
+            .map(|p| p.decompress().ok_or("RangeProof's R point is invalid"))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let mega_check = RistrettoPoint::vartime_multiscalar_mul(
+            iter::once(x) // A_I
+                .chain(iter::once(xx)) // A_O
+                .chain(iter::once(x)) // W_L_point
+                .chain(iter::once(x)) // W_R_point
+                .chain(iter::once(Scalar::one())) // W_O_point
+                .chain(iter::once(x * xx)) // S
+                .chain(iter::once(w * (proof.t_x - a * b) + r * (xx * (delta + z_c) - proof.t_x))) // B
+                .chain(iter::once(-proof.e_blinding - r * proof.t_x_blinding)) // B_blinding
+                .chain(g) // G
+                .chain(h) // H
+                .chain(x_sq.iter().cloned()) // ipp_proof.L_vec
+                .chain(x_inv_sq.iter().cloned()) // ipp_proof.R_vec
+                .chain(V_coeff) // V
+                .chain(T_scalars.iter().cloned()), // T_points
+            iter::once(&A_I)
+                .chain(iter::once(&A_O))
+                .chain(iter::once(&W_L_point))
+                .chain(iter::once(&W_R_point))
+                .chain(iter::once(&W_O_point))
+                .chain(iter::once(&S))
+                .chain(iter::once(&gen.pedersen_gens.B))
+                .chain(iter::once(&gen.pedersen_gens.B_blinding))
+                .chain(gen.G.iter())
+                .chain(gen.H.iter())
+                .chain(Ls.iter())
+                .chain(Rs.iter())
+                .chain(self.V.iter())
+                .chain(T_points.iter()),
+        );
+
+        use curve25519_dalek::traits::IsIdentity;
+
+        if !mega_check.is_identity() {
+            return Err("Circuit did not verify correctly.");
+        }
+
+        Ok(())
     }
+}
+
+// Computes z * z^Q * W, where W is a qx(n or m) matrix and z is a scalar.
+// Input: Qx(n or m) matrix of scalars and scalar z
+// Output: length (n or m) vector of Scalars
+// Note: output_dim parameter is necessary in case W is `qxn` where `q=0`,
+//       such that it is not possible to derive `n` from looking at W.
+pub fn matrix_flatten(
+    W: &Vec<Vec<Scalar>>,
+    z: &Scalar,
+    output_dim: usize,
+) -> Result<Vec<Scalar>, &'static str> {
+    let mut result = vec![Scalar::zero(); output_dim];
+    let mut exp_z = *z; // z^n starting at n=1
+
+    for row in 0..W.len() {
+        if W[row].len() != output_dim {
+            return Err("Matrix size doesn't match specified parameters in matrix_flatten");
+        }
+        for col in 0..output_dim {
+            result[col] += exp_z * W[row][col];
+        }
+        exp_z = exp_z * z; // z^n -> z^(n+1)
+    }
+    Ok(result)
 }
 
 #[cfg(test)]
@@ -331,8 +712,9 @@ mod tests {
             1,
         );
 
-        let (proof, verifier_input) = prover_cs.prove(&gen, &mut rng)?;
-        let actual_result = verifier_cs.verify(&proof, &verifier_input, &gen, &mut rng);
+        let proof = prover_cs.prove(&gen)?;
+
+        let actual_result = verifier_cs.verify(&proof, &gen, &mut rng);
 
         match expected_result {
             Ok(_) => assert!(actual_result.is_ok()),
@@ -351,7 +733,7 @@ mod tests {
     // The purpose of this test is to see how a multiplication gate with no
     // variables (no corresponding v commitments) and no linear constraints behaves.
     fn mul_circuit_basic_helper(a: u64, b: u64, c: u64, expected_result: Result<(), ()>) {
-        let mut prover_transcript = Transcript::new(b"CircuitProofTest");
+        let mut prover_transcript = Transcript::new(b"R1CSProofTest");
         // empty commitments vec because there are no commitments in this test
         let v = vec![];
         let v_blinding = vec![];
@@ -368,7 +750,7 @@ mod tests {
             Assignment::from(c),
         );
 
-        let mut verifier_transcript = Transcript::new(b"CircuitProofTest");
+        let mut verifier_transcript = Transcript::new(b"R1CSProofTest");
         let (mut verifier_cs, _verifier_committed_variables) =
             ConstraintSystem::verifier_new(&mut verifier_transcript, commitments);
         verifier_cs.assign_multiplier(
@@ -377,9 +759,7 @@ mod tests {
             Assignment::Missing(),
         );
 
-        assert!(
-            create_and_verify_helper(prover_cs, verifier_cs, expected_result).is_ok()
-        );
+        assert!(create_and_verify_helper(prover_cs, verifier_cs, expected_result).is_ok());
     }
 
     #[test]
@@ -404,7 +784,7 @@ mod tests {
         let one = Scalar::one();
         let zer = Scalar::zero();
 
-        let mut prover_transcript = Transcript::new(b"CircuitProofTest");
+        let mut prover_transcript = Transcript::new(b"R1CSProofTest");
         let v = vec![Scalar::from(a), Scalar::from(b), Scalar::from(c)];
         let v_blinding = blinding_helper(v.len());
         let (mut prover_cs, prover_committed_variables, commitments) = ConstraintSystem::prover_new(
@@ -436,7 +816,7 @@ mod tests {
             zer,
         ));
 
-        let mut verifier_transcript = Transcript::new(b"CircuitProofTest");
+        let mut verifier_transcript = Transcript::new(b"R1CSProofTest");
         let (mut verifier_cs, verifier_committed_variables) =
             ConstraintSystem::verifier_new(&mut verifier_transcript, commitments);
         let (aL, aR, aO) = verifier_cs.assign_multiplier(
@@ -461,9 +841,7 @@ mod tests {
             zer,
         ));
 
-        assert!(
-            create_and_verify_helper(prover_cs, verifier_cs, expected_result).is_ok()
-        );
+        assert!(create_and_verify_helper(prover_cs, verifier_cs, expected_result).is_ok());
     }
 
     #[test]
@@ -488,7 +866,7 @@ mod tests {
         let one = Scalar::one();
         let zer = Scalar::zero();
 
-        let mut prover_transcript = Transcript::new(b"CircuitProofTest");
+        let mut prover_transcript = Transcript::new(b"R1CSProofTest");
         let v = vec![Scalar::from(a), Scalar::from(b), Scalar::from(c)];
         let v_blinding = blinding_helper(v.len());
         let (mut prover_cs, prover_committed_variables, commitments) = ConstraintSystem::prover_new(
@@ -506,7 +884,7 @@ mod tests {
             zer,
         ));
 
-        let mut verifier_transcript = Transcript::new(b"CircuitProofTest");
+        let mut verifier_transcript = Transcript::new(b"R1CSProofTest");
         let (mut verifier_cs, verifier_committed_variables) =
             ConstraintSystem::verifier_new(&mut verifier_transcript, commitments);
         let v_a = verifier_committed_variables[0];
@@ -517,9 +895,7 @@ mod tests {
             zer,
         ));
 
-        assert!(
-            create_and_verify_helper(prover_cs, verifier_cs, expected_result).is_ok()
-        );
+        assert!(create_and_verify_helper(prover_cs, verifier_cs, expected_result).is_ok());
     }
 
     #[test]
@@ -537,7 +913,7 @@ mod tests {
         let one = Scalar::one();
         let zer = Scalar::zero();
 
-        let mut prover_transcript = Transcript::new(b"CircuitProofTest");
+        let mut prover_transcript = Transcript::new(b"R1CSProofTest");
         let v = vec![Scalar::from(a), Scalar::from(b), Scalar::from(c)];
         let v_blinding = blinding_helper(v.len());
         let (mut prover_cs, prover_committed_variables, commitments) = ConstraintSystem::prover_new(
@@ -572,7 +948,7 @@ mod tests {
             zer,
         ));
 
-        let mut verifier_transcript = Transcript::new(b"CircuitProofTest");
+        let mut verifier_transcript = Transcript::new(b"R1CSProofTest");
         let (mut verifier_cs, verifier_committed_variables) =
             ConstraintSystem::verifier_new(&mut verifier_transcript, commitments);
         // Make high-level variables
@@ -603,9 +979,7 @@ mod tests {
             zer,
         ));
 
-        assert!(
-            create_and_verify_helper(prover_cs, verifier_cs, expected_result).is_ok()
-        );
+        assert!(create_and_verify_helper(prover_cs, verifier_cs, expected_result).is_ok());
     }
 
     #[test]
@@ -628,7 +1002,7 @@ mod tests {
         let one = Scalar::one();
         let zer = Scalar::zero();
 
-        let mut prover_transcript = Transcript::new(b"CircuitProofTest");
+        let mut prover_transcript = Transcript::new(b"R1CSProofTest");
         let v = vec![
             Scalar::from(a1),
             Scalar::from(a2),
@@ -671,7 +1045,7 @@ mod tests {
             zer,
         ));
 
-        let mut verifier_transcript = Transcript::new(b"CircuitProofTest");
+        let mut verifier_transcript = Transcript::new(b"R1CSProofTest");
         let (mut verifier_cs, verifier_committed_variables) =
             ConstraintSystem::verifier_new(&mut verifier_transcript, commitments);
         // Make high-level variables
@@ -701,9 +1075,7 @@ mod tests {
             zer,
         ));
 
-        assert!(
-            create_and_verify_helper(prover_cs, verifier_cs, expected_result).is_ok()
-        );
+        assert!(create_and_verify_helper(prover_cs, verifier_cs, expected_result).is_ok());
     }
 
     #[test]
