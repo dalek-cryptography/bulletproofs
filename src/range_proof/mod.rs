@@ -82,7 +82,7 @@ impl RangeProof {
         if !(n == 8 || n == 16 || n == 32 || n == 64) {
             return Err(ProofError::InvalidBitsize);
         }
-        if generators.capacity() < n {
+        if generators.gens_capacity < n {
             return Err(ProofError::InvalidGeneratorsLength);
         }
 
@@ -155,7 +155,7 @@ impl RangeProof {
         if !(n == 8 || n == 16 || n == 32 || n == 64) {
             return Err(ProofError::InvalidBitsize);
         }
-        if gens.capacity() < n {
+        if gens.gens_capacity < n {
             return Err(ProofError::InvalidGeneratorsLength);
         }
 
@@ -235,8 +235,8 @@ impl RangeProof {
                 .chain(self.ipp_proof.R_vec.iter().map(|R| R.decompress()))
                 .chain(iter::once(Some(gens.pedersen_gens.B_blinding)))
                 .chain(iter::once(Some(gens.pedersen_gens.B)))
-                .chain(gens.G(n).map(|&x| Some(x)))
-                .chain(gens.H(n).map(|&x| Some(x)))
+                .chain(gens.G(n, m).map(|&x| Some(x)))
+                .chain(gens.H(n, m).map(|&x| Some(x)))
                 .chain(value_commitments.iter().map(|&x| Some(x))),
         ).ok_or_else(|| ProofError::VerificationError)?;
 
@@ -407,7 +407,9 @@ mod tests {
         use bincode;
 
         // Both prover and verifier have access to the generators and the proof
-        let generators = Generators::new(PedersenGenerators::default(), n, m);
+        let max_bitsize = 64;
+        let max_parties = 8;
+        let generators = Generators::new(PedersenGenerators::default(), max_bitsize, max_parties);
 
         // Serialized proof data
         let proof_bytes: Vec<u8>;

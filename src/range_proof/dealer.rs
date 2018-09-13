@@ -226,8 +226,8 @@ impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
             self.transcript,
             &Q,
             util::exp_iter(self.value_challenge.y.invert()),
-            self.gens.G(self.n).cloned().collect(),
-            self.gens.H(self.n).cloned().collect(),
+            self.gens.G(self.n, self.m).cloned().collect(),
+            self.gens.H(self.n, self.m).cloned().collect(),
             l_vec,
             r_vec,
         );

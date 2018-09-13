@@ -88,9 +88,9 @@ pub struct Generators {
     /// Bases for Pedersen commitments
     pub pedersen_gens: PedersenGenerators,
     /// The maximum number of usable generators for each party.
-    capacity: usize,
+    pub gens_capacity: usize,
     /// Number of values or parties
-    parties: usize,
+    pub party_capacity: usize,
     /// Per-bit generators for the bit values
     G_vec: Vec<Vec<RistrettoPoint>>,
     /// Per-bit generators for the bit blinding factors
@@ -98,38 +98,54 @@ pub struct Generators {
 }
 
 impl Generators {
-    /// Creates `capacity` generators for the given number of `parties`.
-    pub fn new(pedersen_gens: PedersenGenerators, capacity: usize, parties: usize) -> Self {
+    /// Create a new `Generators` object.
+    ///
+    /// # Inputs
+    ///
+    /// * `pedersen_gens` is a pair of generators used for Pedersen
+    ///    commitments.
+    /// * `gens_capacity` is the number of generators to precompute
+    ///    for each party.  For rangeproofs, it is sufficient to pass
+    ///    `64`, the maximum bitsize of the rangeproofs.  For circuit
+    ///    proofs, the capacity must be greater than the number of
+    ///    multipliers, rounded up to the next power of two.
+    /// * `party_capacity` is the maximum number of parties that can
+    ///    produce an aggregated proof.
+    pub fn new(
+        pedersen_gens: PedersenGenerators,
+        gens_capacity: usize,
+        party_capacity: usize,
+    ) -> Self {
         use byteorder::{ByteOrder, LittleEndian};
 
-        let G_vec = (0..parties)
+        let G_vec = (0..party_capacity)
             .map(|i| {
                 let party_index = i as u32;
                 let mut label = [b'G', 0, 0, 0, 0];
                 LittleEndian::write_u32(&mut label[1..5], party_index);
 
                 GeneratorsChain::new(&label)
-                    .take(capacity)
+                    .take(gens_capacity)
                     .collect::<Vec<_>>()
             })
             .collect();
 
-        let H_vec = (0..parties)
+        let H_vec = (0..party_capacity)
             .map(|i| {
                 let party_index = i as u32;
                 let mut label = [b'H', 0, 0, 0, 0];
                 LittleEndian::write_u32(&mut label[1..5], party_index);
 
                 GeneratorsChain::new(&label)
-                    .take(capacity)
+                    .take(gens_capacity)
                     .collect::<Vec<_>>()
             })
             .collect();
 
         Generators {
             pedersen_gens,
-            capacity,
-            parties,
+            gens_capacity,
+            party_capacity,
             G_vec,
             H_vec,
         }
@@ -145,15 +161,11 @@ impl Generators {
         }
     }
 
-    /// Get the maximum number of generators that can be used in a proof.
-    pub fn capacity(&self) -> usize {
-        self.capacity
-    }
-
     /// Return an iterator over the aggregation of the parties' G generators with given size `n`.
-    pub(crate) fn G(&self, n: usize) -> impl Iterator<Item = &RistrettoPoint> {
+    pub(crate) fn G(&self, n: usize, m: usize) -> impl Iterator<Item = &RistrettoPoint> {
         AggregatedGensIter {
             n,
+            m,
             array: &self.G_vec,
             party_idx: 0,
             gen_idx: 0,
@@ -161,9 +173,10 @@ impl Generators {
     }
 
     /// Return an iterator over the aggregation of the parties' H generators with given size `n`.
-    pub(crate) fn H(&self, n: usize) -> impl Iterator<Item = &RistrettoPoint> {
+    pub(crate) fn H(&self, n: usize, m: usize) -> impl Iterator<Item = &RistrettoPoint> {
         AggregatedGensIter {
             n,
+            m,
             array: &self.H_vec,
             party_idx: 0,
             gen_idx: 0,
@@ -174,6 +187,7 @@ impl Generators {
 struct AggregatedGensIter<'a> {
     array: &'a Vec<Vec<RistrettoPoint>>,
     n: usize,
+    m: usize,
     party_idx: usize,
     gen_idx: usize,
 }
@@ -187,7 +201,7 @@ impl<'a> Iterator for AggregatedGensIter<'a> {
             self.party_idx += 1;
         }
 
-        if self.party_idx >= self.array.len() {
+        if self.party_idx >= self.m {
             None
         } else {
             let cur_gen = self.gen_idx;
@@ -197,7 +211,7 @@ impl<'a> Iterator for AggregatedGensIter<'a> {
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let size = self.n * self.array.len();
+        let size = self.n * self.m;
         (size, Some(size))
     }
 }
@@ -240,19 +254,21 @@ mod tests {
     fn aggregated_gens_iter_matches_flat_map() {
         let gens = Generators::new(PedersenGenerators::default(), 64, 8);
 
-        let helper = |n: usize| {
-            let agg_G: Vec<RistrettoPoint> = gens.G(n).cloned().collect();
+        let helper = |n: usize, m: usize| {
+            let agg_G: Vec<RistrettoPoint> = gens.G(n, m).cloned().collect();
             let flat_G: Vec<RistrettoPoint> = gens
                 .G_vec
                 .iter()
+                .take(m)
                 .flat_map(move |G_j| G_j.iter().take(n))
                 .cloned()
                 .collect();
 
-            let agg_H: Vec<RistrettoPoint> = gens.H(n).cloned().collect();
+            let agg_H: Vec<RistrettoPoint> = gens.H(n, m).cloned().collect();
             let flat_H: Vec<RistrettoPoint> = gens
                 .H_vec
                 .iter()
+                .take(m)
                 .flat_map(move |H_j| H_j.iter().take(n))
                 .cloned()
                 .collect();
@@ -261,9 +277,17 @@ mod tests {
             assert_eq!(agg_H, flat_H);
         };
 
-        helper(64);
-        helper(32);
-        helper(16);
-        helper(8);
+        helper(64, 8);
+        helper(64, 4);
+        helper(64, 2);
+        helper(64, 1);
+        helper(32, 8);
+        helper(32, 4);
+        helper(32, 2);
+        helper(32, 1);
+        helper(16, 8);
+        helper(16, 4);
+        helper(16, 2);
+        helper(16, 1);
     }
 }
