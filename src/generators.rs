@@ -248,8 +248,6 @@ mod tests {
     extern crate hex;
     use super::*;
 
-    // XXX write tests
-
     #[test]
     fn aggregated_gens_iter_matches_flat_map() {
         let gens = Generators::new(PedersenGenerators::default(), 64, 8);
