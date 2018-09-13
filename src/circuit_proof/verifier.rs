@@ -7,8 +7,7 @@ use merlin::Transcript;
 use rand::{CryptoRng, Rng};
 
 use super::assignment::Assignment;
-use super::r1cs::{ConstraintSystem, LinearCombination, Variable};
-use super::R1CSProof;
+use super::{ConstraintSystem, LinearCombination, R1CSProof, Variable};
 
 use errors::R1CSError;
 use generators::Generators;
