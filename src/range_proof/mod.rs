@@ -79,11 +79,11 @@ impl RangeProof {
         if values.len() != blindings.len() {
             return Err(ProofError::WrongNumBlindingFactors);
         }
-        if generators.n != n {
-            return Err(ProofError::InvalidGeneratorsLength);
-        }
         if !(n == 8 || n == 16 || n == 32 || n == 64) {
             return Err(ProofError::InvalidBitsize);
+        }
+        if generators.capacity() < n {
+            return Err(ProofError::InvalidGeneratorsLength);
         }
 
         let dealer = Dealer::new(generators, n, values.len(), transcript)?;
@@ -152,11 +152,11 @@ impl RangeProof {
     ) -> Result<(), ProofError> {
         // First, replay the "interactive" protocol using the proof
         // data to recompute all challenges.
-        if gens.n != n {
-            return Err(ProofError::InvalidGeneratorsLength);
-        }
         if !(n == 8 || n == 16 || n == 32 || n == 64) {
             return Err(ProofError::InvalidBitsize);
+        }
+        if gens.capacity() < n {
+            return Err(ProofError::InvalidGeneratorsLength);
         }
 
         let m = value_commitments.len();
@@ -235,8 +235,8 @@ impl RangeProof {
                 .chain(self.ipp_proof.R_vec.iter().map(|R| R.decompress()))
                 .chain(iter::once(Some(gens.pedersen_gens.B_blinding)))
                 .chain(iter::once(Some(gens.pedersen_gens.B)))
-                .chain(gens.G.iter().map(|&x| Some(x)))
-                .chain(gens.H.iter().map(|&x| Some(x)))
+                .chain(gens.G(n).map(|&x| Some(x)))
+                .chain(gens.H(n).map(|&x| Some(x)))
                 .chain(value_commitments.iter().map(|&x| Some(x))),
         ).ok_or_else(|| ProofError::VerificationError)?;
 

@@ -226,10 +226,10 @@ impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
             self.transcript,
             &Q,
             util::exp_iter(self.value_challenge.y.invert()),
-            self.gens.G.to_vec(),
-            self.gens.H.to_vec(),
-            l_vec.clone(),
-            r_vec.clone(),
+            self.gens.G(self.n).cloned().collect(),
+            self.gens.H(self.n).cloned().collect(),
+            l_vec,
+            r_vec,
         );
 
         Ok(RangeProof {

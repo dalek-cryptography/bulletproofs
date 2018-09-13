@@ -337,8 +337,8 @@ mod tests {
 
         use generators::{Generators, PedersenGenerators};
         let gens = Generators::new(PedersenGenerators::default(), n, 1);
-        let G = gens.share(0).G.to_vec();
-        let H = gens.share(0).H.to_vec();
+        let G: Vec<RistrettoPoint> = gens.share(0).G(n).cloned().collect();
+        let H: Vec<RistrettoPoint> = gens.share(0).H(n).cloned().collect();
 
         // Q would be determined upstream in the protocol, so we pick a random one.
         let Q = RistrettoPoint::hash_from_bytes::<Sha3_512>(b"test point");

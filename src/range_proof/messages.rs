@@ -63,7 +63,7 @@ impl ProofShare {
         use inner_product_proof::inner_product;
         use util;
 
-        let n = gens.n;
+        let n = self.l_vec.len();
         let (y, z) = (&value_challenge.y, &value_challenge.z);
         let x = &poly_challenge.x;
 
@@ -98,8 +98,8 @@ impl ProofShare {
             iter::once(&value_commitment.A_j)
                 .chain(iter::once(&value_commitment.S_j))
                 .chain(iter::once(&gens.pedersen_gens.B_blinding))
-                .chain(gens.share(j).G.iter())
-                .chain(gens.share(j).H.iter()),
+                .chain(gens.share(j).G(n))
+                .chain(gens.share(j).H(n)),
         );
         if !P_check.is_identity() {
             return Err(());

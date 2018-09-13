@@ -11,6 +11,36 @@ use curve25519_dalek::traits::MultiscalarMul;
 use digest::{ExtendableOutput, Input, XofReader};
 use sha3::{Sha3XofReader, Shake256};
 
+/// Represents a pair of base points for Pedersen commitments.
+#[derive(Copy, Clone)]
+pub struct PedersenGenerators {
+    /// Base for the committed value
+    pub B: RistrettoPoint,
+
+    /// Base for the blinding factor
+    pub B_blinding: RistrettoPoint,
+}
+
+impl PedersenGenerators {
+    /// Creates a Pedersen commitment using the value scalar and a blinding factor.
+    pub fn commit(&self, value: Scalar, blinding: Scalar) -> RistrettoPoint {
+        RistrettoPoint::multiscalar_mul(&[value, blinding], &[self.B, self.B_blinding])
+    }
+}
+
+impl Default for PedersenGenerators {
+    fn default() -> Self {
+        PedersenGenerators {
+            B: GeneratorsChain::new(b"Bulletproofs.Generators.B")
+                .next()
+                .unwrap(),
+            B_blinding: GeneratorsChain::new(b"Bulletproofs.Generators.B_blinding")
+                .next()
+                .unwrap(),
+        }
+    }
+}
+
 /// The `GeneratorsChain` creates an arbitrary-long sequence of orthogonal generators.
 /// The sequence can be deterministically produced starting with an arbitrary point.
 struct GeneratorsChain {
@@ -55,16 +85,121 @@ impl Iterator for GeneratorsChain {
 /// aggregating `m` range proofs of `n` bits each.
 #[derive(Clone)]
 pub struct Generators {
-    /// Number of bits in a rangeproof
-    pub n: usize,
-    /// Number of values or parties
-    pub m: usize,
     /// Bases for Pedersen commitments
     pub pedersen_gens: PedersenGenerators,
+    /// The maximum number of usable generators for each party.
+    capacity: usize,
+    /// Number of values or parties
+    parties: usize,
     /// Per-bit generators for the bit values
-    pub G: Vec<RistrettoPoint>,
+    G_vec: Vec<Vec<RistrettoPoint>>,
     /// Per-bit generators for the bit blinding factors
-    pub H: Vec<RistrettoPoint>,
+    H_vec: Vec<Vec<RistrettoPoint>>,
+}
+
+impl Generators {
+    /// Creates `capacity` generators for the given number of `parties`.
+    pub fn new(pedersen_gens: PedersenGenerators, capacity: usize, parties: usize) -> Self {
+        use byteorder::{ByteOrder, LittleEndian};
+
+        let G_vec = (0..parties)
+            .map(|i| {
+                let party_index = i as u32;
+                let mut label = [b'G', 0, 0, 0, 0];
+                LittleEndian::write_u32(&mut label[1..5], party_index);
+
+                GeneratorsChain::new(&label)
+                    .take(capacity)
+                    .collect::<Vec<_>>()
+            })
+            .collect();
+
+        let H_vec = (0..parties)
+            .map(|i| {
+                let party_index = i as u32;
+                let mut label = [b'H', 0, 0, 0, 0];
+                LittleEndian::write_u32(&mut label[1..5], party_index);
+
+                GeneratorsChain::new(&label)
+                    .take(capacity)
+                    .collect::<Vec<_>>()
+            })
+            .collect();
+
+        Generators {
+            pedersen_gens,
+            capacity,
+            parties,
+            G_vec,
+            H_vec,
+        }
+    }
+
+    /// Returns j-th share of generators, with an appropriate
+    /// slice of vectors G and H for the j-th range proof.
+    pub fn share(&self, j: usize) -> GeneratorsView {
+        GeneratorsView {
+            pedersen_gens: &self.pedersen_gens,
+            gens: &self,
+            share: j,
+        }
+    }
+
+    /// Get the maximum number of generators that can be used in a proof.
+    pub fn capacity(&self) -> usize {
+        self.capacity
+    }
+
+    /// Return an iterator over the aggregation of the parties' G generators with given size `n`.
+    pub(crate) fn G(&self, n: usize) -> impl Iterator<Item = &RistrettoPoint> {
+        AggregatedGensIter {
+            n,
+            array: &self.G_vec,
+            party_idx: 0,
+            gen_idx: 0,
+        }
+    }
+
+    /// Return an iterator over the aggregation of the parties' H generators with given size `n`.
+    pub(crate) fn H(&self, n: usize) -> impl Iterator<Item = &RistrettoPoint> {
+        AggregatedGensIter {
+            n,
+            array: &self.H_vec,
+            party_idx: 0,
+            gen_idx: 0,
+        }
+    }
+}
+
+struct AggregatedGensIter<'a> {
+    array: &'a Vec<Vec<RistrettoPoint>>,
+    n: usize,
+    party_idx: usize,
+    gen_idx: usize,
+}
+
+impl<'a> Iterator for AggregatedGensIter<'a> {
+    type Item = &'a RistrettoPoint;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.gen_idx >= self.n {
+            self.gen_idx = 0;
+            self.party_idx += 1;
+        }
+
+        if self.party_idx >= self.array.len() {
+            None
+        } else {
+            let cur_gen = self.gen_idx;
+            self.gen_idx += 1;
+            Some(&self.array[self.party_idx][cur_gen])
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let size = self.n * self.array.len();
+        (size, Some(size))
+    }
 }
 
 /// The `GeneratorsView` is produced by `Generators::share()`.
@@ -76,86 +211,21 @@ pub struct Generators {
 pub struct GeneratorsView<'a> {
     /// Bases for Pedersen commitments
     pub pedersen_gens: &'a PedersenGenerators,
-    /// Per-bit generators for the bit values
-    pub G: &'a [RistrettoPoint],
-    /// Per-bit generators for the bit blinding factors
-    pub H: &'a [RistrettoPoint],
+    /// The parent object that this is a view into
+    gens: &'a Generators,
+    /// Which share we are
+    share: usize,
 }
 
-/// Represents a pair of base points for Pedersen commitments.
-#[derive(Copy, Clone)]
-pub struct PedersenGenerators {
-    /// Base for the committed value
-    pub B: RistrettoPoint,
-
-    /// Base for the blinding factor
-    pub B_blinding: RistrettoPoint,
-}
-
-impl PedersenGenerators {
-    /// Creates a Pedersen commitment using the value scalar and a blinding factor.
-    pub fn commit(&self, value: Scalar, blinding: Scalar) -> RistrettoPoint {
-        RistrettoPoint::multiscalar_mul(&[value, blinding], &[self.B, self.B_blinding])
-    }
-}
-
-impl Default for PedersenGenerators {
-    fn default() -> Self {
-        PedersenGenerators {
-            B: GeneratorsChain::new(b"Bulletproofs.Generators.B")
-                .next()
-                .unwrap(),
-            B_blinding: GeneratorsChain::new(b"Bulletproofs.Generators.B_blinding")
-                .next()
-                .unwrap(),
-        }
-    }
-}
-
-impl Generators {
-    /// Creates generators for `m` range proofs of `n` bits each.
-    pub fn new(pedersen_gens: PedersenGenerators, n: usize, m: usize) -> Self {
-        use byteorder::{ByteOrder, LittleEndian};
-
-        let G = (0..m)
-            .flat_map(|i| {
-                let party_index = i as u32;
-                let mut label = [b'G', 0, 0, 0, 0];
-                LittleEndian::write_u32(&mut label[1..5], party_index);
-
-                GeneratorsChain::new(&label).take(n)
-            })
-            .collect();
-
-        let H = (0..m)
-            .flat_map(|i| {
-                let party_index = i as u32;
-                let mut label = [b'H', 0, 0, 0, 0];
-                LittleEndian::write_u32(&mut label[1..5], party_index);
-
-                GeneratorsChain::new(&label).take(n)
-            })
-            .collect();
-
-        Generators {
-            pedersen_gens,
-            n,
-            m,
-            G,
-            H,
-        }
+impl<'a> GeneratorsView<'a> {
+    /// Return an iterator over this party's G generators with given size `n`.
+    pub(crate) fn G(&self, n: usize) -> impl Iterator<Item = &'a RistrettoPoint> {
+        self.gens.G_vec[self.share].iter().take(n)
     }
 
-    /// Returns j-th share of generators, with an appropriate
-    /// slice of vectors G and H for the j-th range proof.
-    pub fn share(&self, j: usize) -> GeneratorsView {
-        let lower = self.n * j;
-        let upper = self.n * (j + 1);
-        GeneratorsView {
-            pedersen_gens: &self.pedersen_gens,
-            G: &self.G[lower..upper],
-            H: &self.H[lower..upper],
-        }
+    /// Return an iterator over this party's H generators with given size `n`.
+    pub(crate) fn H(&self, n: usize) -> impl Iterator<Item = &'a RistrettoPoint> {
+        self.gens.H_vec[self.share].iter().take(n)
     }
 }
 
@@ -164,24 +234,36 @@ mod tests {
     extern crate hex;
     use super::*;
 
-    #[test]
-    fn rangeproof_generators() {
-        let n = 2;
-        let m = 3;
-        let gens = Generators::new(PedersenGenerators::default(), n, m);
+    // XXX write tests
 
-        // The concatenation of shares must be the full generator set
-        assert_eq!(
-            [gens.G[..n].to_vec(), gens.H[..n].to_vec()],
-            [gens.share(0).G[..].to_vec(), gens.share(0).H[..].to_vec()]
-        );
-        assert_eq!(
-            [gens.G[n..][..n].to_vec(), gens.H[n..][..n].to_vec()],
-            [gens.share(1).G[..].to_vec(), gens.share(1).H[..].to_vec()]
-        );
-        assert_eq!(
-            [gens.G[2 * n..][..n].to_vec(), gens.H[2 * n..][..n].to_vec()],
-            [gens.share(2).G[..].to_vec(), gens.share(2).H[..].to_vec()]
-        );
+    #[test]
+    fn aggregated_gens_iter_matches_flat_map() {
+        let gens = Generators::new(PedersenGenerators::default(), 64, 8);
+
+        let helper = |n: usize| {
+            let agg_G: Vec<RistrettoPoint> = gens.G(n).cloned().collect();
+            let flat_G: Vec<RistrettoPoint> = gens
+                .G_vec
+                .iter()
+                .flat_map(move |G_j| G_j.iter().take(n))
+                .cloned()
+                .collect();
+
+            let agg_H: Vec<RistrettoPoint> = gens.H(n).cloned().collect();
+            let flat_H: Vec<RistrettoPoint> = gens
+                .H_vec
+                .iter()
+                .flat_map(move |H_j| H_j.iter().take(n))
+                .cloned()
+                .collect();
+
+            assert_eq!(agg_G, flat_G);
+            assert_eq!(agg_H, flat_H);
+        };
+
+        helper(64);
+        helper(32);
+        helper(16);
+        helper(8);
     }
 }
