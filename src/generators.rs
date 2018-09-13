@@ -127,8 +127,7 @@ impl Generators {
                 GeneratorsChain::new(&label)
                     .take(gens_capacity)
                     .collect::<Vec<_>>()
-            })
-            .collect();
+            }).collect();
 
         let H_vec = (0..party_capacity)
             .map(|i| {
@@ -139,8 +138,7 @@ impl Generators {
                 GeneratorsChain::new(&label)
                     .take(gens_capacity)
                     .collect::<Vec<_>>()
-            })
-            .collect();
+            }).collect();
 
         Generators {
             pedersen_gens,
