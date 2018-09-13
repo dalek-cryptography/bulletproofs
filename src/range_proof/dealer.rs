@@ -36,6 +36,12 @@ impl Dealer {
         if !m.is_power_of_two() {
             return Err(MPCError::InvalidAggregation);
         }
+        if gens.gens_capacity < n {
+            return Err(MPCError::InvalidGeneratorsLength);
+        }
+        if gens.party_capacity < m {
+            return Err(MPCError::InvalidGeneratorsLength);
+        }
 
         // At the end of the protocol, the dealer will attempt to
         // verify the proof, and if it fails, determine which party's

@@ -85,6 +85,9 @@ impl RangeProof {
         if generators.gens_capacity < n {
             return Err(ProofError::InvalidGeneratorsLength);
         }
+        if generators.party_capacity < values.len() {
+            return Err(ProofError::InvalidGeneratorsLength);
+        }
 
         let dealer = Dealer::new(generators, n, values.len(), transcript)?;
 
@@ -150,6 +153,8 @@ impl RangeProof {
         rng: &mut R,
         n: usize,
     ) -> Result<(), ProofError> {
+        let m = value_commitments.len();
+
         // First, replay the "interactive" protocol using the proof
         // data to recompute all challenges.
         if !(n == 8 || n == 16 || n == 32 || n == 64) {
@@ -158,8 +163,9 @@ impl RangeProof {
         if gens.gens_capacity < n {
             return Err(ProofError::InvalidGeneratorsLength);
         }
-
-        let m = value_commitments.len();
+        if gens.party_capacity < m {
+            return Err(ProofError::InvalidGeneratorsLength);
+        }
 
         // XXX check n, m parameters
 
