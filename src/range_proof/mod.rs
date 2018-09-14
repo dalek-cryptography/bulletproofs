@@ -79,11 +79,14 @@ impl RangeProof {
         if values.len() != blindings.len() {
             return Err(ProofError::WrongNumBlindingFactors);
         }
-        if generators.n != n {
-            return Err(ProofError::InvalidGeneratorsLength);
-        }
         if !(n == 8 || n == 16 || n == 32 || n == 64) {
             return Err(ProofError::InvalidBitsize);
+        }
+        if generators.gens_capacity < n {
+            return Err(ProofError::InvalidGeneratorsLength);
+        }
+        if generators.party_capacity < values.len() {
+            return Err(ProofError::InvalidGeneratorsLength);
         }
 
         let dealer = Dealer::new(generators, n, values.len(), transcript)?;
@@ -150,16 +153,19 @@ impl RangeProof {
         rng: &mut R,
         n: usize,
     ) -> Result<(), ProofError> {
+        let m = value_commitments.len();
+
         // First, replay the "interactive" protocol using the proof
         // data to recompute all challenges.
-        if gens.n != n {
-            return Err(ProofError::InvalidGeneratorsLength);
-        }
         if !(n == 8 || n == 16 || n == 32 || n == 64) {
             return Err(ProofError::InvalidBitsize);
         }
-
-        let m = value_commitments.len();
+        if gens.gens_capacity < n {
+            return Err(ProofError::InvalidGeneratorsLength);
+        }
+        if gens.party_capacity < m {
+            return Err(ProofError::InvalidGeneratorsLength);
+        }
 
         // XXX check n, m parameters
 
@@ -235,8 +241,8 @@ impl RangeProof {
                 .chain(self.ipp_proof.R_vec.iter().map(|R| R.decompress()))
                 .chain(iter::once(Some(gens.pedersen_gens.B_blinding)))
                 .chain(iter::once(Some(gens.pedersen_gens.B)))
-                .chain(gens.G.iter().map(|&x| Some(x)))
-                .chain(gens.H.iter().map(|&x| Some(x)))
+                .chain(gens.G(n, m).map(|&x| Some(x)))
+                .chain(gens.H(n, m).map(|&x| Some(x)))
                 .chain(value_commitments.iter().map(|&x| Some(x))),
         ).ok_or_else(|| ProofError::VerificationError)?;
 
@@ -407,7 +413,9 @@ mod tests {
         use bincode;
 
         // Both prover and verifier have access to the generators and the proof
-        let generators = Generators::new(PedersenGenerators::default(), n, m);
+        let max_bitsize = 64;
+        let max_parties = 8;
+        let generators = Generators::new(PedersenGenerators::default(), max_bitsize, max_parties);
 
         // Serialized proof data
         let proof_bytes: Vec<u8>;

@@ -140,7 +140,7 @@ impl<'a> VerifierCS<'a> {
     pub fn verify<R: Rng + CryptoRng>(
         mut self,
         proof: &R1CSProof,
-        gen: &Generators,
+        generators: &Generators,
         rng: &mut R,
     ) -> Result<(), &'static str> {
         let temp_n = self.num_vars;
@@ -159,8 +159,9 @@ impl<'a> VerifierCS<'a> {
         use std::iter;
         use util;
 
+        // We are performing a single-party circuit proof, so party index is 0.
+        let gens = generators.share(0);
         let n = self.num_vars;
-        assert_eq!(n, gen.n);
 
         self.transcript.commit_point(b"A_I", &proof.A_I);
         self.transcript.commit_point(b"A_O", &proof.A_O);
@@ -224,9 +225,8 @@ impl<'a> VerifierCS<'a> {
         let y_inv = y.invert();
 
         // Calculate points that represent the matrices
-        let H_prime: Vec<RistrettoPoint> = gen
-            .H
-            .iter()
+        let H_prime: Vec<RistrettoPoint> = gens
+            .H(n)
             .zip(util::exp_iter(y_inv))
             .map(|(H_i, exp_y_inv)| H_i * exp_y_inv)
             .collect();
@@ -240,7 +240,7 @@ impl<'a> VerifierCS<'a> {
             .zip(util::exp_iter(y.invert()))
             .map(|(W_R_right_i, exp_y_inv)| W_R_right_i * exp_y_inv)
             .collect::<Vec<Scalar>>();
-        let W_R_point = RistrettoPoint::vartime_multiscalar_mul(&y_n_z_zQ_WR, gen.G.iter());
+        let W_R_point = RistrettoPoint::vartime_multiscalar_mul(&y_n_z_zQ_WR, gens.G(n));
 
         // W_O_point = <h * y^-n , z * z^Q * W_O>, line 83
         let W_O_point = RistrettoPoint::vartime_multiscalar_mul(&z_zQ_WO, &H_prime);
@@ -302,10 +302,10 @@ impl<'a> VerifierCS<'a> {
                 .chain(iter::once(&W_R_point))
                 .chain(iter::once(&W_O_point))
                 .chain(iter::once(&S))
-                .chain(iter::once(&gen.pedersen_gens.B))
-                .chain(iter::once(&gen.pedersen_gens.B_blinding))
-                .chain(gen.G.iter())
-                .chain(gen.H.iter())
+                .chain(iter::once(&gens.pedersen_gens.B))
+                .chain(iter::once(&gens.pedersen_gens.B_blinding))
+                .chain(gens.G(n))
+                .chain(gens.H(n))
                 .chain(Ls.iter())
                 .chain(Rs.iter())
                 .chain(self.V.iter())
