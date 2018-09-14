@@ -36,6 +36,12 @@ impl Dealer {
         if !m.is_power_of_two() {
             return Err(MPCError::InvalidAggregation);
         }
+        if gens.gens_capacity < n {
+            return Err(MPCError::InvalidGeneratorsLength);
+        }
+        if gens.party_capacity < m {
+            return Err(MPCError::InvalidGeneratorsLength);
+        }
 
         // At the end of the protocol, the dealer will attempt to
         // verify the proof, and if it fails, determine which party's
@@ -226,10 +232,10 @@ impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
             self.transcript,
             &Q,
             util::exp_iter(self.value_challenge.y.invert()),
-            self.gens.G.to_vec(),
-            self.gens.H.to_vec(),
-            l_vec.clone(),
-            r_vec.clone(),
+            self.gens.G(self.n, self.m).cloned().collect(),
+            self.gens.H(self.n, self.m).cloned().collect(),
+            l_vec,
+            r_vec,
         );
 
         Ok(RangeProof {

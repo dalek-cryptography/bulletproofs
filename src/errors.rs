@@ -21,8 +21,8 @@ pub enum ProofError {
     /// proof with non-power-of-two aggregation size.
     #[fail(display = "Invalid aggregation size, m must be a power of 2.")]
     InvalidAggregation,
-    /// This error occurs when the generators are of the wrong length.
-    #[fail(display = "Invalid generators length, must be equal to n.")]
+    /// This error occurs when there are insufficient generators for the proof.
+    #[fail(display = "Invalid generators size, too few generators for proof")]
     InvalidGeneratorsLength,
     /// This error results from an internal error during proving.
     ///
@@ -39,6 +39,7 @@ impl From<MPCError> for ProofError {
         match e {
             MPCError::InvalidBitsize => ProofError::InvalidBitsize,
             MPCError::InvalidAggregation => ProofError::InvalidAggregation,
+            MPCError::InvalidGeneratorsLength => ProofError::InvalidGeneratorsLength,
             _ => ProofError::ProvingError(e),
         }
     }
@@ -65,6 +66,9 @@ pub enum MPCError {
     /// proof with non-power-of-two aggregation size.
     #[fail(display = "Invalid aggregation size, m must be a power of 2")]
     InvalidAggregation,
+    /// This error occurs when there are insufficient generators for the proof.
+    #[fail(display = "Invalid generators size, too few generators for proof")]
+    InvalidGeneratorsLength,
     /// This error occurs when the dealer is given the wrong number of
     /// value commitments.
     #[fail(display = "Wrong number of value commitments")]
@@ -92,6 +96,9 @@ pub enum MPCError {
 /// Represents an error during the proving or verifying of a constraint system.
 #[derive(Fail, Copy, Clone, Debug, Eq, PartialEq)]
 pub enum R1CSError {
+    /// This error occurs when there are insufficient generators for the proof.
+    #[fail(display = "Invalid generators size, too few generators for proof")]
+    InvalidGeneratorsLength,
     // TODO: make better errors
     #[fail(display = "Invalid R1CS construction.")]
     InvalidR1CSConstruction,

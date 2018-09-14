@@ -156,7 +156,7 @@ impl<'a> ProverCS<'a> {
     }
 
     /// Consume this `ConstraintSystem` to produce a proof.
-    pub fn prove(mut self, gen: &Generators) -> Result<R1CSProof, R1CSError> {
+    pub fn prove(mut self, generators: &Generators) -> Result<R1CSProof, R1CSError> {
         use std::iter;
         use util;
 
@@ -174,9 +174,14 @@ impl<'a> ProverCS<'a> {
                 );
             }
         }
-
         let n = self.a_L.len();
-        assert_eq!(n, gen.n);
+        if generators.gens_capacity < n {
+            return Err(R1CSError::InvalidGeneratorsLength);
+        }
+
+        // We are performing a single-party circuit proof, so party index is 0.
+        let gens = generators.share(0);
+        let pg = &gens.pedersen_gens;
 
         // 1. Create a `TranscriptRng` from the high-level witness data
 
@@ -206,23 +211,19 @@ impl<'a> ProverCS<'a> {
             iter::once(&i_blinding)
                 .chain(self.a_L.iter())
                 .chain(self.a_R.iter()),
-            iter::once(&gen.pedersen_gens.B_blinding)
-                .chain(gen.G.iter())
-                .chain(gen.H.iter()),
+            iter::once(&pg.B_blinding).chain(gens.G(n)).chain(gens.H(n)),
         ).compress();
 
         // A_O = <a_O, G> + o_blinding * B_blinding
         let A_O = RistrettoPoint::multiscalar_mul(
             iter::once(&o_blinding).chain(self.a_O.iter()),
-            iter::once(&gen.pedersen_gens.B_blinding).chain(gen.G.iter()),
+            iter::once(&pg.B_blinding).chain(gens.G(n)),
         ).compress();
 
         // S = <s_L, G> + <s_R, H> + s_blinding * B_blinding
         let S = RistrettoPoint::multiscalar_mul(
             iter::once(&s_blinding).chain(s_L.iter()).chain(s_R.iter()),
-            iter::once(&gen.pedersen_gens.B_blinding)
-                .chain(gen.G.iter())
-                .chain(gen.H.iter()),
+            iter::once(&pg.B_blinding).chain(gens.G(n)).chain(gens.H(n)),
         ).compress();
 
         self.transcript.commit_point(b"A_I", &A_I);
@@ -271,8 +272,6 @@ impl<'a> ProverCS<'a> {
         let t_5_blinding = Scalar::random(&mut rng);
         let t_6_blinding = Scalar::random(&mut rng);
 
-        let pg = &gen.pedersen_gens;
-
         let T_1 = pg.commit(t_poly.t1, t_1_blinding).compress();
         let T_3 = pg.commit(t_poly.t3, t_3_blinding).compress();
         let T_4 = pg.commit(t_poly.t4, t_4_blinding).compress();
@@ -317,14 +316,14 @@ impl<'a> ProverCS<'a> {
 
         // Get a challenge value to combine statements for the IPP
         let w = self.transcript.challenge_scalar(b"w");
-        let Q = w * gen.pedersen_gens.B;
+        let Q = w * pg.B;
 
         let ipp_proof = InnerProductProof::create(
             self.transcript,
             &Q,
             util::exp_iter(y.invert()),
-            gen.G.to_vec(),
-            gen.H.to_vec(),
+            gens.G(n).cloned().collect(),
+            gens.H(n).cloned().collect(),
             l_vec,
             r_vec,
         );

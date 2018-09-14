@@ -165,7 +165,7 @@ mod tests {
         c2: u64,
     ) -> Result<(), R1CSError> {
         // Common
-        let gens = Generators::new(PedersenGenerators::default(), 1, 1);
+        let gens = Generators::new(PedersenGenerators::default(), 128, 1);
 
         // Prover's scope
         let (proof, commitments) = {
