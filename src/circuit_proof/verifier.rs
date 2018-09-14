@@ -126,7 +126,7 @@ impl<'a> VerifierCS<'a> {
                     Variable::Committed(i) => {
                         z_zQ_WV[*i] -= exp_z * coeff;
                     }
-                    Variable::Constant() => {
+                    Variable::One() => {
                         z_zQ_c -= exp_z * coeff;
                     }
                 }

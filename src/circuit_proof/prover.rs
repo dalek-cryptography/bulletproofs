@@ -146,7 +146,7 @@ impl<'a> ProverCS<'a> {
                     Variable::Committed(i) => {
                         z_zQ_WV[*i] -= exp_z * coeff;
                     }
-                    Variable::Constant() => {
+                    Variable::One() => {
                         // The prover doesn't need to handle constant terms
                     }
                 }

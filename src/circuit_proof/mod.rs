@@ -55,7 +55,7 @@ pub enum Variable {
     /// Represents the output of a multiplication gate.
     MultiplierOutput(usize),
     /// Represents the constant 1.
-    Constant(),
+    One(),
 }
 
 /// Represents a linear combination of `Variables`.  Each term is
@@ -168,7 +168,7 @@ mod tests {
         cs.add_constraint([(aL, -one), (a1.0, one), (a2.0, one)].iter().collect());
         cs.add_constraint([(aR, -one), (b1.0, one), (b2.0, one)].iter().collect());
         cs.add_constraint(
-            [(aO, -one), (c1.0, one), (Variable::Constant(), c2)]
+            [(aO, -one), (c1.0, one), (Variable::One(), c2)]
                 .iter()
                 .collect(),
         );
