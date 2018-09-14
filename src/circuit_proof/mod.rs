@@ -147,6 +147,8 @@ mod tests {
 
     use rand::thread_rng;
 
+    /// Constrains (a1 + a2) * (b1 + b2) = (c1 + c2),
+    /// where c2 is a constant.
     #[allow(non_snake_case)]
     fn example_gadget<CS: ConstraintSystem>(
         cs: &mut CS,
@@ -155,16 +157,21 @@ mod tests {
         b1: (Variable, Assignment),
         b2: (Variable, Assignment),
         c1: (Variable, Assignment),
-        c2: (Variable, Assignment),
+        c2: Scalar,
     ) -> Result<(), R1CSError> {
         // Make low-level variables (aL = v_a1 + v_a2, aR = v_b1 + v_b2, aO = v_c1 + v_c2)
-        let (aL, aR, aO) = cs.assign_multiplier(a1.1 + a2.1, b1.1 + b2.1, c1.1 + c2.1)?;
+        let (aL, aR, aO) =
+            cs.assign_multiplier(a1.1 + a2.1, b1.1 + b2.1, c1.1 + Assignment::from(c2))?;
 
         // Tie high-level and low-level variables together
         let one = Scalar::one();
         cs.add_constraint([(aL, -one), (a1.0, one), (a2.0, one)].iter().collect());
         cs.add_constraint([(aR, -one), (b1.0, one), (b2.0, one)].iter().collect());
-        cs.add_constraint([(aO, -one), (c1.0, one), (c2.0, one)].iter().collect());
+        cs.add_constraint(
+            [(aO, -one), (c1.0, one), (Variable::Constant(), c2)]
+                .iter()
+                .collect(),
+        );
 
         Ok(())
     }
@@ -192,7 +199,7 @@ mod tests {
             let mut transcript = Transcript::new(b"R1CSExampleGadget");
 
             // 1. Construct HL witness
-            let v: Vec<_> = [a1, a2, b1, b2, c1, c2]
+            let v: Vec<_> = [a1, a2, b1, b2, c1]
                 .iter()
                 .map(|x| Scalar::from(*x))
                 .collect();
@@ -214,7 +221,7 @@ mod tests {
                 (vars[2], v[2].into()),
                 (vars[3], v[3].into()),
                 (vars[4], v[4].into()),
-                (vars[5], v[5].into()),
+                c2.into(),
             )?;
 
             // 4. Prove.
@@ -239,7 +246,7 @@ mod tests {
             (vars[2], Assignment::Missing()),
             (vars[3], Assignment::Missing()),
             (vars[4], Assignment::Missing()),
-            (vars[5], Assignment::Missing()),
+            c2.into(),
         )?;
 
         // 3. Verify.
