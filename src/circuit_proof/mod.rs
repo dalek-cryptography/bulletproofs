@@ -94,9 +94,9 @@ impl<'a> FromIterator<&'a (Variable, Scalar)> for LinearCombination {
 }
 
 pub trait ConstraintSystem {
-    // Allocate variables for left, right, and output wires of multiplication,
-    // and assign them the Assignments that are passed in.
-    // Prover will pass in `Value(Scalar)`s, and Verifier will pass in `Missing`s.
+    /// Allocate variables for left, right, and output wires of multiplication,
+    /// and assign them the Assignments that are passed in.
+    /// Prover will pass in `Value(Scalar)`s, and Verifier will pass in `Missing`s.
     fn assign_multiplier(
         &mut self,
         left: Assignment,
@@ -104,16 +104,31 @@ pub trait ConstraintSystem {
         out: Assignment,
     ) -> Result<(Variable, Variable, Variable), R1CSError>;
 
-    // Allocate two uncommitted variables, and assign them the Assignments passed in.
-    // Prover will pass in `Value(Scalar)`s, and Verifier will pass in `Missing`s.
+    /// Allocate two uncommitted variables, and assign them the Assignments passed in.
+    /// Prover will pass in `Value(Scalar)`s, and Verifier will pass in `Missing`s.
     fn assign_uncommitted(
         &mut self,
         val_1: Assignment,
         val_2: Assignment,
     ) -> Result<(Variable, Variable), R1CSError>;
 
+    /// Enforce that the given `LinearCombination` is zero.
     fn add_constraint(&mut self, lc: LinearCombination);
 
+    /// Obtain a challenge scalar bound to the assignments of all of
+    /// the externally committed wires.
+    ///
+    /// This allows the prover to select a challenge circuit from a
+    /// family of circuits parameterized by challenge scalars.
+    ///
+    /// # Warning
+    ///
+    /// The challenge scalars are bound only to the externally
+    /// committed wires (high-level witness variables), and not to the
+    /// assignments to all wires (low-level witness variables).  In
+    /// the same way that it is the user's responsibility to ensure
+    /// that the constraints are sound, it is **also** the user's
+    /// responsibility to ensure that each challenge circuit is sound.
     fn challenge_scalar(&mut self, label: &'static [u8]) -> Scalar;
 }
 
