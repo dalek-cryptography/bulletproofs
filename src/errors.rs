@@ -39,6 +39,7 @@ impl From<MPCError> for ProofError {
         match e {
             MPCError::InvalidBitsize => ProofError::InvalidBitsize,
             MPCError::InvalidAggregation => ProofError::InvalidAggregation,
+            MPCError::InvalidGeneratorsLength => ProofError::InvalidGeneratorsLength,
             _ => ProofError::ProvingError(e),
         }
     }
@@ -65,6 +66,9 @@ pub enum MPCError {
     /// proof with non-power-of-two aggregation size.
     #[fail(display = "Invalid aggregation size, m must be a power of 2")]
     InvalidAggregation,
+    /// This error occurs when the generators are of the wrong length.
+    #[fail(display = "Invalid generators length, must be equal to n.")]
+    InvalidGeneratorsLength,
     /// This error occurs when the dealer is given the wrong number of
     /// value commitments.
     #[fail(display = "Wrong number of value commitments")]
