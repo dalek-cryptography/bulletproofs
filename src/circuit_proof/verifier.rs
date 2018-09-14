@@ -263,9 +263,6 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
             .collect::<Vec<Scalar>>();
         let W_R_point = RistrettoPoint::vartime_multiscalar_mul(&y_n_z_zQ_WR, gens.G(n));
 
-        // W_O_point = <h * y^-n , z * z^Q * W_O>, line 83
-        let W_O_point = RistrettoPoint::vartime_multiscalar_mul(&z_zQ_WO, &H_prime);
-
         // Get IPP variables
         let (x_sq, x_inv_sq, s) = proof.ipp_proof.verification_scalars(self.transcript);
         let s_inv = s.iter().rev().take(n);
@@ -292,7 +289,7 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
                 .chain(iter::once(xx)) // A_O
                 .chain(iter::once(x)) // W_L_point
                 .chain(iter::once(x)) // W_R_point
-                .chain(iter::once(Scalar::one())) // W_O_point
+                .chain(z_zQ_WO.iter().cloned()) // H_prime
                 .chain(iter::once(x * xx)) // S
                 .chain(iter::once(
                     w * (proof.t_x - a * b) + r * (xx * (delta + z_zQ_c) - proof.t_x),
@@ -308,7 +305,8 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
                 .chain(iter::once(proof.A_O.decompress()))
                 .chain(iter::once(Some(W_L_point)))
                 .chain(iter::once(Some(W_R_point)))
-                .chain(iter::once(Some(W_O_point)))
+                // W_O_point = <h * y^-n , z * z^Q * W_O>, line 83
+                .chain(H_prime.iter().map(|&H_i| Some(H_i)))
                 .chain(iter::once(proof.S.decompress()))
                 .chain(iter::once(Some(self.pc_gens.B)))
                 .chain(iter::once(Some(self.pc_gens.B_blinding)))
