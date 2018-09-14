@@ -13,14 +13,15 @@ use errors::R1CSError;
 use generators::Generators;
 use transcript::TranscriptProtocol;
 
-pub struct VerifierCS<'a> {
+pub struct VerifierCS<'a, 'b> {
     transcript: &'a mut Transcript,
+    generators: &'b Generators,
     constraints: Vec<LinearCombination>,
     num_vars: usize,
     V: Vec<RistrettoPoint>,
 }
 
-impl<'a> ConstraintSystem for VerifierCS<'a> {
+impl<'a, 'b> ConstraintSystem for VerifierCS<'a, 'b> {
     fn assign_multiplier(
         &mut self,
         _left: Assignment,
@@ -58,9 +59,10 @@ impl<'a> ConstraintSystem for VerifierCS<'a> {
     }
 }
 
-impl<'a> VerifierCS<'a> {
+impl<'a, 'b> VerifierCS<'a, 'b> {
     pub fn new(
         transcript: &'a mut Transcript,
+        generators: &'b Generators,
         // XXX should these take compressed points?
         commitments: Vec<RistrettoPoint>,
     ) -> (Self, Vec<Variable>) {
@@ -78,6 +80,7 @@ impl<'a> VerifierCS<'a> {
 
         let cs = VerifierCS {
             transcript,
+            generators,
             num_vars: 0,
             V: commitments,
             constraints: Vec::new(),
@@ -140,7 +143,6 @@ impl<'a> VerifierCS<'a> {
     pub fn verify<R: Rng + CryptoRng>(
         mut self,
         proof: &R1CSProof,
-        generators: &Generators,
         rng: &mut R,
     ) -> Result<(), R1CSError> {
         let temp_n = self.num_vars;
@@ -156,11 +158,11 @@ impl<'a> VerifierCS<'a> {
         use util;
 
         let n = self.num_vars;
-        if generators.gens_capacity < n {
+        if self.generators.gens_capacity < n {
             return Err(R1CSError::InvalidGeneratorsLength);
         }
         // We are performing a single-party circuit proof, so party index is 0.
-        let gens = generators.share(0);
+        let gens = self.generators.share(0);
 
         self.transcript.commit_point(b"A_I", &proof.A_I);
         self.transcript.commit_point(b"A_O", &proof.A_O);

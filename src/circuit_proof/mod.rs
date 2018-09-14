@@ -180,12 +180,8 @@ mod tests {
             let v_blinding = blinding_helper(v.len());
 
             // 2. Construct CS
-            let (mut cs, vars, commitments) = ProverCS::new(
-                &mut transcript,
-                v.clone(),
-                v_blinding,
-                PedersenGenerators::default(),
-            );
+            let (mut cs, vars, commitments) =
+                ProverCS::new(&mut transcript, &gens, v.clone(), v_blinding);
 
             // 3. Add gadgets
             example_gadget(
@@ -199,7 +195,7 @@ mod tests {
             )?;
 
             // 4. Prove.
-            let proof = cs.prove(&gens)?;
+            let proof = cs.prove()?;
 
             (proof, commitments)
         };
@@ -210,7 +206,7 @@ mod tests {
         let mut transcript = Transcript::new(b"R1CSExampleGadget");
 
         // 1. Construct CS using commitments to HL witness
-        let (mut cs, vars) = VerifierCS::new(&mut transcript, commitments);
+        let (mut cs, vars) = VerifierCS::new(&mut transcript, &gens, commitments);
 
         // 2. Add gadgets
         example_gadget(
@@ -224,7 +220,7 @@ mod tests {
         )?;
 
         // 3. Verify.
-        cs.verify(&proof, &gens, &mut thread_rng())
+        cs.verify(&proof, &mut thread_rng())
             .map_err(|_| R1CSError::VerificationError)
     }
 
