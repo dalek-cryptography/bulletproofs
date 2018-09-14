@@ -142,16 +142,12 @@ impl<'a> VerifierCS<'a> {
         proof: &R1CSProof,
         generators: &Generators,
         rng: &mut R,
-    ) -> Result<(), &'static str> {
+    ) -> Result<(), R1CSError> {
         let temp_n = self.num_vars;
         if !(temp_n == 0 || temp_n.is_power_of_two()) {
             let pad = temp_n.next_power_of_two() - temp_n;
             for _ in 0..pad {
-                let _ = self.assign_multiplier(
-                    Assignment::zero(),
-                    Assignment::zero(),
-                    Assignment::zero(),
-                );
+                self.assign_multiplier(Assignment::zero(), Assignment::zero(), Assignment::zero())?;
             }
         }
 
@@ -159,9 +155,12 @@ impl<'a> VerifierCS<'a> {
         use std::iter;
         use util;
 
+        let n = self.num_vars;
+        if generators.gens_capacity < n {
+            return Err(R1CSError::InvalidGeneratorsLength);
+        }
         // We are performing a single-party circuit proof, so party index is 0.
         let gens = generators.share(0);
-        let n = self.num_vars;
 
         self.transcript.commit_point(b"A_I", &proof.A_I);
         self.transcript.commit_point(b"A_O", &proof.A_O);
@@ -192,35 +191,38 @@ impl<'a> VerifierCS<'a> {
         let xx = x * x;
 
         // Decompress points
-        let S = proof.S.decompress().ok_or_else(|| "Invalid proof point")?;
+        let S = proof
+            .S
+            .decompress()
+            .ok_or_else(|| R1CSError::InvalidProofPoint)?;
         let A_I = proof
             .A_I
             .decompress()
-            .ok_or_else(|| "Invalid proof point")?;
+            .ok_or_else(|| R1CSError::InvalidProofPoint)?;
         let A_O = proof
             .A_O
             .decompress()
-            .ok_or_else(|| "Invalid proof point")?;
+            .ok_or_else(|| R1CSError::InvalidProofPoint)?;
         let T_1 = proof
             .T_1
             .decompress()
-            .ok_or_else(|| "Invalid proof point")?;
+            .ok_or_else(|| R1CSError::InvalidProofPoint)?;
         let T_3 = proof
             .T_3
             .decompress()
-            .ok_or_else(|| "Invalid proof point")?;
+            .ok_or_else(|| R1CSError::InvalidProofPoint)?;
         let T_4 = proof
             .T_4
             .decompress()
-            .ok_or_else(|| "Invalid proof point")?;
+            .ok_or_else(|| R1CSError::InvalidProofPoint)?;
         let T_5 = proof
             .T_5
             .decompress()
-            .ok_or_else(|| "Invalid proof point")?;
+            .ok_or_else(|| R1CSError::InvalidProofPoint)?;
         let T_6 = proof
             .T_6
             .decompress()
-            .ok_or_else(|| "Invalid proof point")?;
+            .ok_or_else(|| R1CSError::InvalidProofPoint)?;
 
         let y_inv = y.invert();
 
@@ -271,14 +273,14 @@ impl<'a> VerifierCS<'a> {
             .ipp_proof
             .L_vec
             .iter()
-            .map(|p| p.decompress().ok_or("RangeProof's L point is invalid"))
+            .map(|p| p.decompress().ok_or(R1CSError::InvalidProofPoint))
             .collect::<Result<Vec<_>, _>>()?;
 
         let Rs = proof
             .ipp_proof
             .R_vec
             .iter()
-            .map(|p| p.decompress().ok_or("RangeProof's R point is invalid"))
+            .map(|p| p.decompress().ok_or(R1CSError::InvalidProofPoint))
             .collect::<Result<Vec<_>, _>>()?;
 
         let mega_check = RistrettoPoint::vartime_multiscalar_mul(
@@ -315,7 +317,7 @@ impl<'a> VerifierCS<'a> {
         use curve25519_dalek::traits::IsIdentity;
 
         if !mega_check.is_identity() {
-            return Err("Circuit did not verify correctly.");
+            return Err(R1CSError::VerificationError);
         }
 
         Ok(())

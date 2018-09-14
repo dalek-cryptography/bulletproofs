@@ -175,6 +175,9 @@ impl<'a> ProverCS<'a> {
             }
         }
         let n = self.a_L.len();
+        if generators.gens_capacity < n {
+            return Err(R1CSError::InvalidGeneratorsLength);
+        }
 
         // We are performing a single-party circuit proof, so party index is 0.
         let gens = generators.share(0);
