@@ -112,7 +112,7 @@ impl<'a> VerifierCS<'a> {
 
         let mut exp_z = *z;
         for lc in self.constraints.iter() {
-            for (var, coeff) in &lc.variables {
+            for (var, coeff) in &lc.terms {
                 match var {
                     Variable::MultiplierLeft(i) => {
                         z_zQ_WL[*i] += exp_z * coeff;
@@ -126,10 +126,11 @@ impl<'a> VerifierCS<'a> {
                     Variable::Committed(i) => {
                         z_zQ_WV[*i] -= exp_z * coeff;
                     }
+                    Variable::Constant() => {
+                        z_zQ_c -= exp_z * coeff;
+                    }
                 }
             }
-            z_zQ_c -= exp_z * lc.constant;
-
             exp_z *= z;
         }
 

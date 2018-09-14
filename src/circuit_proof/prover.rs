@@ -132,7 +132,7 @@ impl<'a> ProverCS<'a> {
 
         let mut exp_z = *z;
         for lc in self.constraints.iter() {
-            for (var, coeff) in &lc.variables {
+            for (var, coeff) in &lc.terms {
                 match var {
                     Variable::MultiplierLeft(i) => {
                         z_zQ_WL[*i] += exp_z * coeff;
@@ -146,9 +146,11 @@ impl<'a> ProverCS<'a> {
                     Variable::Committed(i) => {
                         z_zQ_WV[*i] -= exp_z * coeff;
                     }
+                    Variable::Constant() => {
+                        // The prover doesn't need to handle constant terms
+                    }
                 }
             }
-
             exp_z *= z;
         }
 
