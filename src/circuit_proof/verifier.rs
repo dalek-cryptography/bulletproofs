@@ -1,6 +1,6 @@
 #![allow(non_snake_case)]
 
-use curve25519_dalek::ristretto::RistrettoPoint;
+use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::VartimeMultiscalarMul;
 use merlin::Transcript;
@@ -17,7 +17,7 @@ pub struct VerifierCS<'a> {
     transcript: &'a mut Transcript,
     constraints: Vec<LinearCombination>,
     num_vars: usize,
-    V: Vec<RistrettoPoint>,
+    V: Vec<CompressedRistretto>,
 }
 
 impl<'a> ConstraintSystem for VerifierCS<'a> {
@@ -61,8 +61,7 @@ impl<'a> ConstraintSystem for VerifierCS<'a> {
 impl<'a> VerifierCS<'a> {
     pub fn new(
         transcript: &'a mut Transcript,
-        // XXX should these take compressed points?
-        commitments: Vec<RistrettoPoint>,
+        commitments: Vec<CompressedRistretto>,
     ) -> (Self, Vec<Variable>) {
         let m = commitments.len();
         transcript.r1cs_domain_sep(m as u64);
@@ -70,7 +69,7 @@ impl<'a> VerifierCS<'a> {
         let mut variables = Vec::with_capacity(m);
         for (i, commitment) in commitments.iter().enumerate() {
             // Commit the commitment to the transcript
-            transcript.commit_point(b"V", &commitment.compress());
+            transcript.commit_point(b"V", &commitment);
 
             // Allocate and return a variable for the commitment
             variables.push(Variable::Committed(i));
@@ -283,6 +282,12 @@ impl<'a> VerifierCS<'a> {
             .map(|p| p.decompress().ok_or(R1CSError::InvalidProofPoint))
             .collect::<Result<Vec<_>, _>>()?;
 
+        let Vs = self
+            .V
+            .iter()
+            .map(|p| p.decompress().ok_or(R1CSError::InvalidProofPoint))
+            .collect::<Result<Vec<_>, _>>()?;
+
         let mega_check = RistrettoPoint::vartime_multiscalar_mul(
             iter::once(x) // A_I
                 .chain(iter::once(xx)) // A_O
@@ -310,7 +315,7 @@ impl<'a> VerifierCS<'a> {
                 .chain(gens.H(n))
                 .chain(Ls.iter())
                 .chain(Rs.iter())
-                .chain(self.V.iter())
+                .chain(Vs.iter())
                 .chain(T_points.iter()),
         );
 
