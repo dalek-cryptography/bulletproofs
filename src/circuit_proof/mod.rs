@@ -220,8 +220,7 @@ mod tests {
         )?;
 
         // 3. Verify.
-        cs.verify(&proof, &mut thread_rng())
-            .map_err(|_| R1CSError::VerificationError)
+        cs.verify(&proof).map_err(|_| R1CSError::VerificationError)
     }
 
     #[test]
