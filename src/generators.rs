@@ -151,8 +151,8 @@ impl Generators {
 
     /// Returns j-th share of generators, with an appropriate
     /// slice of vectors G and H for the j-th range proof.
-    pub fn share(&self, j: usize) -> GeneratorsView {
-        GeneratorsView {
+    pub fn share(&self, j: usize) -> BulletproofGensShare {
+        BulletproofGensShare {
             pedersen_gens: &self.pedersen_gens,
             gens: &self,
             share: j,
@@ -214,13 +214,13 @@ impl<'a> Iterator for AggregatedGensIter<'a> {
     }
 }
 
-/// The `GeneratorsView` is produced by `Generators::share()`.
+/// The `BulletproofGensShare` is produced by `Generators::share()`.
 ///
 /// The `Generators` struct represents generators for an aggregated
-/// range proof `m` proofs of `n` bits each; the `GeneratorsView`
+/// range proof `m` proofs of `n` bits each; the `BulletproofGensShare`
 /// represents the generators for one of the `m` parties' shares.
 #[derive(Copy, Clone)]
-pub struct GeneratorsView<'a> {
+pub struct BulletproofGensShare<'a> {
     /// Bases for Pedersen commitments
     pub pedersen_gens: &'a PedersenGens,
     /// The parent object that this is a view into
@@ -229,7 +229,7 @@ pub struct GeneratorsView<'a> {
     share: usize,
 }
 
-impl<'a> GeneratorsView<'a> {
+impl<'a> BulletproofGensShare<'a> {
     /// Return an iterator over this party's G generators with given size `n`.
     pub(crate) fn G(&self, n: usize) -> impl Iterator<Item = &'a RistrettoPoint> {
         self.gens.G_vec[self.share].iter().take(n)
