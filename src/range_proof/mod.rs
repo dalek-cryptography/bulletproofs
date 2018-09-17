@@ -167,8 +167,6 @@ impl RangeProof {
             return Err(ProofError::InvalidGeneratorsLength);
         }
 
-        // XXX check n, m parameters
-
         transcript.rangeproof_domain_sep(n as u64, m as u64);
 
         // TODO: allow user to supply compressed commitments
