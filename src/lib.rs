@@ -41,7 +41,7 @@ mod transcript;
 pub use merlin::Transcript;
 
 pub use errors::ProofError;
-pub use generators::{Generators, GeneratorsView, PedersenGenerators};
+pub use generators::{Generators, GeneratorsView, PedersenGens};
 pub use range_proof::RangeProof;
 
 #[doc(include = "../docs/aggregation-api.md")]

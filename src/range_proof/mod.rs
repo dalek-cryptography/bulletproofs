@@ -371,7 +371,7 @@ mod tests {
     use super::*;
     use rand::rngs::OsRng;
 
-    use generators::PedersenGenerators;
+    use generators::PedersenGens;
 
     #[test]
     fn test_delta() {
@@ -415,7 +415,7 @@ mod tests {
         // Both prover and verifier have access to the generators and the proof
         let max_bitsize = 64;
         let max_parties = 8;
-        let generators = Generators::new(PedersenGenerators::default(), max_bitsize, max_parties);
+        let generators = Generators::new(PedersenGens::default(), max_bitsize, max_parties);
 
         // Serialized proof data
         let proof_bytes: Vec<u8>;
@@ -534,7 +534,7 @@ mod tests {
         let m = 4;
         let n = 32;
 
-        let generators = Generators::new(PedersenGenerators::default(), n, m);
+        let generators = Generators::new(PedersenGens::default(), n, m);
 
         let mut rng = OsRng::new().unwrap();
         let mut transcript = Transcript::new(b"AggregatedRangeProofTest");
@@ -604,7 +604,7 @@ mod tests {
         let m = 1;
         let n = 32;
 
-        let generators = Generators::new(PedersenGenerators::default(), n, m);
+        let generators = Generators::new(PedersenGens::default(), n, m);
 
         let mut rng = OsRng::new().unwrap();
         let mut transcript = Transcript::new(b"AggregatedRangeProofTest");

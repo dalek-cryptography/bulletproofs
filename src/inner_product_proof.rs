@@ -336,8 +336,8 @@ mod tests {
     fn test_helper_create(n: usize) {
         let mut rng = OsRng::new().unwrap();
 
-        use generators::{Generators, PedersenGenerators};
-        let gens = Generators::new(PedersenGenerators::default(), n, 1);
+        use generators::{Generators, PedersenGens};
+        let gens = Generators::new(PedersenGens::default(), n, 1);
         let G: Vec<RistrettoPoint> = gens.share(0).G(n).cloned().collect();
         let H: Vec<RistrettoPoint> = gens.share(0).H(n).cloned().collect();
 

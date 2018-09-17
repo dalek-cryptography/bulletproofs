@@ -13,7 +13,7 @@ use sha3::{Sha3XofReader, Shake256};
 
 /// Represents a pair of base points for Pedersen commitments.
 #[derive(Copy, Clone)]
-pub struct PedersenGenerators {
+pub struct PedersenGens {
     /// Base for the committed value
     pub B: RistrettoPoint,
 
@@ -21,16 +21,16 @@ pub struct PedersenGenerators {
     pub B_blinding: RistrettoPoint,
 }
 
-impl PedersenGenerators {
+impl PedersenGens {
     /// Creates a Pedersen commitment using the value scalar and a blinding factor.
     pub fn commit(&self, value: Scalar, blinding: Scalar) -> RistrettoPoint {
         RistrettoPoint::multiscalar_mul(&[value, blinding], &[self.B, self.B_blinding])
     }
 }
 
-impl Default for PedersenGenerators {
+impl Default for PedersenGens {
     fn default() -> Self {
-        PedersenGenerators {
+        PedersenGens {
             B: GeneratorsChain::new(b"Bulletproofs.Generators.B")
                 .next()
                 .unwrap(),
@@ -86,7 +86,7 @@ impl Iterator for GeneratorsChain {
 #[derive(Clone)]
 pub struct Generators {
     /// Bases for Pedersen commitments
-    pub pedersen_gens: PedersenGenerators,
+    pub pedersen_gens: PedersenGens,
     /// The maximum number of usable generators for each party.
     pub gens_capacity: usize,
     /// Number of values or parties
@@ -112,7 +112,7 @@ impl Generators {
     /// * `party_capacity` is the maximum number of parties that can
     ///    produce an aggregated proof.
     pub fn new(
-        pedersen_gens: PedersenGenerators,
+        pedersen_gens: PedersenGens,
         gens_capacity: usize,
         party_capacity: usize,
     ) -> Self {
@@ -222,7 +222,7 @@ impl<'a> Iterator for AggregatedGensIter<'a> {
 #[derive(Copy, Clone)]
 pub struct GeneratorsView<'a> {
     /// Bases for Pedersen commitments
-    pub pedersen_gens: &'a PedersenGenerators,
+    pub pedersen_gens: &'a PedersenGens,
     /// The parent object that this is a view into
     gens: &'a Generators,
     /// Which share we are
@@ -248,7 +248,7 @@ mod tests {
 
     #[test]
     fn aggregated_gens_iter_matches_flat_map() {
-        let gens = Generators::new(PedersenGenerators::default(), 64, 8);
+        let gens = Generators::new(PedersenGens::default(), 64, 8);
 
         let helper = |n: usize, m: usize| {
             let agg_G: Vec<RistrettoPoint> = gens.G(n, m).cloned().collect();
