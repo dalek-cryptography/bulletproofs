@@ -160,12 +160,11 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
         let gens = self.generators.share(0);
 
         // Create a `TranscriptRng` from the transcript
-        let mut rng = {
-            let ctor = self.transcript.fork_transcript();
-
-            use rand::thread_rng;
-            ctor.reseed_from_rng(&mut thread_rng())
-        };
+        use rand::thread_rng;
+        let mut rng = self
+            .transcript
+            .fork_transcript()
+            .reseed_from_rng(&mut thread_rng());
 
         self.transcript.commit_point(b"A_I", &proof.A_I);
         self.transcript.commit_point(b"A_O", &proof.A_O);
