@@ -188,41 +188,6 @@ impl<'a> VerifierCS<'a> {
 
         let r = Scalar::random(rng);
         let xx = x * x;
-
-        // Decompress points
-        let S = proof
-            .S
-            .decompress()
-            .ok_or_else(|| R1CSError::InvalidProofPoint)?;
-        let A_I = proof
-            .A_I
-            .decompress()
-            .ok_or_else(|| R1CSError::InvalidProofPoint)?;
-        let A_O = proof
-            .A_O
-            .decompress()
-            .ok_or_else(|| R1CSError::InvalidProofPoint)?;
-        let T_1 = proof
-            .T_1
-            .decompress()
-            .ok_or_else(|| R1CSError::InvalidProofPoint)?;
-        let T_3 = proof
-            .T_3
-            .decompress()
-            .ok_or_else(|| R1CSError::InvalidProofPoint)?;
-        let T_4 = proof
-            .T_4
-            .decompress()
-            .ok_or_else(|| R1CSError::InvalidProofPoint)?;
-        let T_5 = proof
-            .T_5
-            .decompress()
-            .ok_or_else(|| R1CSError::InvalidProofPoint)?;
-        let T_6 = proof
-            .T_6
-            .decompress()
-            .ok_or_else(|| R1CSError::InvalidProofPoint)?;
-
         let y_inv = y.invert();
 
         // Calculate points that represent the matrices
@@ -265,7 +230,7 @@ impl<'a> VerifierCS<'a> {
 
         // group the T_scalars and T_points together
         let T_scalars = [r * x, rxx * x, rxx * xx, rxx * xx * x, rxx * xx * xx];
-        let T_points = [T_1, T_3, T_4, T_5, T_6];
+        let T_points = [proof.T_1, proof.T_3, proof.T_4, proof.T_5, proof.T_6];
 
         let mega_check = RistrettoPoint::optional_multiscalar_mul(
             iter::once(x) // A_I
@@ -282,20 +247,20 @@ impl<'a> VerifierCS<'a> {
                 .chain(x_inv_sq.iter().cloned()) // ipp_proof.R_vec
                 .chain(V_coeff) // V
                 .chain(T_scalars.iter().cloned()), // T_points
-            iter::once(Some(A_I))
-                .chain(iter::once(Some(A_O)))
+            iter::once(proof.A_I.decompress())
+                .chain(iter::once(proof.A_O.decompress()))
                 .chain(iter::once(Some(W_L_point)))
                 .chain(iter::once(Some(W_R_point)))
                 .chain(iter::once(Some(W_O_point)))
-                .chain(iter::once(Some(S)))
+                .chain(iter::once(proof.S.decompress()))
                 .chain(iter::once(Some(gens.pedersen_gens.B)))
                 .chain(iter::once(Some(gens.pedersen_gens.B_blinding)))
-                .chain(gens.G(n).map(|&g_i| Some(g_i)))
-                .chain(gens.H(n).map(|&h_i| Some(h_i)))
+                .chain(gens.G(n).map(|&G_i| Some(G_i)))
+                .chain(gens.H(n).map(|&H_i| Some(H_i)))
                 .chain(proof.ipp_proof.L_vec.iter().map(|L_i| L_i.decompress()))
                 .chain(proof.ipp_proof.R_vec.iter().map(|R_i| R_i.decompress()))
                 .chain(self.V.iter().map(|V_i| V_i.decompress()))
-                .chain(T_points.iter().map(|&T_i| Some(T_i))),
+                .chain(T_points.iter().map(|T_i| T_i.decompress())),
         ).ok_or_else(|| R1CSError::VerificationError)?;
 
         use curve25519_dalek::traits::IsIdentity;
