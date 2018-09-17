@@ -267,28 +267,7 @@ impl<'a> VerifierCS<'a> {
         let T_scalars = [r * x, rxx * x, rxx * xx, rxx * xx * x, rxx * xx * xx];
         let T_points = [T_1, T_3, T_4, T_5, T_6];
 
-        // Decompress L and R points from inner product proof
-        let Ls = proof
-            .ipp_proof
-            .L_vec
-            .iter()
-            .map(|p| p.decompress().ok_or(R1CSError::InvalidProofPoint))
-            .collect::<Result<Vec<_>, _>>()?;
-
-        let Rs = proof
-            .ipp_proof
-            .R_vec
-            .iter()
-            .map(|p| p.decompress().ok_or(R1CSError::InvalidProofPoint))
-            .collect::<Result<Vec<_>, _>>()?;
-
-        let Vs = self
-            .V
-            .iter()
-            .map(|p| p.decompress().ok_or(R1CSError::InvalidProofPoint))
-            .collect::<Result<Vec<_>, _>>()?;
-
-        let mega_check = RistrettoPoint::vartime_multiscalar_mul(
+        let mega_check = RistrettoPoint::optional_multiscalar_mul(
             iter::once(x) // A_I
                 .chain(iter::once(xx)) // A_O
                 .chain(iter::once(x)) // W_L_point
@@ -303,21 +282,21 @@ impl<'a> VerifierCS<'a> {
                 .chain(x_inv_sq.iter().cloned()) // ipp_proof.R_vec
                 .chain(V_coeff) // V
                 .chain(T_scalars.iter().cloned()), // T_points
-            iter::once(&A_I)
-                .chain(iter::once(&A_O))
-                .chain(iter::once(&W_L_point))
-                .chain(iter::once(&W_R_point))
-                .chain(iter::once(&W_O_point))
-                .chain(iter::once(&S))
-                .chain(iter::once(&gens.pedersen_gens.B))
-                .chain(iter::once(&gens.pedersen_gens.B_blinding))
-                .chain(gens.G(n))
-                .chain(gens.H(n))
-                .chain(Ls.iter())
-                .chain(Rs.iter())
-                .chain(Vs.iter())
-                .chain(T_points.iter()),
-        );
+            iter::once(Some(A_I))
+                .chain(iter::once(Some(A_O)))
+                .chain(iter::once(Some(W_L_point)))
+                .chain(iter::once(Some(W_R_point)))
+                .chain(iter::once(Some(W_O_point)))
+                .chain(iter::once(Some(S)))
+                .chain(iter::once(Some(gens.pedersen_gens.B)))
+                .chain(iter::once(Some(gens.pedersen_gens.B_blinding)))
+                .chain(gens.G(n).map(|&g_i| Some(g_i)))
+                .chain(gens.H(n).map(|&h_i| Some(h_i)))
+                .chain(proof.ipp_proof.L_vec.iter().map(|L_i| L_i.decompress()))
+                .chain(proof.ipp_proof.R_vec.iter().map(|R_i| R_i.decompress()))
+                .chain(self.V.iter().map(|V_i| V_i.decompress()))
+                .chain(T_points.iter().map(|&T_i| Some(T_i))),
+        ).ok_or_else(|| R1CSError::VerificationError)?;
 
         use curve25519_dalek::traits::IsIdentity;
 
