@@ -294,7 +294,9 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
                 .chain(iter::once(x)) // W_R_point
                 .chain(iter::once(Scalar::one())) // W_O_point
                 .chain(iter::once(x * xx)) // S
-                .chain(iter::once(w * (proof.t_x - a * b) + r * (xx * (delta + z_zQ_c) - proof.t_x))) // B
+                .chain(iter::once(
+                    w * (proof.t_x - a * b) + r * (xx * (delta + z_zQ_c) - proof.t_x),
+                )) // B
                 .chain(iter::once(-proof.e_blinding - r * proof.t_x_blinding)) // B_blinding
                 .chain(g) // G
                 .chain(h) // H
