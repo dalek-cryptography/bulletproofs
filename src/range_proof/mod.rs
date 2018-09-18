@@ -94,11 +94,9 @@ impl RangeProof {
         let parties: Vec<_> = values
             .iter()
             .zip(blindings.iter())
-            .map(|(&v, &v_blinding)| {
-                Party::new(bp_gens, pc_gens, v, v_blinding, n)
-            })
+            .map(|(&v, &v_blinding)| Party::new(bp_gens, pc_gens, v, v_blinding, n))
             // Collect the iterator of Results into a Result<Vec>, then unwrap it
-            .collect::<Result<Vec<_>,_>>()?;
+            .collect::<Result<Vec<_>, _>>()?;
 
         let (parties, value_commitments): (Vec<_>, Vec<_>) = parties
             .into_iter()
@@ -119,7 +117,7 @@ impl RangeProof {
             .into_iter()
             .map(|p| p.apply_challenge(&poly_challenge))
             // Collect the iterator of Results into a Result<Vec>, then unwrap it
-            .collect::<Result<Vec<_>,_>>()?;
+            .collect::<Result<Vec<_>, _>>()?;
 
         let proof = dealer.receive_trusted_shares(&proof_shares)?;
 

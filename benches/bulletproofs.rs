@@ -98,13 +98,7 @@ fn verify_aggregated_rangeproof_helper(n: usize, c: &mut Criterion) {
                 // Each proof creation requires a clean transcript.
                 let mut transcript = Transcript::new(b"AggregateRangeProofBenchmark");
 
-                proof.verify(
-                    &bp_gens,
-                    &pc_gens,
-                    &mut transcript,
-                    &value_commitments,
-                    n,
-                )
+                proof.verify(&bp_gens, &pc_gens, &mut transcript, &value_commitments, n)
             });
         },
         &AGGREGATION_SIZES,
