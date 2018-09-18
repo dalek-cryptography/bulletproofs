@@ -91,9 +91,9 @@ pub struct BulletproofGens {
     pub gens_capacity: usize,
     /// Number of values or parties
     pub party_capacity: usize,
-    /// Per-bit generators for the bit values
+    /// Precomputed \\(\mathbf G\\) generators for each party.
     G_vec: Vec<Vec<RistrettoPoint>>,
-    /// Per-bit generators for the bit blinding factors
+    /// Precomputed \\(\mathbf H\\) generators for each party.
     H_vec: Vec<Vec<RistrettoPoint>>,
 }
 
