@@ -81,10 +81,10 @@ impl Iterator for GeneratorsChain {
     }
 }
 
-/// The `Generators` struct contains all the generators needed for
+/// The `BulletproofGens` struct contains all the generators needed for
 /// aggregating `m` range proofs of `n` bits each.
 #[derive(Clone)]
-pub struct Generators {
+pub struct BulletproofGens {
     /// Bases for Pedersen commitments
     pub pedersen_gens: PedersenGens,
     /// The maximum number of usable generators for each party.
@@ -97,8 +97,8 @@ pub struct Generators {
     H_vec: Vec<Vec<RistrettoPoint>>,
 }
 
-impl Generators {
-    /// Create a new `Generators` object.
+impl BulletproofGens {
+    /// Create a new `BulletproofGens` object.
     ///
     /// # Inputs
     ///
@@ -140,7 +140,7 @@ impl Generators {
                     .collect::<Vec<_>>()
             }).collect();
 
-        Generators {
+        BulletproofGens {
             pedersen_gens,
             gens_capacity,
             party_capacity,
@@ -214,9 +214,9 @@ impl<'a> Iterator for AggregatedGensIter<'a> {
     }
 }
 
-/// The `BulletproofGensShare` is produced by `Generators::share()`.
+/// The `BulletproofGensShare` is produced by `BulletproofGens::share()`.
 ///
-/// The `Generators` struct represents generators for an aggregated
+/// The `BulletproofGens` struct represents generators for an aggregated
 /// range proof `m` proofs of `n` bits each; the `BulletproofGensShare`
 /// represents the generators for one of the `m` parties' shares.
 #[derive(Copy, Clone)]
@@ -224,7 +224,7 @@ pub struct BulletproofGensShare<'a> {
     /// Bases for Pedersen commitments
     pub pedersen_gens: &'a PedersenGens,
     /// The parent object that this is a view into
-    gens: &'a Generators,
+    gens: &'a BulletproofGens,
     /// Which share we are
     share: usize,
 }
@@ -248,7 +248,7 @@ mod tests {
 
     #[test]
     fn aggregated_gens_iter_matches_flat_map() {
-        let gens = Generators::new(PedersenGens::default(), 64, 8);
+        let gens = BulletproofGens::new(PedersenGens::default(), 64, 8);
 
         let helper = |n: usize, m: usize| {
             let agg_G: Vec<RistrettoPoint> = gens.G(n, m).cloned().collect();

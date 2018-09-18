@@ -9,7 +9,7 @@ use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::MultiscalarMul;
 
 use errors::MPCError;
-use generators::Generators;
+use generators::BulletproofGens;
 use rand::{CryptoRng, Rng};
 use std::iter;
 use util;
@@ -24,7 +24,7 @@ impl Party {
         v: u64,
         v_blinding: Scalar,
         n: usize,
-        generators: &Generators,
+        generators: &BulletproofGens,
     ) -> Result<PartyAwaitingPosition, MPCError> {
         if !(n == 8 || n == 16 || n == 32 || n == 64) {
             return Err(MPCError::InvalidBitsize);
@@ -44,7 +44,7 @@ impl Party {
 
 /// As party awaits its position, they only know their value and desired bit-size of the proof.
 pub struct PartyAwaitingPosition<'a> {
-    generators: &'a Generators,
+    generators: &'a BulletproofGens,
     n: usize,
     v: u64,
     v_blinding: Scalar,
@@ -119,7 +119,7 @@ pub struct PartyAwaitingValueChallenge<'a> {
     v_blinding: Scalar,
 
     j: usize,
-    generators: &'a Generators,
+    generators: &'a BulletproofGens,
     a_blinding: Scalar,
     s_blinding: Scalar,
     s_L: Vec<Scalar>,

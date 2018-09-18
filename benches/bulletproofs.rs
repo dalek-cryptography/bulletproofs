@@ -12,7 +12,7 @@ use curve25519_dalek::scalar::Scalar;
 extern crate bulletproofs;
 use bulletproofs::RangeProof;
 use bulletproofs::Transcript;
-use bulletproofs::{Generators, PedersenGenerators};
+use bulletproofs::{BulletproofGens, PedersenGens};
 
 static AGGREGATION_SIZES: [usize; 6] = [1, 2, 4, 8, 16, 32];
 
@@ -22,7 +22,7 @@ fn create_aggregated_rangeproof_helper(n: usize, c: &mut Criterion) {
     c.bench_function_over_inputs(
         &label,
         move |b, &&m| {
-            let generators = Generators::new(PedersenGenerators::default(), n, m);
+            let generators = BulletproofGens::new(PedersenGens::default(), n, m);
             let mut rng = OsRng::new().unwrap();
 
             let (min, max) = (0u64, ((1u128 << n) - 1) as u64);
@@ -69,7 +69,7 @@ fn verify_aggregated_rangeproof_helper(n: usize, c: &mut Criterion) {
     c.bench_function_over_inputs(
         &label,
         move |b, &&m| {
-            let generators = Generators::new(PedersenGenerators::default(), n, m);
+            let generators = BulletproofGens::new(PedersenGens::default(), n, m);
             let mut rng = OsRng::new().unwrap();
 
             let (min, max) = (0u64, ((1u128 << n) - 1) as u64);

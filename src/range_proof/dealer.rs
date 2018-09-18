@@ -10,7 +10,7 @@ use merlin::Transcript;
 use rand::{CryptoRng, Rng};
 
 use errors::MPCError;
-use generators::Generators;
+use generators::BulletproofGens;
 use inner_product_proof;
 use range_proof::RangeProof;
 use transcript::TranscriptProtocol;
@@ -25,7 +25,7 @@ pub struct Dealer {}
 impl Dealer {
     /// Creates a new dealer coordinating `m` parties proving `n`-bit ranges.
     pub fn new<'a, 'b>(
-        gens: &'b Generators,
+        gens: &'b BulletproofGens,
         n: usize,
         m: usize,
         transcript: &'a mut Transcript,
@@ -78,7 +78,7 @@ pub struct DealerAwaitingValueCommitments<'a, 'b> {
     /// The dealer keeps a copy of the initial transcript state, so
     /// that it can attempt to verify the aggregated proof at the end.
     initial_transcript: Transcript,
-    gens: &'b Generators,
+    gens: &'b BulletproofGens,
 }
 
 impl<'a, 'b> DealerAwaitingValueCommitments<'a, 'b> {
@@ -130,7 +130,7 @@ pub struct DealerAwaitingPolyCommitments<'a, 'b> {
     m: usize,
     transcript: &'a mut Transcript,
     initial_transcript: Transcript,
-    gens: &'b Generators,
+    gens: &'b BulletproofGens,
     value_challenge: ValueChallenge,
     value_commitments: Vec<ValueCommitment>,
     /// Aggregated commitment to the parties' bits
@@ -184,7 +184,7 @@ pub struct DealerAwaitingProofShares<'a, 'b> {
     m: usize,
     transcript: &'a mut Transcript,
     initial_transcript: Transcript,
-    gens: &'b Generators,
+    gens: &'b BulletproofGens,
     value_challenge: ValueChallenge,
     value_commitments: Vec<ValueCommitment>,
     poly_challenge: PolyChallenge,

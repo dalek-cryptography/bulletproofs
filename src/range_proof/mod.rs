@@ -11,7 +11,7 @@ use curve25519_dalek::traits::{IsIdentity, VartimeMultiscalarMul};
 use merlin::Transcript;
 
 use errors::ProofError;
-use generators::Generators;
+use generators::BulletproofGens;
 use inner_product_proof::InnerProductProof;
 use transcript::TranscriptProtocol;
 use util;
@@ -52,7 +52,7 @@ impl RangeProof {
     ///
     /// XXX add doctests
     pub fn prove_single<R: Rng + CryptoRng>(
-        generators: &Generators,
+        generators: &BulletproofGens,
         transcript: &mut Transcript,
         rng: &mut R,
         v: u64,
@@ -66,7 +66,7 @@ impl RangeProof {
     ///
     /// XXX add doctests
     pub fn prove_multiple<R: Rng + CryptoRng>(
-        generators: &Generators,
+        generators: &BulletproofGens,
         transcript: &mut Transcript,
         rng: &mut R,
         values: &[u64],
@@ -134,7 +134,7 @@ impl RangeProof {
     pub fn verify_single<R: Rng + CryptoRng>(
         &self,
         V: &RistrettoPoint,
-        gens: &Generators,
+        gens: &BulletproofGens,
         transcript: &mut Transcript,
         rng: &mut R,
         n: usize,
@@ -148,7 +148,7 @@ impl RangeProof {
     pub fn verify<R: Rng + CryptoRng>(
         &self,
         value_commitments: &[RistrettoPoint],
-        gens: &Generators,
+        gens: &BulletproofGens,
         transcript: &mut Transcript,
         rng: &mut R,
         n: usize,
@@ -413,7 +413,7 @@ mod tests {
         // Both prover and verifier have access to the generators and the proof
         let max_bitsize = 64;
         let max_parties = 8;
-        let generators = Generators::new(PedersenGens::default(), max_bitsize, max_parties);
+        let generators = BulletproofGens::new(PedersenGens::default(), max_bitsize, max_parties);
 
         // Serialized proof data
         let proof_bytes: Vec<u8>;
@@ -532,7 +532,7 @@ mod tests {
         let m = 4;
         let n = 32;
 
-        let generators = Generators::new(PedersenGens::default(), n, m);
+        let generators = BulletproofGens::new(PedersenGens::default(), n, m);
 
         let mut rng = OsRng::new().unwrap();
         let mut transcript = Transcript::new(b"AggregatedRangeProofTest");
@@ -602,7 +602,7 @@ mod tests {
         let m = 1;
         let n = 32;
 
-        let generators = Generators::new(PedersenGens::default(), n, m);
+        let generators = BulletproofGens::new(PedersenGens::default(), n, m);
 
         let mut rng = OsRng::new().unwrap();
         let mut transcript = Transcript::new(b"AggregatedRangeProofTest");

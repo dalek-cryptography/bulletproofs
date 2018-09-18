@@ -7,7 +7,7 @@
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
 
-use generators::Generators;
+use generators::BulletproofGens;
 
 /// XXX rename this to `BitCommitment`
 #[derive(Serialize, Deserialize, Copy, Clone, Debug)]
@@ -49,7 +49,7 @@ impl ProofShare {
     /// malformed.
     pub(crate) fn audit_share(
         &self,
-        gens: &Generators,
+        gens: &BulletproofGens,
         j: usize,
         value_commitment: &ValueCommitment,
         value_challenge: &ValueChallenge,
