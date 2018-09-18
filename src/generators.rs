@@ -85,8 +85,6 @@ impl Iterator for GeneratorsChain {
 /// aggregating `m` range proofs of `n` bits each.
 #[derive(Clone)]
 pub struct BulletproofGens {
-    /// Bases for Pedersen commitments
-    pub pedersen_gens: PedersenGens,
     /// The maximum number of usable generators for each party.
     pub gens_capacity: usize,
     /// Number of values or parties
@@ -102,8 +100,6 @@ impl BulletproofGens {
     ///
     /// # Inputs
     ///
-    /// * `pedersen_gens` is a pair of generators used for Pedersen
-    ///    commitments.
     /// * `gens_capacity` is the number of generators to precompute
     ///    for each party.  For rangeproofs, it is sufficient to pass
     ///    `64`, the maximum bitsize of the rangeproofs.  For circuit
@@ -111,41 +107,32 @@ impl BulletproofGens {
     ///    multipliers, rounded up to the next power of two.
     /// * `party_capacity` is the maximum number of parties that can
     ///    produce an aggregated proof.
-    pub fn new(
-        pedersen_gens: PedersenGens,
-        gens_capacity: usize,
-        party_capacity: usize,
-    ) -> Self {
+    pub fn new(gens_capacity: usize, party_capacity: usize) -> Self {
         use byteorder::{ByteOrder, LittleEndian};
 
-        let G_vec = (0..party_capacity)
-            .map(|i| {
-                let party_index = i as u32;
-                let mut label = [b'G', 0, 0, 0, 0];
-                LittleEndian::write_u32(&mut label[1..5], party_index);
-
-                GeneratorsChain::new(&label)
-                    .take(gens_capacity)
-                    .collect::<Vec<_>>()
-            }).collect();
-
-        let H_vec = (0..party_capacity)
-            .map(|i| {
-                let party_index = i as u32;
-                let mut label = [b'H', 0, 0, 0, 0];
-                LittleEndian::write_u32(&mut label[1..5], party_index);
-
-                GeneratorsChain::new(&label)
-                    .take(gens_capacity)
-                    .collect::<Vec<_>>()
-            }).collect();
-
         BulletproofGens {
-            pedersen_gens,
             gens_capacity,
             party_capacity,
-            G_vec,
-            H_vec,
+            G_vec: (0..party_capacity)
+                .map(|i| {
+                    let party_index = i as u32;
+                    let mut label = [b'G', 0, 0, 0, 0];
+                    LittleEndian::write_u32(&mut label[1..5], party_index);
+
+                    GeneratorsChain::new(&label)
+                        .take(gens_capacity)
+                        .collect::<Vec<_>>()
+                }).collect(),
+            H_vec: (0..party_capacity)
+                .map(|i| {
+                    let party_index = i as u32;
+                    let mut label = [b'H', 0, 0, 0, 0];
+                    LittleEndian::write_u32(&mut label[1..5], party_index);
+
+                    GeneratorsChain::new(&label)
+                        .take(gens_capacity)
+                        .collect::<Vec<_>>()
+                }).collect(),
         }
     }
 
@@ -153,7 +140,6 @@ impl BulletproofGens {
     /// slice of vectors G and H for the j-th range proof.
     pub fn share(&self, j: usize) -> BulletproofGensShare {
         BulletproofGensShare {
-            pedersen_gens: &self.pedersen_gens,
             gens: &self,
             share: j,
         }
@@ -221,8 +207,6 @@ impl<'a> Iterator for AggregatedGensIter<'a> {
 /// represents the generators for one of the `m` parties' shares.
 #[derive(Copy, Clone)]
 pub struct BulletproofGensShare<'a> {
-    /// Bases for Pedersen commitments
-    pub pedersen_gens: &'a PedersenGens,
     /// The parent object that this is a view into
     gens: &'a BulletproofGens,
     /// Which share we are
@@ -248,7 +232,7 @@ mod tests {
 
     #[test]
     fn aggregated_gens_iter_matches_flat_map() {
-        let gens = BulletproofGens::new(PedersenGens::default(), 64, 8);
+        let gens = BulletproofGens::new(64, 8);
 
         let helper = |n: usize, m: usize| {
             let agg_G: Vec<RistrettoPoint> = gens.G(n, m).cloned().collect();
