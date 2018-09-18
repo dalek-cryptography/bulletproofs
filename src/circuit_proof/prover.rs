@@ -9,12 +9,13 @@ use super::assignment::Assignment;
 use super::{ConstraintSystem, LinearCombination, R1CSProof, Variable};
 
 use errors::R1CSError;
-use generators::{Generators, PedersenGenerators};
+use generators::Generators;
 use inner_product_proof::InnerProductProof;
 use transcript::TranscriptProtocol;
 
-pub struct ProverCS<'a> {
+pub struct ProverCS<'a, 'b> {
     transcript: &'a mut Transcript,
+    generators: &'b Generators,
     constraints: Vec<LinearCombination>,
     a_L: Vec<Scalar>,
     a_R: Vec<Scalar>,
@@ -23,7 +24,7 @@ pub struct ProverCS<'a> {
     v_blinding: Vec<Scalar>,
 }
 
-impl<'a> ConstraintSystem for ProverCS<'a> {
+impl<'a, 'b> ConstraintSystem for ProverCS<'a, 'b> {
     fn assign_multiplier(
         &mut self,
         left: Assignment,
@@ -68,13 +69,12 @@ impl<'a> ConstraintSystem for ProverCS<'a> {
     }
 }
 
-impl<'a> ProverCS<'a> {
+impl<'a, 'b> ProverCS<'a, 'b> {
     pub fn new(
         transcript: &'a mut Transcript,
+        generators: &'b Generators,
         v: Vec<Scalar>,
         v_blinding: Vec<Scalar>,
-        // XXX should this just be Generators
-        pedersen_gens: PedersenGenerators,
     ) -> (Self, Vec<Variable>, Vec<RistrettoPoint>) {
         // Check that the input lengths are consistent
         assert_eq!(v.len(), v_blinding.len());
@@ -86,7 +86,7 @@ impl<'a> ProverCS<'a> {
 
         for i in 0..m {
             // Generate pedersen commitment and commit it to the transcript
-            let V = pedersen_gens.commit(v[i], v_blinding[i]);
+            let V = generators.pedersen_gens.commit(v[i], v_blinding[i]);
             transcript.commit_point(b"V", &V.compress());
             commitments.push(V);
 
@@ -96,6 +96,7 @@ impl<'a> ProverCS<'a> {
 
         let cs = ProverCS {
             transcript,
+            generators,
             v,
             v_blinding,
             constraints: vec![],
@@ -158,7 +159,7 @@ impl<'a> ProverCS<'a> {
     }
 
     /// Consume this `ConstraintSystem` to produce a proof.
-    pub fn prove(mut self, generators: &Generators) -> Result<R1CSProof, R1CSError> {
+    pub fn prove(mut self) -> Result<R1CSProof, R1CSError> {
         use std::iter;
         use util;
 
@@ -177,12 +178,12 @@ impl<'a> ProverCS<'a> {
             }
         }
         let n = self.a_L.len();
-        if generators.gens_capacity < n {
+        if self.generators.gens_capacity < n {
             return Err(R1CSError::InvalidGeneratorsLength);
         }
 
         // We are performing a single-party circuit proof, so party index is 0.
-        let gens = generators.share(0);
+        let gens = self.generators.share(0);
         let pg = &gens.pedersen_gens;
 
         // 1. Create a `TranscriptRng` from the high-level witness data
