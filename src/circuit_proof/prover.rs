@@ -1,6 +1,6 @@
 #![allow(non_snake_case)]
 
-use curve25519_dalek::ristretto::RistrettoPoint;
+use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::MultiscalarMul;
 use merlin::Transcript;
@@ -75,7 +75,7 @@ impl<'a, 'b> ProverCS<'a, 'b> {
         generators: &'b Generators,
         v: Vec<Scalar>,
         v_blinding: Vec<Scalar>,
-    ) -> (Self, Vec<Variable>, Vec<RistrettoPoint>) {
+    ) -> (Self, Vec<Variable>, Vec<CompressedRistretto>) {
         // Check that the input lengths are consistent
         assert_eq!(v.len(), v_blinding.len());
         let m = v.len();
@@ -86,8 +86,11 @@ impl<'a, 'b> ProverCS<'a, 'b> {
 
         for i in 0..m {
             // Generate pedersen commitment and commit it to the transcript
-            let V = generators.pedersen_gens.commit(v[i], v_blinding[i]);
-            transcript.commit_point(b"V", &V.compress());
+            let V = generators
+                .pedersen_gens
+                .commit(v[i], v_blinding[i])
+                .compress();
+            transcript.commit_point(b"V", &V);
             commitments.push(V);
 
             // Allocate and return a variable for v_i
