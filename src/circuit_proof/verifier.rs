@@ -4,7 +4,6 @@ use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::VartimeMultiscalarMul;
 use merlin::Transcript;
-use rand::{CryptoRng, Rng};
 
 use super::assignment::Assignment;
 use super::{ConstraintSystem, LinearCombination, R1CSProof, Variable};
@@ -13,14 +12,15 @@ use errors::R1CSError;
 use generators::Generators;
 use transcript::TranscriptProtocol;
 
-pub struct VerifierCS<'a> {
+pub struct VerifierCS<'a, 'b> {
     transcript: &'a mut Transcript,
+    generators: &'b Generators,
     constraints: Vec<LinearCombination>,
     num_vars: usize,
     V: Vec<CompressedRistretto>,
 }
 
-impl<'a> ConstraintSystem for VerifierCS<'a> {
+impl<'a, 'b> ConstraintSystem for VerifierCS<'a, 'b> {
     fn assign_multiplier(
         &mut self,
         _left: Assignment,
@@ -58,9 +58,10 @@ impl<'a> ConstraintSystem for VerifierCS<'a> {
     }
 }
 
-impl<'a> VerifierCS<'a> {
+impl<'a, 'b> VerifierCS<'a, 'b> {
     pub fn new(
         transcript: &'a mut Transcript,
+        generators: &'b Generators,
         commitments: Vec<CompressedRistretto>,
     ) -> (Self, Vec<Variable>) {
         let m = commitments.len();
@@ -77,6 +78,7 @@ impl<'a> VerifierCS<'a> {
 
         let cs = VerifierCS {
             transcript,
+            generators,
             num_vars: 0,
             V: commitments,
             constraints: Vec::new(),
@@ -111,7 +113,7 @@ impl<'a> VerifierCS<'a> {
 
         let mut exp_z = *z;
         for lc in self.constraints.iter() {
-            for (var, coeff) in &lc.variables {
+            for (var, coeff) in &lc.terms {
                 match var {
                     Variable::MultiplierLeft(i) => {
                         z_zQ_WL[*i] += exp_z * coeff;
@@ -125,10 +127,11 @@ impl<'a> VerifierCS<'a> {
                     Variable::Committed(i) => {
                         z_zQ_WV[*i] -= exp_z * coeff;
                     }
+                    Variable::One() => {
+                        z_zQ_c -= exp_z * coeff;
+                    }
                 }
             }
-            z_zQ_c -= exp_z * lc.constant;
-
             exp_z *= z;
         }
 
@@ -136,12 +139,7 @@ impl<'a> VerifierCS<'a> {
     }
 
     // This function can only be called once per ConstraintSystem instance.
-    pub fn verify<R: Rng + CryptoRng>(
-        mut self,
-        proof: &R1CSProof,
-        generators: &Generators,
-        rng: &mut R,
-    ) -> Result<(), R1CSError> {
+    pub fn verify(mut self, proof: &R1CSProof) -> Result<(), R1CSError> {
         let temp_n = self.num_vars;
         if !(temp_n == 0 || temp_n.is_power_of_two()) {
             let pad = temp_n.next_power_of_two() - temp_n;
@@ -155,11 +153,18 @@ impl<'a> VerifierCS<'a> {
         use util;
 
         let n = self.num_vars;
-        if generators.gens_capacity < n {
+        if self.generators.gens_capacity < n {
             return Err(R1CSError::InvalidGeneratorsLength);
         }
         // We are performing a single-party circuit proof, so party index is 0.
-        let gens = generators.share(0);
+        let gens = self.generators.share(0);
+
+        // Create a `TranscriptRng` from the transcript
+        use rand::thread_rng;
+        let mut rng = self
+            .transcript
+            .fork_transcript()
+            .reseed_from_rng(&mut thread_rng());
 
         self.transcript.commit_point(b"A_I", &proof.A_I);
         self.transcript.commit_point(b"A_O", &proof.A_O);
@@ -186,7 +191,7 @@ impl<'a> VerifierCS<'a> {
 
         let w = self.transcript.challenge_scalar(b"w");
 
-        let r = Scalar::random(rng);
+        let r = Scalar::random(&mut rng);
         let xx = x * x;
         let y_inv = y.invert();
 

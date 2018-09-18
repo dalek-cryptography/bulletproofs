@@ -4,6 +4,8 @@ pub mod assignment;
 pub mod prover;
 pub mod verifier;
 
+use std::iter::FromIterator;
+
 use curve25519_dalek::ristretto::CompressedRistretto;
 use curve25519_dalek::scalar::Scalar;
 
@@ -41,47 +43,60 @@ pub struct R1CSProof {
     ipp_proof: InnerProductProof,
 }
 
-/// The variables used in the `LinearCombination` and `ConstraintSystem` structs.
+/// Represents a variable in a constraint system.
 #[derive(Copy, Clone, Debug)]
 pub enum Variable {
-    Committed(usize),        // high-level variable
-    MultiplierLeft(usize),   // low-level variable, left input of multiplication gate
-    MultiplierRight(usize),  // low-level variable, right input of multiplication gate
-    MultiplierOutput(usize), // low-level variable, output multiplication gate
+    /// Represents an external input specified by a commitment.
+    Committed(usize),
+    /// Represents the left input of a multiplication gate.
+    MultiplierLeft(usize),
+    /// Represents the right input of a multiplication gate.
+    MultiplierRight(usize),
+    /// Represents the output of a multiplication gate.
+    MultiplierOutput(usize),
+    /// Represents the constant 1.
+    One(),
 }
 
-/// Represents a linear combination of some variables multiplied with their scalar coefficients,
-/// plus a scalar. `ConstraintSystem` expects all linear combinations to evaluate to zero.
-/// E.g. LC = variable[0]*scalar[0] + variable[1]*scalar[1] + scalar
+/// Represents a linear combination of `Variables`.  Each term is
+/// represented by a `(Variable, Scalar)` pair.
 #[derive(Clone, Debug)]
 pub struct LinearCombination {
-    variables: Vec<(Variable, Scalar)>,
-    constant: Scalar,
+    terms: Vec<(Variable, Scalar)>,
 }
 
-impl LinearCombination {
-    // TODO: make constructor with iterators
-    // see FromIterator trait - [(a1, v1), (a2, v2)].iter().collect() (pass in the iterator, collect to get LC)
-    pub fn new(variables: Vec<(Variable, Scalar)>, constant: Scalar) -> Self {
+impl Default for LinearCombination {
+    fn default() -> Self {
+        LinearCombination { terms: Vec::new() }
+    }
+}
+
+impl FromIterator<(Variable, Scalar)> for LinearCombination {
+    fn from_iter<T>(iter: T) -> Self
+    where
+        T: IntoIterator<Item = (Variable, Scalar)>,
+    {
         LinearCombination {
-            variables,
-            constant,
+            terms: iter.into_iter().collect(),
         }
     }
+}
 
-    // XXX this could be Default?
-    pub fn zero() -> Self {
+impl<'a> FromIterator<&'a (Variable, Scalar)> for LinearCombination {
+    fn from_iter<T>(iter: T) -> Self
+    where
+        T: IntoIterator<Item = &'a (Variable, Scalar)>,
+    {
         LinearCombination {
-            variables: vec![],
-            constant: Scalar::zero(),
+            terms: iter.into_iter().cloned().collect(),
         }
     }
 }
 
 pub trait ConstraintSystem {
-    // Allocate variables for left, right, and output wires of multiplication,
-    // and assign them the Assignments that are passed in.
-    // Prover will pass in `Value(Scalar)`s, and Verifier will pass in `Missing`s.
+    /// Allocate variables for left, right, and output wires of multiplication,
+    /// and assign them the Assignments that are passed in.
+    /// Prover will pass in `Value(Scalar)`s, and Verifier will pass in `Missing`s.
     fn assign_multiplier(
         &mut self,
         left: Assignment,
@@ -89,16 +104,31 @@ pub trait ConstraintSystem {
         out: Assignment,
     ) -> Result<(Variable, Variable, Variable), R1CSError>;
 
-    // Allocate two uncommitted variables, and assign them the Assignments passed in.
-    // Prover will pass in `Value(Scalar)`s, and Verifier will pass in `Missing`s.
+    /// Allocate two uncommitted variables, and assign them the Assignments passed in.
+    /// Prover will pass in `Value(Scalar)`s, and Verifier will pass in `Missing`s.
     fn assign_uncommitted(
         &mut self,
         val_1: Assignment,
         val_2: Assignment,
     ) -> Result<(Variable, Variable), R1CSError>;
 
+    /// Enforce that the given `LinearCombination` is zero.
     fn add_constraint(&mut self, lc: LinearCombination);
 
+    /// Obtain a challenge scalar bound to the assignments of all of
+    /// the externally committed wires.
+    ///
+    /// This allows the prover to select a challenge circuit from a
+    /// family of circuits parameterized by challenge scalars.
+    ///
+    /// # Warning
+    ///
+    /// The challenge scalars are bound only to the externally
+    /// committed wires (high-level witness variables), and not to the
+    /// assignments to all wires (low-level witness variables).  In
+    /// the same way that it is the user's responsibility to ensure
+    /// that the constraints are sound, it is **also** the user's
+    /// responsibility to ensure that each challenge circuit is sound.
     fn challenge_scalar(&mut self, label: &'static [u8]) -> Scalar;
 }
 
@@ -117,6 +147,8 @@ mod tests {
 
     use rand::thread_rng;
 
+    /// Constrains (a1 + a2) * (b1 + b2) = (c1 + c2),
+    /// where c2 is a constant.
     #[allow(non_snake_case)]
     fn example_gadget<CS: ConstraintSystem>(
         cs: &mut CS,
@@ -125,27 +157,21 @@ mod tests {
         b1: (Variable, Assignment),
         b2: (Variable, Assignment),
         c1: (Variable, Assignment),
-        c2: (Variable, Assignment),
+        c2: Scalar,
     ) -> Result<(), R1CSError> {
-        let one = Scalar::one();
-        let zer = Scalar::zero();
-
         // Make low-level variables (aL = v_a1 + v_a2, aR = v_b1 + v_b2, aO = v_c1 + v_c2)
-        let (aL, aR, aO) = cs.assign_multiplier(a1.1 + a2.1, b1.1 + b2.1, c1.1 + c2.1)?;
+        let (aL, aR, aO) =
+            cs.assign_multiplier(a1.1 + a2.1, b1.1 + b2.1, c1.1 + Assignment::from(c2))?;
 
         // Tie high-level and low-level variables together
-        cs.add_constraint(LinearCombination::new(
-            vec![(aL, -one), (a1.0, one), (a2.0, one)],
-            zer,
-        ));
-        cs.add_constraint(LinearCombination::new(
-            vec![(aR, -one), (b1.0, one), (b2.0, one)],
-            zer,
-        ));
-        cs.add_constraint(LinearCombination::new(
-            vec![(aO, -one), (c1.0, one), (c2.0, one)],
-            zer,
-        ));
+        let one = Scalar::one();
+        cs.add_constraint([(aL, -one), (a1.0, one), (a2.0, one)].iter().collect());
+        cs.add_constraint([(aR, -one), (b1.0, one), (b2.0, one)].iter().collect());
+        cs.add_constraint(
+            [(aO, -one), (c1.0, one), (Variable::One(), c2)]
+                .iter()
+                .collect(),
+        );
 
         Ok(())
     }
@@ -173,19 +199,15 @@ mod tests {
             let mut transcript = Transcript::new(b"R1CSExampleGadget");
 
             // 1. Construct HL witness
-            let v: Vec<_> = [a1, a2, b1, b2, c1, c2]
+            let v: Vec<_> = [a1, a2, b1, b2, c1]
                 .iter()
                 .map(|x| Scalar::from(*x))
                 .collect();
             let v_blinding = blinding_helper(v.len());
 
             // 2. Construct CS
-            let (mut cs, vars, commitments) = ProverCS::new(
-                &mut transcript,
-                v.clone(),
-                v_blinding,
-                PedersenGenerators::default(),
-            );
+            let (mut cs, vars, commitments) =
+                ProverCS::new(&mut transcript, &gens, v.clone(), v_blinding);
 
             // 3. Add gadgets
             example_gadget(
@@ -195,11 +217,11 @@ mod tests {
                 (vars[2], v[2].into()),
                 (vars[3], v[3].into()),
                 (vars[4], v[4].into()),
-                (vars[5], v[5].into()),
+                c2.into(),
             )?;
 
             // 4. Prove.
-            let proof = cs.prove(&gens)?;
+            let proof = cs.prove()?;
 
             (proof, commitments)
         };
@@ -210,7 +232,7 @@ mod tests {
         let mut transcript = Transcript::new(b"R1CSExampleGadget");
 
         // 1. Construct CS using commitments to HL witness
-        let (mut cs, vars) = VerifierCS::new(&mut transcript, commitments);
+        let (mut cs, vars) = VerifierCS::new(&mut transcript, &gens, commitments);
 
         // 2. Add gadgets
         example_gadget(
@@ -220,12 +242,11 @@ mod tests {
             (vars[2], Assignment::Missing()),
             (vars[3], Assignment::Missing()),
             (vars[4], Assignment::Missing()),
-            (vars[5], Assignment::Missing()),
+            c2.into(),
         )?;
 
         // 3. Verify.
-        cs.verify(&proof, &gens, &mut thread_rng())
-            .map_err(|_| R1CSError::VerificationError)
+        cs.verify(&proof).map_err(|_| R1CSError::VerificationError)
     }
 
     #[test]
