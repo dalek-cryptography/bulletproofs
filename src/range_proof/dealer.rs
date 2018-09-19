@@ -7,10 +7,9 @@
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
 use merlin::Transcript;
-use rand::{CryptoRng, Rng};
 
 use errors::MPCError;
-use generators::Generators;
+use generators::{BulletproofGens, PedersenGens};
 use inner_product_proof;
 use range_proof::RangeProof;
 use transcript::TranscriptProtocol;
@@ -25,10 +24,11 @@ pub struct Dealer {}
 impl Dealer {
     /// Creates a new dealer coordinating `m` parties proving `n`-bit ranges.
     pub fn new<'a, 'b>(
-        gens: &'b Generators,
+        bp_gens: &'b BulletproofGens,
+        pc_gens: &'b PedersenGens,
+        transcript: &'a mut Transcript,
         n: usize,
         m: usize,
-        transcript: &'a mut Transcript,
     ) -> Result<DealerAwaitingValueCommitments<'a, 'b>, MPCError> {
         if !(n == 8 || n == 16 || n == 32 || n == 64) {
             return Err(MPCError::InvalidBitsize);
@@ -36,10 +36,10 @@ impl Dealer {
         if !m.is_power_of_two() {
             return Err(MPCError::InvalidAggregation);
         }
-        if gens.gens_capacity < n {
+        if bp_gens.gens_capacity < n {
             return Err(MPCError::InvalidGeneratorsLength);
         }
-        if gens.party_capacity < m {
+        if bp_gens.party_capacity < m {
             return Err(MPCError::InvalidGeneratorsLength);
         }
 
@@ -60,11 +60,12 @@ impl Dealer {
         transcript.rangeproof_domain_sep(n as u64, m as u64);
 
         Ok(DealerAwaitingValueCommitments {
-            n,
-            m,
+            bp_gens,
+            pc_gens,
             transcript,
             initial_transcript,
-            gens,
+            n,
+            m,
         })
     }
 }
@@ -72,13 +73,14 @@ impl Dealer {
 /// The initial dealer state, waiting for the parties to send value
 /// commitments.
 pub struct DealerAwaitingValueCommitments<'a, 'b> {
-    n: usize,
-    m: usize,
+    bp_gens: &'b BulletproofGens,
+    pc_gens: &'b PedersenGens,
     transcript: &'a mut Transcript,
     /// The dealer keeps a copy of the initial transcript state, so
     /// that it can attempt to verify the aggregated proof at the end.
     initial_transcript: Transcript,
-    gens: &'b Generators,
+    n: usize,
+    m: usize,
 }
 
 impl<'a, 'b> DealerAwaitingValueCommitments<'a, 'b> {
@@ -114,7 +116,8 @@ impl<'a, 'b> DealerAwaitingValueCommitments<'a, 'b> {
                 m: self.m,
                 transcript: self.transcript,
                 initial_transcript: self.initial_transcript,
-                gens: self.gens,
+                bp_gens: self.bp_gens,
+                pc_gens: self.pc_gens,
                 value_challenge,
                 value_commitments,
                 A,
@@ -130,7 +133,8 @@ pub struct DealerAwaitingPolyCommitments<'a, 'b> {
     m: usize,
     transcript: &'a mut Transcript,
     initial_transcript: Transcript,
-    gens: &'b Generators,
+    bp_gens: &'b BulletproofGens,
+    pc_gens: &'b PedersenGens,
     value_challenge: ValueChallenge,
     value_commitments: Vec<ValueCommitment>,
     /// Aggregated commitment to the parties' bits
@@ -164,7 +168,8 @@ impl<'a, 'b> DealerAwaitingPolyCommitments<'a, 'b> {
                 m: self.m,
                 transcript: self.transcript,
                 initial_transcript: self.initial_transcript,
-                gens: self.gens,
+                bp_gens: self.bp_gens,
+                pc_gens: self.pc_gens,
                 value_challenge: self.value_challenge,
                 value_commitments: self.value_commitments,
                 A: self.A,
@@ -184,7 +189,8 @@ pub struct DealerAwaitingProofShares<'a, 'b> {
     m: usize,
     transcript: &'a mut Transcript,
     initial_transcript: Transcript,
-    gens: &'b Generators,
+    bp_gens: &'b BulletproofGens,
+    pc_gens: &'b PedersenGens,
     value_challenge: ValueChallenge,
     value_commitments: Vec<ValueCommitment>,
     poly_challenge: PolyChallenge,
@@ -217,7 +223,7 @@ impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
 
         // Get a challenge value to combine statements for the IPP
         let w = self.transcript.challenge_scalar(b"w");
-        let Q = w * self.gens.pedersen_gens.B;
+        let Q = w * self.pc_gens.B;
 
         let l_vec: Vec<Scalar> = proof_shares
             .iter()
@@ -232,8 +238,8 @@ impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
             self.transcript,
             &Q,
             util::exp_iter(self.value_challenge.y.invert()),
-            self.gens.G(self.n, self.m).cloned().collect(),
-            self.gens.H(self.n, self.m).cloned().collect(),
+            self.bp_gens.G(self.n, self.m).cloned().collect(),
+            self.bp_gens.H(self.n, self.m).cloned().collect(),
             l_vec,
             r_vec,
         );
@@ -258,25 +264,25 @@ impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
     /// error.
     ///
     /// XXX define error types so we can surface the blame info
-    pub fn receive_shares<R: Rng + CryptoRng>(
-        mut self,
-        rng: &mut R,
-        proof_shares: &[ProofShare],
-    ) -> Result<RangeProof, MPCError> {
+    pub fn receive_shares(mut self, proof_shares: &[ProofShare]) -> Result<RangeProof, MPCError> {
         let proof = self.assemble_shares(proof_shares)?;
 
         let V: Vec<_> = self.value_commitments.iter().map(|vc| vc.V_j).collect();
 
         // See comment in `Dealer::new` for why we use `initial_transcript`
         let transcript = &mut self.initial_transcript;
-        if proof.verify(&V, self.gens, transcript, rng, self.n).is_ok() {
+        if proof
+            .verify(self.bp_gens, self.pc_gens, transcript, &V, self.n)
+            .is_ok()
+        {
             Ok(proof)
         } else {
             // Proof verification failed. Now audit the parties:
             let mut bad_shares = Vec::new();
             for j in 0..self.m {
                 match proof_shares[j].audit_share(
-                    &self.gens,
+                    &self.bp_gens,
+                    &self.pc_gens,
                     j,
                     &self.value_commitments[j],
                     &self.value_challenge,

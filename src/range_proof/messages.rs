@@ -7,7 +7,7 @@
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
 
-use generators::Generators;
+use generators::{BulletproofGens, PedersenGens};
 
 /// XXX rename this to `BitCommitment`
 #[derive(Serialize, Deserialize, Copy, Clone, Debug)]
@@ -49,7 +49,8 @@ impl ProofShare {
     /// malformed.
     pub(crate) fn audit_share(
         &self,
-        gens: &Generators,
+        bp_gens: &BulletproofGens,
+        pc_gens: &PedersenGens,
         j: usize,
         value_commitment: &ValueCommitment,
         value_challenge: &ValueChallenge,
@@ -97,9 +98,9 @@ impl ProofShare {
                 .chain(h),
             iter::once(&value_commitment.A_j)
                 .chain(iter::once(&value_commitment.S_j))
-                .chain(iter::once(&gens.pedersen_gens.B_blinding))
-                .chain(gens.share(j).G(n))
-                .chain(gens.share(j).H(n)),
+                .chain(iter::once(&pc_gens.B_blinding))
+                .chain(bp_gens.share(j).G(n))
+                .chain(bp_gens.share(j).H(n)),
         );
         if !P_check.is_identity() {
             return Err(());
@@ -117,8 +118,8 @@ impl ProofShare {
             iter::once(&value_commitment.V_j)
                 .chain(iter::once(&poly_commitment.T_1_j))
                 .chain(iter::once(&poly_commitment.T_2_j))
-                .chain(iter::once(&gens.pedersen_gens.B))
-                .chain(iter::once(&gens.pedersen_gens.B_blinding)),
+                .chain(iter::once(&pc_gens.B))
+                .chain(iter::once(&pc_gens.B_blinding)),
         );
 
         if t_check.is_identity() {

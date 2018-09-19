@@ -9,8 +9,8 @@ use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::MultiscalarMul;
 
 use errors::MPCError;
-use generators::Generators;
-use rand::{CryptoRng, Rng};
+use generators::{BulletproofGens, PedersenGens};
+use rand;
 use std::iter;
 use util;
 
@@ -20,20 +20,22 @@ use super::messages::*;
 pub struct Party {}
 
 impl Party {
-    pub fn new(
+    pub fn new<'a>(
+        bp_gens: &'a BulletproofGens,
+        pc_gens: &'a PedersenGens,
         v: u64,
         v_blinding: Scalar,
         n: usize,
-        generators: &Generators,
-    ) -> Result<PartyAwaitingPosition, MPCError> {
+    ) -> Result<PartyAwaitingPosition<'a>, MPCError> {
         if !(n == 8 || n == 16 || n == 32 || n == 64) {
             return Err(MPCError::InvalidBitsize);
         }
 
-        let V = generators.pedersen_gens.commit(Scalar::from(v), v_blinding);
+        let V = pc_gens.commit(v.into(), v_blinding);
 
         Ok(PartyAwaitingPosition {
-            generators,
+            bp_gens,
+            pc_gens,
             n,
             v,
             v_blinding,
@@ -44,7 +46,8 @@ impl Party {
 
 /// As party awaits its position, they only know their value and desired bit-size of the proof.
 pub struct PartyAwaitingPosition<'a> {
-    generators: &'a Generators,
+    bp_gens: &'a BulletproofGens,
+    pc_gens: &'a PedersenGens,
     n: usize,
     v: u64,
     v_blinding: Scalar,
@@ -54,21 +57,23 @@ pub struct PartyAwaitingPosition<'a> {
 impl<'a> PartyAwaitingPosition<'a> {
     /// Assigns the position to a party,
     /// at which point the party knows its generators.
-    pub fn assign_position<R: Rng + CryptoRng>(
+    pub fn assign_position(
         self,
         // XXX need to check that j is valid (in gens range)
         j: usize,
-        rng: &mut R,
     ) -> (PartyAwaitingValueChallenge<'a>, ValueCommitment) {
-        let gen_share = self.generators.share(j);
+        // XXX use transcript RNG
+        let mut rng = rand::thread_rng();
 
-        let a_blinding = Scalar::random(rng);
+        let bp_share = self.bp_gens.share(j);
+
+        let a_blinding = Scalar::random(&mut rng);
         // Compute A = <a_L, G> + <a_R, H> + a_blinding * B_blinding
-        let mut A = gen_share.pedersen_gens.B_blinding * a_blinding;
+        let mut A = self.pc_gens.B_blinding * a_blinding;
 
         use subtle::{Choice, ConditionallyAssignable};
         let mut i = 0;
-        for (G_i, H_i) in gen_share.G(self.n).zip(gen_share.H(self.n)) {
+        for (G_i, H_i) in bp_share.G(self.n).zip(bp_share.H(self.n)) {
             // If v_i = 0, we add a_L[i] * G[i] + a_R[i] * H[i] = - H[i]
             // If v_i = 1, we add a_L[i] * G[i] + a_R[i] * H[i] =   G[i]
             let v_i = Choice::from(((self.v >> i) & 1) as u8);
@@ -78,16 +83,16 @@ impl<'a> PartyAwaitingPosition<'a> {
             i += 1;
         }
 
-        let s_blinding = Scalar::random(rng);
-        let s_L: Vec<Scalar> = (0..self.n).map(|_| Scalar::random(rng)).collect();
-        let s_R: Vec<Scalar> = (0..self.n).map(|_| Scalar::random(rng)).collect();
+        let s_blinding = Scalar::random(&mut rng);
+        let s_L: Vec<Scalar> = (0..self.n).map(|_| Scalar::random(&mut rng)).collect();
+        let s_R: Vec<Scalar> = (0..self.n).map(|_| Scalar::random(&mut rng)).collect();
 
         // Compute S = <s_L, G> + <s_R, H> + s_blinding * B_blinding
         let S = RistrettoPoint::multiscalar_mul(
             iter::once(&s_blinding).chain(s_L.iter()).chain(s_R.iter()),
-            iter::once(&gen_share.pedersen_gens.B_blinding)
-                .chain(gen_share.G(self.n))
-                .chain(gen_share.H(self.n)),
+            iter::once(&self.pc_gens.B_blinding)
+                .chain(bp_share.G(self.n))
+                .chain(bp_share.H(self.n)),
         );
 
         // Return next state and all commitments
@@ -100,7 +105,7 @@ impl<'a> PartyAwaitingPosition<'a> {
             n: self.n,
             v: self.v,
             v_blinding: self.v_blinding,
-            generators: self.generators,
+            pc_gens: self.pc_gens,
             j,
             a_blinding,
             s_blinding,
@@ -117,9 +122,8 @@ pub struct PartyAwaitingValueChallenge<'a> {
     n: usize, // bitsize of the range
     v: u64,
     v_blinding: Scalar,
-
     j: usize,
-    generators: &'a Generators,
+    pc_gens: &'a PedersenGens,
     a_blinding: Scalar,
     s_blinding: Scalar,
     s_L: Vec<Scalar>,
@@ -127,11 +131,12 @@ pub struct PartyAwaitingValueChallenge<'a> {
 }
 
 impl<'a> PartyAwaitingValueChallenge<'a> {
-    pub fn apply_challenge<R: Rng + CryptoRng>(
+    pub fn apply_challenge(
         self,
         vc: &ValueChallenge,
-        rng: &mut R,
     ) -> (PartyAwaitingPolyChallenge, PolyCommitment) {
+        let mut rng = rand::thread_rng();
+
         let n = self.n;
         let offset_y = util::scalar_exp_vartime(&vc.y, (self.j * n) as u64);
         let offset_z = util::scalar_exp_vartime(&vc.z, self.j as u64);
@@ -159,18 +164,10 @@ impl<'a> PartyAwaitingValueChallenge<'a> {
         let t_poly = l_poly.inner_product(&r_poly);
 
         // Generate x by committing to T_1, T_2 (line 49-54)
-        let t_1_blinding = Scalar::random(rng);
-        let t_2_blinding = Scalar::random(rng);
-        let T_1 = self
-            .generators
-            .share(self.j)
-            .pedersen_gens
-            .commit(t_poly.1, t_1_blinding);
-        let T_2 = self
-            .generators
-            .share(self.j)
-            .pedersen_gens
-            .commit(t_poly.2, t_2_blinding);
+        let t_1_blinding = Scalar::random(&mut rng);
+        let t_2_blinding = Scalar::random(&mut rng);
+        let T_1 = self.pc_gens.commit(t_poly.1, t_1_blinding);
+        let T_2 = self.pc_gens.commit(t_poly.2, t_2_blinding);
 
         let poly_commitment = PolyCommitment {
             T_1_j: T_1,
@@ -178,14 +175,14 @@ impl<'a> PartyAwaitingValueChallenge<'a> {
         };
 
         let papc = PartyAwaitingPolyChallenge {
+            v_blinding: self.v_blinding,
+            a_blinding: self.a_blinding,
+            s_blinding: self.s_blinding,
             z: vc.z,
             offset_z,
             l_poly,
             r_poly,
             t_poly,
-            v_blinding: self.v_blinding,
-            a_blinding: self.a_blinding,
-            s_blinding: self.s_blinding,
             t_1_blinding,
             t_2_blinding,
         };

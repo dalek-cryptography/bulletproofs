@@ -1,7 +1,7 @@
 #![allow(non_snake_case)]
 #![doc(include = "../docs/range-proof-protocol.md")]
 
-use rand::{CryptoRng, Rng};
+use rand;
 
 use std::iter;
 
@@ -11,7 +11,7 @@ use curve25519_dalek::traits::{IsIdentity, VartimeMultiscalarMul};
 use merlin::Transcript;
 
 use errors::ProofError;
-use generators::Generators;
+use generators::{BulletproofGens, PedersenGens};
 use inner_product_proof::InnerProductProof;
 use transcript::TranscriptProtocol;
 use util;
@@ -51,24 +51,24 @@ impl RangeProof {
     /// blinding scalar `v_blinding`.
     ///
     /// XXX add doctests
-    pub fn prove_single<R: Rng + CryptoRng>(
-        generators: &Generators,
+    pub fn prove_single(
+        bp_gens: &BulletproofGens,
+        pc_gens: &PedersenGens,
         transcript: &mut Transcript,
-        rng: &mut R,
         v: u64,
         v_blinding: &Scalar,
         n: usize,
     ) -> Result<RangeProof, ProofError> {
-        RangeProof::prove_multiple(generators, transcript, rng, &[v], &[*v_blinding], n)
+        RangeProof::prove_multiple(bp_gens, pc_gens, transcript, &[v], &[*v_blinding], n)
     }
 
     /// Create a rangeproof for a set of values.
     ///
     /// XXX add doctests
-    pub fn prove_multiple<R: Rng + CryptoRng>(
-        generators: &Generators,
+    pub fn prove_multiple(
+        bp_gens: &BulletproofGens,
+        pc_gens: &PedersenGens,
         transcript: &mut Transcript,
-        rng: &mut R,
         values: &[u64],
         blindings: &[Scalar],
         n: usize,
@@ -82,35 +82,33 @@ impl RangeProof {
         if !(n == 8 || n == 16 || n == 32 || n == 64) {
             return Err(ProofError::InvalidBitsize);
         }
-        if generators.gens_capacity < n {
+        if bp_gens.gens_capacity < n {
             return Err(ProofError::InvalidGeneratorsLength);
         }
-        if generators.party_capacity < values.len() {
+        if bp_gens.party_capacity < values.len() {
             return Err(ProofError::InvalidGeneratorsLength);
         }
 
-        let dealer = Dealer::new(generators, n, values.len(), transcript)?;
+        let dealer = Dealer::new(bp_gens, pc_gens, transcript, n, values.len())?;
 
         let parties: Vec<_> = values
             .iter()
             .zip(blindings.iter())
-            .map(|(&v, &v_blinding)| {
-                Party::new(v, v_blinding, n, &generators)
-            })
+            .map(|(&v, &v_blinding)| Party::new(bp_gens, pc_gens, v, v_blinding, n))
             // Collect the iterator of Results into a Result<Vec>, then unwrap it
-            .collect::<Result<Vec<_>,_>>()?;
+            .collect::<Result<Vec<_>, _>>()?;
 
         let (parties, value_commitments): (Vec<_>, Vec<_>) = parties
             .into_iter()
             .enumerate()
-            .map(|(j, p)| p.assign_position(j, rng))
+            .map(|(j, p)| p.assign_position(j))
             .unzip();
 
         let (dealer, value_challenge) = dealer.receive_value_commitments(value_commitments)?;
 
         let (parties, poly_commitments): (Vec<_>, Vec<_>) = parties
             .into_iter()
-            .map(|p| p.apply_challenge(&value_challenge, rng))
+            .map(|p| p.apply_challenge(&value_challenge))
             .unzip();
 
         let (dealer, poly_challenge) = dealer.receive_poly_commitments(poly_commitments)?;
@@ -119,7 +117,7 @@ impl RangeProof {
             .into_iter()
             .map(|p| p.apply_challenge(&poly_challenge))
             // Collect the iterator of Results into a Result<Vec>, then unwrap it
-            .collect::<Result<Vec<_>,_>>()?;
+            .collect::<Result<Vec<_>, _>>()?;
 
         let proof = dealer.receive_trusted_shares(&proof_shares)?;
 
@@ -131,26 +129,26 @@ impl RangeProof {
     /// This is a convenience wrapper around `verify` for the `m=1` case.
     ///
     /// XXX add doctests
-    pub fn verify_single<R: Rng + CryptoRng>(
+    pub fn verify_single(
         &self,
-        V: &RistrettoPoint,
-        gens: &Generators,
+        bp_gens: &BulletproofGens,
+        pc_gens: &PedersenGens,
         transcript: &mut Transcript,
-        rng: &mut R,
+        V: &RistrettoPoint,
         n: usize,
     ) -> Result<(), ProofError> {
-        self.verify(&[*V], gens, transcript, rng, n)
+        self.verify(bp_gens, pc_gens, transcript, &[*V], n)
     }
 
     /// Verifies an aggregated rangeproof for the given value commitments.
     ///
     /// XXX add doctests
-    pub fn verify<R: Rng + CryptoRng>(
+    pub fn verify(
         &self,
-        value_commitments: &[RistrettoPoint],
-        gens: &Generators,
+        bp_gens: &BulletproofGens,
+        pc_gens: &PedersenGens,
         transcript: &mut Transcript,
-        rng: &mut R,
+        value_commitments: &[RistrettoPoint],
         n: usize,
     ) -> Result<(), ProofError> {
         let m = value_commitments.len();
@@ -160,14 +158,12 @@ impl RangeProof {
         if !(n == 8 || n == 16 || n == 32 || n == 64) {
             return Err(ProofError::InvalidBitsize);
         }
-        if gens.gens_capacity < n {
+        if bp_gens.gens_capacity < n {
             return Err(ProofError::InvalidGeneratorsLength);
         }
-        if gens.party_capacity < m {
+        if bp_gens.party_capacity < m {
             return Err(ProofError::InvalidGeneratorsLength);
         }
-
-        // XXX check n, m parameters
 
         transcript.rangeproof_domain_sep(n as u64, m as u64);
 
@@ -195,8 +191,12 @@ impl RangeProof {
 
         let w = transcript.challenge_scalar(b"w");
 
+        let mut rng = transcript
+            .fork_transcript()
+            .reseed_from_rng(&mut rand::thread_rng());
+
         // Challenge value for batching statements to be verified
-        let c = Scalar::random(rng);
+        let c = Scalar::random(&mut rng);
 
         let (x_sq, x_inv_sq, s) = self.ipp_proof.verification_scalars(transcript);
         let s_inv = s.iter().rev();
@@ -239,10 +239,10 @@ impl RangeProof {
                 .chain(iter::once(self.T_2.decompress()))
                 .chain(self.ipp_proof.L_vec.iter().map(|L| L.decompress()))
                 .chain(self.ipp_proof.R_vec.iter().map(|R| R.decompress()))
-                .chain(iter::once(Some(gens.pedersen_gens.B_blinding)))
-                .chain(iter::once(Some(gens.pedersen_gens.B)))
-                .chain(gens.G(n, m).map(|&x| Some(x)))
-                .chain(gens.H(n, m).map(|&x| Some(x)))
+                .chain(iter::once(Some(pc_gens.B_blinding)))
+                .chain(iter::once(Some(pc_gens.B)))
+                .chain(bp_gens.G(n, m).map(|&x| Some(x)))
+                .chain(bp_gens.H(n, m).map(|&x| Some(x)))
                 .chain(value_commitments.iter().map(|&x| Some(x))),
         ).ok_or_else(|| ProofError::VerificationError)?;
 
@@ -369,13 +369,12 @@ fn delta(n: usize, m: usize, y: &Scalar, z: &Scalar) -> Scalar {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rand::rngs::OsRng;
 
-    use generators::PedersenGenerators;
+    use generators::PedersenGens;
 
     #[test]
     fn test_delta() {
-        let mut rng = OsRng::new().unwrap();
+        let mut rng = rand::thread_rng();
         let y = Scalar::random(&mut rng);
         let z = Scalar::random(&mut rng);
 
@@ -415,7 +414,8 @@ mod tests {
         // Both prover and verifier have access to the generators and the proof
         let max_bitsize = 64;
         let max_parties = 8;
-        let generators = Generators::new(PedersenGenerators::default(), max_bitsize, max_parties);
+        let pc_gens = PedersenGens::default();
+        let bp_gens = BulletproofGens::new(max_bitsize, max_parties);
 
         // Serialized proof data
         let proof_bytes: Vec<u8>;
@@ -424,18 +424,19 @@ mod tests {
         // Prover's scope
         {
             // 1. Generate the proof
-
-            let mut rng = OsRng::new().unwrap();
             let mut transcript = Transcript::new(b"AggregatedRangeProofTest");
+
+            use rand::Rng;
+            let mut rng = rand::thread_rng();
 
             let (min, max) = (0u64, ((1u128 << n) - 1) as u64);
             let values: Vec<u64> = (0..m).map(|_| rng.gen_range(min, max)).collect();
             let blindings: Vec<Scalar> = (0..m).map(|_| Scalar::random(&mut rng)).collect();
 
             let proof = RangeProof::prove_multiple(
-                &generators,
+                &bp_gens,
+                &pc_gens,
                 &mut transcript,
-                &mut rng,
                 &values,
                 &blindings,
                 n,
@@ -444,13 +445,11 @@ mod tests {
             // 2. Serialize
             proof_bytes = bincode::serialize(&proof).unwrap();
 
-            let pg = &generators.pedersen_gens;
-
             // XXX would be nice to have some convenience API for this
             value_commitments = values
                 .iter()
                 .zip(blindings.iter())
-                .map(|(&v, &v_blinding)| pg.commit(Scalar::from(v), v_blinding))
+                .map(|(&v, &v_blinding)| pc_gens.commit(v.into(), v_blinding))
                 .collect();
         }
 
@@ -467,18 +466,12 @@ mod tests {
             let proof: RangeProof = bincode::deserialize(&proof_bytes).unwrap();
 
             // 4. Verify with the same customization label as above
-            let mut rng = OsRng::new().unwrap();
             let mut transcript = Transcript::new(b"AggregatedRangeProofTest");
 
             assert!(
                 proof
-                    .verify(
-                        &value_commitments,
-                        &generators,
-                        &mut transcript,
-                        &mut rng,
-                        n
-                    ).is_ok()
+                    .verify(&bp_gens, &pc_gens, &mut transcript, &value_commitments, n)
+                    .is_ok()
             );
         }
     }
@@ -534,44 +527,46 @@ mod tests {
         let m = 4;
         let n = 32;
 
-        let generators = Generators::new(PedersenGenerators::default(), n, m);
+        let pc_gens = PedersenGens::default();
+        let bp_gens = BulletproofGens::new(n, m);
 
-        let mut rng = OsRng::new().unwrap();
+        use rand::Rng;
+        let mut rng = rand::thread_rng();
         let mut transcript = Transcript::new(b"AggregatedRangeProofTest");
 
         // Parties 0, 2 are honest and use a 32-bit value
         let v0 = rng.gen::<u32>() as u64;
         let v0_blinding = Scalar::random(&mut rng);
-        let party0 = Party::new(v0, v0_blinding, n, &generators).unwrap();
+        let party0 = Party::new(&bp_gens, &pc_gens, v0, v0_blinding, n).unwrap();
 
         let v2 = rng.gen::<u32>() as u64;
         let v2_blinding = Scalar::random(&mut rng);
-        let party2 = Party::new(v2, v2_blinding, n, &generators).unwrap();
+        let party2 = Party::new(&bp_gens, &pc_gens, v2, v2_blinding, n).unwrap();
 
         // Parties 1, 3 are dishonest and use a 64-bit value
         let v1 = rng.gen::<u64>();
         let v1_blinding = Scalar::random(&mut rng);
-        let party1 = Party::new(v1, v1_blinding, n, &generators).unwrap();
+        let party1 = Party::new(&bp_gens, &pc_gens, v1, v1_blinding, n).unwrap();
 
         let v3 = rng.gen::<u64>();
         let v3_blinding = Scalar::random(&mut rng);
-        let party3 = Party::new(v3, v3_blinding, n, &generators).unwrap();
+        let party3 = Party::new(&bp_gens, &pc_gens, v3, v3_blinding, n).unwrap();
 
-        let dealer = Dealer::new(&generators, n, m, &mut transcript).unwrap();
+        let dealer = Dealer::new(&bp_gens, &pc_gens, &mut transcript, n, m).unwrap();
 
-        let (party0, value_com0) = party0.assign_position(0, &mut rng);
-        let (party1, value_com1) = party1.assign_position(1, &mut rng);
-        let (party2, value_com2) = party2.assign_position(2, &mut rng);
-        let (party3, value_com3) = party3.assign_position(3, &mut rng);
+        let (party0, value_com0) = party0.assign_position(0);
+        let (party1, value_com1) = party1.assign_position(1);
+        let (party2, value_com2) = party2.assign_position(2);
+        let (party3, value_com3) = party3.assign_position(3);
 
         let (dealer, value_challenge) = dealer
             .receive_value_commitments(vec![value_com0, value_com1, value_com2, value_com3])
             .unwrap();
 
-        let (party0, poly_com0) = party0.apply_challenge(&value_challenge, &mut rng);
-        let (party1, poly_com1) = party1.apply_challenge(&value_challenge, &mut rng);
-        let (party2, poly_com2) = party2.apply_challenge(&value_challenge, &mut rng);
-        let (party3, poly_com3) = party3.apply_challenge(&value_challenge, &mut rng);
+        let (party0, poly_com0) = party0.apply_challenge(&value_challenge);
+        let (party1, poly_com1) = party1.apply_challenge(&value_challenge);
+        let (party2, poly_com2) = party2.apply_challenge(&value_challenge);
+        let (party3, poly_com3) = party3.apply_challenge(&value_challenge);
 
         let (dealer, poly_challenge) = dealer
             .receive_poly_commitments(vec![poly_com0, poly_com1, poly_com2, poly_com3])
@@ -582,7 +577,7 @@ mod tests {
         let share2 = party2.apply_challenge(&poly_challenge).unwrap();
         let share3 = party3.apply_challenge(&poly_challenge).unwrap();
 
-        match dealer.receive_shares(&mut rng, &[share0, share1, share2, share3]) {
+        match dealer.receive_shares(&[share0, share1, share2, share3]) {
             Err(MPCError::MalformedProofShares { bad_shares }) => {
                 assert_eq!(bad_shares, vec![1, 3]);
             }
@@ -604,24 +599,26 @@ mod tests {
         let m = 1;
         let n = 32;
 
-        let generators = Generators::new(PedersenGenerators::default(), n, m);
+        let pc_gens = PedersenGens::default();
+        let bp_gens = BulletproofGens::new(n, m);
 
-        let mut rng = OsRng::new().unwrap();
+        use rand::Rng;
+        let mut rng = rand::thread_rng();
         let mut transcript = Transcript::new(b"AggregatedRangeProofTest");
 
         let v0 = rng.gen::<u32>() as u64;
         let v0_blinding = Scalar::random(&mut rng);
-        let party0 = Party::new(v0, v0_blinding, n, &generators).unwrap();
+        let party0 = Party::new(&bp_gens, &pc_gens, v0, v0_blinding, n).unwrap();
 
-        let dealer = Dealer::new(&generators, n, m, &mut transcript).unwrap();
+        let dealer = Dealer::new(&bp_gens, &pc_gens, &mut transcript, n, m).unwrap();
 
         // Now do the protocol flow as normal....
 
-        let (party0, value_com0) = party0.assign_position(0, &mut rng);
+        let (party0, value_com0) = party0.assign_position(0);
 
         let (dealer, value_challenge) = dealer.receive_value_commitments(vec![value_com0]).unwrap();
 
-        let (party0, poly_com0) = party0.apply_challenge(&value_challenge, &mut rng);
+        let (party0, poly_com0) = party0.apply_challenge(&value_challenge);
 
         let (_dealer, mut poly_challenge) =
             dealer.receive_poly_commitments(vec![poly_com0]).unwrap();
