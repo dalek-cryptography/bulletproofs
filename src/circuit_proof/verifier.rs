@@ -9,12 +9,13 @@ use super::assignment::Assignment;
 use super::{ConstraintSystem, LinearCombination, R1CSProof, Variable};
 
 use errors::R1CSError;
-use generators::Generators;
+use generators::{BulletproofGens, PedersenGens};
 use transcript::TranscriptProtocol;
 
 pub struct VerifierCS<'a, 'b> {
+    bp_gens: &'b BulletproofGens,
+    pc_gens: &'b PedersenGens,
     transcript: &'a mut Transcript,
-    generators: &'b Generators,
     constraints: Vec<LinearCombination>,
     num_vars: usize,
     V: Vec<CompressedRistretto>,
@@ -60,8 +61,9 @@ impl<'a, 'b> ConstraintSystem for VerifierCS<'a, 'b> {
 
 impl<'a, 'b> VerifierCS<'a, 'b> {
     pub fn new(
+        bp_gens: &'b BulletproofGens,
+        pc_gens: &'b PedersenGens,
         transcript: &'a mut Transcript,
-        generators: &'b Generators,
         commitments: Vec<CompressedRistretto>,
     ) -> (Self, Vec<Variable>) {
         let m = commitments.len();
@@ -77,8 +79,9 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
         }
 
         let cs = VerifierCS {
+            bp_gens,
+            pc_gens,
             transcript,
-            generators,
             num_vars: 0,
             V: commitments,
             constraints: Vec::new(),
@@ -153,18 +156,15 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
         use util;
 
         let n = self.num_vars;
-        if self.generators.gens_capacity < n {
+        if self.bp_gens.gens_capacity < n {
             return Err(R1CSError::InvalidGeneratorsLength);
         }
         // We are performing a single-party circuit proof, so party index is 0.
-        let gens = self.generators.share(0);
+        let gens = self.bp_gens.share(0);
 
         // Create a `TranscriptRng` from the transcript
         use rand::thread_rng;
-        let mut rng = self
-            .transcript
-            .fork_transcript()
-            .reseed_from_rng(&mut thread_rng());
+        let mut rng = self.transcript.build_rng().finalize(&mut thread_rng());
 
         self.transcript.commit_point(b"A_I", &proof.A_I);
         self.transcript.commit_point(b"A_O", &proof.A_O);
@@ -260,8 +260,8 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
                 .chain(iter::once(Some(W_R_point)))
                 .chain(iter::once(Some(W_O_point)))
                 .chain(iter::once(proof.S.decompress()))
-                .chain(iter::once(Some(gens.pedersen_gens.B)))
-                .chain(iter::once(Some(gens.pedersen_gens.B_blinding)))
+                .chain(iter::once(Some(self.pc_gens.B)))
+                .chain(iter::once(Some(self.pc_gens.B_blinding)))
                 .chain(gens.G(n).map(|&G_i| Some(G_i)))
                 .chain(gens.H(n).map(|&H_i| Some(H_i)))
                 .chain(proof.ipp_proof.L_vec.iter().map(|L_i| L_i.decompress()))

@@ -140,7 +140,7 @@ mod tests {
     use super::*;
 
     use errors::R1CSError;
-    use generators::{Generators, PedersenGenerators};
+    use generators::{BulletproofGens, PedersenGens};
 
     use curve25519_dalek::scalar::Scalar;
     use merlin::Transcript;
@@ -191,7 +191,8 @@ mod tests {
         c2: u64,
     ) -> Result<(), R1CSError> {
         // Common
-        let gens = Generators::new(PedersenGenerators::default(), 128, 1);
+        let pc_gens = PedersenGens::default();
+        let bp_gens = BulletproofGens::new(128, 1);
 
         // Prover's scope
         let (proof, commitments) = {
@@ -207,7 +208,7 @@ mod tests {
 
             // 2. Construct CS
             let (mut cs, vars, commitments) =
-                ProverCS::new(&mut transcript, &gens, v.clone(), v_blinding);
+                ProverCS::new(&bp_gens, &pc_gens, &mut transcript, v.clone(), v_blinding);
 
             // 3. Add gadgets
             example_gadget(
@@ -232,7 +233,7 @@ mod tests {
         let mut transcript = Transcript::new(b"R1CSExampleGadget");
 
         // 1. Construct CS using commitments to HL witness
-        let (mut cs, vars) = VerifierCS::new(&mut transcript, &gens, commitments);
+        let (mut cs, vars) = VerifierCS::new(&bp_gens, &pc_gens, &mut transcript, commitments);
 
         // 2. Add gadgets
         example_gadget(

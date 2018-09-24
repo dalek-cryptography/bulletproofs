@@ -58,7 +58,7 @@ impl RangeProof {
         v: u64,
         v_blinding: &Scalar,
         n: usize,
-        ) -> Result<RangeProof, ProofError> {
+    ) -> Result<RangeProof, ProofError> {
         RangeProof::prove_multiple(bp_gens, pc_gens, transcript, &[v], &[*v_blinding], n)
     }
 
@@ -72,7 +72,7 @@ impl RangeProof {
         values: &[u64],
         blindings: &[Scalar],
         n: usize,
-        ) -> Result<RangeProof, ProofError> {
+    ) -> Result<RangeProof, ProofError> {
         use self::dealer::*;
         use self::party::*;
 
