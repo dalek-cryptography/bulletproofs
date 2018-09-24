@@ -345,10 +345,10 @@ mod tests {
     fn test_helper_create(n: usize) {
         let mut rng = OsRng::new().unwrap();
 
-        use generators::{Generators, PedersenGenerators};
-        let gens = Generators::new(PedersenGenerators::default(), n, 1);
-        let G: Vec<RistrettoPoint> = gens.share(0).G(n).cloned().collect();
-        let H: Vec<RistrettoPoint> = gens.share(0).H(n).cloned().collect();
+        use generators::BulletproofGens;
+        let bp_gens = BulletproofGens::new(n, 1);
+        let G: Vec<RistrettoPoint> = bp_gens.share(0).G(n).cloned().collect();
+        let H: Vec<RistrettoPoint> = bp_gens.share(0).H(n).cloned().collect();
 
         // Q would be determined upstream in the protocol, so we pick a random one.
         let Q = RistrettoPoint::hash_from_bytes::<Sha3_512>(b"test point");
