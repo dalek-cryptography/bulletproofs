@@ -191,9 +191,7 @@ impl RangeProof {
 
         let w = transcript.challenge_scalar(b"w");
 
-        let mut rng = transcript
-            .fork_transcript()
-            .reseed_from_rng(&mut rand::thread_rng());
+        let mut rng = transcript.build_rng().finalize(&mut rand::thread_rng());
 
         // Challenge value for batching statements to be verified
         let c = Scalar::random(&mut rng);
