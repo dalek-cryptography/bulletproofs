@@ -1,5 +1,6 @@
 use curve25519_dalek::scalar::Scalar;
 use errors::R1CSError;
+use std::cmp::PartialEq;
 use std::ops::{Add, Div, Mul, Sub, Try};
 
 // The assignment value to a variable, as stored in `ConstraintSystem`.
@@ -135,5 +136,17 @@ impl Try for Assignment {
 
     fn from_ok(v: Self::Ok) -> Self {
         Assignment::Value(v)
+    }
+}
+
+impl PartialEq for Assignment {
+    fn eq(&self, other: &Assignment) -> bool {
+        match (self, other) {
+            (Assignment::Value(self_value), Assignment::Value(other_value)) => {
+                self_value == other_value
+            }
+            (Assignment::Missing(), Assignment::Missing()) => true,
+            _ => false,
+        }
     }
 }
