@@ -68,7 +68,7 @@ impl<'a> PartyAwaitingPosition<'a> {
         self,
         // XXX need to check that j is valid (in gens range)
         j: usize,
-    ) -> (PartyAwaitingValueChallenge<'a>, ValueCommitment) {
+    ) -> (PartyAwaitingBitChallenge<'a>, BitCommitment) {
         // XXX use transcript RNG
         let mut rng = rand::thread_rng();
 
@@ -103,12 +103,12 @@ impl<'a> PartyAwaitingPosition<'a> {
         );
 
         // Return next state and all commitments
-        let value_commitment = ValueCommitment {
+        let value_commitment = BitCommitment {
             V_j: self.V,
             A_j: A,
             S_j: S,
         };
-        let next_state = PartyAwaitingValueChallenge {
+        let next_state = PartyAwaitingBitChallenge {
             n: self.n,
             v: self.v,
             v_blinding: self.v_blinding,
@@ -125,7 +125,7 @@ impl<'a> PartyAwaitingPosition<'a> {
 
 /// A party which has committed to the bits of its value
 /// and is waiting for the aggregated value challenge from the dealer.
-pub struct PartyAwaitingValueChallenge<'a> {
+pub struct PartyAwaitingBitChallenge<'a> {
     n: usize, // bitsize of the range
     v: u64,
     v_blinding: Scalar,
@@ -137,12 +137,12 @@ pub struct PartyAwaitingValueChallenge<'a> {
     s_R: Vec<Scalar>,
 }
 
-impl<'a> PartyAwaitingValueChallenge<'a> {
-    /// Receive a [`ValueChallenge`] from the dealer and use it to
+impl<'a> PartyAwaitingBitChallenge<'a> {
+    /// Receive a [`BitChallenge`] from the dealer and use it to
     /// compute commitments to the party's polynomial coefficients.
     pub fn apply_challenge(
         self,
-        vc: &ValueChallenge,
+        vc: &BitChallenge,
     ) -> (PartyAwaitingPolyChallenge, PolyCommitment) {
         let mut rng = rand::thread_rng();
 

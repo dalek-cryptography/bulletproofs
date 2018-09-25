@@ -29,7 +29,7 @@ impl Dealer {
         transcript: &'a mut Transcript,
         n: usize,
         m: usize,
-    ) -> Result<DealerAwaitingValueCommitments<'a, 'b>, MPCError> {
+    ) -> Result<DealerAwaitingBitCommitments<'a, 'b>, MPCError> {
         if !(n == 8 || n == 16 || n == 32 || n == 64) {
             return Err(MPCError::InvalidBitsize);
         }
@@ -59,7 +59,7 @@ impl Dealer {
 
         transcript.rangeproof_domain_sep(n as u64, m as u64);
 
-        Ok(DealerAwaitingValueCommitments {
+        Ok(DealerAwaitingBitCommitments {
             bp_gens,
             pc_gens,
             transcript,
@@ -70,8 +70,8 @@ impl Dealer {
     }
 }
 
-/// A dealer waiting for the parties to send their [`ValueCommitment`]s.
-pub struct DealerAwaitingValueCommitments<'a, 'b> {
+/// A dealer waiting for the parties to send their [`BitCommitment`]s.
+pub struct DealerAwaitingBitCommitments<'a, 'b> {
     bp_gens: &'b BulletproofGens,
     pc_gens: &'b PedersenGens,
     transcript: &'a mut Transcript,
@@ -82,14 +82,14 @@ pub struct DealerAwaitingValueCommitments<'a, 'b> {
     m: usize,
 }
 
-impl<'a, 'b> DealerAwaitingValueCommitments<'a, 'b> {
-    /// Receive each party's [`ValueCommitment`]s and compute the [`ValueChallenge`].
+impl<'a, 'b> DealerAwaitingBitCommitments<'a, 'b> {
+    /// Receive each party's [`BitCommitment`]s and compute the [`BitChallenge`].
     pub fn receive_value_commitments(
         self,
-        value_commitments: Vec<ValueCommitment>,
-    ) -> Result<(DealerAwaitingPolyCommitments<'a, 'b>, ValueChallenge), MPCError> {
+        value_commitments: Vec<BitCommitment>,
+    ) -> Result<(DealerAwaitingPolyCommitments<'a, 'b>, BitChallenge), MPCError> {
         if self.m != value_commitments.len() {
-            return Err(MPCError::WrongNumValueCommitments);
+            return Err(MPCError::WrongNumBitCommitments);
         }
 
         // XXX value commitments should be compressed
@@ -107,7 +107,7 @@ impl<'a, 'b> DealerAwaitingValueCommitments<'a, 'b> {
 
         let y = self.transcript.challenge_scalar(b"y");
         let z = self.transcript.challenge_scalar(b"z");
-        let value_challenge = ValueChallenge { y, z };
+        let value_challenge = BitChallenge { y, z };
 
         Ok((
             DealerAwaitingPolyCommitments {
@@ -127,7 +127,7 @@ impl<'a, 'b> DealerAwaitingValueCommitments<'a, 'b> {
     }
 }
 
-/// A dealer which has sent the [`ValueChallenge`] to the parties and
+/// A dealer which has sent the [`BitChallenge`] to the parties and
 /// is waiting for their [`PolyCommitment`]s.
 pub struct DealerAwaitingPolyCommitments<'a, 'b> {
     n: usize,
@@ -136,8 +136,8 @@ pub struct DealerAwaitingPolyCommitments<'a, 'b> {
     initial_transcript: Transcript,
     bp_gens: &'b BulletproofGens,
     pc_gens: &'b PedersenGens,
-    value_challenge: ValueChallenge,
-    value_commitments: Vec<ValueCommitment>,
+    value_challenge: BitChallenge,
+    value_commitments: Vec<BitCommitment>,
     /// Aggregated commitment to the parties' bits
     A: RistrettoPoint,
     /// Aggregated commitment to the parties' bit blindings
@@ -197,8 +197,8 @@ pub struct DealerAwaitingProofShares<'a, 'b> {
     initial_transcript: Transcript,
     bp_gens: &'b BulletproofGens,
     pc_gens: &'b PedersenGens,
-    value_challenge: ValueChallenge,
-    value_commitments: Vec<ValueCommitment>,
+    value_challenge: BitChallenge,
+    value_commitments: Vec<BitCommitment>,
     poly_challenge: PolyChallenge,
     poly_commitments: Vec<PolyCommitment>,
     A: RistrettoPoint,
@@ -278,7 +278,7 @@ impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
     pub fn receive_shares(mut self, proof_shares: &[ProofShare]) -> Result<RangeProof, MPCError> {
         let proof = self.assemble_shares(proof_shares)?;
 
-        // XXX ValueCommitments should have compressed points
+        // XXX BitCommitments should have compressed points
         let V: Vec<_> = self
             .value_commitments
             .iter()

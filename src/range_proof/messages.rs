@@ -10,17 +10,16 @@ use curve25519_dalek::scalar::Scalar;
 use generators::{BulletproofGens, PedersenGens};
 
 /// A commitment to the bits of a party's value.
-/// XXX rename this to `BitCommitment`
 #[derive(Serialize, Deserialize, Copy, Clone, Debug)]
-pub struct ValueCommitment {
+pub struct BitCommitment {
     pub(super) V_j: RistrettoPoint,
     pub(super) A_j: RistrettoPoint,
     pub(super) S_j: RistrettoPoint,
 }
 
-/// Challenge values derived from all parties' [`ValueCommitment`]s.
+/// Challenge values derived from all parties' [`BitCommitment`]s.
 #[derive(Serialize, Deserialize, Copy, Clone, Debug)]
-pub struct ValueChallenge {
+pub struct BitChallenge {
     pub(super) y: Scalar,
     pub(super) z: Scalar,
 }
@@ -57,8 +56,8 @@ impl ProofShare {
         bp_gens: &BulletproofGens,
         pc_gens: &PedersenGens,
         j: usize,
-        value_commitment: &ValueCommitment,
-        value_challenge: &ValueChallenge,
+        value_commitment: &BitCommitment,
+        value_challenge: &BitChallenge,
         poly_commitment: &PolyCommitment,
         poly_challenge: &PolyChallenge,
     ) -> Result<(), ()> {
