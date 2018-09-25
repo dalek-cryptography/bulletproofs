@@ -191,7 +191,7 @@ impl RangeProof {
     /// let mut transcript = Transcript::new(b"doctest example");
     /// assert!(
     ///     proof
-    ///         .verify(&bp_gens, &pc_gens, &mut transcript, &commitments, 32)
+    ///         .verify_multiple(&bp_gens, &pc_gens, &mut transcript, &commitments, 32)
     ///         .is_ok()
     /// );
     /// # }
@@ -257,7 +257,7 @@ impl RangeProof {
 
     /// Verifies a rangeproof for a given value commitment \\(V\\).
     ///
-    /// This is a convenience wrapper around `verify` for the `m=1` case.
+    /// This is a convenience wrapper around `verify_multiple` for the `m=1` case.
     pub fn verify_single(
         &self,
         bp_gens: &BulletproofGens,
@@ -266,11 +266,11 @@ impl RangeProof {
         V: &RistrettoPoint,
         n: usize,
     ) -> Result<(), ProofError> {
-        self.verify(bp_gens, pc_gens, transcript, &[*V], n)
+        self.verify_multiple(bp_gens, pc_gens, transcript, &[*V], n)
     }
 
     /// Verifies an aggregated rangeproof for the given value commitments.
-    pub fn verify(
+    pub fn verify_multiple(
         &self,
         bp_gens: &BulletproofGens,
         pc_gens: &PedersenGens,
@@ -595,7 +595,7 @@ mod tests {
 
             assert!(
                 proof
-                    .verify(&bp_gens, &pc_gens, &mut transcript, &value_commitments, n)
+                    .verify_multiple(&bp_gens, &pc_gens, &mut transcript, &value_commitments, n)
                     .is_ok()
             );
         }
