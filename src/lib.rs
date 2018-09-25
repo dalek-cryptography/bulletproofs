@@ -8,18 +8,20 @@
 
 extern crate byteorder;
 extern crate core;
-extern crate curve25519_dalek;
-extern crate digest;
-#[macro_use]
-extern crate failure;
-extern crate merlin;
 extern crate rand;
+extern crate digest;
 extern crate sha3;
+
+extern crate curve25519_dalek;
+extern crate merlin;
 extern crate subtle;
-extern crate tiny_keccak;
+
 #[macro_use]
 extern crate serde_derive;
 extern crate serde;
+
+#[macro_use]
+extern crate failure;
 
 #[cfg(test)]
 extern crate bincode;
