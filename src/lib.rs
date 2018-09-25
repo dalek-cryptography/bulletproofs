@@ -1,6 +1,4 @@
-#![cfg_attr(feature = "bench", feature(test))]
 #![feature(nll)]
-#![feature(test)]
 #![feature(external_doc)]
 #![doc(include = "../README.md")]
 #![doc(html_logo_url = "https://doc.dalek.rs/assets/dalek-logo-clear.png")]
@@ -25,8 +23,6 @@ extern crate serde;
 
 #[cfg(test)]
 extern crate bincode;
-#[cfg(test)]
-extern crate test;
 
 mod util;
 
