@@ -623,7 +623,7 @@ New notation for aggregated proofs
 
 The subscript \\({(j)}\\) denotes the \\(j\\)th party's share. For instance, \\(v_{(j)}\\) is the \\(v\\) value of the \\(j\\)th party; \\( \mathbf{a}\_{L, (j)}\\) is the \\( \mathbf{a}\_L \\) vector of the \\(j\\)th party; \\(\mathbf{l}\_{(0)}(x)\\) is the \\(\mathbf{l}(x)\\) polynomial of party \\(0\\). 
 
-We use pythonic notation to denote slices of vectors, such that \\(\mathbf{G}\_{[a:b]} = [\mathbf{G}\_{a}, \mathbf{G}\_{a+1}, \dots, \mathbf{G}\_{b-1} ]\\).
+We use pythonic notation to denote slices of vectors, such that \\(\mathbf{G}\_{\[a:b\]} = [\mathbf{G}\_{a}, \mathbf{G}\_{a+1}, \dots, \mathbf{G}\_{b-1} ]\\).
 
 \\({\mathbf{G}\_{(j)}}\\) is party \\(j\\)'s share of the generators \\({\mathbf{G}}\\), or \\({\mathbf{G}\_{[j\cdot n : (j+1)n]}}\\), and \\({\mathbf{H}'\_{(j)}}\\) is party \\(j\\)'s share of the generators \\({\mathbf{H}'}\\), or \\({\mathbf{H}'\_{[j\cdot n : (j+1)n]}}\\).
 

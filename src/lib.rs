@@ -1,15 +1,13 @@
 #![feature(nll)]
 #![feature(external_doc)]
+#![deny(missing_docs)]
 #![doc(include = "../README.md")]
 #![doc(html_logo_url = "https://doc.dalek.rs/assets/dalek-logo-clear.png")]
 
-//! Note that docs will only build on nightly Rust until
-//! [RFC 1990 stabilizes](https://github.com/rust-lang/rust/issues/44732).
-
 extern crate byteorder;
 extern crate core;
-extern crate rand;
 extern crate digest;
+extern crate rand;
 extern crate sha3;
 
 extern crate curve25519_dalek;

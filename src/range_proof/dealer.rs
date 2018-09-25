@@ -18,7 +18,7 @@ use util;
 
 use super::messages::*;
 
-/// Dealer is an entry-point API for setting up a dealer
+/// Used to construct a dealer for the aggregated rangeproof MPC protocol.
 pub struct Dealer {}
 
 impl Dealer {
@@ -70,8 +70,7 @@ impl Dealer {
     }
 }
 
-/// The initial dealer state, waiting for the parties to send value
-/// commitments.
+/// A dealer waiting for the parties to send their [`ValueCommitment`]s.
 pub struct DealerAwaitingValueCommitments<'a, 'b> {
     bp_gens: &'b BulletproofGens,
     pc_gens: &'b PedersenGens,
@@ -84,7 +83,7 @@ pub struct DealerAwaitingValueCommitments<'a, 'b> {
 }
 
 impl<'a, 'b> DealerAwaitingValueCommitments<'a, 'b> {
-    /// Combines commitments and computes challenge variables.
+    /// Receive each party's [`ValueCommitment`]s and compute the [`ValueChallenge`].
     pub fn receive_value_commitments(
         self,
         value_commitments: Vec<ValueCommitment>,
@@ -128,6 +127,8 @@ impl<'a, 'b> DealerAwaitingValueCommitments<'a, 'b> {
     }
 }
 
+/// A dealer which has sent the [`ValueChallenge`] to the parties and
+/// is waiting for their [`PolyCommitment`]s.
 pub struct DealerAwaitingPolyCommitments<'a, 'b> {
     n: usize,
     m: usize,
@@ -144,6 +145,8 @@ pub struct DealerAwaitingPolyCommitments<'a, 'b> {
 }
 
 impl<'a, 'b> DealerAwaitingPolyCommitments<'a, 'b> {
+    /// Receive [`PolyCommitment`]s from the parties and compute the
+    /// [`PolyChallenge`].
     pub fn receive_poly_commitments(
         self,
         poly_commitments: Vec<PolyCommitment>,
@@ -184,6 +187,9 @@ impl<'a, 'b> DealerAwaitingPolyCommitments<'a, 'b> {
     }
 }
 
+/// A dealer which has sent the [`PolyChallenge`] to the parties and
+/// is waiting to aggregate their [`ProofShare`]s into a
+/// [`RangeProof`].
 pub struct DealerAwaitingProofShares<'a, 'b> {
     n: usize,
     m: usize,
@@ -256,14 +262,19 @@ impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
         })
     }
 
-    /// Assemble the final aggregated proof from the given
-    /// `proof_shares`, and validate that all input shares and the
-    /// aggregated proof are well-formed.  If the aggregated proof is
-    /// not well-formed, this function detects which party submitted a
-    /// malformed share and returns that information as part of the
-    /// error.
+    /// Assemble the final aggregated [`RangeProof`] from the given
+    /// `proof_shares`, then validate the proof to ensure that all
+    /// `ProofShare`s were well-formed.
     ///
-    /// XXX define error types so we can surface the blame info
+    /// If the aggregated proof fails to validate, this function
+    /// audits the submitted shares to determine which shares were
+    /// invalid.  This information is returned as part of the
+    /// [`MPCError`].
+    ///
+    /// If the proof shares are known to be trusted, for instance when
+    /// performing local aggregation,
+    /// [`receive_trusted_shares`](DealerAwaitingProofShares::receive_trusted_shares)
+    /// saves time by skipping verification of the aggregated proof.
     pub fn receive_shares(mut self, proof_shares: &[ProofShare]) -> Result<RangeProof, MPCError> {
         let proof = self.assemble_shares(proof_shares)?;
 
@@ -302,8 +313,8 @@ impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
         }
     }
 
-    /// Assemble the final aggregated proof from the given
-    /// `proof_shares`, but does not validate that they are well-formed.
+    /// Assemble the final aggregated [`RangeProof`] from the given
+    /// `proof_shares`, but skip validation of the proof.
     ///
     /// ## WARNING
     ///
@@ -312,9 +323,10 @@ impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
     /// known by the dealer to be honest (for instance, when there's
     /// only one party playing all roles).
     ///
-    /// Otherwise, use `receive_shares`, which validates that all
-    /// shares are well-formed, or else detects which party(ies)
-    /// submitted malformed shares.
+    /// Otherwise, use
+    /// [`receive_shares`](DealerAwaitingProofShares::receive_shares),
+    /// which validates that all shares are well-formed, or else
+    /// detects which party(ies) submitted malformed shares.
     pub fn receive_trusted_shares(
         mut self,
         proof_shares: &[ProofShare],
