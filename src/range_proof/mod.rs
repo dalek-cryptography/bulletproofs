@@ -71,7 +71,7 @@ pub struct RangeProof {
 impl RangeProof {
     /// Create a rangeproof for a given pair of value `v` and
     /// blinding scalar `v_blinding`.
-    /// This is a convenience wrapper around [`prove_multiple`].
+    /// This is a convenience wrapper around [`RangeProof::prove_multiple`].
     ///
     /// # Example
     /// ```
