@@ -287,8 +287,8 @@ Instead, the prover chooses vectors of blinding factors
 and uses them to construct vector polynomials
 \\[
 \begin{aligned}
-  {\mathbf{l}}(x) &= {\mathbf{l}}\_{0} + {\mathbf{l}}\_{1} x = ({\mathbf{a}}\_{L} + {\mathbf{s}}\_{L} x) - z {\mathbf{1}} & \in {\mathbb Z\_p}[x]^{n}  \\\\
-  {\mathbf{r}}(x) &= {\mathbf{r}}\_{0} + {\mathbf{r}}\_{1} x = {\mathbf{y}}^{n} \circ \left( ({\mathbf{a}}\_{R} + {\mathbf{s}}\_{R} x\right)  + z {\mathbf{1}}) + z^{2} {\mathbf{2}}^{n} &\in {\mathbb Z\_p}[x]^{n} 
+  {\mathbf{l}}(x) &= {\mathbf{l}}\_{0} + {\mathbf{l}}\_{1} x = ({\mathbf{a}}\_{L} + {\mathbf{s}}\_{L} x) - z {\mathbf{1}} & \in {\mathbb Z\_p}\[x\]^{n}  \\\\
+  {\mathbf{r}}(x) &= {\mathbf{r}}\_{0} + {\mathbf{r}}\_{1} x = {\mathbf{y}}^{n} \circ \left( ({\mathbf{a}}\_{R} + {\mathbf{s}}\_{R} x\right)  + z {\mathbf{1}}) + z^{2} {\mathbf{2}}^{n} &\in {\mathbb Z\_p}\[x\]^{n} 
 \end{aligned}
 \\]
 These are the left and right sides of the combined inner product with \\({\mathbf{a}}\_{L}\\), \\({\mathbf{a}}\_{R}\\)
@@ -692,8 +692,8 @@ The prover chooses vectors of blinding factors \\( \mathbf{s}\_{L, (j)}, {\mathb
 
 \\[
 \begin{aligned}
-  {\mathbf{l}}\_{(j)}(x) &= ({\mathbf{a}}\_{L, (j)} + {\mathbf{s}}\_{L, (j)} x) - z {\mathbf{1}} & \in {\mathbb Z\_p}[x]^{n}  \\\\
-  {\mathbf{r}}\_{(j)}(x) &= {\mathbf{y}}^{n}\_{(j)} \circ \left( ({\mathbf{a}}\_{R, (j)} + {\mathbf{s}}\_{R, (j)} x\right)  + z {\mathbf{1}}) + z^{2} z_{(j)} {\mathbf{2}}^{n} &\in {\mathbb Z\_p}[x]^{n} 
+  {\mathbf{l}}\_{(j)}(x) &= ({\mathbf{a}}\_{L, (j)} + {\mathbf{s}}\_{L, (j)} x) - z {\mathbf{1}} & \in {\mathbb Z\_p}\[x\]^{n}  \\\\
+  {\mathbf{r}}\_{(j)}(x) &= {\mathbf{y}}^{n}\_{(j)} \circ \left( ({\mathbf{a}}\_{R, (j)} + {\mathbf{s}}\_{R, (j)} x\right)  + z {\mathbf{1}}) + z^{2} z_{(j)} {\mathbf{2}}^{n} &\in {\mathbb Z\_p}\[x\]^{n} 
 \end{aligned}
 \\]
 
