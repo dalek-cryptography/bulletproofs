@@ -38,8 +38,6 @@ mod inner_product_proof;
 mod range_proof;
 mod transcript;
 
-pub use merlin::Transcript;
-
 pub use errors::ProofError;
 pub use generators::{BulletproofGens, BulletproofGensShare, PedersenGens};
 pub use range_proof::RangeProof;
