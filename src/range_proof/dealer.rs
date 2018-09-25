@@ -267,7 +267,12 @@ impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
     pub fn receive_shares(mut self, proof_shares: &[ProofShare]) -> Result<RangeProof, MPCError> {
         let proof = self.assemble_shares(proof_shares)?;
 
-        let V: Vec<_> = self.value_commitments.iter().map(|vc| vc.V_j).collect();
+        // XXX ValueCommitments should have compressed points
+        let V: Vec<_> = self
+            .value_commitments
+            .iter()
+            .map(|vc| vc.V_j.compress())
+            .collect();
 
         // See comment in `Dealer::new` for why we use `initial_transcript`
         let transcript = &mut self.initial_transcript;

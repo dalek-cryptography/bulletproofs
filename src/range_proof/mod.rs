@@ -101,7 +101,7 @@ impl RangeProof {
     ///
     /// // The API takes an opening to an existing commitment, so create one:
     /// let blinding = Scalar::random(&mut thread_rng());
-    /// let committed_value = pc_gens.commit(secret_value.into(), blinding);
+    /// let committed_value = pc_gens.commit(secret_value.into(), blinding).compress();
     ///
     /// // The proof can be chained to an existing transcript.
     /// // Here we create a transcript with a doctest domain separator.
@@ -170,7 +170,7 @@ impl RangeProof {
     /// let commitments: Vec<_> = secrets
     ///     .iter()
     ///     .zip(blindings.iter())
-    ///     .map(|(&v, &v_blinding)| pc_gens.commit(v.into(), v_blinding))
+    ///     .map(|(&v, &v_blinding)| pc_gens.commit(v.into(), v_blinding).compress())
     ///     .collect();
     ///
     /// // The proof can be chained to an existing transcript.
@@ -263,7 +263,7 @@ impl RangeProof {
         bp_gens: &BulletproofGens,
         pc_gens: &PedersenGens,
         transcript: &mut Transcript,
-        V: &RistrettoPoint,
+        V: &CompressedRistretto,
         n: usize,
     ) -> Result<(), ProofError> {
         self.verify_multiple(bp_gens, pc_gens, transcript, &[*V], n)
@@ -275,7 +275,7 @@ impl RangeProof {
         bp_gens: &BulletproofGens,
         pc_gens: &PedersenGens,
         transcript: &mut Transcript,
-        value_commitments: &[RistrettoPoint],
+        value_commitments: &[CompressedRistretto],
         n: usize,
     ) -> Result<(), ProofError> {
         let m = value_commitments.len();
@@ -294,10 +294,8 @@ impl RangeProof {
 
         transcript.rangeproof_domain_sep(n as u64, m as u64);
 
-        // XXX: allow user to supply compressed commitments
-        // to avoid unnecessary compression
         for V in value_commitments.iter() {
-            transcript.commit_point(b"V", &V.compress());
+            transcript.commit_point(b"V", V);
         }
         transcript.commit_point(b"A", &self.A);
         transcript.commit_point(b"S", &self.S);
@@ -368,7 +366,7 @@ impl RangeProof {
                 .chain(iter::once(Some(pc_gens.B)))
                 .chain(bp_gens.G(n, m).map(|&x| Some(x)))
                 .chain(bp_gens.H(n, m).map(|&x| Some(x)))
-                .chain(value_commitments.iter().map(|&x| Some(x))),
+                .chain(value_commitments.iter().map(|V| V.decompress())),
         ).ok_or_else(|| ProofError::VerificationError)?;
 
         if mega_check.is_identity() {
@@ -544,7 +542,7 @@ mod tests {
 
         // Serialized proof data
         let proof_bytes: Vec<u8>;
-        let value_commitments: Vec<RistrettoPoint>;
+        let value_commitments: Vec<CompressedRistretto>;
 
         // Prover's scope
         {
@@ -574,7 +572,7 @@ mod tests {
             value_commitments = values
                 .iter()
                 .zip(blindings.iter())
-                .map(|(&v, &v_blinding)| pc_gens.commit(v.into(), v_blinding))
+                .map(|(&v, &v_blinding)| pc_gens.commit(v.into(), v_blinding).compress())
                 .collect();
         }
 
