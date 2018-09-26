@@ -2,6 +2,7 @@ use curve25519_dalek::scalar::Scalar;
 use errors::R1CSError;
 use std::cmp::PartialEq;
 use std::ops::{Add, Div, Mul, Sub, Try};
+use subtle::ConstantTimeEq;
 
 // The assignment value to a variable, as stored in `ConstraintSystem`.
 // Provers create a `Value` assignment, while verifiers create an `Missing` assignment.
@@ -143,7 +144,7 @@ impl PartialEq for Assignment {
     fn eq(&self, other: &Assignment) -> bool {
         match (self, other) {
             (Assignment::Value(self_value), Assignment::Value(other_value)) => {
-                self_value == other_value
+                bool::from(self_value.ct_eq(other_value))
             }
             (Assignment::Missing(), Assignment::Missing()) => true,
             _ => false,
