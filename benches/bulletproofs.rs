@@ -4,7 +4,7 @@ extern crate criterion;
 use criterion::Criterion;
 
 extern crate rand;
-use rand::{rngs::OsRng, Rng};
+use rand::Rng;
 
 extern crate curve25519_dalek;
 use curve25519_dalek::scalar::Scalar;
@@ -12,7 +12,7 @@ use curve25519_dalek::scalar::Scalar;
 extern crate bulletproofs;
 use bulletproofs::RangeProof;
 use bulletproofs::Transcript;
-use bulletproofs::{Generators, PedersenGenerators};
+use bulletproofs::{BulletproofGens, PedersenGens};
 
 static AGGREGATION_SIZES: [usize; 6] = [1, 2, 4, 8, 16, 32];
 
@@ -22,8 +22,9 @@ fn create_aggregated_rangeproof_helper(n: usize, c: &mut Criterion) {
     c.bench_function_over_inputs(
         &label,
         move |b, &&m| {
-            let generators = Generators::new(PedersenGenerators::default(), n, m);
-            let mut rng = OsRng::new().unwrap();
+            let pc_gens = PedersenGens::default();
+            let bp_gens = BulletproofGens::new(n, m);
+            let mut rng = rand::thread_rng();
 
             let (min, max) = (0u64, ((1u128 << n) - 1) as u64);
             let values: Vec<u64> = (0..m).map(|_| rng.gen_range(min, max)).collect();
@@ -34,9 +35,9 @@ fn create_aggregated_rangeproof_helper(n: usize, c: &mut Criterion) {
                 let mut transcript = Transcript::new(b"AggregateRangeProofBenchmark");
 
                 RangeProof::prove_multiple(
-                    &generators,
+                    &bp_gens,
+                    &pc_gens,
                     &mut transcript,
-                    &mut rng,
                     &values,
                     &blindings,
                     n,
@@ -69,8 +70,9 @@ fn verify_aggregated_rangeproof_helper(n: usize, c: &mut Criterion) {
     c.bench_function_over_inputs(
         &label,
         move |b, &&m| {
-            let generators = Generators::new(PedersenGenerators::default(), n, m);
-            let mut rng = OsRng::new().unwrap();
+            let pc_gens = PedersenGens::default();
+            let bp_gens = BulletproofGens::new(n, m);
+            let mut rng = rand::thread_rng();
 
             let (min, max) = (0u64, ((1u128 << n) - 1) as u64);
             let values: Vec<u64> = (0..m).map(|_| rng.gen_range(min, max)).collect();
@@ -78,33 +80,25 @@ fn verify_aggregated_rangeproof_helper(n: usize, c: &mut Criterion) {
 
             let mut transcript = Transcript::new(b"AggregateRangeProofBenchmark");
             let proof = RangeProof::prove_multiple(
-                &generators,
+                &bp_gens,
+                &pc_gens,
                 &mut transcript,
-                &mut rng,
                 &values,
                 &blindings,
                 n,
             ).unwrap();
 
-            // XXX would be nice to have some convenience API for this
-            let pg = &generators.pedersen_gens;
             let value_commitments: Vec<_> = values
                 .iter()
                 .zip(blindings.iter())
-                .map(|(&v, &v_blinding)| pg.commit(Scalar::from(v), v_blinding))
+                .map(|(&v, &v_blinding)| pc_gens.commit(v.into(), v_blinding))
                 .collect();
 
             b.iter(|| {
                 // Each proof creation requires a clean transcript.
                 let mut transcript = Transcript::new(b"AggregateRangeProofBenchmark");
 
-                proof.verify(
-                    &value_commitments,
-                    &generators,
-                    &mut transcript,
-                    &mut rng,
-                    n,
-                )
+                proof.verify(&bp_gens, &pc_gens, &mut transcript, &value_commitments, n)
             });
         },
         &AGGREGATION_SIZES,

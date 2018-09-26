@@ -13,7 +13,7 @@ use sha3::{Sha3XofReader, Shake256};
 
 /// Represents a pair of base points for Pedersen commitments.
 #[derive(Copy, Clone)]
-pub struct PedersenGenerators {
+pub struct PedersenGens {
     /// Base for the committed value
     pub B: RistrettoPoint,
 
@@ -21,16 +21,16 @@ pub struct PedersenGenerators {
     pub B_blinding: RistrettoPoint,
 }
 
-impl PedersenGenerators {
+impl PedersenGens {
     /// Creates a Pedersen commitment using the value scalar and a blinding factor.
     pub fn commit(&self, value: Scalar, blinding: Scalar) -> RistrettoPoint {
         RistrettoPoint::multiscalar_mul(&[value, blinding], &[self.B, self.B_blinding])
     }
 }
 
-impl Default for PedersenGenerators {
+impl Default for PedersenGens {
     fn default() -> Self {
-        PedersenGenerators {
+        PedersenGens {
             B: GeneratorsChain::new(b"Bulletproofs.Generators.B")
                 .next()
                 .unwrap(),
@@ -81,29 +81,25 @@ impl Iterator for GeneratorsChain {
     }
 }
 
-/// The `Generators` struct contains all the generators needed for
+/// The `BulletproofGens` struct contains all the generators needed for
 /// aggregating `m` range proofs of `n` bits each.
 #[derive(Clone)]
-pub struct Generators {
-    /// Bases for Pedersen commitments
-    pub pedersen_gens: PedersenGenerators,
+pub struct BulletproofGens {
     /// The maximum number of usable generators for each party.
     pub gens_capacity: usize,
     /// Number of values or parties
     pub party_capacity: usize,
-    /// Per-bit generators for the bit values
+    /// Precomputed \\(\mathbf G\\) generators for each party.
     G_vec: Vec<Vec<RistrettoPoint>>,
-    /// Per-bit generators for the bit blinding factors
+    /// Precomputed \\(\mathbf H\\) generators for each party.
     H_vec: Vec<Vec<RistrettoPoint>>,
 }
 
-impl Generators {
-    /// Create a new `Generators` object.
+impl BulletproofGens {
+    /// Create a new `BulletproofGens` object.
     ///
     /// # Inputs
     ///
-    /// * `pedersen_gens` is a pair of generators used for Pedersen
-    ///    commitments.
     /// * `gens_capacity` is the number of generators to precompute
     ///    for each party.  For rangeproofs, it is sufficient to pass
     ///    `64`, the maximum bitsize of the rangeproofs.  For circuit
@@ -111,49 +107,39 @@ impl Generators {
     ///    multipliers, rounded up to the next power of two.
     /// * `party_capacity` is the maximum number of parties that can
     ///    produce an aggregated proof.
-    pub fn new(
-        pedersen_gens: PedersenGenerators,
-        gens_capacity: usize,
-        party_capacity: usize,
-    ) -> Self {
+    pub fn new(gens_capacity: usize, party_capacity: usize) -> Self {
         use byteorder::{ByteOrder, LittleEndian};
 
-        let G_vec = (0..party_capacity)
-            .map(|i| {
-                let party_index = i as u32;
-                let mut label = [b'G', 0, 0, 0, 0];
-                LittleEndian::write_u32(&mut label[1..5], party_index);
-
-                GeneratorsChain::new(&label)
-                    .take(gens_capacity)
-                    .collect::<Vec<_>>()
-            }).collect();
-
-        let H_vec = (0..party_capacity)
-            .map(|i| {
-                let party_index = i as u32;
-                let mut label = [b'H', 0, 0, 0, 0];
-                LittleEndian::write_u32(&mut label[1..5], party_index);
-
-                GeneratorsChain::new(&label)
-                    .take(gens_capacity)
-                    .collect::<Vec<_>>()
-            }).collect();
-
-        Generators {
-            pedersen_gens,
+        BulletproofGens {
             gens_capacity,
             party_capacity,
-            G_vec,
-            H_vec,
+            G_vec: (0..party_capacity)
+                .map(|i| {
+                    let party_index = i as u32;
+                    let mut label = [b'G', 0, 0, 0, 0];
+                    LittleEndian::write_u32(&mut label[1..5], party_index);
+
+                    GeneratorsChain::new(&label)
+                        .take(gens_capacity)
+                        .collect::<Vec<_>>()
+                }).collect(),
+            H_vec: (0..party_capacity)
+                .map(|i| {
+                    let party_index = i as u32;
+                    let mut label = [b'H', 0, 0, 0, 0];
+                    LittleEndian::write_u32(&mut label[1..5], party_index);
+
+                    GeneratorsChain::new(&label)
+                        .take(gens_capacity)
+                        .collect::<Vec<_>>()
+                }).collect(),
         }
     }
 
     /// Returns j-th share of generators, with an appropriate
     /// slice of vectors G and H for the j-th range proof.
-    pub fn share(&self, j: usize) -> GeneratorsView {
-        GeneratorsView {
-            pedersen_gens: &self.pedersen_gens,
+    pub fn share(&self, j: usize) -> BulletproofGensShare {
+        BulletproofGensShare {
             gens: &self,
             share: j,
         }
@@ -214,22 +200,20 @@ impl<'a> Iterator for AggregatedGensIter<'a> {
     }
 }
 
-/// The `GeneratorsView` is produced by `Generators::share()`.
+/// The `BulletproofGensShare` is produced by `BulletproofGens::share()`.
 ///
-/// The `Generators` struct represents generators for an aggregated
-/// range proof `m` proofs of `n` bits each; the `GeneratorsView`
+/// The `BulletproofGens` struct represents generators for an aggregated
+/// range proof `m` proofs of `n` bits each; the `BulletproofGensShare`
 /// represents the generators for one of the `m` parties' shares.
 #[derive(Copy, Clone)]
-pub struct GeneratorsView<'a> {
-    /// Bases for Pedersen commitments
-    pub pedersen_gens: &'a PedersenGenerators,
+pub struct BulletproofGensShare<'a> {
     /// The parent object that this is a view into
-    gens: &'a Generators,
+    gens: &'a BulletproofGens,
     /// Which share we are
     share: usize,
 }
 
-impl<'a> GeneratorsView<'a> {
+impl<'a> BulletproofGensShare<'a> {
     /// Return an iterator over this party's G generators with given size `n`.
     pub(crate) fn G(&self, n: usize) -> impl Iterator<Item = &'a RistrettoPoint> {
         self.gens.G_vec[self.share].iter().take(n)
@@ -248,7 +232,7 @@ mod tests {
 
     #[test]
     fn aggregated_gens_iter_matches_flat_map() {
-        let gens = Generators::new(PedersenGenerators::default(), 64, 8);
+        let gens = BulletproofGens::new(64, 8);
 
         let helper = |n: usize, m: usize| {
             let agg_G: Vec<RistrettoPoint> = gens.G(n, m).cloned().collect();
