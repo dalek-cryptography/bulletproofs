@@ -48,8 +48,8 @@ the library's [internal documentation][doc_internal]:
 ## WARNING
 
 This code is still research-quality.  It is not (yet) suitable for
-deployment.  The development roadmap can be found in the Milestones
-section of the Github repo.
+deployment.  The development roadmap can be found in the
+[Milestones][gh_milestones] section of the [Github repo][gh_repo].
 
 ## Tests
 
@@ -82,8 +82,8 @@ worse code generation elsewhere ¯\\\_(ツ)\_/¯
 
 ## About
 
-This is a research project being built for Chain, Inc, by Henry de Valence,
-Cathie Yun, and Oleg Andreev.
+This is a research project sponsored by [Interstellar][interstellar],
+developed by Henry de Valence, Cathie Yun, and Oleg Andreev.
 
 [bp_website]: https://crypto.stanford.edu/bulletproofs/
 [ristretto]: https://ristretto.group
@@ -98,3 +98,6 @@ Cathie Yun, and Oleg Andreev.
 [session_type_blog]: https://blog.chain.com/bulletproof-multi-party-computation-in-rust-with-session-types-b3da6e928d5d
 [curve25519_dalek]: https://doc.dalek.rs/curve25519_dalek/index.html
 [parallel_edwards]: https://medium.com/@hdevalence/accelerating-edwards-curve-arithmetic-with-parallel-formulas-ac12cf5015be
+[gh_repo]: https://github.com/dalek-cryptography/bulletproofs/
+[gh_milestones]: https://github.com/dalek-cryptography/bulletproofs/milestones
+[interstellar]: https://interstellar.com/
