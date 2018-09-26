@@ -12,8 +12,8 @@ keywords = ["cryptography", "ristretto", "zero-knowledge", "bulletproofs"]
 description = "A pure-Rust implementation of Bulletproofs using Ristretto"
 
 [dependencies]
-curve25519-dalek = { version = "0.19", features = ["serde"] }
-subtle = "0.7"
+curve25519-dalek = { version = "0.20", features = ["serde"] }
+subtle = "1"
 sha3 = "0.7"
 digest = "0.7"
 rand = "0.5"
@@ -24,7 +24,7 @@ failure = "0.1"
 merlin = "0.4"
 
 [dev-dependencies]
-hex = "^0.3"
+hex = "0.3"
 criterion = "0.2"
 bincode = "1"
 
