@@ -13,6 +13,7 @@ use generators::{BulletproofGens, PedersenGens};
 use inner_product_proof;
 use range_proof::RangeProof;
 use transcript::TranscriptProtocol;
+
 use util;
 
 use super::messages::*;
