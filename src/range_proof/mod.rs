@@ -210,9 +210,6 @@ impl RangeProof {
         if values.len() != blindings.len() {
             return Err(ProofError::WrongNumBlindingFactors);
         }
-        if !(n == 8 || n == 16 || n == 32 || n == 64) {
-            return Err(ProofError::InvalidBitsize);
-        }
         if bp_gens.gens_capacity < n {
             return Err(ProofError::InvalidGeneratorsLength);
         }
@@ -233,6 +230,8 @@ impl RangeProof {
             .into_iter()
             .enumerate()
             .map(|(j, p)| p.assign_position(j))
+            .collect::<Result<Vec<_>, _>>()?
+            .into_iter()
             .unzip();
 
         let (dealer, bit_challenge) = dealer.receive_bit_commitments(bit_commitments)?;
@@ -677,10 +676,10 @@ mod tests {
 
         let dealer = Dealer::new(&bp_gens, &pc_gens, &mut transcript, n, m).unwrap();
 
-        let (party0, bit_com0) = party0.assign_position(0);
-        let (party1, bit_com1) = party1.assign_position(1);
-        let (party2, bit_com2) = party2.assign_position(2);
-        let (party3, bit_com3) = party3.assign_position(3);
+        let (party0, bit_com0) = party0.assign_position(0).unwrap();
+        let (party1, bit_com1) = party1.assign_position(1).unwrap();
+        let (party2, bit_com2) = party2.assign_position(2).unwrap();
+        let (party3, bit_com3) = party3.assign_position(3).unwrap();
 
         let (dealer, bit_challenge) = dealer
             .receive_bit_commitments(vec![bit_com0, bit_com1, bit_com2, bit_com3])
@@ -737,7 +736,7 @@ mod tests {
 
         // Now do the protocol flow as normal....
 
-        let (party0, bit_com0) = party0.assign_position(0);
+        let (party0, bit_com0) = party0.assign_position(0).unwrap();
 
         let (dealer, bit_challenge) = dealer.receive_bit_commitments(vec![bit_com0]).unwrap();
 
