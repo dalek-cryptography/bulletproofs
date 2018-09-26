@@ -13,7 +13,6 @@ use generators::{BulletproofGens, PedersenGens};
 use inner_product_proof;
 use range_proof::RangeProof;
 use transcript::TranscriptProtocol;
-
 use util;
 
 use super::messages::*;
@@ -231,6 +230,10 @@ impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
         let w = self.transcript.challenge_scalar(b"w");
         let Q = w * self.pc_gens.B;
 
+        let Hprime_factors: Vec<Scalar> = util::exp_iter(self.value_challenge.y.invert())
+            .take(self.n * self.m)
+            .collect();
+
         let l_vec: Vec<Scalar> = proof_shares
             .iter()
             .flat_map(|ps| ps.l_vec.clone().into_iter())
@@ -243,7 +246,7 @@ impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
         let ipp_proof = inner_product_proof::InnerProductProof::create(
             self.transcript,
             &Q,
-            util::exp_iter(self.value_challenge.y.invert()),
+            &Hprime_factors,
             self.bp_gens.G(self.n, self.m).cloned().collect(),
             self.bp_gens.H(self.n, self.m).cloned().collect(),
             l_vec,
