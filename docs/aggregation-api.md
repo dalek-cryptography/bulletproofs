@@ -9,7 +9,7 @@ To create the aggregated range proof, \\(m\\) individual parties which each have
 
 First, \\(m\\) [`Party`](../range_proof/party/struct.Party.html) objects are instantiated with their secret values and the range for the range proof. A [`Dealer`](../range_proof/dealer/struct.Dealer.html) object is instantiated with \\(n\\) and \\(m\\). The dealer assigns a unique index \\(j\\) to each party.
 
-Next, each `Party` commits to their secret value, bits, and blinding factors via \\(V_{(j)}, A_{(j)}, S_{(j)}\\) and sends this data in a [`ValueCommitment`](../range_proof/messages/struct.ValueCommitment.html) to the dealer. The dealer receives and combines all of the `ValueCommitment` messages from all of the parties, generates challenges \\(y, z\\), and sends \\(y, z\\) as [`ValueChallenge`](../range_proof/messages/struct.ValueChallenge.html) to all of the parties.
+Next, each `Party` commits to their secret value, bits, and blinding factors via \\(V_{(j)}, A_{(j)}, S_{(j)}\\) and sends this data in a [`BitCommitment`](../range_proof/messages/struct.BitCommitment.html) to the dealer. The dealer receives and combines all of the `BitCommitment` messages from all of the parties, generates challenges \\(y, z\\), and sends \\(y, z\\) as [`BitChallenge`](../range_proof/messages/struct.BitChallenge.html) to all of the parties.
 
 Then, each party commits to the resulting polynomials via \\(T_{1, (j)}, T_{2, (j)}\\) and sends this data in a `PolyCommitment` to the dealer. The dealer receives and combines all of the [`PolyCommitment`](../range_proof/messages/struct.PolyCommitment.html) messages from all of the parties, generates challenge \\(x\\), and sends \\(x\\) as [`PolyChallenge`](../range_proof/messages/struct.PolyChallenge.html) to all of the parties.
 

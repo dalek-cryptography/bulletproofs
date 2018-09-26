@@ -9,51 +9,55 @@ use curve25519_dalek::scalar::Scalar;
 
 use generators::{BulletproofGens, PedersenGens};
 
-/// XXX rename this to `BitCommitment`
+/// A commitment to the bits of a party's value.
 #[derive(Serialize, Deserialize, Copy, Clone, Debug)]
-pub struct ValueCommitment {
-    pub V_j: RistrettoPoint,
-    pub A_j: RistrettoPoint,
-    pub S_j: RistrettoPoint,
+pub struct BitCommitment {
+    pub(super) V_j: RistrettoPoint,
+    pub(super) A_j: RistrettoPoint,
+    pub(super) S_j: RistrettoPoint,
 }
 
+/// Challenge values derived from all parties' [`BitCommitment`]s.
 #[derive(Serialize, Deserialize, Copy, Clone, Debug)]
-pub struct ValueChallenge {
-    pub y: Scalar,
-    pub z: Scalar,
+pub struct BitChallenge {
+    pub(super) y: Scalar,
+    pub(super) z: Scalar,
 }
 
+/// A commitment to a party's polynomial coefficents.
 #[derive(Serialize, Deserialize, Copy, Clone, Debug)]
 pub struct PolyCommitment {
-    pub T_1_j: RistrettoPoint,
-    pub T_2_j: RistrettoPoint,
+    pub(super) T_1_j: RistrettoPoint,
+    pub(super) T_2_j: RistrettoPoint,
 }
 
+/// Challenge values derived from all parties' [`PolyCommitment`]s.
 #[derive(Serialize, Deserialize, Copy, Clone, Debug)]
 pub struct PolyChallenge {
-    pub x: Scalar,
+    pub(super) x: Scalar,
 }
 
+/// A party's proof share, ready for aggregation into the final
+/// [`RangeProof`](::RangeProof).
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ProofShare {
-    pub t_x: Scalar,
-    pub t_x_blinding: Scalar,
-    pub e_blinding: Scalar,
-
-    pub l_vec: Vec<Scalar>,
-    pub r_vec: Vec<Scalar>,
+    pub(super) t_x: Scalar,
+    pub(super) t_x_blinding: Scalar,
+    pub(super) e_blinding: Scalar,
+    pub(super) l_vec: Vec<Scalar>,
+    pub(super) r_vec: Vec<Scalar>,
 }
 
 impl ProofShare {
     /// Audit an individual proof share to determine whether it is
     /// malformed.
-    pub(crate) fn audit_share(
+    pub(super) fn audit_share(
         &self,
         bp_gens: &BulletproofGens,
         pc_gens: &PedersenGens,
         j: usize,
-        value_commitment: &ValueCommitment,
-        value_challenge: &ValueChallenge,
+        value_commitment: &BitCommitment,
+        value_challenge: &BitChallenge,
         poly_commitment: &PolyCommitment,
         poly_challenge: &PolyChallenge,
     ) -> Result<(), ()> {

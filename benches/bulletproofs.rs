@@ -9,9 +9,11 @@ use rand::Rng;
 extern crate curve25519_dalek;
 use curve25519_dalek::scalar::Scalar;
 
+extern crate merlin;
+use merlin::Transcript;
+
 extern crate bulletproofs;
 use bulletproofs::RangeProof;
-use bulletproofs::Transcript;
 use bulletproofs::{BulletproofGens, PedersenGens};
 
 static AGGREGATION_SIZES: [usize; 6] = [1, 2, 4, 8, 16, 32];
@@ -91,14 +93,14 @@ fn verify_aggregated_rangeproof_helper(n: usize, c: &mut Criterion) {
             let value_commitments: Vec<_> = values
                 .iter()
                 .zip(blindings.iter())
-                .map(|(&v, &v_blinding)| pc_gens.commit(v.into(), v_blinding))
+                .map(|(&v, &v_blinding)| pc_gens.commit(v.into(), v_blinding).compress())
                 .collect();
 
             b.iter(|| {
                 // Each proof creation requires a clean transcript.
                 let mut transcript = Transcript::new(b"AggregateRangeProofBenchmark");
 
-                proof.verify(&bp_gens, &pc_gens, &mut transcript, &value_commitments, n)
+                proof.verify_multiple(&bp_gens, &pc_gens, &mut transcript, &value_commitments, n)
             });
         },
         &AGGREGATION_SIZES,
