@@ -148,6 +148,7 @@ impl ConditionallySelectable for Assignment {
             (Assignment::Value(a_val), Assignment::Value(b_val)) => {
                 // FIXME: use `Scalar::conditional_select(&a_val, &b_val, choice)` instead
                 // Currently that trait is not available because of a bug in `curve25519-dalek`.
+                // Filed issue: https://github.com/dalek-cryptography/curve25519-dalek/issues/200
                 let mut out_val = a_val.clone();
                 out_val.conditional_assign(&b_val, choice);
                 Assignment::from(out_val)
