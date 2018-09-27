@@ -133,7 +133,8 @@ impl RangeProof {
         v_blinding: &Scalar,
         n: usize,
     ) -> Result<(RangeProof, CompressedRistretto), ProofError> {
-        let (p, Vs) = RangeProof::prove_multiple(bp_gens, pc_gens, transcript, &[v], &[*v_blinding], n)?;
+        let (p, Vs) =
+            RangeProof::prove_multiple(bp_gens, pc_gens, transcript, &[v], &[*v_blinding], n)?;
         Ok((p, Vs[0]))
     }
 
@@ -245,7 +246,7 @@ impl RangeProof {
 
         let proof = dealer.receive_trusted_shares(&proof_shares)?;
 
-        Ok((proof,value_commitments))
+        Ok((proof, value_commitments))
     }
 
     /// Verifies a rangeproof for a given value commitment \\(V\\).
