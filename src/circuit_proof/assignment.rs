@@ -1,6 +1,7 @@
 use curve25519_dalek::scalar::Scalar;
 use errors::R1CSError;
 use std::ops::{Add, Div, Mul, Sub, Try};
+use subtle::{Choice, ConditionallyAssignable, ConditionallySelectable, ConstantTimeEq};
 
 // The assignment value to a variable, as stored in `ConstraintSystem`.
 // Provers create a `Value` assignment, while verifiers create an `Missing` assignment.
@@ -135,5 +136,37 @@ impl Try for Assignment {
 
     fn from_ok(v: Self::Ok) -> Self {
         Assignment::Value(v)
+    }
+}
+
+impl ConditionallySelectable for Assignment {
+    // This function should execute in constant time for a and b of the same type.
+    // So, if a and b are both of type Assignment::Value(), then the comparison will
+    // execute in constant time regardless of their value assignments.
+    fn conditional_select(a: &Self, b: &Self, choice: Choice) -> Self {
+        match (a, b) {
+            (Assignment::Value(a_val), Assignment::Value(b_val)) => {
+                // FIXME: use `Scalar::conditional_select(&a_val, &b_val, choice)` instead
+                // Currently that trait is not available because of a bug in `curve25519-dalek`.
+                // Filed issue: https://github.com/dalek-cryptography/curve25519-dalek/issues/200
+                let mut out_val = a_val.clone();
+                out_val.conditional_assign(&b_val, choice);
+                Assignment::from(out_val)
+            }
+            (_, _) => Assignment::Missing(),
+        }
+    }
+}
+
+impl ConstantTimeEq for Assignment {
+    // This function should execute in constant time for self and other of the same type.
+    fn ct_eq(&self, other: &Self) -> Choice {
+        match (self, other) {
+            (Assignment::Value(self_value), Assignment::Value(other_value)) => {
+                self_value.ct_eq(other_value)
+            }
+            (Assignment::Missing(), Assignment::Missing()) => Choice::from(1),
+            _ => Choice::from(0),
+        }
     }
 }
