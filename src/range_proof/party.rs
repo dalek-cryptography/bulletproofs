@@ -103,7 +103,7 @@ impl<'a> PartyAwaitingPosition<'a> {
         );
 
         // Return next state and all commitments
-        let value_commitment = BitCommitment {
+        let bit_commitment = BitCommitment {
             V_j: self.V,
             A_j: A,
             S_j: S,
@@ -119,7 +119,7 @@ impl<'a> PartyAwaitingPosition<'a> {
             s_L,
             s_R,
         };
-        (next_state, value_commitment)
+        (next_state, bit_commitment)
     }
 }
 

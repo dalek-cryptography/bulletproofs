@@ -56,8 +56,8 @@ impl ProofShare {
         bp_gens: &BulletproofGens,
         pc_gens: &PedersenGens,
         j: usize,
-        value_commitment: &BitCommitment,
-        value_challenge: &BitChallenge,
+        bit_commitment: &BitCommitment,
+        bit_challenge: &BitChallenge,
         poly_commitment: &PolyCommitment,
         poly_challenge: &PolyChallenge,
     ) -> Result<(), ()> {
@@ -69,7 +69,7 @@ impl ProofShare {
         use util;
 
         let n = self.l_vec.len();
-        let (y, z) = (&value_challenge.y, &value_challenge.z);
+        let (y, z) = (&bit_challenge.y, &bit_challenge.z);
         let x = &poly_challenge.x;
 
         // Precompute some variables
@@ -100,8 +100,8 @@ impl ProofShare {
                 .chain(iter::once(-self.e_blinding))
                 .chain(g)
                 .chain(h),
-            iter::once(&value_commitment.A_j)
-                .chain(iter::once(&value_commitment.S_j))
+            iter::once(&bit_commitment.A_j)
+                .chain(iter::once(&bit_commitment.S_j))
                 .chain(iter::once(&pc_gens.B_blinding))
                 .chain(bp_gens.share(j).G(n))
                 .chain(bp_gens.share(j).H(n)),
@@ -119,7 +119,7 @@ impl ProofShare {
                 .chain(iter::once(x * x))
                 .chain(iter::once(delta - self.t_x))
                 .chain(iter::once(-self.t_x_blinding)),
-            iter::once(&value_commitment.V_j)
+            iter::once(&bit_commitment.V_j)
                 .chain(iter::once(&poly_commitment.T_1_j))
                 .chain(iter::once(&poly_commitment.T_2_j))
                 .chain(iter::once(&pc_gens.B))
