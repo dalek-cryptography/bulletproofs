@@ -84,22 +84,22 @@ pub struct DealerAwaitingBitCommitments<'a, 'b> {
 
 impl<'a, 'b> DealerAwaitingBitCommitments<'a, 'b> {
     /// Receive each party's [`BitCommitment`]s and compute the [`BitChallenge`].
-    pub fn receive_value_commitments(
+    pub fn receive_bit_commitments(
         self,
-        value_commitments: Vec<BitCommitment>,
+        bit_commitments: Vec<BitCommitment>,
     ) -> Result<(DealerAwaitingPolyCommitments<'a, 'b>, BitChallenge), MPCError> {
-        if self.m != value_commitments.len() {
+        if self.m != bit_commitments.len() {
             return Err(MPCError::WrongNumBitCommitments);
         }
 
         // XXX value commitments should be compressed
         // Commit each V_j individually
-        for vc in value_commitments.iter() {
+        for vc in bit_commitments.iter() {
             self.transcript.commit_point(b"V", &vc.V_j.compress());
         }
 
-        let A: RistrettoPoint = value_commitments.iter().map(|vc| vc.A_j).sum();
-        let S: RistrettoPoint = value_commitments.iter().map(|vc| vc.S_j).sum();
+        let A: RistrettoPoint = bit_commitments.iter().map(|vc| vc.A_j).sum();
+        let S: RistrettoPoint = bit_commitments.iter().map(|vc| vc.S_j).sum();
 
         // Commit aggregated A_j, S_j
         self.transcript.commit_point(b"A", &A.compress());
@@ -107,7 +107,7 @@ impl<'a, 'b> DealerAwaitingBitCommitments<'a, 'b> {
 
         let y = self.transcript.challenge_scalar(b"y");
         let z = self.transcript.challenge_scalar(b"z");
-        let value_challenge = BitChallenge { y, z };
+        let bit_challenge = BitChallenge { y, z };
 
         Ok((
             DealerAwaitingPolyCommitments {
@@ -117,12 +117,12 @@ impl<'a, 'b> DealerAwaitingBitCommitments<'a, 'b> {
                 initial_transcript: self.initial_transcript,
                 bp_gens: self.bp_gens,
                 pc_gens: self.pc_gens,
-                value_challenge,
-                value_commitments,
+                bit_challenge,
+                bit_commitments,
                 A,
                 S,
             },
-            value_challenge,
+            bit_challenge,
         ))
     }
 }
@@ -136,8 +136,8 @@ pub struct DealerAwaitingPolyCommitments<'a, 'b> {
     initial_transcript: Transcript,
     bp_gens: &'b BulletproofGens,
     pc_gens: &'b PedersenGens,
-    value_challenge: BitChallenge,
-    value_commitments: Vec<BitCommitment>,
+    bit_challenge: BitChallenge,
+    bit_commitments: Vec<BitCommitment>,
     /// Aggregated commitment to the parties' bits
     A: RistrettoPoint,
     /// Aggregated commitment to the parties' bit blindings
@@ -173,8 +173,8 @@ impl<'a, 'b> DealerAwaitingPolyCommitments<'a, 'b> {
                 initial_transcript: self.initial_transcript,
                 bp_gens: self.bp_gens,
                 pc_gens: self.pc_gens,
-                value_challenge: self.value_challenge,
-                value_commitments: self.value_commitments,
+                bit_challenge: self.bit_challenge,
+                bit_commitments: self.bit_commitments,
                 A: self.A,
                 S: self.S,
                 poly_challenge,
@@ -197,8 +197,8 @@ pub struct DealerAwaitingProofShares<'a, 'b> {
     initial_transcript: Transcript,
     bp_gens: &'b BulletproofGens,
     pc_gens: &'b PedersenGens,
-    value_challenge: BitChallenge,
-    value_commitments: Vec<BitCommitment>,
+    bit_challenge: BitChallenge,
+    bit_commitments: Vec<BitCommitment>,
     poly_challenge: PolyChallenge,
     poly_commitments: Vec<PolyCommitment>,
     A: RistrettoPoint,
@@ -231,7 +231,7 @@ impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
         let w = self.transcript.challenge_scalar(b"w");
         let Q = w * self.pc_gens.B;
 
-        let Hprime_factors: Vec<Scalar> = util::exp_iter(self.value_challenge.y.invert())
+        let Hprime_factors: Vec<Scalar> = util::exp_iter(self.bit_challenge.y.invert())
             .take(self.n * self.m)
             .collect();
 
@@ -284,7 +284,7 @@ impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
 
         // XXX BitCommitments should have compressed points
         let V: Vec<_> = self
-            .value_commitments
+            .bit_commitments
             .iter()
             .map(|vc| vc.V_j.compress())
             .collect();
@@ -304,8 +304,8 @@ impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
                     &self.bp_gens,
                     &self.pc_gens,
                     j,
-                    &self.value_commitments[j],
-                    &self.value_challenge,
+                    &self.bit_commitments[j],
+                    &self.bit_challenge,
                     &self.poly_commitments[j],
                     &self.poly_challenge,
                 ) {

@@ -229,17 +229,17 @@ impl RangeProof {
             // Collect the iterator of Results into a Result<Vec>, then unwrap it
             .collect::<Result<Vec<_>, _>>()?;
 
-        let (parties, value_commitments): (Vec<_>, Vec<_>) = parties
+        let (parties, bit_commitments): (Vec<_>, Vec<_>) = parties
             .into_iter()
             .enumerate()
             .map(|(j, p)| p.assign_position(j))
             .unzip();
 
-        let (dealer, value_challenge) = dealer.receive_value_commitments(value_commitments)?;
+        let (dealer, bit_challenge) = dealer.receive_bit_commitments(bit_commitments)?;
 
         let (parties, poly_commitments): (Vec<_>, Vec<_>) = parties
             .into_iter()
-            .map(|p| p.apply_challenge(&value_challenge))
+            .map(|p| p.apply_challenge(&bit_challenge))
             .unzip();
 
         let (dealer, poly_challenge) = dealer.receive_poly_commitments(poly_commitments)?;
@@ -677,19 +677,19 @@ mod tests {
 
         let dealer = Dealer::new(&bp_gens, &pc_gens, &mut transcript, n, m).unwrap();
 
-        let (party0, value_com0) = party0.assign_position(0);
-        let (party1, value_com1) = party1.assign_position(1);
-        let (party2, value_com2) = party2.assign_position(2);
-        let (party3, value_com3) = party3.assign_position(3);
+        let (party0, bit_com0) = party0.assign_position(0);
+        let (party1, bit_com1) = party1.assign_position(1);
+        let (party2, bit_com2) = party2.assign_position(2);
+        let (party3, bit_com3) = party3.assign_position(3);
 
-        let (dealer, value_challenge) = dealer
-            .receive_value_commitments(vec![value_com0, value_com1, value_com2, value_com3])
+        let (dealer, bit_challenge) = dealer
+            .receive_bit_commitments(vec![bit_com0, bit_com1, bit_com2, bit_com3])
             .unwrap();
 
-        let (party0, poly_com0) = party0.apply_challenge(&value_challenge);
-        let (party1, poly_com1) = party1.apply_challenge(&value_challenge);
-        let (party2, poly_com2) = party2.apply_challenge(&value_challenge);
-        let (party3, poly_com3) = party3.apply_challenge(&value_challenge);
+        let (party0, poly_com0) = party0.apply_challenge(&bit_challenge);
+        let (party1, poly_com1) = party1.apply_challenge(&bit_challenge);
+        let (party2, poly_com2) = party2.apply_challenge(&bit_challenge);
+        let (party3, poly_com3) = party3.apply_challenge(&bit_challenge);
 
         let (dealer, poly_challenge) = dealer
             .receive_poly_commitments(vec![poly_com0, poly_com1, poly_com2, poly_com3])
@@ -737,11 +737,11 @@ mod tests {
 
         // Now do the protocol flow as normal....
 
-        let (party0, value_com0) = party0.assign_position(0);
+        let (party0, bit_com0) = party0.assign_position(0);
 
-        let (dealer, value_challenge) = dealer.receive_value_commitments(vec![value_com0]).unwrap();
+        let (dealer, bit_challenge) = dealer.receive_bit_commitments(vec![bit_com0]).unwrap();
 
-        let (party0, poly_com0) = party0.apply_challenge(&value_challenge);
+        let (party0, poly_com0) = party0.apply_challenge(&bit_challenge);
 
         let (_dealer, mut poly_challenge) =
             dealer.receive_poly_commitments(vec![poly_com0]).unwrap();
