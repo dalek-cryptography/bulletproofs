@@ -78,24 +78,25 @@ impl InnerProductProof {
             let c_L = inner_product(&a_L, &b_R);
             let c_R = inner_product(&a_R, &b_L);
 
-            let h_l: Vec<_> = b_R
-                .iter()
-                .zip(Hprime_factors[0..n].into_iter())
-                .map(|(b_R_i, y_i)| b_R_i * y_i)
-                .collect();
-            let h_r: Vec<_> = b_L
-                .iter()
-                .zip(Hprime_factors[n..2 * n].into_iter())
-                .map(|(b_L_i, y_i)| b_L_i * y_i)
-                .collect();
-
             let L = RistrettoPoint::vartime_multiscalar_mul(
-                a_L.iter().chain(h_l.iter()).chain(iter::once(&c_L)),
+                a_L.iter()
+                    .cloned()
+                    .chain(
+                        b_R.iter()
+                            .zip(Hprime_factors[0..n].into_iter())
+                            .map(|(b_R_i, y_i)| b_R_i * y_i),
+                    ).chain(iter::once(c_L)),
                 G_R.iter().chain(H_L.iter()).chain(iter::once(Q)),
             ).compress();
 
             let R = RistrettoPoint::vartime_multiscalar_mul(
-                a_R.iter().chain(h_r.iter()).chain(iter::once(&c_R)),
+                a_R.iter()
+                    .cloned()
+                    .chain(
+                        b_L.iter()
+                            .zip(Hprime_factors[n..2 * n].into_iter())
+                            .map(|(b_L_i, y_i)| b_L_i * y_i),
+                    ).chain(iter::once(c_R)),
                 G_L.iter().chain(H_R.iter()).chain(iter::once(Q)),
             ).compress();
 
