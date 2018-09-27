@@ -99,16 +99,15 @@ impl RangeProof {
     /// // A secret value we want to prove lies in the range [0, 2^32)
     /// let secret_value = 1037578891u64;
     ///
-    /// // The API takes an opening to an existing commitment, so create one:
+    /// // The API takes a blinding factor for the commitment.
     /// let blinding = Scalar::random(&mut thread_rng());
-    /// let committed_value = pc_gens.commit(secret_value.into(), blinding).compress();
     ///
     /// // The proof can be chained to an existing transcript.
     /// // Here we create a transcript with a doctest domain separator.
     /// let mut transcript = Transcript::new(b"doctest example");
     ///
     /// // Create a 32-bit rangeproof.
-    /// let proof = RangeProof::prove_single(
+    /// let (proof, committed_value) = RangeProof::prove_single(
     ///     &bp_gens,
     ///     &pc_gens,
     ///     &mut transcript,
@@ -133,8 +132,9 @@ impl RangeProof {
         v: u64,
         v_blinding: &Scalar,
         n: usize,
-    ) -> Result<RangeProof, ProofError> {
-        RangeProof::prove_multiple(bp_gens, pc_gens, transcript, &[v], &[*v_blinding], n)
+    ) -> Result<(RangeProof, CompressedRistretto), ProofError> {
+        let (p, Vs) = RangeProof::prove_multiple(bp_gens, pc_gens, transcript, &[v], &[*v_blinding], n)?;
+        Ok((p, Vs[0]))
     }
 
     /// Create a rangeproof for a set of values.
@@ -165,20 +165,15 @@ impl RangeProof {
     /// // Four secret values we want to prove lie in the range [0, 2^32)
     /// let secrets = [4242344947u64, 3718732727u64, 2255562556u64, 2526146994u64];
     ///
-    /// // The API takes openings to existing commitments, so create them:
+    /// // The API takes blinding factors for the commitments.
     /// let blindings: Vec<_> = (0..4).map(|_| Scalar::random(&mut thread_rng())).collect();
-    /// let commitments: Vec<_> = secrets
-    ///     .iter()
-    ///     .zip(blindings.iter())
-    ///     .map(|(&v, &v_blinding)| pc_gens.commit(v.into(), v_blinding).compress())
-    ///     .collect();
     ///
     /// // The proof can be chained to an existing transcript.
     /// // Here we create a transcript with a doctest domain separator.
     /// let mut transcript = Transcript::new(b"doctest example");
     ///
-    /// // Create an aggregated 32-bit rangeproof.
-    /// let proof = RangeProof::prove_multiple(
+    /// // Create an aggregated 32-bit rangeproof and corresponding commitments.
+    /// let (proof, commitments) = RangeProof::prove_multiple(
     ///     &bp_gens,
     ///     &pc_gens,
     ///     &mut transcript,
@@ -203,7 +198,7 @@ impl RangeProof {
         values: &[u64],
         blindings: &[Scalar],
         n: usize,
-    ) -> Result<RangeProof, ProofError> {
+    ) -> Result<(RangeProof, Vec<CompressedRistretto>), ProofError> {
         use self::dealer::*;
         use self::party::*;
 
@@ -230,6 +225,9 @@ impl RangeProof {
             .into_iter()
             .unzip();
 
+        // XXX value commitments should be already compressed
+        let value_commitments: Vec<_> = bit_commitments.iter().map(|c| c.V_j.compress()).collect();
+
         let (dealer, bit_challenge) = dealer.receive_bit_commitments(bit_commitments)?;
 
         let (parties, poly_commitments): (Vec<_>, Vec<_>) = parties
@@ -247,7 +245,7 @@ impl RangeProof {
 
         let proof = dealer.receive_trusted_shares(&proof_shares)?;
 
-        Ok(proof)
+        Ok((proof,value_commitments))
     }
 
     /// Verifies a rangeproof for a given value commitment \\(V\\).
@@ -551,7 +549,7 @@ mod tests {
             let values: Vec<u64> = (0..m).map(|_| rng.gen_range(min, max)).collect();
             let blindings: Vec<Scalar> = (0..m).map(|_| Scalar::random(&mut rng)).collect();
 
-            let proof = RangeProof::prove_multiple(
+            let (proof, Vs) = RangeProof::prove_multiple(
                 &bp_gens,
                 &pc_gens,
                 &mut transcript,
@@ -563,12 +561,8 @@ mod tests {
             // 2. Serialize
             proof_bytes = bincode::serialize(&proof).unwrap();
 
-            // XXX would be nice to have some convenience API for this
-            value_commitments = values
-                .iter()
-                .zip(blindings.iter())
-                .map(|(&v, &v_blinding)| pc_gens.commit(v.into(), v_blinding).compress())
-                .collect();
+            // 3. Return value commitments too
+            value_commitments = Vs;
         }
 
         println!(
