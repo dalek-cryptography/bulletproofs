@@ -203,8 +203,6 @@ impl RangeProof {
         use self::dealer::*;
         use self::party::*;
 
-        // .zip silently truncates the longest iterator, so we need to check our lists
-        // have the same length.
         if values.len() != blindings.len() {
             return Err(ProofError::WrongNumBlindingFactors);
         }
@@ -221,10 +219,10 @@ impl RangeProof {
         let (parties, bit_commitments): (Vec<_>, Vec<_>) = parties
             .into_iter()
             .enumerate()
-            .map(|(j, p)| p.assign_position(j))
-            .collect::<Result<Vec<_>, _>>()?
-            .into_iter()
-            .unzip();
+            .map(|(j, p)| {
+                p.assign_position(j)
+                    .expect("We already checked the parameters, so this should never happen")
+            }).unzip();
 
         let value_commitments: Vec<_> = bit_commitments.iter().map(|c| c.V_j).collect();
 
