@@ -207,14 +207,10 @@ impl RangeProof {
         use self::dealer::*;
         use self::party::*;
 
+        // .zip silently truncates the longest iterator, so we need to check our lists
+        // have the same length.
         if values.len() != blindings.len() {
             return Err(ProofError::WrongNumBlindingFactors);
-        }
-        if bp_gens.gens_capacity < n {
-            return Err(ProofError::InvalidGeneratorsLength);
-        }
-        if bp_gens.party_capacity < values.len() {
-            return Err(ProofError::InvalidGeneratorsLength);
         }
 
         let dealer = Dealer::new(bp_gens, pc_gens, transcript, n, values.len())?;

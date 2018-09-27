@@ -37,6 +37,9 @@ impl Party {
         if !(n == 8 || n == 16 || n == 32 || n == 64) {
             return Err(MPCError::InvalidBitsize);
         }
+        if bp_gens.gens_capacity < n {
+            return Err(MPCError::InvalidGeneratorsLength);
+        }
 
         let V = pc_gens.commit(v.into(), v_blinding);
 
