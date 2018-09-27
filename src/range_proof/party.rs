@@ -10,7 +10,7 @@
 //! modules orchestrate the protocol execution, see the documentation
 //! in the [`aggregation`](::aggregation) module.
 
-use curve25519_dalek::ristretto::{RistrettoPoint, CompressedRistretto};
+use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::MultiscalarMul;
 
