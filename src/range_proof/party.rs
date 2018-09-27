@@ -10,7 +10,7 @@
 //! modules orchestrate the protocol execution, see the documentation
 //! in the [`aggregation`](::aggregation) module.
 
-use curve25519_dalek::ristretto::RistrettoPoint;
+use curve25519_dalek::ristretto::{RistrettoPoint, CompressedRistretto};
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::MultiscalarMul;
 
@@ -41,7 +41,7 @@ impl Party {
             return Err(MPCError::InvalidGeneratorsLength);
         }
 
-        let V = pc_gens.commit(v.into(), v_blinding);
+        let V = pc_gens.commit(v.into(), v_blinding).compress();
 
         Ok(PartyAwaitingPosition {
             bp_gens,
@@ -61,7 +61,7 @@ pub struct PartyAwaitingPosition<'a> {
     n: usize,
     v: u64,
     v_blinding: Scalar,
-    V: RistrettoPoint,
+    V: CompressedRistretto,
 }
 
 impl<'a> PartyAwaitingPosition<'a> {

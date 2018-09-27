@@ -226,8 +226,7 @@ impl RangeProof {
             .into_iter()
             .unzip();
 
-        // XXX value commitments should be already compressed
-        let value_commitments: Vec<_> = bit_commitments.iter().map(|c| c.V_j.compress()).collect();
+        let value_commitments: Vec<_> = bit_commitments.iter().map(|c| c.V_j).collect();
 
         let (dealer, bit_challenge) = dealer.receive_bit_commitments(bit_commitments)?;
 
