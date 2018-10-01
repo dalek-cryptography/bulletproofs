@@ -250,13 +250,13 @@ impl<'a, 'b> ProverCS<'a, 'b> {
         let mut r_poly = util::VecPoly3::zero(n);
 
         let mut exp_y = Scalar::one(); // y^n starting at n=0
-        let mut exp_y_inv = Scalar::one(); // y^-n starting at n=0
         let y_inv = y.invert();
+        let exp_y_inv = util::exp_iter(y_inv).take(n).collect::<Vec<_>>();
 
         for i in 0..n {
             // l_poly.0 = 0
             // l_poly.1 = a_L + y^-n * (z * z^Q * W_R)
-            l_poly.1[i] = self.a_L[i] + exp_y_inv * z_zQ_WR[i];
+            l_poly.1[i] = self.a_L[i] + exp_y_inv[i] * z_zQ_WR[i];
             // l_poly.2 = a_O
             l_poly.2[i] = self.a_O[i];
             // l_poly.3 = s_L
@@ -270,7 +270,6 @@ impl<'a, 'b> ProverCS<'a, 'b> {
             r_poly.3[i] = exp_y * s_R[i];
 
             exp_y = exp_y * y; // y^i -> y^(i+1)
-            exp_y_inv = exp_y_inv * y_inv; // y^-i -> y^-(i+1)
         }
 
         let t_poly = l_poly.inner_product(&r_poly);
@@ -330,7 +329,7 @@ impl<'a, 'b> ProverCS<'a, 'b> {
         let ipp_proof = InnerProductProof::create(
             self.transcript,
             &Q,
-            util::exp_iter(y.invert()),
+            &exp_y_inv,
             gens.G(n).cloned().collect(),
             gens.H(n).cloned().collect(),
             l_vec,
