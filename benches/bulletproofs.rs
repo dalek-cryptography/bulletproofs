@@ -81,7 +81,7 @@ fn verify_aggregated_rangeproof_helper(n: usize, c: &mut Criterion) {
             let blindings: Vec<Scalar> = (0..m).map(|_| Scalar::random(&mut rng)).collect();
 
             let mut transcript = Transcript::new(b"AggregateRangeProofBenchmark");
-            let proof = RangeProof::prove_multiple(
+            let (proof, value_commitments) = RangeProof::prove_multiple(
                 &bp_gens,
                 &pc_gens,
                 &mut transcript,
@@ -90,12 +90,6 @@ fn verify_aggregated_rangeproof_helper(n: usize, c: &mut Criterion) {
                 n,
             )
             .unwrap();
-
-            let value_commitments: Vec<_> = values
-                .iter()
-                .zip(blindings.iter())
-                .map(|(&v, &v_blinding)| pc_gens.commit(v.into(), v_blinding).compress())
-                .collect();
 
             b.iter(|| {
                 // Each proof creation requires a clean transcript.
