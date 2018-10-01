@@ -367,7 +367,8 @@ impl RangeProof {
                 .chain(bp_gens.G(n, m).map(|&x| Some(x)))
                 .chain(bp_gens.H(n, m).map(|&x| Some(x)))
                 .chain(value_commitments.iter().map(|V| V.decompress())),
-        ).ok_or_else(|| ProofError::VerificationError)?;
+        )
+        .ok_or_else(|| ProofError::VerificationError)?;
 
         if mega_check.is_identity() {
             Ok(())
@@ -563,7 +564,8 @@ mod tests {
                 &values,
                 &blindings,
                 n,
-            ).unwrap();
+            )
+            .unwrap();
 
             // 2. Serialize
             proof_bytes = bincode::serialize(&proof).unwrap();

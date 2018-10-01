@@ -88,7 +88,8 @@ fn verify_aggregated_rangeproof_helper(n: usize, c: &mut Criterion) {
                 &values,
                 &blindings,
                 n,
-            ).unwrap();
+            )
+            .unwrap();
 
             let value_commitments: Vec<_> = values
                 .iter()

@@ -272,7 +272,8 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
                 .chain(proof.ipp_proof.R_vec.iter().map(|R_i| R_i.decompress()))
                 .chain(self.V.iter().map(|V_i| V_i.decompress()))
                 .chain(T_points.iter().map(|T_i| T_i.decompress())),
-        ).ok_or_else(|| R1CSError::VerificationError)?;
+        )
+        .ok_or_else(|| R1CSError::VerificationError)?;
 
         use curve25519_dalek::traits::IsIdentity;
 

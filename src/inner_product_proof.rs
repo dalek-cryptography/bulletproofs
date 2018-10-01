@@ -94,9 +94,11 @@ impl InnerProductProof {
                         b_R.iter()
                             .zip(Hprime_factors[0..n].into_iter())
                             .map(|(b_R_i, y_i)| b_R_i * y_i),
-                    ).chain(iter::once(c_L)),
+                    )
+                    .chain(iter::once(c_L)),
                 G_R.iter().chain(H_L.iter()).chain(iter::once(Q)),
-            ).compress();
+            )
+            .compress();
 
             let R = RistrettoPoint::vartime_multiscalar_mul(
                 a_R.iter()
@@ -105,9 +107,11 @@ impl InnerProductProof {
                         b_L.iter()
                             .zip(Hprime_factors[n..2 * n].into_iter())
                             .map(|(b_L_i, y_i)| b_L_i * y_i),
-                    ).chain(iter::once(c_R)),
+                    )
+                    .chain(iter::once(c_R)),
                 G_L.iter().chain(H_R.iter()).chain(iter::once(Q)),
-            ).compress();
+            )
+            .compress();
 
             L_vec.push(L);
             R_vec.push(R);
@@ -147,12 +151,14 @@ impl InnerProductProof {
             let L = RistrettoPoint::vartime_multiscalar_mul(
                 a_L.iter().chain(b_R.iter()).chain(iter::once(&c_L)),
                 G_R.iter().chain(H_L.iter()).chain(iter::once(Q)),
-            ).compress();
+            )
+            .compress();
 
             let R = RistrettoPoint::vartime_multiscalar_mul(
                 a_R.iter().chain(b_L.iter()).chain(iter::once(&c_R)),
                 G_L.iter().chain(H_R.iter()).chain(iter::once(Q)),
-            ).compress();
+            )
+            .compress();
 
             L_vec.push(L);
             R_vec.push(R);

@@ -219,13 +219,15 @@ impl<'a, 'b> ProverCS<'a, 'b> {
             iter::once(&self.pc_gens.B_blinding)
                 .chain(gens.G(n))
                 .chain(gens.H(n)),
-        ).compress();
+        )
+        .compress();
 
         // A_O = <a_O, G> + o_blinding * B_blinding
         let A_O = RistrettoPoint::multiscalar_mul(
             iter::once(&o_blinding).chain(self.a_O.iter()),
             iter::once(&self.pc_gens.B_blinding).chain(gens.G(n)),
-        ).compress();
+        )
+        .compress();
 
         // S = <s_L, G> + <s_R, H> + s_blinding * B_blinding
         let S = RistrettoPoint::multiscalar_mul(
@@ -233,7 +235,8 @@ impl<'a, 'b> ProverCS<'a, 'b> {
             iter::once(&self.pc_gens.B_blinding)
                 .chain(gens.G(n))
                 .chain(gens.H(n)),
-        ).compress();
+        )
+        .compress();
 
         self.transcript.commit_point(b"A_I", &A_I);
         self.transcript.commit_point(b"A_O", &A_O);
