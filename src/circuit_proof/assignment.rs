@@ -3,7 +3,7 @@ use errors::R1CSError;
 use std::ops::{Add, Div, Mul, Sub, Try};
 use subtle::{Choice, ConditionallyAssignable, ConditionallySelectable, ConstantTimeEq};
 
-/// Represents an optional [`Variable`](::r1cs::Variable) assignment.
+/// Represents an optional assignment to a [`Variable`](::r1cs::Variable).
 ///
 /// This type is like an `Option<Scalar>`, but implements the
 /// `std::ops` traits to perform arithmetic operations.

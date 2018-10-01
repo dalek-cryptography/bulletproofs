@@ -72,8 +72,9 @@ pub enum Variable {
     One(),
 }
 
-/// Represents a linear combination of `Variables`.  Each term is
-/// represented by a `(Variable, Scalar)` pair.
+/// Represents a linear combination of
+/// [`Variables`](::r1cs::Variable).  Each term is represented by a
+/// `(Variable, Scalar)` pair.
 #[derive(Clone, Debug)]
 pub struct LinearCombination {
     terms: Vec<(Variable, Scalar)>,
