@@ -11,9 +11,12 @@ pub enum Assignment {
     Missing(),
 }
 
-impl Assignment {
-    pub fn zero() -> Self {
-        Assignment::Value(Scalar::zero())
+impl From<Option<Scalar>> for Assignment {
+    fn from(o: Option<Scalar>) -> Self {
+        match o {
+            Some(v) => Assignment::Value(v),
+            None => Assignment::Missing(),
+        }
     }
 }
 

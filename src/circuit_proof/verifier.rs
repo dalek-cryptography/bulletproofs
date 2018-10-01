@@ -147,7 +147,11 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
         if !(temp_n == 0 || temp_n.is_power_of_two()) {
             let pad = temp_n.next_power_of_two() - temp_n;
             for _ in 0..pad {
-                self.assign_multiplier(Assignment::zero(), Assignment::zero(), Assignment::zero())?;
+                let _ = self.assign_multiplier(
+                    Scalar::zero().into(),
+                    Scalar::zero().into(),
+                    Scalar::zero().into(),
+                );
             }
         }
 

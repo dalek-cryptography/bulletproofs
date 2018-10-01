@@ -174,9 +174,9 @@ impl<'a, 'b> ProverCS<'a, 'b> {
             let pad = temp_n.next_power_of_two() - temp_n;
             for _ in 0..pad {
                 let _ = self.assign_multiplier(
-                    Assignment::zero(),
-                    Assignment::zero(),
-                    Assignment::zero(),
+                    Scalar::zero().into(),
+                    Scalar::zero().into(),
+                    Scalar::zero().into(),
                 );
             }
         }
