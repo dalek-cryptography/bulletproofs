@@ -74,7 +74,7 @@ impl<'a> PartyAwaitingPosition<'a> {
         // XXX use transcript RNG
         let mut rng = rand::thread_rng();
 
-        if self.bp_gens.gens_capacity <= j {
+        if self.bp_gens.party_capacity <= j {
             return Err(MPCError::InvalidGeneratorsLength);
         }
 
