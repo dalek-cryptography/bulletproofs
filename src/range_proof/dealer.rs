@@ -92,17 +92,16 @@ impl<'a, 'b> DealerAwaitingBitCommitments<'a, 'b> {
             return Err(MPCError::WrongNumBitCommitments);
         }
 
-        // XXX value commitments should be compressed
         // Commit each V_j individually
         for vc in bit_commitments.iter() {
-            self.transcript.commit_point(b"V", &vc.V_j.compress());
+            self.transcript.commit_point(b"V", &vc.V_j);
         }
 
-        let A: RistrettoPoint = bit_commitments.iter().map(|vc| vc.A_j).sum();
-        let S: RistrettoPoint = bit_commitments.iter().map(|vc| vc.S_j).sum();
-
         // Commit aggregated A_j, S_j
+        let A: RistrettoPoint = bit_commitments.iter().map(|vc| vc.A_j).sum();
         self.transcript.commit_point(b"A", &A.compress());
+
+        let S: RistrettoPoint = bit_commitments.iter().map(|vc| vc.S_j).sum();
         self.transcript.commit_point(b"S", &S.compress());
 
         let y = self.transcript.challenge_scalar(b"y");
@@ -282,17 +281,12 @@ impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
     pub fn receive_shares(mut self, proof_shares: &[ProofShare]) -> Result<RangeProof, MPCError> {
         let proof = self.assemble_shares(proof_shares)?;
 
-        // XXX BitCommitments should have compressed points
-        let V: Vec<_> = self
-            .bit_commitments
-            .iter()
-            .map(|vc| vc.V_j.compress())
-            .collect();
+        let Vs: Vec<_> = self.bit_commitments.iter().map(|vc| vc.V_j).collect();
 
         // See comment in `Dealer::new` for why we use `initial_transcript`
         let transcript = &mut self.initial_transcript;
         if proof
-            .verify_multiple(self.bp_gens, self.pc_gens, transcript, &V, self.n)
+            .verify_multiple(self.bp_gens, self.pc_gens, transcript, &Vs, self.n)
             .is_ok()
         {
             Ok(proof)

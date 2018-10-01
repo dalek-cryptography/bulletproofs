@@ -4,7 +4,7 @@
 //! For more explanation of how the `dealer`, `party`, and `messages` modules orchestrate the protocol execution, see
 //! [the API for the aggregated multiparty computation protocol](../aggregation/index.html#api-for-the-aggregated-multiparty-computation-protocol).
 
-use curve25519_dalek::ristretto::RistrettoPoint;
+use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
 
 use generators::{BulletproofGens, PedersenGens};
@@ -12,7 +12,7 @@ use generators::{BulletproofGens, PedersenGens};
 /// A commitment to the bits of a party's value.
 #[derive(Serialize, Deserialize, Copy, Clone, Debug)]
 pub struct BitCommitment {
-    pub(super) V_j: RistrettoPoint,
+    pub(super) V_j: CompressedRistretto,
     pub(super) A_j: RistrettoPoint,
     pub(super) S_j: RistrettoPoint,
 }
@@ -110,6 +110,8 @@ impl ProofShare {
             return Err(());
         }
 
+        let V_j = bit_commitment.V_j.decompress().ok_or(())?;
+
         let sum_of_powers_y = util::sum_of_powers(&y, n);
         let sum_of_powers_2 = util::sum_of_powers(&Scalar::from(2u64), n);
         let delta = (z - zz) * sum_of_powers_y * y_jn - z * zz * sum_of_powers_2 * z_j;
@@ -119,7 +121,7 @@ impl ProofShare {
                 .chain(iter::once(x * x))
                 .chain(iter::once(delta - self.t_x))
                 .chain(iter::once(-self.t_x_blinding)),
-            iter::once(&bit_commitment.V_j)
+            iter::once(&V_j)
                 .chain(iter::once(&poly_commitment.T_1_j))
                 .chain(iter::once(&poly_commitment.T_2_j))
                 .chain(iter::once(&pc_gens.B))

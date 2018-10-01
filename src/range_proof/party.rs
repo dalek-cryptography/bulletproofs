@@ -10,7 +10,7 @@
 //! modules orchestrate the protocol execution, see the documentation
 //! in the [`aggregation`](::aggregation) module.
 
-use curve25519_dalek::ristretto::RistrettoPoint;
+use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::MultiscalarMul;
 
@@ -37,8 +37,11 @@ impl Party {
         if !(n == 8 || n == 16 || n == 32 || n == 64) {
             return Err(MPCError::InvalidBitsize);
         }
+        if bp_gens.gens_capacity < n {
+            return Err(MPCError::InvalidGeneratorsLength);
+        }
 
-        let V = pc_gens.commit(v.into(), v_blinding);
+        let V = pc_gens.commit(v.into(), v_blinding).compress();
 
         Ok(PartyAwaitingPosition {
             bp_gens,
@@ -58,7 +61,7 @@ pub struct PartyAwaitingPosition<'a> {
     n: usize,
     v: u64,
     v_blinding: Scalar,
-    V: RistrettoPoint,
+    V: CompressedRistretto,
 }
 
 impl<'a> PartyAwaitingPosition<'a> {
@@ -66,11 +69,14 @@ impl<'a> PartyAwaitingPosition<'a> {
     /// allowing the party to commit to the bits of their value.
     pub fn assign_position(
         self,
-        // XXX need to check that j is valid (in gens range)
         j: usize,
-    ) -> (PartyAwaitingBitChallenge<'a>, BitCommitment) {
+    ) -> Result<(PartyAwaitingBitChallenge<'a>, BitCommitment), MPCError> {
         // XXX use transcript RNG
         let mut rng = rand::thread_rng();
+
+        if self.bp_gens.party_capacity <= j {
+            return Err(MPCError::InvalidGeneratorsLength);
+        }
 
         let bp_share = self.bp_gens.share(j);
 
@@ -119,7 +125,7 @@ impl<'a> PartyAwaitingPosition<'a> {
             s_L,
             s_R,
         };
-        (next_state, bit_commitment)
+        Ok((next_state, bit_commitment))
     }
 }
 

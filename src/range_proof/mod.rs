@@ -99,16 +99,15 @@ impl RangeProof {
     /// // A secret value we want to prove lies in the range [0, 2^32)
     /// let secret_value = 1037578891u64;
     ///
-    /// // The API takes an opening to an existing commitment, so create one:
+    /// // The API takes a blinding factor for the commitment.
     /// let blinding = Scalar::random(&mut thread_rng());
-    /// let committed_value = pc_gens.commit(secret_value.into(), blinding).compress();
     ///
     /// // The proof can be chained to an existing transcript.
     /// // Here we create a transcript with a doctest domain separator.
     /// let mut transcript = Transcript::new(b"doctest example");
     ///
     /// // Create a 32-bit rangeproof.
-    /// let proof = RangeProof::prove_single(
+    /// let (proof, committed_value) = RangeProof::prove_single(
     ///     &bp_gens,
     ///     &pc_gens,
     ///     &mut transcript,
@@ -133,8 +132,10 @@ impl RangeProof {
         v: u64,
         v_blinding: &Scalar,
         n: usize,
-    ) -> Result<RangeProof, ProofError> {
-        RangeProof::prove_multiple(bp_gens, pc_gens, transcript, &[v], &[*v_blinding], n)
+    ) -> Result<(RangeProof, CompressedRistretto), ProofError> {
+        let (p, Vs) =
+            RangeProof::prove_multiple(bp_gens, pc_gens, transcript, &[v], &[*v_blinding], n)?;
+        Ok((p, Vs[0]))
     }
 
     /// Create a rangeproof for a set of values.
@@ -165,20 +166,15 @@ impl RangeProof {
     /// // Four secret values we want to prove lie in the range [0, 2^32)
     /// let secrets = [4242344947u64, 3718732727u64, 2255562556u64, 2526146994u64];
     ///
-    /// // The API takes openings to existing commitments, so create them:
+    /// // The API takes blinding factors for the commitments.
     /// let blindings: Vec<_> = (0..4).map(|_| Scalar::random(&mut thread_rng())).collect();
-    /// let commitments: Vec<_> = secrets
-    ///     .iter()
-    ///     .zip(blindings.iter())
-    ///     .map(|(&v, &v_blinding)| pc_gens.commit(v.into(), v_blinding).compress())
-    ///     .collect();
     ///
     /// // The proof can be chained to an existing transcript.
     /// // Here we create a transcript with a doctest domain separator.
     /// let mut transcript = Transcript::new(b"doctest example");
     ///
-    /// // Create an aggregated 32-bit rangeproof.
-    /// let proof = RangeProof::prove_multiple(
+    /// // Create an aggregated 32-bit rangeproof and corresponding commitments.
+    /// let (proof, commitments) = RangeProof::prove_multiple(
     ///     &bp_gens,
     ///     &pc_gens,
     ///     &mut transcript,
@@ -203,21 +199,12 @@ impl RangeProof {
         values: &[u64],
         blindings: &[Scalar],
         n: usize,
-    ) -> Result<RangeProof, ProofError> {
+    ) -> Result<(RangeProof, Vec<CompressedRistretto>), ProofError> {
         use self::dealer::*;
         use self::party::*;
 
         if values.len() != blindings.len() {
             return Err(ProofError::WrongNumBlindingFactors);
-        }
-        if !(n == 8 || n == 16 || n == 32 || n == 64) {
-            return Err(ProofError::InvalidBitsize);
-        }
-        if bp_gens.gens_capacity < n {
-            return Err(ProofError::InvalidGeneratorsLength);
-        }
-        if bp_gens.party_capacity < values.len() {
-            return Err(ProofError::InvalidGeneratorsLength);
         }
 
         let dealer = Dealer::new(bp_gens, pc_gens, transcript, n, values.len())?;
@@ -232,8 +219,12 @@ impl RangeProof {
         let (parties, bit_commitments): (Vec<_>, Vec<_>) = parties
             .into_iter()
             .enumerate()
-            .map(|(j, p)| p.assign_position(j))
-            .unzip();
+            .map(|(j, p)| {
+                p.assign_position(j)
+                    .expect("We already checked the parameters, so this should never happen")
+            }).unzip();
+
+        let value_commitments: Vec<_> = bit_commitments.iter().map(|c| c.V_j).collect();
 
         let (dealer, bit_challenge) = dealer.receive_bit_commitments(bit_commitments)?;
 
@@ -252,7 +243,7 @@ impl RangeProof {
 
         let proof = dealer.receive_trusted_shares(&proof_shares)?;
 
-        Ok(proof)
+        Ok((proof, value_commitments))
     }
 
     /// Verifies a rangeproof for a given value commitment \\(V\\).
@@ -540,23 +531,19 @@ mod tests {
         let pc_gens = PedersenGens::default();
         let bp_gens = BulletproofGens::new(max_bitsize, max_parties);
 
-        // Serialized proof data
-        let proof_bytes: Vec<u8>;
-        let value_commitments: Vec<CompressedRistretto>;
-
         // Prover's scope
-        {
-            // 1. Generate the proof
-            let mut transcript = Transcript::new(b"AggregatedRangeProofTest");
-
+        let (proof_bytes, value_commitments) = {
             use rand::Rng;
             let mut rng = rand::thread_rng();
 
+            // 0. Create witness data
             let (min, max) = (0u64, ((1u128 << n) - 1) as u64);
             let values: Vec<u64> = (0..m).map(|_| rng.gen_range(min, max)).collect();
             let blindings: Vec<Scalar> = (0..m).map(|_| Scalar::random(&mut rng)).collect();
 
-            let proof = RangeProof::prove_multiple(
+            // 1. Create the proof
+            let mut transcript = Transcript::new(b"AggregatedRangeProofTest");
+            let (proof, value_commitments) = RangeProof::prove_multiple(
                 &bp_gens,
                 &pc_gens,
                 &mut transcript,
@@ -565,16 +552,9 @@ mod tests {
                 n,
             ).unwrap();
 
-            // 2. Serialize
-            proof_bytes = bincode::serialize(&proof).unwrap();
-
-            // XXX would be nice to have some convenience API for this
-            value_commitments = values
-                .iter()
-                .zip(blindings.iter())
-                .map(|(&v, &v_blinding)| pc_gens.commit(v.into(), v_blinding).compress())
-                .collect();
-        }
+            // 2. Return serialized proof and value commitments
+            (bincode::serialize(&proof).unwrap(), value_commitments)
+        };
 
         println!(
             "Aggregated rangeproof of m={} proofs of n={} bits has size {} bytes",
@@ -677,10 +657,10 @@ mod tests {
 
         let dealer = Dealer::new(&bp_gens, &pc_gens, &mut transcript, n, m).unwrap();
 
-        let (party0, bit_com0) = party0.assign_position(0);
-        let (party1, bit_com1) = party1.assign_position(1);
-        let (party2, bit_com2) = party2.assign_position(2);
-        let (party3, bit_com3) = party3.assign_position(3);
+        let (party0, bit_com0) = party0.assign_position(0).unwrap();
+        let (party1, bit_com1) = party1.assign_position(1).unwrap();
+        let (party2, bit_com2) = party2.assign_position(2).unwrap();
+        let (party3, bit_com3) = party3.assign_position(3).unwrap();
 
         let (dealer, bit_challenge) = dealer
             .receive_bit_commitments(vec![bit_com0, bit_com1, bit_com2, bit_com3])
@@ -737,7 +717,7 @@ mod tests {
 
         // Now do the protocol flow as normal....
 
-        let (party0, bit_com0) = party0.assign_position(0);
+        let (party0, bit_com0) = party0.assign_position(0).unwrap();
 
         let (dealer, bit_challenge) = dealer.receive_bit_commitments(vec![bit_com0]).unwrap();
 
