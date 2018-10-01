@@ -1,34 +1,29 @@
-#![cfg_attr(feature = "bench", feature(test))]
 #![feature(nll)]
-#![feature(test)]
 #![feature(external_doc)]
 #![feature(try_trait)]
+#![deny(missing_docs)]
 #![doc(include = "../README.md")]
 #![doc(html_logo_url = "https://doc.dalek.rs/assets/dalek-logo-clear.png")]
 
-//! Note that docs will only build on nightly Rust until
-//! [RFC 1990 stabilizes](https://github.com/rust-lang/rust/issues/44732).
-
 extern crate byteorder;
 extern crate core;
-extern crate curve25519_dalek;
 extern crate digest;
-#[macro_use]
-extern crate failure;
-extern crate merlin;
 extern crate rand;
 extern crate sha3;
+
+extern crate curve25519_dalek;
+extern crate merlin;
 extern crate subtle;
-extern crate tiny_keccak;
 
 #[macro_use]
 extern crate serde_derive;
 extern crate serde;
 
+#[macro_use]
+extern crate failure;
+
 #[cfg(test)]
 extern crate bincode;
-#[cfg(test)]
-extern crate test;
 
 mod util;
 
@@ -41,8 +36,6 @@ mod generators;
 mod inner_product_proof;
 mod range_proof;
 pub mod transcript;
-
-pub use merlin::Transcript;
 
 pub use errors::{ProofError, R1CSError};
 pub use generators::{BulletproofGens, BulletproofGensShare, PedersenGens};

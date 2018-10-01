@@ -18,7 +18,7 @@ use util;
 
 use super::messages::*;
 
-/// Dealer is an entry-point API for setting up a dealer
+/// Used to construct a dealer for the aggregated rangeproof MPC protocol.
 pub struct Dealer {}
 
 impl Dealer {
@@ -29,7 +29,7 @@ impl Dealer {
         transcript: &'a mut Transcript,
         n: usize,
         m: usize,
-    ) -> Result<DealerAwaitingValueCommitments<'a, 'b>, MPCError> {
+    ) -> Result<DealerAwaitingBitCommitments<'a, 'b>, MPCError> {
         if !(n == 8 || n == 16 || n == 32 || n == 64) {
             return Err(MPCError::InvalidBitsize);
         }
@@ -59,7 +59,7 @@ impl Dealer {
 
         transcript.rangeproof_domain_sep(n as u64, m as u64);
 
-        Ok(DealerAwaitingValueCommitments {
+        Ok(DealerAwaitingBitCommitments {
             bp_gens,
             pc_gens,
             transcript,
@@ -70,9 +70,8 @@ impl Dealer {
     }
 }
 
-/// The initial dealer state, waiting for the parties to send value
-/// commitments.
-pub struct DealerAwaitingValueCommitments<'a, 'b> {
+/// A dealer waiting for the parties to send their [`BitCommitment`]s.
+pub struct DealerAwaitingBitCommitments<'a, 'b> {
     bp_gens: &'b BulletproofGens,
     pc_gens: &'b PedersenGens,
     transcript: &'a mut Transcript,
@@ -83,24 +82,24 @@ pub struct DealerAwaitingValueCommitments<'a, 'b> {
     m: usize,
 }
 
-impl<'a, 'b> DealerAwaitingValueCommitments<'a, 'b> {
-    /// Combines commitments and computes challenge variables.
-    pub fn receive_value_commitments(
+impl<'a, 'b> DealerAwaitingBitCommitments<'a, 'b> {
+    /// Receive each party's [`BitCommitment`]s and compute the [`BitChallenge`].
+    pub fn receive_bit_commitments(
         self,
-        value_commitments: Vec<ValueCommitment>,
-    ) -> Result<(DealerAwaitingPolyCommitments<'a, 'b>, ValueChallenge), MPCError> {
-        if self.m != value_commitments.len() {
-            return Err(MPCError::WrongNumValueCommitments);
+        bit_commitments: Vec<BitCommitment>,
+    ) -> Result<(DealerAwaitingPolyCommitments<'a, 'b>, BitChallenge), MPCError> {
+        if self.m != bit_commitments.len() {
+            return Err(MPCError::WrongNumBitCommitments);
         }
 
         // XXX value commitments should be compressed
         // Commit each V_j individually
-        for vc in value_commitments.iter() {
+        for vc in bit_commitments.iter() {
             self.transcript.commit_point(b"V", &vc.V_j.compress());
         }
 
-        let A: RistrettoPoint = value_commitments.iter().map(|vc| vc.A_j).sum();
-        let S: RistrettoPoint = value_commitments.iter().map(|vc| vc.S_j).sum();
+        let A: RistrettoPoint = bit_commitments.iter().map(|vc| vc.A_j).sum();
+        let S: RistrettoPoint = bit_commitments.iter().map(|vc| vc.S_j).sum();
 
         // Commit aggregated A_j, S_j
         self.transcript.commit_point(b"A", &A.compress());
@@ -108,7 +107,7 @@ impl<'a, 'b> DealerAwaitingValueCommitments<'a, 'b> {
 
         let y = self.transcript.challenge_scalar(b"y");
         let z = self.transcript.challenge_scalar(b"z");
-        let value_challenge = ValueChallenge { y, z };
+        let bit_challenge = BitChallenge { y, z };
 
         Ok((
             DealerAwaitingPolyCommitments {
@@ -118,16 +117,18 @@ impl<'a, 'b> DealerAwaitingValueCommitments<'a, 'b> {
                 initial_transcript: self.initial_transcript,
                 bp_gens: self.bp_gens,
                 pc_gens: self.pc_gens,
-                value_challenge,
-                value_commitments,
+                bit_challenge,
+                bit_commitments,
                 A,
                 S,
             },
-            value_challenge,
+            bit_challenge,
         ))
     }
 }
 
+/// A dealer which has sent the [`BitChallenge`] to the parties and
+/// is waiting for their [`PolyCommitment`]s.
 pub struct DealerAwaitingPolyCommitments<'a, 'b> {
     n: usize,
     m: usize,
@@ -135,8 +136,8 @@ pub struct DealerAwaitingPolyCommitments<'a, 'b> {
     initial_transcript: Transcript,
     bp_gens: &'b BulletproofGens,
     pc_gens: &'b PedersenGens,
-    value_challenge: ValueChallenge,
-    value_commitments: Vec<ValueCommitment>,
+    bit_challenge: BitChallenge,
+    bit_commitments: Vec<BitCommitment>,
     /// Aggregated commitment to the parties' bits
     A: RistrettoPoint,
     /// Aggregated commitment to the parties' bit blindings
@@ -144,6 +145,8 @@ pub struct DealerAwaitingPolyCommitments<'a, 'b> {
 }
 
 impl<'a, 'b> DealerAwaitingPolyCommitments<'a, 'b> {
+    /// Receive [`PolyCommitment`]s from the parties and compute the
+    /// [`PolyChallenge`].
     pub fn receive_poly_commitments(
         self,
         poly_commitments: Vec<PolyCommitment>,
@@ -170,8 +173,8 @@ impl<'a, 'b> DealerAwaitingPolyCommitments<'a, 'b> {
                 initial_transcript: self.initial_transcript,
                 bp_gens: self.bp_gens,
                 pc_gens: self.pc_gens,
-                value_challenge: self.value_challenge,
-                value_commitments: self.value_commitments,
+                bit_challenge: self.bit_challenge,
+                bit_commitments: self.bit_commitments,
                 A: self.A,
                 S: self.S,
                 poly_challenge,
@@ -184,6 +187,9 @@ impl<'a, 'b> DealerAwaitingPolyCommitments<'a, 'b> {
     }
 }
 
+/// A dealer which has sent the [`PolyChallenge`] to the parties and
+/// is waiting to aggregate their [`ProofShare`]s into a
+/// [`RangeProof`].
 pub struct DealerAwaitingProofShares<'a, 'b> {
     n: usize,
     m: usize,
@@ -191,8 +197,8 @@ pub struct DealerAwaitingProofShares<'a, 'b> {
     initial_transcript: Transcript,
     bp_gens: &'b BulletproofGens,
     pc_gens: &'b PedersenGens,
-    value_challenge: ValueChallenge,
-    value_commitments: Vec<ValueCommitment>,
+    bit_challenge: BitChallenge,
+    bit_commitments: Vec<BitCommitment>,
     poly_challenge: PolyChallenge,
     poly_commitments: Vec<PolyCommitment>,
     A: RistrettoPoint,
@@ -225,6 +231,10 @@ impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
         let w = self.transcript.challenge_scalar(b"w");
         let Q = w * self.pc_gens.B;
 
+        let Hprime_factors: Vec<Scalar> = util::exp_iter(self.bit_challenge.y.invert())
+            .take(self.n * self.m)
+            .collect();
+
         let l_vec: Vec<Scalar> = proof_shares
             .iter()
             .flat_map(|ps| ps.l_vec.clone().into_iter())
@@ -237,7 +247,7 @@ impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
         let ipp_proof = inner_product_proof::InnerProductProof::create(
             self.transcript,
             &Q,
-            util::exp_iter(self.value_challenge.y.invert()),
+            &Hprime_factors,
             self.bp_gens.G(self.n, self.m).cloned().collect(),
             self.bp_gens.H(self.n, self.m).cloned().collect(),
             l_vec,
@@ -256,23 +266,33 @@ impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
         })
     }
 
-    /// Assemble the final aggregated proof from the given
-    /// `proof_shares`, and validate that all input shares and the
-    /// aggregated proof are well-formed.  If the aggregated proof is
-    /// not well-formed, this function detects which party submitted a
-    /// malformed share and returns that information as part of the
-    /// error.
+    /// Assemble the final aggregated [`RangeProof`] from the given
+    /// `proof_shares`, then validate the proof to ensure that all
+    /// `ProofShare`s were well-formed.
     ///
-    /// XXX define error types so we can surface the blame info
+    /// If the aggregated proof fails to validate, this function
+    /// audits the submitted shares to determine which shares were
+    /// invalid.  This information is returned as part of the
+    /// [`MPCError`].
+    ///
+    /// If the proof shares are known to be trusted, for instance when
+    /// performing local aggregation,
+    /// [`receive_trusted_shares`](DealerAwaitingProofShares::receive_trusted_shares)
+    /// saves time by skipping verification of the aggregated proof.
     pub fn receive_shares(mut self, proof_shares: &[ProofShare]) -> Result<RangeProof, MPCError> {
         let proof = self.assemble_shares(proof_shares)?;
 
-        let V: Vec<_> = self.value_commitments.iter().map(|vc| vc.V_j).collect();
+        // XXX BitCommitments should have compressed points
+        let V: Vec<_> = self
+            .bit_commitments
+            .iter()
+            .map(|vc| vc.V_j.compress())
+            .collect();
 
         // See comment in `Dealer::new` for why we use `initial_transcript`
         let transcript = &mut self.initial_transcript;
         if proof
-            .verify(self.bp_gens, self.pc_gens, transcript, &V, self.n)
+            .verify_multiple(self.bp_gens, self.pc_gens, transcript, &V, self.n)
             .is_ok()
         {
             Ok(proof)
@@ -284,8 +304,8 @@ impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
                     &self.bp_gens,
                     &self.pc_gens,
                     j,
-                    &self.value_commitments[j],
-                    &self.value_challenge,
+                    &self.bit_commitments[j],
+                    &self.bit_challenge,
                     &self.poly_commitments[j],
                     &self.poly_challenge,
                 ) {
@@ -297,8 +317,8 @@ impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
         }
     }
 
-    /// Assemble the final aggregated proof from the given
-    /// `proof_shares`, but does not validate that they are well-formed.
+    /// Assemble the final aggregated [`RangeProof`] from the given
+    /// `proof_shares`, but skip validation of the proof.
     ///
     /// ## WARNING
     ///
@@ -307,9 +327,10 @@ impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
     /// known by the dealer to be honest (for instance, when there's
     /// only one party playing all roles).
     ///
-    /// Otherwise, use `receive_shares`, which validates that all
-    /// shares are well-formed, or else detects which party(ies)
-    /// submitted malformed shares.
+    /// Otherwise, use
+    /// [`receive_shares`](DealerAwaitingProofShares::receive_shares),
+    /// which validates that all shares are well-formed, or else
+    /// detects which party(ies) submitted malformed shares.
     pub fn receive_trusted_shares(
         mut self,
         proof_shares: &[ProofShare],

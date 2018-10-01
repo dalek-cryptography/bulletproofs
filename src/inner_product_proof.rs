@@ -32,19 +32,15 @@ impl InnerProductProof {
     ///
     /// The lengths of the vectors must all be the same, and must all be
     /// either 0 or a power of 2.
-    pub fn create<I>(
+    pub fn create(
         transcript: &mut Transcript,
         Q: &RistrettoPoint,
-        Hprime_factors: I,
+        Hprime_factors: &[Scalar],
         mut G_vec: Vec<RistrettoPoint>,
         mut H_vec: Vec<RistrettoPoint>,
         mut a_vec: Vec<Scalar>,
         mut b_vec: Vec<Scalar>,
-    ) -> InnerProductProof
-    where
-        I: IntoIterator,
-        I::Item: Borrow<Scalar>,
-    {
+    ) -> InnerProductProof {
         // Create slices G, H, a, b backed by their respective
         // vectors.  This lets us reslice as we compress the lengths
         // of the vectors in the main loop below.
@@ -75,17 +71,70 @@ impl InnerProductProof {
 
         transcript.innerproduct_domain_sep(n as u64);
 
-        // XXX save these scalar mults by unrolling them into the
-        // first iteration of the loop below
-        for (H_i, h_i) in H.iter_mut().zip(Hprime_factors.into_iter()) {
-            *H_i = (&*H_i) * h_i.borrow();
-        }
-
         let lg_n = n.next_power_of_two().trailing_zeros() as usize;
         let mut L_vec = Vec::with_capacity(lg_n);
         let mut R_vec = Vec::with_capacity(lg_n);
 
-        while n > 1 {
+        // If it's the first iteration, unroll the Hprime = H*y_inv scalar mults
+        // into multiscalar muls, for performance.
+        if n != 1 {
+            n = n / 2;
+            let (a_L, a_R) = a.split_at_mut(n);
+            let (b_L, b_R) = b.split_at_mut(n);
+            let (G_L, G_R) = G.split_at_mut(n);
+            let (H_L, H_R) = H.split_at_mut(n);
+
+            let c_L = inner_product(&a_L, &b_R);
+            let c_R = inner_product(&a_R, &b_L);
+
+            let L = RistrettoPoint::vartime_multiscalar_mul(
+                a_L.iter()
+                    .cloned()
+                    .chain(
+                        b_R.iter()
+                            .zip(Hprime_factors[0..n].into_iter())
+                            .map(|(b_R_i, y_i)| b_R_i * y_i),
+                    ).chain(iter::once(c_L)),
+                G_R.iter().chain(H_L.iter()).chain(iter::once(Q)),
+            ).compress();
+
+            let R = RistrettoPoint::vartime_multiscalar_mul(
+                a_R.iter()
+                    .cloned()
+                    .chain(
+                        b_L.iter()
+                            .zip(Hprime_factors[n..2 * n].into_iter())
+                            .map(|(b_L_i, y_i)| b_L_i * y_i),
+                    ).chain(iter::once(c_R)),
+                G_L.iter().chain(H_R.iter()).chain(iter::once(Q)),
+            ).compress();
+
+            L_vec.push(L);
+            R_vec.push(R);
+
+            transcript.commit_point(b"L", &L);
+            transcript.commit_point(b"R", &R);
+
+            let u = transcript.challenge_scalar(b"u");
+            let u_inv = u.invert();
+
+            for i in 0..n {
+                a_L[i] = a_L[i] * u + u_inv * a_R[i];
+                b_L[i] = b_L[i] * u_inv + u * b_R[i];
+                G_L[i] = RistrettoPoint::vartime_multiscalar_mul(&[u_inv, u], &[G_L[i], G_R[i]]);
+                H_L[i] = RistrettoPoint::vartime_multiscalar_mul(
+                    &[u * Hprime_factors[i], u_inv * Hprime_factors[n + i]],
+                    &[H_L[i], H_R[i]],
+                )
+            }
+
+            a = a_L;
+            b = b_L;
+            G = G_L;
+            H = H_L;
+        }
+
+        while n != 1 {
             n = n / 2;
             let (a_L, a_R) = a.split_at_mut(n);
             let (b_L, b_R) = b.split_at_mut(n);
@@ -360,6 +409,7 @@ mod tests {
 
         // y_inv is (the inverse of) a random challenge
         let y_inv = Scalar::random(&mut rng);
+        let Hprime_factors: Vec<Scalar> = util::exp_iter(y_inv).take(n).collect();
 
         // P would be determined upstream, but we need a correct P to check the proof.
         //
@@ -379,7 +429,7 @@ mod tests {
         let proof = InnerProductProof::create(
             &mut verifier,
             &Q,
-            util::exp_iter(y_inv),
+            &Hprime_factors,
             G.clone(),
             H.clone(),
             a.clone(),
