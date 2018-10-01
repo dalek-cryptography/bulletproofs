@@ -3,11 +3,18 @@ use errors::R1CSError;
 use std::ops::{Add, Div, Mul, Sub, Try};
 use subtle::{Choice, ConditionallyAssignable, ConditionallySelectable, ConstantTimeEq};
 
-// The assignment value to a variable, as stored in `ConstraintSystem`.
-// Provers create a `Value` assignment, while verifiers create an `Missing` assignment.
+/// Represents an optional [`Variable`] assignment.
+///
+/// This type is like an `Option<Scalar>`, but implements the
+/// `std::ops` traits to perform arithmetic operations.
+///
+/// Proving code creates `Value` assignments, while verification code
+/// creates `Missing` assignments.
 #[derive(Copy, Clone, Debug)]
 pub enum Assignment {
+    /// A known assignment to a variable in a [`ConstraintSystem`].
     Value(Scalar),
+    /// An unknown assignment to a variable in a [`ConstraintSystem`].
     Missing(),
 }
 

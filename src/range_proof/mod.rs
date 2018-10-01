@@ -45,7 +45,7 @@ pub mod party;
 /// # Note
 ///
 /// For proving, these functions run the multiparty aggregation
-/// protocol locally.  That API is exposed in the [`aggregation`](::aggregation)
+/// protocol locally.  That API is exposed in the [`aggregation`](::rangeproof_mpc)
 /// module and can be used to perform online aggregation between
 /// parties without revealing secret values to each other.
 #[derive(Clone, Debug)]

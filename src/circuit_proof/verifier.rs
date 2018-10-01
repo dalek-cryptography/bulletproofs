@@ -12,6 +12,21 @@ use errors::R1CSError;
 use generators::{BulletproofGens, PedersenGens};
 use transcript::TranscriptProtocol;
 
+/// A [`ConstraintSystem`] implementation for use by the verifier.
+///
+/// The lifecycle of a `VerifierCS` is as follows. The verification
+/// code assembles the commitments to the external inputs to the
+/// constraint system, then passes them, along with generators and a
+/// transcript, to [`VerifierCS::new`].  This initializes the
+/// `VerifierCS` and returns [`Variable`]s corresponding to the
+/// inputs.
+///
+/// The verifier can then pass the `VerifierCS` and the external
+/// variables to the same gadget code as the prover, using
+/// `Assignment::Missing` for witness variables, to build an identical
+/// constraint system to the one the prover built.  Finally, they pass
+/// the prover's [`R1CSProof`] to [`VerifierCS::verify`], which
+/// consumes the `VerifierCS` and verifies the proof.
 pub struct VerifierCS<'a, 'b> {
     bp_gens: &'b BulletproofGens,
     pc_gens: &'b PedersenGens,
@@ -60,6 +75,37 @@ impl<'a, 'b> ConstraintSystem for VerifierCS<'a, 'b> {
 }
 
 impl<'a, 'b> VerifierCS<'a, 'b> {
+    /// Construct an empty constraint system with specified external
+    /// input variables.
+    ///
+    /// # Inputs
+    ///
+    /// The `bp_gens` and `pc_gens` are generators for Bulletproofs
+    /// and for the Pedersen commitments, respectively.  The
+    /// [`BulletproofGens`] should have `gens_capacity` greater than
+    /// the number of multiplication constraints that will eventually
+    /// be added into the constraint system.
+    ///
+    /// The `transcript` parameter is a Merlin proof transcript.  The
+    /// `VerifierCS` holds onto the `&mut Transcript` until it consumes
+    /// itself during [`VerifierCS::verify`], releasing its borrow of the
+    /// transcript.  This ensures that the transcript cannot be
+    /// altered except by the `VerifierCS` before proving is complete.
+    ///
+    /// The `commitments` parameter is a list of Pedersen commitments
+    /// to the external variables for the constraint system.  All
+    /// external variables must be passed up-front, so that challenges
+    /// produced by [`ConstraintSystem::challenge_scalar`] are bound
+    /// to the external variables.
+    ///
+    /// # Returns
+    ///
+    /// Returns a tuple `(cs, vars)`.
+    ///
+    /// The first element is the newly constructed constraint system.
+    ///
+    /// The second element is a list of [`Variable`]s corresponding to
+    /// the external inputs, which can be used to form constraints.
     pub fn new(
         bp_gens: &'b BulletproofGens,
         pc_gens: &'b PedersenGens,
@@ -141,7 +187,7 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
         (z_zQ_WL, z_zQ_WR, z_zQ_WO, z_zQ_WV, z_zQ_c)
     }
 
-    // This function can only be called once per ConstraintSystem instance.
+    /// Consume this `VerifierCS` and attempt to verify the supplied `proof`.
     pub fn verify(mut self, proof: &R1CSProof) -> Result<(), R1CSError> {
         let temp_n = self.num_vars;
         if !(temp_n == 0 || temp_n.is_power_of_two()) {

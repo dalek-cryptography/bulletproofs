@@ -29,22 +29,36 @@ mod util;
 
 #[doc(include = "../docs/notes.md")]
 mod notes {}
-// XXX re-export selectively -- this suppresses dead code errors
-pub mod circuit_proof;
+mod circuit_proof;
 mod errors;
 mod generators;
 mod inner_product_proof;
 mod range_proof;
-pub mod transcript;
+mod transcript;
 
-pub use errors::{ProofError, R1CSError};
+pub use errors::ProofError;
 pub use generators::{BulletproofGens, BulletproofGensShare, PedersenGens};
 pub use range_proof::RangeProof;
 
 #[doc(include = "../docs/aggregation-api.md")]
-pub mod aggregation {
+pub mod rangeproof_mpc {
     pub use errors::MPCError;
     pub use range_proof::dealer;
     pub use range_proof::messages;
     pub use range_proof::party;
+}
+
+/// The rank-1 constraint system API for programmatically defining constraint systems.
+///
+/// XXX explain how the parts fit together here
+///
+pub mod r1cs {
+    pub use circuit_proof::assignment::Assignment;
+    pub use circuit_proof::prover::ProverCS;
+    pub use circuit_proof::verifier::VerifierCS;
+    pub use circuit_proof::ConstraintSystem;
+    pub use circuit_proof::LinearCombination;
+    pub use circuit_proof::R1CSProof;
+    pub use circuit_proof::Variable;
+    pub use errors::R1CSError;
 }

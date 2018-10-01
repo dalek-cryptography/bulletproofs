@@ -8,7 +8,7 @@
 //!
 //! For more explanation of how the `dealer`, `party`, and `messages`
 //! modules orchestrate the protocol execution, see the documentation
-//! in the [`aggregation`](::aggregation) module.
+//! in the [`aggregation`](::rangeproof_mpc) module.
 
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
