@@ -531,23 +531,19 @@ mod tests {
         let pc_gens = PedersenGens::default();
         let bp_gens = BulletproofGens::new(max_bitsize, max_parties);
 
-        // Serialized proof data
-        let proof_bytes: Vec<u8>;
-        let value_commitments: Vec<CompressedRistretto>;
-
         // Prover's scope
-        {
-            // 1. Generate the proof
-            let mut transcript = Transcript::new(b"AggregatedRangeProofTest");
-
+        let (proof_bytes, value_commitments) = {
             use rand::Rng;
             let mut rng = rand::thread_rng();
 
+            // 0. Create witness data
             let (min, max) = (0u64, ((1u128 << n) - 1) as u64);
             let values: Vec<u64> = (0..m).map(|_| rng.gen_range(min, max)).collect();
             let blindings: Vec<Scalar> = (0..m).map(|_| Scalar::random(&mut rng)).collect();
 
-            let (proof, Vs) = RangeProof::prove_multiple(
+            // 1. Create the proof
+            let mut transcript = Transcript::new(b"AggregatedRangeProofTest");
+            let (proof, value_commitments) = RangeProof::prove_multiple(
                 &bp_gens,
                 &pc_gens,
                 &mut transcript,
@@ -556,12 +552,9 @@ mod tests {
                 n,
             ).unwrap();
 
-            // 2. Serialize
-            proof_bytes = bincode::serialize(&proof).unwrap();
-
-            // 3. Return value commitments too
-            value_commitments = Vs;
-        }
+            // 2. Return serialized proof and value commitments
+            (bincode::serialize(&proof).unwrap(), value_commitments)
+        };
 
         println!(
             "Aggregated rangeproof of m={} proofs of n={} bits has size {} bytes",
