@@ -3,7 +3,7 @@ use errors::R1CSError;
 use std::ops::{Add, Div, Mul, Sub, Try};
 use subtle::{Choice, ConditionallyAssignable, ConditionallySelectable, ConstantTimeEq};
 
-/// Represents an optional [`Variable`] assignment.
+/// Represents an optional [`Variable`](::r1cs::Variable) assignment.
 ///
 /// This type is like an `Option<Scalar>`, but implements the
 /// `std::ops` traits to perform arithmetic operations.
@@ -12,9 +12,9 @@ use subtle::{Choice, ConditionallyAssignable, ConditionallySelectable, ConstantT
 /// creates `Missing` assignments.
 #[derive(Copy, Clone, Debug)]
 pub enum Assignment {
-    /// A known assignment to a variable in a [`ConstraintSystem`].
+    /// A known assignment to a variable in a [`ConstraintSystem`](::r1cs::ConstraintSystem).
     Value(Scalar),
-    /// An unknown assignment to a variable in a [`ConstraintSystem`].
+    /// An unknown assignment to a variable in a [`ConstraintSystem`](::r1cs::ConstraintSystem).
     Missing(),
 }
 

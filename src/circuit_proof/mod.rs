@@ -17,13 +17,16 @@ use inner_product_proof::InnerProductProof;
 ///
 /// Statements are specified by writing gadget functions which add
 /// constraints to a `ConstraintSystem` implementation.  To construct
-/// an `R1CSProof`, a prover constructs a [`ProverCS`], then passes it
-/// to gadget functions to build the constraint system, then consumes
-/// the constraint system using [`ProverCS::prove`] to produce an
-/// `R1CSProof`.  To verify an `R1CSProof`, a verifier constructs a
-/// [`VerifierCS`], then passes it to the same gadget functions to
-/// (re)build the constraint system, then consumes the constraint
-/// system using [`VerifierCS::verify`] to verify the proof.
+/// an `R1CSProof`, a prover constructs a
+/// [`ProverCS`](::r1cs::ProverCS), then passes it to gadget functions
+/// to build the constraint system, then consumes the constraint
+/// system using [`ProverCS::prove`](::r1cs::ProverCS::prove) to
+/// produce an `R1CSProof`.  To verify an `R1CSProof`, a verifier
+/// constructs a [`VerifierCS`](::r1cs::VerifierCS), then passes it to
+/// the same gadget functions to (re)build the constraint system, then
+/// consumes the constraint system using
+/// [`VerifierCS::verify`](::r1cs::VerifierCS::verify) to verify the
+/// proof.
 #[derive(Clone, Debug)]
 #[allow(non_snake_case)]
 pub struct R1CSProof {

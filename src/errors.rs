@@ -100,11 +100,13 @@ pub enum R1CSError {
     #[fail(display = "Invalid generators size, too few generators for proof")]
     InvalidGeneratorsLength,
     /// Occurs when trying to use a missing variable assignment, for
-    /// instance if [`Assignment::Missing`] is passed to a
-    /// [`ProverCS`].
+    /// instance if
+    /// [`Assignment::Missing`](::r1cs::Assignment::Missing) is passed
+    /// to a [`ProverCS`](::r1cs::ProverCS).
     #[fail(display = "Variable does not have a value assignment.")]
     MissingAssignment,
-    /// Occurs when verification of an [`R1CSProof`] fails.
+    /// Occurs when verification of an
+    /// [`R1CSProof`](::r1cs::R1CSProof) fails.
     #[fail(display = "R1CSProof did not verify correctly.")]
     VerificationError,
 }
