@@ -1,5 +1,10 @@
 # Bulletproofs
 
+<img
+ width="100%"
+ src="https://user-images.githubusercontent.com/698/46373713-9cc40280-c643-11e8-9bfe-2b0586e40369.png"
+/>
+
 The fastest [Bulletproofs][bp_website] implementation ever, featuring
 single and aggregated range proofs, strongly-typed multiparty
 computation, and a programmable constraint system API for proving
@@ -31,6 +36,8 @@ This library provides implementations of:
 These proofs are implemented using [Merlin transcripts][doc_merlin],
 allowing them to be arbitrarily composed with other proofs without
 implementation changes.
+
+## Documentation
   
 The user-facing documentation for this functionality can be [found
 here][doc_external].  In addition, the library *also* contains
