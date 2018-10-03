@@ -1,9 +1,9 @@
 #![deny(missing_docs)]
 #![allow(non_snake_case)]
 
+use clear_on_drop::clear::Clear;
 use curve25519_dalek::scalar::Scalar;
 use inner_product_proof::inner_product;
-use clear_on_drop::clear::Clear;
 
 /// Represents a degree-1 vector polynomial \\(\mathbf{a} + \mathbf{b} \cdot x\\).
 pub struct VecPoly1(pub Vec<Scalar>, pub Vec<Scalar>);
@@ -253,19 +253,21 @@ mod tests {
             use core::mem;
             use core::slice;
 
-            unsafe {
-                slice::from_raw_parts(x.as_ptr() as *const u8, mem::size_of_val(x))
-            }
+            unsafe { slice::from_raw_parts(x.as_ptr() as *const u8, mem::size_of_val(x)) }
         }
 
-        assert_eq!(flat_slice(&v.as_slice()), &[0u8;64][..]);
+        assert_eq!(flat_slice(&v.as_slice()), &[0u8; 64][..]);
         assert_eq!(v[0], Scalar::zero());
         assert_eq!(v[1], Scalar::zero());
     }
 
     #[test]
     fn tuple_of_scalars_clear_on_drop() {
-        let mut v = Poly2(Scalar::from(24u64), Scalar::from(42u64), Scalar::from(255u64));
+        let mut v = Poly2(
+            Scalar::from(24u64),
+            Scalar::from(42u64),
+            Scalar::from(255u64),
+        );
 
         v.0.clear();
         v.1.clear();
@@ -275,12 +277,10 @@ mod tests {
             use core::mem;
             use core::slice;
 
-            unsafe {
-                slice::from_raw_parts(x as *const T as *const u8, mem::size_of_val(x))
-            }
+            unsafe { slice::from_raw_parts(x as *const T as *const u8, mem::size_of_val(x)) }
         }
 
-        assert_eq!(as_bytes(&v), &[0u8;96][..]);
+        assert_eq!(as_bytes(&v), &[0u8; 96][..]);
         assert_eq!(v.0, Scalar::zero());
         assert_eq!(v.1, Scalar::zero());
         assert_eq!(v.2, Scalar::zero());
