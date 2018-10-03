@@ -226,8 +226,8 @@ impl<'a> Drop for PartyAwaitingBitChallenge<'a> {
         // Important: due to how ClearOnDrop auto-implements InitializableFromZeroed
         // for T: Default, calling .clear() on Vec compiles, but does not
         // clear the content. Instead, it only clears the Vec's header.
-        // Clearing the underlying buffer via a slice will do the job, but will
-        // keep the header as-is. But that's fine since the header has no secret data.
+        // Clearing the underlying buffer item-by-item will do the job, but will
+        // keep the header as-is, which is fine since the header does not contain secrets.
         for e in self.s_L.iter_mut() {
             e.clear();
         }
