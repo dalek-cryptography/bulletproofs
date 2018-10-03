@@ -19,6 +19,7 @@ use generators::{BulletproofGens, PedersenGens};
 use rand;
 use std::iter;
 use util;
+use clear_on_drop::clear::Clear;
 
 use super::messages::*;
 
@@ -129,6 +130,14 @@ impl<'a> PartyAwaitingPosition<'a> {
     }
 }
 
+/// Overwrite secrets with null bytes when they go out of scope.
+impl<'a> Drop for PartyAwaitingPosition<'a> {
+    fn drop(&mut self) {
+        self.v.clear();
+        self.v_blinding.clear();
+    }
+}
+
 /// A party which has committed to the bits of its value
 /// and is waiting for the aggregated value challenge from the dealer.
 pub struct PartyAwaitingBitChallenge<'a> {
@@ -206,6 +215,28 @@ impl<'a> PartyAwaitingBitChallenge<'a> {
     }
 }
 
+/// Overwrite secrets with null bytes when they go out of scope.
+impl<'a> Drop for PartyAwaitingBitChallenge<'a> {
+    fn drop(&mut self) {
+        self.v.clear();
+        self.v_blinding.clear();
+        self.a_blinding.clear();
+        self.s_blinding.clear();
+
+        // Important: due to how ClearOnDrop auto-implements InitializableFromZeroed
+        // for T: Default, calling .clear() on Vec compiles, but does not
+        // clear the content. Instead, it only clears the Vec's header.
+        // Clearing the underlying buffer via a slice will do the job, but will
+        // keep the header as-is. But that's fine since the header has no secret data.
+        for e in self.s_L.iter_mut() {
+            e.clear();
+        }
+        for e in self.s_R.iter_mut() {
+            e.clear();
+        }
+    }
+}
+
 /// A party which has committed to their polynomial coefficents
 /// and is waiting for the polynomial challenge from the dealer.
 pub struct PartyAwaitingPolyChallenge {
@@ -250,5 +281,19 @@ impl PartyAwaitingPolyChallenge {
             l_vec,
             r_vec,
         })
+    }
+}
+
+/// Overwrite secrets with null bytes when they go out of scope.
+impl Drop for PartyAwaitingPolyChallenge {
+    fn drop(&mut self) {
+        self.v_blinding.clear();
+        self.a_blinding.clear();
+        self.s_blinding.clear();
+        self.t_1_blinding.clear();
+        self.t_2_blinding.clear();
+
+        // Note: polynomials r_poly, l_poly and t_poly
+        // are cleared within their own Drop impls.
     }
 }

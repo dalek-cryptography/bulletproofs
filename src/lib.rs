@@ -13,6 +13,7 @@ extern crate sha3;
 extern crate curve25519_dalek;
 extern crate merlin;
 extern crate subtle;
+extern crate clear_on_drop;
 
 #[macro_use]
 extern crate serde_derive;
