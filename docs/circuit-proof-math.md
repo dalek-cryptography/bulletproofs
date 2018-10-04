@@ -55,8 +55,7 @@ All of these constraints are represented together in the following equation:
 \\]
 
 
-Building constraints
---------------------
+### Building constraints
 
 Bulletproofs framework allows making proofs of arbitrary circuits _on the fly_, without a trusted setup.
 This enables two things:
@@ -79,19 +78,28 @@ or _low-level_ (“internal wires” of the circuit).
 The prover performs a combination of the following operations to generate the circuit
 using linear constraints and multiplication gates:
 
-1. **Allocate a multiplier:** a new multiplication gate is added represented by 3 variables 
-2. **Allocate an uncommitted variable:** TBD
-3. **Add a linear constraint** between any number of variables: TBD
-4. **Request a challenge scalar:** TBD
+1. **Allocate a multiplier:** a new multiplication gate is added represented by 3 variables \\(a_L, a_R, a_O\\), for left input, right input and output value respectively.
+2. **Add a constraint:** a linear combination of any number of variables is encoded into appropriate positions in matrices \\(\textbf{W}\_L, \textbf{W}\_R, \textbf{W}\_O, \textbf{W}\_V\\) and a vector of constants \\(\textbf{c}\\).
+3. **Request a challenge scalar:** a random scalar returned in response to committed high-level variables.
 
 
-TBD: how internal variables are allocated from multipliers
- 
-TBD: how W matrices are sparse by storing pairs of weights with variable indices
+### Representation of constraints
 
-TBD: logical OR for a collections of statements
+The matrices \\(\textbf{W}\_L, \textbf{W}\_R, \textbf{W}\_O, \textbf{W}\_V\\) are usually very sparse:
+most constraints apply to very few variables.
 
-TBD: using challenges in W matrices
+As a result, constraints are represented as lists of pairs \\((i, w)\\) where \\(i\\) is a variable index,
+and `w` is its (non-zero) weight.
+
+Multiplication of a matrix by a vector is implemented by multiplying each weight \\(w\\) by 
+a scalar in the vector at a corresponding index \\(i\\).
+
+
+### Unconstrained variables
+
+Often a circuit is formed using _gadgets_: subcircuits that represent various constraints defined in a higher-level protocol.
+The “wires” connecting such subcircuits are called _uncommitted variables_ and created from left and right variables of
+auxilliary multiplication gates (output variables intentionally left unconstrained).
 
 
 Combining statements using challenge variables
@@ -326,11 +334,11 @@ and uses them to blind \\(\mathbf{a}\_L\\) and \\(\mathbf{a}\_R\\) within left a
 
 The blinding factors are multiplied by \\(x^2\\) so that when the substitution is made into the \\(\textbf{l}(x)\\) and \\(\textbf{r}(x)\\) equations, \\({\mathbf{s}}\_{L}\\) will be in the 3rd degree of \\(x\\) in \\(\textbf{l}(x)\\), and \\({\mathbf{s}}\_{L}\\) will be in the 3rd degree of \\(x\\) in \\(\textbf{r}(x)\\). As a result, the blinding factors will not interfere with the value \\(t_2\\), which is the 2nd degree of \\(\langle {\mathbf{l}}(x), {\mathbf{r}}(x) \rangle\\).
 
-Multiplication outputs \\(\mathbf{a}\_O\\) do not to be blinded with their own blinding factors:
-they are automatically blinded by \\(\mathbf{s}\_{L}\\) since they are part of the left side of the inner product
-that contains blinded \\(\mathbf{a}\_L\\) values.
+Note: multiplication outputs \\(\mathbf{a}\_O\\) do not need their own blinding factors:
+they are automatically blinded by \\(\mathbf{s}\_{L}\\) since both \\(\mathbf{a}\_L\\)
+and \\(\mathbf{a}\_O\\) are terms in the same (left) side of the inner product.
 
-We construct vector polynomials \\({\mathbf{l}}(x)\\) and \\({\mathbf{r}}(x)\\),
+We now construct vector polynomials \\({\mathbf{l}}(x)\\) and \\({\mathbf{r}}(x)\\),
 which represent the left and right sides of the input to the inner-product equation, with these new definitions:
 \\[
 \begin{aligned}
