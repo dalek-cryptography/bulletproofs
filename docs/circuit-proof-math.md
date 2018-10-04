@@ -1,36 +1,50 @@
 Arithmetic Circuit Proofs
 =========================
 
-An arithmetic circuit is a directed acyclic graph, where every node with indegree zero is an input gate, and every other node is either a multiplication gate or an addition gate. Multiplication gates can either be variable multiplication gates, where two variables are multiplied together, or constant multiplication gates, where a variable is multiplied by a constant. Addition gates can also be either variable addition gates or constant addition gates. 
+An arithmetic circuit is a directed acyclic graph, where every node with indegree zero is an input gate, and every other node is either a multiplication gate or an addition gate. Multiplication gates can either be variable multiplication gates, where two variables are multiplied together, or constant multiplication gates, where a variable is multiplied by a constant. Addition gates can also be either variable addition gates or constant addition gates.
 
-The goal of an *arithmetic circuit proof* is for a prover to convince a verifier that a particular set of values \\(v\\) satisfy the constraints represented by the arithmetic circuit, without revealing any additional information about the values \\(v\\).
+The goal of an *arithmetic circuit proof* is for a prover to convince a verifier that a particular set of values \\({\textbf{v}}\\) satisfy the constraints represented by the arithmetic circuit, without revealing any additional information about the values \\({\textbf{v}}\\).
 
-The prover will use the efficient inner product protocol to do this, so we want to work towards expressing the arithmetic circuit's conditions in terms of a single inner product. The prover begins with a vector of secret values \\(v\\), and a vector of commitments to those secret values \\(V\\). The prover will send \\(V\\) to the verifier, along with the proof.
+The prover will use the efficient [inner product protocol](../inner_product_proof/index.html) to do this, so we want to work towards expressing the arithmetic circuit's conditions in terms of a single inner product. The prover begins with a vector of secret values \\({\textbf{v}}\\), and a vector of Pedersen commitments to those secret values \\({\textbf{V}}\\). The prover will send \\({\textbf{V}}\\) to the verifier, along with the proof.
 
-Notation for arithmetic circuit proofs
-------------------------------------------
+Notation
+--------
 
-In the paper, matrices are labeled as \\( \textbf{W}\_L, \textbf{W}\_R, \textbf{W}\_O, \textbf{W}\_V \\). We will keep this notation, but will note to readers not to confuse the \\(\textbf{W}\_{L,R,O,V}\\) notation for being a vector of points. 
+Dimensions of vectors:
 
-We will use the notation described in the [`notation`](../notes/index.html#notation) section of the notes. In addition, we rename one more variable from the paper, to make it clear which variables are blinding factors:
+* \\(m\\) — number of secret values \\({\textbf{v}}\\),
+* \\(n\\) — number of variable multiplication gates represented by \\(\textbf{a}\_L, \textbf{a}\_R, \textbf{a}\_O\\),
+* \\(q\\) — number of linear constraints represented by \\(\textbf{W}\_L, \textbf{W}\_R, \textbf{W}\_O, \textbf{W}\_V\\).
+
+In the [Bulletproofs paper][bp_website], matrices are labeled as \\(\textbf{W}\_L, \textbf{W}\_R, \textbf{W}\_O, \textbf{W}\_V\\). We will keep this notation, but will note to readers not to confuse the \\(\textbf{W}\_{L,R,O,V}\\) notation for being a vector of points.
+
+We will use the notation described in the [`notation`](../notes/index.html#notation) section of the notes. In addition, we rename two more variables from the paper, to make it clear which variables are blinding factors and use lower-case variable \\(q\\) to not confuse it with a group element:
 \\[
 \begin{aligned}
     \beta         &\xrightarrow{} \tilde{o} \\\\
+	Q             &\xrightarrow{} q \\\\
 \end{aligned}
 \\]
 
-Proving statements about arithmetic circuits gates
---------------------------------------------------
 
-An arithmetic circuit represents a set of constraints on some inputs, where the constraints are satisfied if and only if the inputs are correctly applied to the circuit and all of the gates in the arithmetic circuit graph perform their operations correctly. Therefore, an arithmetic circuit can also be expressed as a set of constraints on inputs. To convert a circuit into a constraint system, take each of its inputs as variables and reconnect them with consistency equations. 
+From an arithmetic circuit to a constraint system
+-------------------------------------------------
 
-One type of gate in an arithmetic circuit is a variable multiplication gate, which takes two input variables and multiplies them to get an output. If for all of the multiplication gates in a circuit, \\(\textbf{a}\_L\\) is the vector of the first input to each gate, \\(\textbf{a}\_R\\) is the vector of the second input to each gate, and \\(\textbf{a}\_O\\) is the vector of results, then the following equation will represent the relationship between the wires of all the multiplication gates in the circuit:
+An arithmetic circuit represents a set of _constraints_ on some inputs, where the constraints are satisfied if and only if the inputs are correctly applied to the circuit and all of the gates in the arithmetic circuit graph perform their operations correctly. Therefore, an arithmetic circuit can also be expressed as a set of constraints on inputs.
+
+One type of gate in an arithmetic circuit is a _variable multiplication gate_, which takes two input variables and multiplies them to get an output. If for all of the multiplication gates in a circuit, \\(\textbf{a}\_L\\) is the vector of the first input to each gate, \\(\textbf{a}\_R\\) is the vector of the second input to each gate, and \\(\textbf{a}\_O\\) is the vector of results, then the following equation will represent the relationship between the wires of all the multiplication gates in the circuit:
 
 \\[
 \textbf{a}\_L \circ \textbf{a}\_R = \textbf{a}\_O
 \\]
 
-Other types of gates in arithmetic circuits are constant multiplication gates, constant addition gates, and variable addition gates. All of these gates can be represented as a collection of linear constraints. Constant multiplication gates are represented by multiplying the input variable by a corresponding constant in a matrix (\\( \textbf{W}\_L, \textbf{W}\_R, \textbf{W}\_O, \textbf{W}\_V \\) ), constant addition gates are represented by multiplying the input variable by one and adding the constant in \\( \textbf{c}\\), and variable addition gates are represented by multiplying both input variables by one. All of these constraints are represented together in the following equation:
+Other types of gates in arithmetic circuits can be represented as a collection of linear constraints:
+
+* _constant multiplication gates_ are represented by multiplying the input variable by a corresponding constant in a matrix (\\(\textbf{W}\_L, \textbf{W}\_R, \textbf{W}\_O, \textbf{W}\_V\\)),
+* _constant addition gates_ are represented by multiplying the input variable by one and adding the constant in \\( \textbf{c}\\),
+* _variable addition gates_ are represented by multiplying both input variables by one.
+
+All of these constraints are represented together in the following equation:
 
 \\[
 \textbf{W}\_L \cdot \textbf{a}\_L +
@@ -39,6 +53,46 @@ Other types of gates in arithmetic circuits are constant multiplication gates, c
 \textbf{W}\_V \cdot \textbf{v} +
 \textbf{c}
 \\]
+
+
+Building constraints
+--------------------
+
+Bulletproofs framework allows making proofs of arbitrary circuits _on the fly_, without a trusted setup.
+This enables two things:
+
+1. Instead of making a single circuit that covers a wide range of parameters, we can define a _family of circuits_,
+instantiating a specific one for a given set of parameters. For example, a range proof can be created for a specific
+bit-width, without an overhead of supporting the widest width possible.
+2. The instantiation of a circuit can be parametrized not only by the public data, but also by commitments to the secrets (\\(\textbf{V}\\)),
+turning the circuit into a _challenge_ from the verifier to the prover. For example, two arbitrarily
+large sets of statements for a logical `OR` operation can be compressed in only two linear constraints
+and a single multiplication gate using a challenge scalar.
+
+The prover starts out by committing to its secret inputs \\(\textbf{v}\\)
+and obtaining \\(m\\) variables representing these inputs.
+
+Then, the prover creates linear combinations of available variables.
+Variables could be _high-level_ (“input wires” for the circuit, \\(\textbf{v}\\))
+or _low-level_ (“internal wires” of the circuit).
+
+The prover performs a combination of the following operations to generate the circuit
+using linear constraints and multiplication gates:
+
+1. **Allocate a multiplier:** a new multiplication gate is added represented by 3 variables 
+2. **Allocate an uncommitted variable:** TBD
+3. **Add a linear constraint** between any number of variables: TBD
+4. **Request a challenge scalar:** TBD
+
+
+TBD: how internal variables are allocated from multipliers
+ 
+TBD: how W matrices are sparse by storing pairs of weights with variable indices
+
+TBD: logical OR for a collections of statements
+
+TBD: using challenges in W matrices
+
 
 Combining statements using challenge variables
 ----------------------------------------------
@@ -62,7 +116,7 @@ We can rewrite the statement about the linear constraints into an inner product 
 becomes:
 
 \\[
-\langle z \textbf{z}^Q, 
+\langle z \textbf{z}^q,
 \textbf{W}\_L \cdot \textbf{a}\_L +
 \textbf{W}\_R \cdot \textbf{a}\_R +
 \textbf{W}\_O \cdot \textbf{a}\_O -
@@ -71,12 +125,12 @@ becomes:
 \rangle = 0
 \\]
 
-We can combine these two inner product equations, since they are offset by different multiples of challenge variable \\(z\\). The statement about multiplication gates is multiplied by \\(z^0\\), while the statements about addition and scalar multiplication gates are multiplied by a power of \\(z\\) between \\(z^1\\) and \\(z \cdot z^Q\\). Combining the two equations gives us:
+We can combine these two inner product equations, since they are offset by different multiples of challenge variable \\(z\\). The statement about multiplication gates is multiplied by \\(z^0\\), while the statements about addition and scalar multiplication gates are multiplied by a power of \\(z\\) between \\(z^1\\) and \\(z \cdot z^q\\). Combining the two equations gives us:
 
 \\[
 \langle \textbf{a}\_L \circ \textbf{a}\_R - \textbf{a}\_O ,
 \textbf{y}^n \rangle +
-\langle z \textbf{z}^Q, 
+\langle z \textbf{z}^q, 
 \textbf{W}\_L \cdot \textbf{a}\_L +
 \textbf{W}\_R \cdot \textbf{a}\_R +
 \textbf{W}\_O \cdot \textbf{a}\_O -
@@ -104,141 +158,145 @@ factored out into a new term \\(\delta(y, z) \\).
 If we break apart the equation into individual terms, we can write it as:
 
 \\[
-\langle z \textbf{z}^Q,
+\langle z \textbf{z}^q,
 \textbf{c} + \textbf{W}\_V \cdot \textbf{v} \rangle =
 \langle \textbf{a}\_L \circ \textbf{a}\_R, \textbf{y}^n \rangle -
 \langle \textbf{a}\_O, \textbf{y}^n \rangle + 
-\langle z \textbf{z}^Q, 
+\langle z \textbf{z}^q, 
 \textbf{W}\_L \cdot \textbf{a}\_L \rangle +
-\langle z \textbf{z}^Q, 
+\langle z \textbf{z}^q, 
 \textbf{W}\_R \cdot \textbf{a}\_R \rangle +
-\langle z \textbf{z}^Q, 
+\langle z \textbf{z}^q, 
 \textbf{W}\_O \cdot \textbf{a}\_O \rangle
 \\]
 
-Merge the statements containing \\(\textbf{a}\_O \\).
+Merge the statements containing \\(\textbf{a}\_O \\):
 
 \\[
-\langle z \textbf{z}^Q,
+\langle z \textbf{z}^q,
 \textbf{c} + \textbf{W}\_V \cdot \textbf{v} \rangle =
 \langle \textbf{a}\_L, 
 \textbf{y}^n \circ \textbf{a}\_R \rangle + 
 \langle \textbf{a}\_L,
-z \textbf{z}^Q \cdot \textbf{W}\_L \rangle +
+z \textbf{z}^q \cdot \textbf{W}\_L \rangle +
 \langle \textbf{a}\_O, 
--\textbf{y}^n + z \textbf{z}^Q \cdot \textbf{W}\_O \rangle +
+-\textbf{y}^n + z \textbf{z}^q \cdot \textbf{W}\_O \rangle +
 \langle \textbf{a}\_R, 
-z \textbf{z}^Q \cdot \textbf{W}\_R \rangle
+z \textbf{z}^q \cdot \textbf{W}\_R \rangle
 \\]
 
 Multiply the \\( \langle \textbf{a}\_R, 
-z \textbf{z}^Q \cdot \textbf{W}\_R \rangle \\) term by \\(\textbf{y}^n\\) one one side of the inner product and by \\(\textbf{y}^{-n}\\) on the other side:
+z \textbf{z}^q \cdot \textbf{W}\_R \rangle \\) term by \\(\textbf{y}^n\\) one one side of the inner product and by \\(\textbf{y}^{-n}\\) on the other side:
 
 \\[
-\langle z \textbf{z}^Q,
+\langle z \textbf{z}^q,
 \textbf{c} + \textbf{W}\_V \cdot \textbf{v} \rangle =
 \langle \textbf{a}\_L, 
 \textbf{y}^n \circ \textbf{a}\_R \rangle + 
 \langle \textbf{a}\_L,
-z \textbf{z}^Q \cdot \textbf{W}\_L \rangle +
+z \textbf{z}^q \cdot \textbf{W}\_L \rangle +
 \langle \textbf{a}\_O, 
--\textbf{y}^n + z \textbf{z}^Q \cdot \textbf{W}\_O \rangle +
+-\textbf{y}^n + z \textbf{z}^q \cdot \textbf{W}\_O \rangle +
 \langle \textbf{y}^n \circ \textbf{a}\_R, 
-\textbf{y}^{-n} \circ (z \textbf{z}^Q \cdot \textbf{W}\_R) \rangle
+\textbf{y}^{-n} \circ (z \textbf{z}^q \cdot \textbf{W}\_R) \rangle
 \\]
 
-Merge the statements containing \\(\textbf{y}^n \circ \textbf{a}\_R\\).
+Merge the statements containing \\(\textbf{y}^n \circ \textbf{a}\_R\\):
 
 \\[
-\langle z \textbf{z}^Q,
+\langle z \textbf{z}^q,
 \textbf{c} + \textbf{W}\_V \cdot \textbf{v} \rangle =
-\langle \textbf{a}\_L + \textbf{y}^{-n} \circ (z \textbf{z}^Q \cdot \textbf{W}\_R), 
+\langle \textbf{a}\_L + \textbf{y}^{-n} \circ (z \textbf{z}^q \cdot \textbf{W}\_R), 
 \textbf{y}^n \circ \textbf{a}\_R \rangle + 
 \langle \textbf{a}\_L,
-z \textbf{z}^Q \cdot \textbf{W}\_L \rangle +
+z \textbf{z}^q \cdot \textbf{W}\_L \rangle +
 \langle \textbf{a}\_O, 
--\textbf{y}^n + z \textbf{z}^Q \cdot \textbf{W}\_O \rangle
+-\textbf{y}^n + z \textbf{z}^q \cdot \textbf{W}\_O \rangle
 \\]
 
-Add \\(\delta(y, z) = \langle \textbf{y}^{-n} \circ (z \textbf{z}^Q \cdot \textbf{W}\_R), z \textbf{z}^Q \cdot \textbf{W}\_L \rangle \\) to both sides. 
+Add \\(\delta(y, z) = \langle \textbf{y}^{-n} \circ (z \textbf{z}^q \cdot \textbf{W}\_R), z \textbf{z}^q \cdot \textbf{W}\_L \rangle \\) to both sides:
 
 \\[
 \begin{aligned}
-\langle z \textbf{z}^Q,
+\langle z \textbf{z}^q,
 \textbf{c} &+ \textbf{W}\_V \cdot \textbf{v} \rangle + \delta(y, z) \\\\
-&= \langle \textbf{a}\_L + \textbf{y}^{-n} \circ (z \textbf{z}^Q \cdot \textbf{W}\_R), 
+&= \langle \textbf{a}\_L + \textbf{y}^{-n} \circ (z \textbf{z}^q \cdot \textbf{W}\_R), 
 \textbf{y}^n \circ \textbf{a}\_R \rangle + 
 \langle \textbf{a}\_L,
-z \textbf{z}^Q \cdot \textbf{W}\_L \rangle \\\\ &+
+z \textbf{z}^q \cdot \textbf{W}\_L \rangle \\\\ &+
 \langle \textbf{a}\_O, 
--\textbf{y}^n + z \textbf{z}^Q \cdot \textbf{W}\_O \rangle + 
-\langle \textbf{y}^{-n} \circ (z \textbf{z}^Q \cdot \textbf{W}\_R), z \textbf{z}^Q \cdot \textbf{W}\_L \rangle
+-\textbf{y}^n + z \textbf{z}^q \cdot \textbf{W}\_O \rangle + 
+\langle \textbf{y}^{-n} \circ (z \textbf{z}^q \cdot \textbf{W}\_R), z \textbf{z}^q \cdot \textbf{W}\_L \rangle
 \end{aligned}
 \\]
 
-Merge the terms containing \\(z \textbf{z}^Q \cdot \textbf{W}\_L\\).
+Merge the terms containing \\(z \textbf{z}^q \cdot \textbf{W}\_L\\):
 
 \\[
 \begin{aligned}
-\langle z \textbf{z}^Q,
+\langle z \textbf{z}^q,
 \textbf{c} &+ \textbf{W}\_V \cdot \textbf{v} \rangle + \delta(y, z) \\\\
-&= \langle \textbf{a}\_L + \textbf{y}^{-n} \circ (z \textbf{z}^Q \cdot \textbf{W}\_R), 
+&= \langle \textbf{a}\_L + \textbf{y}^{-n} \circ (z \textbf{z}^q \cdot \textbf{W}\_R), 
 \textbf{y}^n \circ \textbf{a}\_R \rangle + 
-\langle \textbf{a}\_L + \textbf{y}^{-n} \circ (z \textbf{z}^Q \cdot \textbf{W}\_R),
-z \textbf{z}^Q \cdot \textbf{W}\_L \rangle +
+\langle \textbf{a}\_L + \textbf{y}^{-n} \circ (z \textbf{z}^q \cdot \textbf{W}\_R),
+z \textbf{z}^q \cdot \textbf{W}\_L \rangle +
 \langle \textbf{a}\_O, 
--\textbf{y}^n + z \textbf{z}^Q \cdot \textbf{W}\_O \rangle
+-\textbf{y}^n + z \textbf{z}^q \cdot \textbf{W}\_O \rangle
 \end{aligned}
 \\]
 
-Merge the terms containing \\(\textbf{a}\_L + \textbf{y}^{-n} \circ (z \textbf{z}^Q \cdot \textbf{W}\_R)\\).
+Merge the terms containing \\(\textbf{a}\_L + \textbf{y}^{-n} \circ (z \textbf{z}^q \cdot \textbf{W}\_R)\\):
 
 \\[
-\langle z \textbf{z}^Q,
+\langle z \textbf{z}^q,
 \textbf{c} + \textbf{W}\_V \cdot \textbf{v} \rangle + \delta(y, z) =
-\langle \textbf{a}\_L + \textbf{y}^{-n} \circ (z \textbf{z}^Q \cdot \textbf{W}\_R), 
+\langle \textbf{a}\_L + \textbf{y}^{-n} \circ (z \textbf{z}^q \cdot \textbf{W}\_R), 
 \textbf{y}^n \circ \textbf{a}\_R +
-z \textbf{z}^Q \cdot \textbf{W}\_L \rangle +
+z \textbf{z}^q \cdot \textbf{W}\_L \rangle +
 \langle \textbf{a}\_O, 
--\textbf{y}^n + z \textbf{z}^Q \cdot \textbf{W}\_O \rangle
+-\textbf{y}^n + z \textbf{z}^q \cdot \textbf{W}\_O \rangle
 \\]
 
-Note: if you want to combine \\( \langle a, b \rangle + \langle c, d \rangle\\) into one inner product, you can do so by taking a degree of the linear combination with respect to a challenge scalar. For example, the 2nd degree of \\( \langle a \cdot x + c \cdot x^2, b \cdot x + d \cdot x^0 \rangle \\) is equal to \\( \langle a, b \rangle + \langle c, d \rangle\\). We can use this technique for the above equation by assigning \\(a, b, c, d\\) the following values:
+We want to combine a sum of two inner products \\(\langle a, b \rangle + \langle c, d \rangle\\) into one inner product.
+To do that, we will take a term of a polynomial formed by a linear combination of these products with respect to a challenge scalar \\(x\\). Specifically, the 2nd degree term of \\(\langle a \cdot x + c \cdot x^2, b \cdot x + d \cdot x^0 \rangle\\) is equal to
+\\( \langle a, b \rangle + \langle c, d \rangle\\).
+
+To apply this technique to the above equation we assign \\(a, b, c, d\\) the following values:
 
 \\[
 \begin{aligned}
-a &= \textbf{a}\_L + \textbf{y}^{-n} \circ (z \textbf{z}^Q \cdot \textbf{W}\_R) \\\\
+a &= \textbf{a}\_L + \textbf{y}^{-n} \circ (z \textbf{z}^q \cdot \textbf{W}\_R) \\\\
 b &= \textbf{y}^n \circ \textbf{a}\_R +
-z \textbf{z}^Q \cdot \textbf{W}\_L\\\\
+z \textbf{z}^q \cdot \textbf{W}\_L\\\\
 c &= \textbf{a}\_O \\\\
-d &= -\textbf{y}^n + z \textbf{z}^Q \cdot \textbf{W}\_O
+d &= -\textbf{y}^n + z \textbf{z}^q \cdot \textbf{W}\_O
 \end{aligned}
 \\]
 
 Next, we combine \\(a, b, c, d\\) using the equation \\( \langle a \cdot x + c \cdot x^2, b \cdot x + d \cdot x^0 \rangle \\). When we take its second degree, we recover a single inner product, which was our original goal:
 
 \\[
-\langle z \textbf{z}^Q,
+\langle z \textbf{z}^q,
 \textbf{c} + \textbf{W}\_V \cdot \textbf{v} \rangle + \delta(y, z) = 
 \text{2nd degree of }
-\langle (\textbf{a}\_L + \textbf{y}^{-n} \circ (z \textbf{z}^Q \cdot \textbf{W}\_R)) \cdot x + 
+\langle (\textbf{a}\_L + \textbf{y}^{-n} \circ (z \textbf{z}^q \cdot \textbf{W}\_R)) \cdot x + 
 \textbf{a}\_O \cdot x^2,
 (\textbf{y}^n \circ \textbf{a}\_R +
-z \textbf{z}^Q \cdot \textbf{W}\_L) \cdot x +
-(-\textbf{y}^n + z \textbf{z}^Q \cdot \textbf{W}\_O) \cdot x^0 \rangle 
+z \textbf{z}^q \cdot \textbf{W}\_L) \cdot x +
+(-\textbf{y}^n + z \textbf{z}^q \cdot \textbf{W}\_O) \cdot x^0 \rangle 
 \\]
 
 Distribute the \\(x\\) values: 
 
 \\[
-\langle z \textbf{z}^Q,
+\langle z \textbf{z}^q,
 \textbf{c} + \textbf{W}\_V \cdot \textbf{v} \rangle + \delta(y, z) = 
 \text{2nd degree of }
-\langle \textbf{a}\_L \cdot x + \textbf{y}^{-n} \circ (z \textbf{z}^Q \cdot \textbf{W}\_R) \cdot x + 
+\langle \textbf{a}\_L \cdot x + \textbf{y}^{-n} \circ (z \textbf{z}^q \cdot \textbf{W}\_R) \cdot x + 
 \textbf{a}\_O \cdot x^2,
 \textbf{y}^n \circ \textbf{a}\_R \cdot x +
-z \textbf{z}^Q \cdot \textbf{W}\_L \cdot x -
-\textbf{y}^n + z \textbf{z}^Q \cdot \textbf{W}\_O \rangle
+z \textbf{z}^q \cdot \textbf{W}\_L \cdot x -
+\textbf{y}^n + z \textbf{z}^q \cdot \textbf{W}\_O \rangle
 \\]
 
 This is equivalent to the equation we started with, but has a single
@@ -248,13 +306,16 @@ the right, and non-secret terms factored out.
 Blinding the inner product
 --------------------------
 
-The prover cannot send the vectors in the inner-product equation to the verifier without revealing information about the values \\(v\\). Also, since the inner-product argument is not zero-knowledge, the vectors cannot be used in the inner-product argument without revealing information about \\(v\\) either. To solve this problem, the prover chooses vectors of blinding factors
+In the current form, the vectors in the inner-product reveal information about the values
+\\({\mathbf{a}}\_{L}\\), \\({\mathbf{a}}\_{R}\\) and \\({\mathbf{a}}\_{O}\\), which in turn reveal the values \\(\mathbf{v}\\).
+And since the inner-product argument is not zero-knowledge, the vectors cannot be used in the inner-product argument either.
+To solve this problem, the prover chooses two vectors of blinding factors
 
 \\[
 {\mathbf{s}}\_{L}, {\mathbf{s}}\_{R} \\;{\xleftarrow{\\$}}\\; {\mathbb Z\_p}^{n},
 \\]
 
-and uses them to blind \\(\mathbf{a}\_L\\) and \\(\mathbf{a}\_R\\).
+and uses them to blind \\(\mathbf{a}\_L\\) and \\(\mathbf{a}\_R\\) within left and right sides of the inner product respectively.
 
 \\[
 \begin{aligned}
@@ -263,15 +324,20 @@ and uses them to blind \\(\mathbf{a}\_L\\) and \\(\mathbf{a}\_R\\).
 \end{aligned}
 \\]
 
-Note: the blinding factors are multiplied by \\(x^2\\) so that when the substitution is made into the \\(\textbf{l}(x)\\) and \\(\textbf{r}(x)\\) equations, \\({\mathbf{s}}\_{L}\\) will be in the third degree of \\(x\\) in \\(\textbf{l}(x)\\), and \\({\mathbf{s}}\_{L}\\) will be in the third degree of \\(x\\) in \\(\textbf{r}(x)\\). As a result, the blinding factors will not interfere with the value \\(t_2\\), which is the 2nd degree of \\(\langle {\mathbf{l}}(x), {\mathbf{r}}(x) \rangle\\).
+The blinding factors are multiplied by \\(x^2\\) so that when the substitution is made into the \\(\textbf{l}(x)\\) and \\(\textbf{r}(x)\\) equations, \\({\mathbf{s}}\_{L}\\) will be in the 3rd degree of \\(x\\) in \\(\textbf{l}(x)\\), and \\({\mathbf{s}}\_{L}\\) will be in the 3rd degree of \\(x\\) in \\(\textbf{r}(x)\\). As a result, the blinding factors will not interfere with the value \\(t_2\\), which is the 2nd degree of \\(\langle {\mathbf{l}}(x), {\mathbf{r}}(x) \rangle\\).
 
-We construct vector polynomials \\({\mathbf{l}}(x)\\) and \\({\mathbf{r}}(x)\\), which represent the left and right sides of the input to the inner-product equation, with these new definitions:
+Multiplication outputs \\(\mathbf{a}\_O\\) do not to be blinded with their own blinding factors:
+they are automatically blinded by \\(\mathbf{s}\_{L}\\) since they are part of the left side of the inner product
+that contains blinded \\(\mathbf{a}\_L\\) values.
+
+We construct vector polynomials \\({\mathbf{l}}(x)\\) and \\({\mathbf{r}}(x)\\),
+which represent the left and right sides of the input to the inner-product equation, with these new definitions:
 \\[
 \begin{aligned}
-  {\mathbf{l}}(x) &= (\textbf{a}\_L + \textbf{s}\_L \cdot x^2) \cdot x + \textbf{y}^{-n} \circ (z \textbf{z}^Q \cdot \textbf{W}\_R) \cdot x + \textbf{a}\_O \cdot x^2 \\\\
-  &= \textbf{a}\_L \cdot x + \textbf{s}\_L \cdot x^3 + \textbf{y}^{-n} \circ (z \textbf{z}^Q \cdot \textbf{W}\_R) \cdot x + \textbf{a}\_O \cdot x^2 \\\\
-  {\mathbf{r}}(x) &= \textbf{y}^n \circ (\textbf{a}\_R + \textbf{s}\_R \cdot x^2) \cdot x + z \textbf{z}^Q \cdot \textbf{W}\_L \cdot x - \textbf{y}^n + z \textbf{z}^Q \cdot \textbf{W}\_O \\\\
-  &= \textbf{y}^n \circ \textbf{a}\_R \cdot x + \textbf{y}^n \circ \textbf{s}\_R \cdot x^3 + z \textbf{z}^Q \cdot \textbf{W}\_L \cdot x - \textbf{y}^n + z \textbf{z}^Q \cdot \textbf{W}\_O
+  {\mathbf{l}}(x) &= (\textbf{a}\_L + \textbf{s}\_L \cdot x^2) \cdot x + \textbf{y}^{-n} \circ (z \textbf{z}^q \cdot \textbf{W}\_R) \cdot x + \textbf{a}\_O \cdot x^2 \\\\
+  &= \textbf{a}\_L \cdot x + \textbf{s}\_L \cdot x^3 + \textbf{y}^{-n} \circ (z \textbf{z}^q \cdot \textbf{W}\_R) \cdot x + \textbf{a}\_O \cdot x^2 \\\\
+  {\mathbf{r}}(x) &= \textbf{y}^n \circ (\textbf{a}\_R + \textbf{s}\_R \cdot x^2) \cdot x + z \textbf{z}^q \cdot \textbf{W}\_L \cdot x - \textbf{y}^n + z \textbf{z}^q \cdot \textbf{W}\_O \\\\
+  &= \textbf{y}^n \circ \textbf{a}\_R \cdot x + \textbf{y}^n \circ \textbf{s}\_R \cdot x^3 + z \textbf{z}^q \cdot \textbf{W}\_L \cdot x - \textbf{y}^n + z \textbf{z}^q \cdot \textbf{W}\_O
 \end{aligned}
 \\]
 
@@ -284,21 +350,21 @@ When we take the inner product of \\({\mathbf{l}}(x)\\) and \\({\mathbf{l}}(x)\\
 \end{aligned}
 \\]
 
-Notice that the second degree of \\(t(x)\\) does not include any blinding factors (because the blinding factors end up in the third or greater degrees of \\(t(x)\\)). The second degree also conveniently includes the inner product forms of the initial arithmetic gate statements that we are trying to prove:
+Notice that the second degree of \\(t(x)\\) does not include any blinding factors (because the blinding factors end up in the third or greater degrees of \\(t(x)\\)) and only contains the inner product forms of the initial arithmetic gate statements that we are trying to prove:
 
 \\[
 \begin{aligned}
 t_2 &= \text{2nd degree of } \langle {\mathbf{l}}(x), {\mathbf{r}}(x) \rangle
 \\\\
-&= \langle z \textbf{z}^Q,
+&= \langle z \textbf{z}^q,
 \textbf{c} + \textbf{W}\_V \cdot \textbf{v} \rangle + \delta(y, z) \\\\
 &= \langle \textbf{a}\_L \circ \textbf{a}\_R, \textbf{y}^n \rangle -
 \langle \textbf{a}\_O, \textbf{y}^n \rangle + 
-\langle z \textbf{z}^Q, 
+\langle z \textbf{z}^q, 
 \textbf{W}\_L \cdot \textbf{a}\_L \rangle +
-\langle z \textbf{z}^Q, 
+\langle z \textbf{z}^q, 
 \textbf{W}\_R \cdot \textbf{a}\_R \rangle +
-\langle z \textbf{z}^Q, 
+\langle z \textbf{z}^q, 
 \textbf{W}\_O \cdot \textbf{a}\_O \rangle + \delta(y, z)
 \end{aligned}
 \\]
@@ -311,12 +377,12 @@ The prover first forms a commitment to the coefficients of \\(t(x)\\), then conv
 \\[
 \begin{aligned}
 t(x) &= \sum\_{i=1}^{6} x^i t\_{i} \\\\
-t_2 &= \langle z \textbf{z}^Q,
+t_2 &= \langle z \textbf{z}^q,
 \textbf{c} + \textbf{W}\_V \cdot \textbf{v} \rangle + \delta(y, z) \\\\
 \end{aligned}
 \\]
 
-We define \\(\textbf{V}\\) as the vector of commitments to \\(\textbf{v}\\), and \\(T_i\\) as the commitment to \\(t_i\\) for \\(i \in [1, 3, 4, 5, 6]\\):
+We define \\(\textbf{V}\\) as the vector of Pedersen commitments to \\(\textbf{v}\\), and \\(T_i\\) as the Pedersen commitment to \\(t_i\\) for \\(i \in [1, 3, 4, 5, 6]\\):
 
 \\[
 \begin{aligned}
@@ -329,11 +395,11 @@ The prover forms these commitments, and sends them to the verifier. These commit
 
 \\[
 \begin{aligned}
-  t(x) B                     &\quad &= \quad & x^2 \langle z \textbf{z}^Q , \textbf{W}\_v \cdot \textbf{v} \rangle \cdot B      & \quad &+ \quad & x^2 \big(\langle  z \textbf{z}^Q , \textbf{c} \rangle + \delta(y,z)\big) B  & \quad &+ \quad& x t\_{1} B                     &\quad &+\quad & \sum\_{i=3}^{6} x^i t\_{i} B \\\\
+  t(x) B                     &\quad &= \quad & x^2 \langle z \textbf{z}^q , \textbf{W}\_v \cdot \textbf{v} \rangle \cdot B      & \quad &+ \quad & x^2 \big(\langle  z \textbf{z}^q , \textbf{c} \rangle + \delta(y,z)\big) B  & \quad &+ \quad& x t\_{1} B                     &\quad &+\quad & \sum\_{i=3}^{6} x^i t\_{i} B \\\\
     +                        &\quad &  \quad &  +                          & \quad &  \quad &  +             & \quad &  \quad& +                             &\quad & \quad & +   \\\\
-  {\tilde{t}}(x) {\widetilde{B}} &\quad &= \quad & x^2 \langle z \textbf{z}^Q , \textbf{W}\_v \cdot \tilde{\textbf{v}} \rangle \cdot \widetilde{B}  & \quad &+ \quad & 0 {\widetilde{B}}  & \quad &+ \quad& x {\tilde{t}}\_{1} {\widetilde{B}} &\quad &+\quad & \sum\_{i=3}^{6} x^i \tilde{t\_{i}} {\widetilde{B}} \\\\
+  {\tilde{t}}(x) {\widetilde{B}} &\quad &= \quad & x^2 \langle z \textbf{z}^q , \textbf{W}\_v \cdot \tilde{\textbf{v}} \rangle \cdot \widetilde{B}  & \quad &+ \quad & 0 {\widetilde{B}}  & \quad &+ \quad& x {\tilde{t}}\_{1} {\widetilde{B}} &\quad &+\quad & \sum\_{i=3}^{6} x^i \tilde{t\_{i}} {\widetilde{B}} \\\\
     \shortparallel           &\quad &  \quad & \shortparallel              & \quad &  \quad & \shortparallel & \quad &  \quad& \shortparallel                &\quad & \quad & \shortparallel   \\\\
-                 &\quad &= \quad & x^2 \langle z \textbf{z}^Q , \textbf{W}\_v \cdot \textbf{V} \rangle                         & \quad &+ \quad & x^2 \big(\langle  z \textbf{z}^Q , \textbf{c} \rangle + \delta(y,z)\big) B  & \quad &+ \quad& x T\_{1}                       &\quad &+\quad & \sum\_{i=3}^{6} x^i T\_{i}
+                 &\quad &= \quad & x^2 \langle z \textbf{z}^q , \textbf{W}\_v \cdot \textbf{V} \rangle                         & \quad &+ \quad & x^2 \big(\langle  z \textbf{z}^q , \textbf{c} \rangle + \delta(y,z)\big) B  & \quad &+ \quad& x T\_{1}                       &\quad &+\quad & \sum\_{i=3}^{6} x^i T\_{i}
 \end{aligned}
 \\]
 
@@ -341,7 +407,7 @@ Notice that the sum of each column is a commitment to the variable in the top ro
 \\(t(x) B + {\tilde{t}}(x) {\widetilde{B}}\\), a commitment to the value
 of \\(t\\) at the point \\(x\\), using the synthetic blinding factor[^2]:
 \\[
-  {\tilde{t}}(x) = x^2 \langle z \textbf{z}^Q , \textbf{W}\_v \cdot \tilde{\textbf{v}} \rangle + x {\tilde{t}}\_{1} + \sum\_{i=3}^{6} x^i \tilde{t\_{i}} 
+  {\tilde{t}}(x) = x^2 \langle z \textbf{z}^q , \textbf{W}\_v \cdot \tilde{\textbf{v}} \rangle + x {\tilde{t}}\_{1} + \sum\_{i=3}^{6} x^i \tilde{t\_{i}} 
 \\]
 
 To convince the verifier that
@@ -349,7 +415,7 @@ To convince the verifier that
 the opening \\(t(x), {\tilde{t}}(x)\\) to the verifier, who uses the
 bottom row of the diagram to check consistency:
 \\[
-  t(x) B + {\tilde{t}}(x) {\widetilde{B}} \stackrel{?}{=} x^2 \langle z \textbf{z}^Q , \textbf{W}\_v \cdot \textbf{V} \rangle + x^2 \big(\langle  z \textbf{z}^Q , \textbf{c} \rangle + \delta(y,z)\big) B + x T\_{1} + \sum\_{i=3}^{6} x^i T\_{i}
+  t(x) B + {\tilde{t}}(x) {\widetilde{B}} \stackrel{?}{=} x^2 \langle z \textbf{z}^q , \textbf{W}\_v \cdot \textbf{V} \rangle + x^2 \big(\langle  z \textbf{z}^q , \textbf{c} \rangle + \delta(y,z)\big) B + x T\_{1} + \sum\_{i=3}^{6} x^i T\_{i}
 \\]
 
 [^2]: The blinding factor is synthetic in the sense that it is
@@ -361,7 +427,7 @@ Proving that \\(\textbf{l}(x)\\), \\(\textbf{r}(x)\\) are correct
 We want to relate \\({\mathbf{l}}(x)\\) and \\({\mathbf{r}}(x)\\) to commitments
 to \\({\mathbf{a}}\_{L}\\), \\({\mathbf{a}}\_{R}\\), \\({\mathbf{s}}\_{L}\\), and
 \\({\mathbf{s}}\_{R}\\). Since \\[
-{\mathbf{r}}(x) = \textbf{y}^n \circ \textbf{a}\_R \cdot x + \textbf{y}^n \circ \textbf{s}\_R \cdot x^3 + z \textbf{z}^Q \cdot \textbf{W}\_L \cdot x - \textbf{y}^n + z \textbf{z}^Q \cdot \textbf{W}\_O
+{\mathbf{r}}(x) = \textbf{y}^n \circ \textbf{a}\_R \cdot x + \textbf{y}^n \circ \textbf{s}\_R \cdot x^3 + z \textbf{z}^q \cdot \textbf{W}\_L \cdot x - \textbf{y}^n + z \textbf{z}^q \cdot \textbf{W}\_O
 \\]
 we need commitments to \\({\mathbf{y}}^{n} \circ {\mathbf{a}}\_{R}\\) and
 \\({\mathbf{y}}^{n} \circ {\mathbf{s}}\_{R}\\). However, since the prover
@@ -402,9 +468,9 @@ We define the following commitments over the components of \\({\mathbf{l}}(x)\\)
 \begin{aligned}
 A_I &= \widetilde{B} \cdot \tilde{a} + \langle \textbf{G} , \textbf{a}\_L \rangle + \langle \textbf{H}, \textbf{a}\_R \rangle \\\\
 A_O &= \widetilde{B} \cdot \tilde{o} + \langle \textbf{G} , \textbf{a}\_O \rangle \\\\
-W_L &= \langle z \textbf{z}^Q \cdot \textbf{W}\_L , \textbf{H}' \rangle \\\\
-W_R &= \textbf{y}^{-n} \circ (\langle z \textbf{z}^Q \cdot \textbf{W}\_R) , \textbf{G} \rangle \\\\
-W_O &= \langle z \textbf{z}^Q \cdot \textbf{W}\_O , \textbf{H}' \rangle \\\\
+W_L &= \langle z \textbf{z}^q \cdot \textbf{W}\_L , \textbf{H}' \rangle \\\\
+W_R &= \textbf{y}^{-n} \circ (\langle z \textbf{z}^q \cdot \textbf{W}\_R) , \textbf{G} \rangle \\\\
+W_O &= \langle z \textbf{z}^q \cdot \textbf{W}\_O , \textbf{H}' \rangle \\\\
 S &= \widetilde{B} \cdot \tilde{s} + \langle \textbf{G} , \textbf{s}\_L \rangle + \langle \textbf{H}, \textbf{s}\_R \rangle
 \end{aligned}
 \\]
@@ -415,8 +481,8 @@ For reference, here are the equations for \\({\mathbf{l}}(x)\\) and \\({\mathbf{
 
 \\[
 \begin{aligned}
-  {\mathbf{l}}(x)  &= \textbf{a}\_L \cdot x + \textbf{s}\_L \cdot x^3 + \textbf{y}^{-n} \circ (z \textbf{z}^Q \cdot \textbf{W}\_R) \cdot x + \textbf{a}\_O \cdot x^2 \\\\
-  {\mathbf{r}}(x)  &= \textbf{y}^n \circ \textbf{a}\_R \cdot x + \textbf{y}^n \circ \textbf{s}\_R \cdot x^3 + z \textbf{z}^Q \cdot \textbf{W}\_L \cdot x - \textbf{y}^n + z \textbf{z}^Q \cdot \textbf{W}\_O
+  {\mathbf{l}}(x)  &= \textbf{a}\_L \cdot x + \textbf{s}\_L \cdot x^3 + \textbf{y}^{-n} \circ (z \textbf{z}^q \cdot \textbf{W}\_R) \cdot x + \textbf{a}\_O \cdot x^2 \\\\
+  {\mathbf{r}}(x)  &= \textbf{y}^n \circ \textbf{a}\_R \cdot x + \textbf{y}^n \circ \textbf{s}\_R \cdot x^3 + z \textbf{z}^q \cdot \textbf{W}\_L \cdot x - \textbf{y}^n + z \textbf{z}^q \cdot \textbf{W}\_O
 \end{aligned}
 \\]
 
@@ -425,9 +491,9 @@ To relate the prover’s commitments to
 
 \\[
 \begin{aligned}
-  {\langle {\mathbf{l}}(x), {\mathbf{G}} \rangle}         &\quad &= \quad & {\langle {\mathbf{a}}\_L \cdot x, {\mathbf{G}} \rangle}      & \quad &+ \quad & {\langle {\mathbf{a}}\_O \cdot x^2, {\mathbf{G}} \rangle}  & \quad &+ \quad& \langle \textbf{y}^{-n} \circ (z \textbf{z}^Q \cdot \textbf{W}\_R) \cdot x , \textbf{G} \rangle      &\quad &+\quad & \langle \textbf{s}\_L \cdot x^3 , \textbf{G} \rangle \\\\
+  {\langle {\mathbf{l}}(x), {\mathbf{G}} \rangle}         &\quad &= \quad & {\langle {\mathbf{a}}\_L \cdot x, {\mathbf{G}} \rangle}      & \quad &+ \quad & {\langle {\mathbf{a}}\_O \cdot x^2, {\mathbf{G}} \rangle}  & \quad &+ \quad& \langle \textbf{y}^{-n} \circ (z \textbf{z}^q \cdot \textbf{W}\_R) \cdot x , \textbf{G} \rangle      &\quad &+\quad & \langle \textbf{s}\_L \cdot x^3 , \textbf{G} \rangle \\\\
     +                        &\quad &  \quad &  +                          & \quad &  \quad &  +             & \quad &  \quad& +                             &\quad & \quad & +   \\\\
-  {\langle {\mathbf{r}}(x), {\mathbf{H}}' \rangle}  &\quad &= \quad & \langle \textbf{a}\_R \cdot x, {\mathbf{H}} \rangle & \quad &+ \quad & - \langle \textbf{1}, \textbf{H} \rangle  & \quad &+ \quad& \langle z \textbf{z}^Q \cdot (\textbf{W}\_L \cdot x + \textbf{W}\_O), \textbf{H}' \rangle &\quad &+\quad & \langle \textbf{s}\_R \cdot x^3 , \textbf{H} \rangle \\\\
+  {\langle {\mathbf{r}}(x), {\mathbf{H}}' \rangle}  &\quad &= \quad & \langle \textbf{a}\_R \cdot x, {\mathbf{H}} \rangle & \quad &+ \quad & - \langle \textbf{1}, \textbf{H} \rangle  & \quad &+ \quad& \langle z \textbf{z}^q \cdot (\textbf{W}\_L \cdot x + \textbf{W}\_O), \textbf{H}' \rangle &\quad &+\quad & \langle \textbf{s}\_R \cdot x^3 , \textbf{H} \rangle \\\\
     +                        &\quad &  \quad &  +                          & \quad &  \quad &  +             & \quad &  \quad& +                             &\quad & \quad & +   \\\\
   \tilde{e} \cdot \widetilde{B}  &\quad &= \quad & \tilde{a} \cdot x \cdot \widetilde{B} & \quad &+ \quad & \tilde{o} \cdot x^2 \cdot \widetilde{B}  & \quad &+ \quad& 0 &\quad &+\quad & \tilde{s} \cdot x^3 \cdot \widetilde{B} \\\\
     \shortparallel           &\quad &  \quad & \shortparallel              & \quad &  \quad & \shortparallel & \quad &  \quad& \shortparallel                &\quad & \quad & \shortparallel   \\\\
@@ -456,3 +522,45 @@ if the prover is honest, this is
 so the verifier uses \\(P\\) and \\(t(x)\\) as inputs to the inner-product protocol
 to prove that
 \\(t(x) = {\langle {\mathbf{l}}(x), {\mathbf{r}}(x) \rangle}\\).
+
+
+
+Prover’s algorithm
+------------------
+
+The protocol begins with the prover computing commitments to the secret values \\(\mathbf{v}\\):
+
+\\[
+V_i \gets \operatorname{Com}(v_i, {\widetilde{v}\_i}) = v\_i \cdot B + {\widetilde{v}\_i} \cdot {\widetilde{B}}
+\\] where \\(\widetilde{v}\_i\\) is sampled randomly.
+
+The prover then [builds constraints](#building-constraints), allocating necessary multiplication gates on the fly,
+assigning values to the multiplication left, right and output wires \\(\mathbf{a}\_{L}, \mathbf{a}\_{R}, \mathbf{a}\_{O}\\).
+
+Once all multiplication wires are assigned, the prover commits to them via vector Pedersen commitments:
+
+\\[
+\begin{aligned}
+A_I &= \widetilde{B} \cdot \tilde{a} + \langle \textbf{G} , \textbf{a}\_L \rangle + \langle \textbf{H}, \textbf{a}\_R \rangle \\\\
+A_O &= \widetilde{B} \cdot \tilde{o} + \langle \textbf{G} , \textbf{a}\_O \rangle \\\\
+\end{aligned}
+\\] where \\(\tilde{a}, \tilde{o}\\) are sampled randomly from \\({\mathbb Z\_p}\\).
+
+The prover also computes blinding factors \\(\textbf{s}\_L, \textbf{s}\_R\\)
+for the left and right multiplication values and commits to them:
+
+\\[
+S = \widetilde{B} \cdot \tilde{s} + \langle \textbf{G} , \textbf{s}\_L \rangle + \langle \textbf{H}, \textbf{s}\_R \rangle
+\\] where \\(\widetilde{s}\\) is sampled randomly from \\({\mathbb Z\_p}\\)
+and \\(\mathbf{s}\_L, \mathbf{s}\_R\\) are sampled randomly from \\({\mathbb Z\_p}^{n}\\).
+
+
+
+Verifier’s algorithm
+--------------------
+
+TBD.
+
+
+
+[bp_website]: https://crypto.stanford.edu/bulletproofs/
