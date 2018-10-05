@@ -560,18 +560,66 @@ Once all multiplication wires are assigned, the prover commits to them via vecto
 
 \\[
 \begin{aligned}
-A_I &= \widetilde{B} \cdot \tilde{a} + \langle \textbf{G} , \textbf{a}\_L \rangle + \langle \textbf{H}, \textbf{a}\_R \rangle \\\\
-A_O &= \widetilde{B} \cdot \tilde{o} + \langle \textbf{G} , \textbf{a}\_O \rangle \\\\
+\tilde{a} \\;&{\xleftarrow{\\$}}\\; \mathbb Z\_p \\\\
+\tilde{o} \\;&{\xleftarrow{\\$}}\\; \mathbb Z\_p \\\\
+A_I          &= \widetilde{B} \cdot \tilde{a} + \langle \textbf{G} , \textbf{a}\_L \rangle + \langle \textbf{H}, \textbf{a}\_R \rangle \\\\
+A_O          &= \widetilde{B} \cdot \tilde{o} + \langle \textbf{G} , \textbf{a}\_O \rangle \\\\
 \end{aligned}
-\\] where \\(\tilde{a}, \tilde{o}\\) are sampled randomly from \\({\mathbb Z\_p}\\).
+\\]
 
 The prover also computes blinding factors \\(\textbf{s}\_L, \textbf{s}\_R\\)
 for the left and right multiplication values and commits to them:
 
 \\[
-S = \widetilde{B} \cdot \tilde{s} + \langle \textbf{G} , \textbf{s}\_L \rangle + \langle \textbf{H}, \textbf{s}\_R \rangle
-\\] where \\(\widetilde{s}\\) is sampled randomly from \\({\mathbb Z\_p}\\)
-and \\(\mathbf{s}\_L, \mathbf{s}\_R\\) are sampled randomly from \\({\mathbb Z\_p}^{n}\\).
+\begin{aligned}
+\mathbf{s}\_{L} \\; &{\xleftarrow{\\$}}\\; {\mathbb Z\_p}^{n} \\\\
+\mathbf{s}\_{R} \\; &{\xleftarrow{\\$}}\\; {\mathbb Z\_p}^{n} \\\\
+\tilde{s} \\;       &{\xleftarrow{\\$}}\\; \mathbb Z\_p \\\\
+S                   &= \widetilde{B} \cdot \tilde{s} + \langle \textbf{G} , \textbf{s}\_L \rangle + \langle \textbf{H}, \textbf{s}\_R \rangle
+\end{aligned}
+\\]
+
+The prover adds \\(A_I\\), \\(A_O\\) and \\(S\\) to the protocol transcript
+and obtains challenge scalars \\(y,z \in {\mathbb Z\_p}\\) from the transcript.
+
+The next step is to flatten the constraints using \\(q\\) powers of challenge \\(z\\).
+The prover factors out weights from the following inner product and pre-computes the left vector:
+
+\\[
+\langle z \textbf{z}^q , \textbf{W}\_v \cdot \textbf{V} \rangle = \langle z \textbf{z}^q \cdot \textbf{W}\_v, \textbf{V} \rangle
+\\]
+
+This way, the prover flattens four sets of constraints in four vectors:
+
+\\[
+\begin{aligned}
+\mathbf{w}_L &= z \textbf{z}^q \cdot \textbf{W}\_L, \\\\
+\mathbf{w}_R &= z \textbf{z}^q \cdot \textbf{W}\_R, \\\\
+\mathbf{w}_O &= z \textbf{z}^q \cdot \textbf{W}\_O, \\\\
+\mathbf{w}_V &= z \textbf{z}^q \cdot \textbf{W}\_V,
+\end{aligned}
+\\]
+where \\(\mathbf{w}_L, \mathbf{w}_R, \mathbf{w}_O\\) have length \\(n\\) and \\(\mathbf{w}_V\\) has length \\(m\\).
+
+
+TBD: compute polynomials l(x), r(x)
+
+TBD: compute inner product polynomial t(x)
+
+TBD: compute blinding factors t_1,...,6 & commitments to terms
+
+TBD: compute blinding factor for t2
+
+TBD: send T1...6 to transcript, get x.
+
+TBD: evaluate polynomial t(x) and t_blinding(x)
+
+TBD: evaluate polynomial l(x), r(x)
+
+TBD: compute synthetic blinding factor e_blinding
+
+TBD: compute synthetic blinding factor e_blinding
+
 
 
 
