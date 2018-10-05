@@ -52,6 +52,24 @@ the library's [internal documentation][doc_internal]:
 * how the constraint system reduction works (under development);
 * how the aggregated circuit proofs work (future work).
 
+## Comparative Performance
+
+The following table gives comparative timings for proving and
+verification of a 64-bit rangeproof on an i7-7800X with Turbo Boost
+disabled.  Times are in microseconds (lower is better), with the
+relative speed compared to the fastest implementation.
+
+| Implementation | Group            | Proving (μs) |       rel | Verification (μs) |       rel |
+|----------------|------------------|-------------:|----------:|------------------:|----------:|
+| ours (avx2)    | ristretto255     |         7300 | **1.00x** |              1040 | **1.00x** |
+| ours (u64)     | ristretto255     |        11300 | **1.54x** |              1490 | **1.43x** |
+| libsecp+endo   | secp256k1        |        14300 | **1.96x** |              1900 | **1.83x** |
+| libsecp-endo   | secp256k1        |        16800 | **2.30x** |              2080 | **2.00x** |
+| Monero         | ed25519 (unsafe) |        53300 | **7.30x** |              4810 | **4.63x** |
+
+This crate also contains other benchmarks; see the *Benchmarks*
+section below for details.
+
 ## WARNING
 
 This code is still research-quality.  It is not (yet) suitable for
