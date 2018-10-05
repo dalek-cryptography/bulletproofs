@@ -89,7 +89,9 @@ represent secret values of the corresponding side of a permutation:
 \\((c,d) = (a,b) \vee (c,d) = (b,a) \\) if and only if \\((c-x)\cdot(d-x) = (a-x)\cdot(b-x)\\), where \\(x\\) is a random challenge.
 
 Making a proof of permutation using a static circuit would require
-building a sorting network that requires significantly more multiplication gates.
+building a [sorting network][sorting_network] that requires significantly more multiplication gates.
+
+[sorting_network]: https://en.wikipedia.org/wiki/Sorting_network
 
 
 ### Representation of constraints
