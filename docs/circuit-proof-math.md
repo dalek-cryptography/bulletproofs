@@ -414,11 +414,11 @@ The prover forms these commitments, and sends them to the verifier. These commit
 
 \\[
 \begin{aligned}
-  t(x) B                     &\quad &= \quad & x^2 \langle z \textbf{z}^q , \textbf{W}\_v \cdot \textbf{v} \rangle \cdot B      & \quad &+ \quad & x^2 \big(\langle  z \textbf{z}^q , \textbf{c} \rangle + \delta(y,z)\big) B  & \quad &+ \quad& x t\_{1} B                     &\quad &+\quad & \sum\_{i=3}^{6} x^i t\_{i} B \\\\
-    +                        &\quad &  \quad &  +                          & \quad &  \quad &  +             & \quad &  \quad& +                             &\quad & \quad & +   \\\\
-  {\tilde{t}}(x) {\widetilde{B}} &\quad &= \quad & x^2 \langle z \textbf{z}^q , \textbf{W}\_v \cdot \tilde{\textbf{v}} \rangle \cdot \widetilde{B}  & \quad &+ \quad & 0 {\widetilde{B}}  & \quad &+ \quad& x {\tilde{t}}\_{1} {\widetilde{B}} &\quad &+\quad & \sum\_{i=3}^{6} x^i \tilde{t\_{i}} {\widetilde{B}} \\\\
-    \shortparallel           &\quad &  \quad & \shortparallel              & \quad &  \quad & \shortparallel & \quad &  \quad& \shortparallel                &\quad & \quad & \shortparallel   \\\\
-                 &\quad &= \quad & x^2 \langle z \textbf{z}^q , \textbf{W}\_v \cdot \textbf{V} \rangle                         & \quad &+ \quad & x^2 \big(\langle  z \textbf{z}^q , \textbf{c} \rangle + \delta(y,z)\big) B  & \quad &+ \quad& x T\_{1}                       &\quad &+\quad & \sum\_{i=3}^{6} x^i T\_{i}
+  t(x) B                         &\quad &= \quad & x^2 \langle z \textbf{z}^q , \textbf{W}\_v \cdot \textbf{v} \rangle \cdot B                      & \quad &+ \quad & x^2 \big(\langle  z \textbf{z}^q , \textbf{c} \rangle + \delta(y,z)\big) B   &\quad &+\quad & \sum\_{i\in [1,6]\\setminus\\{2\\}} &x^i t\_{i} B                       \\\\
+    +                            &\quad &  \quad &  +                                                                                               & \quad &  \quad &  +                                                                           &\quad & \quad &                                     &           +                       \\\\
+  {\tilde{t}}(x) {\widetilde{B}} &\quad &= \quad & x^2 \langle z \textbf{z}^q , \textbf{W}\_v \cdot \tilde{\textbf{v}} \rangle \cdot \widetilde{B}  & \quad &+ \quad & 0 {\widetilde{B}}                                                            &\quad &+\quad & \sum\_{i\in [1,6]\\setminus\\{2\\}} &x^i \tilde{t\_{i}} {\widetilde{B}} \\\\
+  \shortparallel                 &\quad &  \quad & \shortparallel                                                                                   & \quad &  \quad & \shortparallel                                                               &\quad & \quad &                                     &    \shortparallel                 \\\\
+                                 &\quad &= \quad & x^2 \langle z \textbf{z}^q , \textbf{W}\_v \cdot \textbf{V} \rangle                              & \quad &+ \quad & x^2 \big(\langle  z \textbf{z}^q , \textbf{c} \rangle + \delta(y,z)\big) B   &\quad &+\quad & \sum\_{i\in [1,6]\\setminus\\{2\\}} &x^i T\_{i}
 \end{aligned}
 \\]
 
@@ -426,7 +426,7 @@ Notice that the sum of each column is a commitment to the variable in the top ro
 \\(t(x) B + {\tilde{t}}(x) {\widetilde{B}}\\), a commitment to the value
 of \\(t\\) at the point \\(x\\), using the synthetic blinding factor[^2]:
 \\[
-  {\tilde{t}}(x) = x^2 \langle z \textbf{z}^q , \textbf{W}\_v \cdot \tilde{\textbf{v}} \rangle + x {\tilde{t}}\_{1} + \sum\_{i=3}^{6} x^i \tilde{t\_{i}} 
+  {\tilde{t}}(x) = x^2 \langle z \textbf{z}^q , \textbf{W}\_v \cdot \tilde{\textbf{v}} \rangle + \sum\_{i\in [1,6]\\setminus\\{2\\}} x^i \tilde{t}\_{i}
 \\]
 
 To convince the verifier that
@@ -434,7 +434,7 @@ To convince the verifier that
 the opening \\(t(x), {\tilde{t}}(x)\\) to the verifier, who uses the
 bottom row of the diagram to check consistency:
 \\[
-  t(x) B + {\tilde{t}}(x) {\widetilde{B}} \stackrel{?}{=} x^2 \langle z \textbf{z}^q , \textbf{W}\_v \cdot \textbf{V} \rangle + x^2 \big(\langle  z \textbf{z}^q , \textbf{c} \rangle + \delta(y,z)\big) B + x T\_{1} + \sum\_{i=3}^{6} x^i T\_{i}
+  t(x) B + {\tilde{t}}(x) {\widetilde{B}} \stackrel{?}{=} x^2 \langle z \textbf{z}^q , \textbf{W}\_v \cdot \textbf{V} \rangle + x^2 \big(\langle  z \textbf{z}^q , \textbf{c} \rangle + \delta(y,z)\big) B + \sum\_{i\in [1,6]\\setminus\\{2\\}} x^i T\_{i}
 \\]
 
 [^2]: The blinding factor is synthetic in the sense that it is
@@ -593,33 +593,67 @@ This way, the prover flattens four sets of constraints in four vectors:
 
 \\[
 \begin{aligned}
-\mathbf{w}_L &= z \textbf{z}^q \cdot \textbf{W}\_L, \\\\
-\mathbf{w}_R &= z \textbf{z}^q \cdot \textbf{W}\_R, \\\\
-\mathbf{w}_O &= z \textbf{z}^q \cdot \textbf{W}\_O, \\\\
-\mathbf{w}_V &= z \textbf{z}^q \cdot \textbf{W}\_V,
+\mathbf{w}\_L &= z \textbf{z}^q \cdot \textbf{W}\_L, \\\\
+\mathbf{w}\_R &= z \textbf{z}^q \cdot \textbf{W}\_R, \\\\
+\mathbf{w}\_O &= z \textbf{z}^q \cdot \textbf{W}\_O, \\\\
+\mathbf{w}\_V &= z \textbf{z}^q \cdot \textbf{W}\_V,
 \end{aligned}
 \\]
-where \\(\mathbf{w}_L, \mathbf{w}_R, \mathbf{w}_O\\) have length \\(n\\) and \\(\mathbf{w}_V\\) has length \\(m\\).
+where \\(\mathbf{w}\_L, \mathbf{w}\_R, \mathbf{w}\_O\\) have length \\(n\\) and \\(\mathbf{w}\_V\\) has length \\(m\\).
 
+The prover then constructs the blinded polynomials and their inner product:
 
-TBD: compute polynomials l(x), r(x)
+\\[
+\begin{aligned}
+  {\mathbf{l}}(x)  &= \textbf{a}\_L \cdot x + \textbf{s}\_L \cdot x^3 + \textbf{y}^{-n} \circ (z \textbf{z}^q \cdot \textbf{W}\_R) \cdot x + \textbf{a}\_O \cdot x^2 \\\\
+  {\mathbf{r}}(x)  &= \textbf{y}^n \circ \textbf{a}\_R \cdot x + \textbf{y}^n \circ \textbf{s}\_R \cdot x^3 + z \textbf{z}^q \cdot \textbf{W}\_L \cdot x - \textbf{y}^n + z \textbf{z}^q \cdot \textbf{W}\_O \\\\
+  t(x)             &= {\langle {\mathbf{l}}(x), {\mathbf{r}}(x) \rangle}
+\end{aligned}
+\\]
 
-TBD: compute inner product polynomial t(x)
+The prover generates blinding factors for terms \\(t\_1, t\_3, t\_4, t\_5, t\_6\\) and creates Pedersen commitments to them
+(term \\(t\_0\\) is known to be zero and term \\(t\_2\\) is subject to a proof):
 
-TBD: compute blinding factors t_1,...,6 & commitments to terms
+\\[
+\begin{aligned}
+  &\tilde{t}\_1, \tilde{t}\_3, \tilde{t}\_4, \tilde{t}\_5, \tilde{t}\_6 \\;{\xleftarrow{\\$}}\\; \mathbb Z\_p \\\\
+  &T_i \gets \operatorname{Com}(t_i, {\tilde{t}\_i}) = t\_i \cdot B + {\tilde{t}\_i} \cdot {\widetilde{B}} \\\\
+\end{aligned}
+\\]
 
-TBD: compute blinding factor for t2
+The prover adds \\(T_1, T_3, T_4, T_5, T_6\\) to the protocol transcript
+and obtains challenge scalar \\(x \in {\mathbb Z\_p}\\) from the transcript.
 
-TBD: send T1...6 to transcript, get x.
+The prover computes the synthetic blinding factors \\({\tilde{t}}(x)\\) at point \\(x\\) and \\(\tilde{e}\\):
 
-TBD: evaluate polynomial t(x) and t_blinding(x)
+\\[
+\begin{aligned}
+  \tilde{t}\_2    &= \langle z \textbf{z}^q , \textbf{W}\_v \cdot \tilde{\textbf{v}} \rangle \\\\
+  {\tilde{t}}(x)  &= \sum\_{i = 1}^{6} x^i \tilde{t}\_{i} \\\\
+  {\tilde{e}}     &= \tilde{a} \cdot x + \tilde{o} \cdot x^2 + \tilde{s} \cdot x^3 \\\\
+\end{aligned}
+\\]
 
-TBD: evaluate polynomial l(x), r(x)
+The prover adds \\(t(x), {\tilde{t}}(x), {\tilde{e}}\\) to the protocol transcript, obtains a challenge scalar \\(w \in {\mathbb Z\_p}\\), and uses it to create a point \\(Q\\):
 
-TBD: compute synthetic blinding factor e_blinding
+\\[
+	Q \gets  w \cdot B
+\\]
 
-TBD: compute synthetic blinding factor e_blinding
+The prover evaluates polynomials \\(\mathbf{l}(x), \mathbf{r}(x)\\) and performs the [inner product argument](../inner_product_proof/index.html) to prove the relation:
+\\[
+\operatorname{PK}\left\\{
+  ({\mathbf{G}}, {\mathbf{H}}' \in {\mathbb G}^{n}, P', Q \in {\mathbb G}; {\mathbf{l}}, {\mathbf{r}} \in {\mathbb Z\_p}^{n})
+  : P' = {\langle {\mathbf{l}}, {\mathbf{G}} \rangle} + {\langle {\mathbf{r}}, {\mathbf{H}}' \rangle} + {\langle {\mathbf{l}}, {\mathbf{r}} \rangle} Q
+\right\\}
+\\] where \\({\mathbf{H}}' = {\mathbf{y}}^{-n} \circ {\mathbf{H}}\\).
 
+The result of the inner product proof is a list of \\(2k\\) points and \\(2\\) scalars, where \\(k = \log_2(n)\\): \\(\\{L\_k, R\_k, \\dots, L\_1, R\_1, a, b\\}\\).
+
+The complete circuit proof consists of \\(13+2k\\) 32-byte elements:
+\\[
+  \\{A\_I, A\_O, S, T\_1, T\_3, T\_4, T\_5, T\_6, t(x), {\tilde{t}}(x), \tilde{e}, L\_k, R\_k, \\dots, L\_1, R\_1, a, b\\}
+\\]
 
 
 
