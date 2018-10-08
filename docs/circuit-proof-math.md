@@ -77,6 +77,12 @@ using linear constraints and multiplication gates:
 2. **Add a constraint:** a linear combination of any number of variables is encoded into appropriate positions in matrices \\(\textbf{W}\_L, \textbf{W}\_R, \textbf{W}\_O, \textbf{W}\_V\\) and a vector of constants \\(\textbf{c}\\).
 3. **Request a challenge scalar:** a random scalar returned in response to committed high-level variables.
 
+### Unconstrained variables
+
+Often a circuit is formed using _gadgets_: subcircuits that represent various constraints defined in a higher-level protocol.
+The “wires” connecting such subcircuits are called _uncommitted variables_ and created from left and right variables \\(a\_L, a\_R\\) of
+auxilliary multiplication gates (output variables \\(a\_O\\) intentionally left unconstrained).
+
 
 ### Circuit as a challenge
 
@@ -86,7 +92,9 @@ For example, a proof of permutation (verifiable shuffle) can be done by proving 
 two polynomials sampled at a challenge point, where roots of each polynomial
 represent secret values of the corresponding side of a permutation:
 
-\\((c,d) = (a,b) \vee (c,d) = (b,a) \\) if and only if \\((c-x)\cdot(d-x) = (a-x)\cdot(b-x)\\), where \\(x\\) is a random challenge.
+\\[
+ \\{a,b\\} = \\{c,d\\}  \iff  (a-x)\cdot(b-x) = (c-x)\cdot(d-x),
+\\] where \\(x\\) is a random challenge, sampled after all values \\(a,b,c,d\\) are committed.
 
 Making a proof of permutation using a static circuit would require
 building a [sorting network][sorting_network] that requires significantly more multiplication gates.
@@ -97,26 +105,18 @@ building a [sorting network][sorting_network] that requires significantly more m
 ### Representation of constraints
 
 The matrices \\(\textbf{W}\_L, \textbf{W}\_R, \textbf{W}\_O, \textbf{W}\_V\\) are usually very sparse:
-most constraints apply to very few variables.
+most constraints apply to very few variables. As a result, constraints are represented as lists
+of pairs \\((i, w)\\) where \\(i\\) is a variable index, and `w` is its (non-zero) weight.
 
-As a result, constraints are represented as lists of pairs \\((i, w)\\) where \\(i\\) is a variable index,
-and `w` is its (non-zero) weight.
-
-Multiplication of a matrix by a vector is implemented by multiplying each weight \\(w\\) by 
-a scalar in the vector at a corresponding index \\(i\\).
-
-
-### Unconstrained variables
-
-Often a circuit is formed using _gadgets_: subcircuits that represent various constraints defined in a higher-level protocol.
-The “wires” connecting such subcircuits are called _uncommitted variables_ and created from left and right variables \\(a\_L, a\_R\\) of
-auxilliary multiplication gates (output variables \\(a\_O\\) intentionally left unconstrained).
+Multiplication of a matrix by a vector is implemented via multiplication of each weight \\(w\\) by 
+a scalar in the vector at a corresponding index \\(i\\). This way, all zero-weight terms are automatically skipped.
 
 
 Combining statements using challenge variables
 ----------------------------------------------
 
-We can rewrite the statement about multiplication gates into an inner product equation, using the challenge variable \\(y\\). We can do this for a random challenge \\(y\\) because \\({\mathbf{b}} = {\mathbf{0}}\\) if and only
+We can rewrite the statement about multiplication gates into an inner product equation, using the challenge variable \\(y\\).
+We can do this for a random challenge \\(y\\) because \\({\mathbf{b}} = {\mathbf{0}}\\) if and only
 if[^1] \\({\langle {\mathbf{b}}, {\mathbf{y}}^{n} \rangle} = 0\\). The equation \\(\textbf{a}\_L \circ \textbf{a}\_R = \textbf{a}\_O\\) becomes:
 
 \\[
@@ -124,7 +124,8 @@ if[^1] \\({\langle {\mathbf{b}}, {\mathbf{y}}^{n} \rangle} = 0\\). The equation 
 \textbf{y}^n \rangle = 0
 \\]
 
-We can rewrite the statement about the linear constraints into an inner product equation, using the challenge variable \\(z\\). We can do this for a random challenge \\(z\\), for the same reason as above. The equation
+We can rewrite the statement about the linear constraints into an inner product equation, using the challenge variable \\(z\\).
+We can do this for a random challenge \\(z\\), for the same reason as above. The equation
 \\(
 \textbf{W}\_L \cdot \textbf{a}\_L +
 \textbf{W}\_R \cdot \textbf{a}\_R +
@@ -144,7 +145,9 @@ becomes:
 \rangle = 0
 \\]
 
-We can combine these two inner product equations, since they are offset by different multiples of challenge variable \\(z\\). The statement about multiplication gates is multiplied by \\(z^0\\), while the statements about addition and scalar multiplication gates are multiplied by a power of \\(z\\) between \\(z^1\\) and \\(z \cdot z^q\\). Combining the two equations gives us:
+We can combine these two inner product equations, since they are offset by different multiples of challenge variable \\(z\\).
+The statement about multiplication gates is multiplied by \\(z^0\\), while the statements about addition and scalar multiplication gates
+are multiplied by a powers of \\(z\\) between \\(z^1\\) and \\(z^q\\). Combining the two equations gives us:
 
 \\[
 \langle \textbf{a}\_L \circ \textbf{a}\_R - \textbf{a}\_O ,
@@ -364,8 +367,9 @@ When we take the inner product of \\({\mathbf{l}}(x)\\) and \\({\mathbf{l}}(x)\\
 
 \\[
 \begin{aligned}
-  t(x) = {\langle {\mathbf{l}}(x), {\mathbf{r}}(x) \rangle} &= t\_{1} x + t\_{2} x^{2} + t\_{3} x^{3} + t\_{4} x^{4} + t\_{5} x^{5} + t\_{6} x^{6} \\\\
-  &= \sum_{i=1}^{6} t_i x^i
+  t(x) &= {\langle {\mathbf{l}}(x), {\mathbf{r}}(x) \rangle} \\\\
+       &= t\_{1} x + t\_{2} x^{2} + t\_{3} x^{3} + t\_{4} x^{4} + t\_{5} x^{5} + t\_{6} x^{6} \\\\
+       &= \sum_{i=1}^{6} t_i x^i
 \end{aligned}
 \\]
 
@@ -414,11 +418,11 @@ The prover forms these commitments, and sends them to the verifier. These commit
 
 \\[
 \begin{aligned}
-  t(x) B                         &\quad &= \quad & x^2 \langle z \textbf{z}^q , \textbf{W}\_v \cdot \textbf{v} \rangle \cdot B                      & \quad &+ \quad & x^2 \big(\langle  z \textbf{z}^q , \textbf{c} \rangle + \delta(y,z)\big) B   &\quad &+\quad & \sum\_{i\in [1,6]\\setminus\\{2\\}} &x^i t\_{i} B                       \\\\
+  t(x) B                         &\quad &= \quad & x^2 \langle z \textbf{z}^q , \textbf{W}\_V \cdot \textbf{v} \rangle \cdot B                      & \quad &+ \quad & x^2 \big(\langle  z \textbf{z}^q , \textbf{c} \rangle + \delta(y,z)\big) B   &\quad &+\quad & \sum\_{i = 1,3,4,5,6} &x^i t\_{i} B                       \\\\
     +                            &\quad &  \quad &  +                                                                                               & \quad &  \quad &  +                                                                           &\quad & \quad &                                     &           +                       \\\\
-  {\tilde{t}}(x) {\widetilde{B}} &\quad &= \quad & x^2 \langle z \textbf{z}^q , \textbf{W}\_v \cdot \tilde{\textbf{v}} \rangle \cdot \widetilde{B}  & \quad &+ \quad & 0 {\widetilde{B}}                                                            &\quad &+\quad & \sum\_{i\in [1,6]\\setminus\\{2\\}} &x^i \tilde{t\_{i}} {\widetilde{B}} \\\\
+  {\tilde{t}}(x) {\widetilde{B}} &\quad &= \quad & x^2 \langle z \textbf{z}^q , \textbf{W}\_V \cdot \tilde{\textbf{v}} \rangle \cdot \widetilde{B}  & \quad &+ \quad & 0 {\widetilde{B}}                                                            &\quad &+\quad & \sum\_{i = 1,3,4,5,6} &x^i \tilde{t\_{i}} {\widetilde{B}} \\\\
   \shortparallel                 &\quad &  \quad & \shortparallel                                                                                   & \quad &  \quad & \shortparallel                                                               &\quad & \quad &                                     &    \shortparallel                 \\\\
-                                 &\quad &= \quad & x^2 \langle z \textbf{z}^q , \textbf{W}\_v \cdot \textbf{V} \rangle                              & \quad &+ \quad & x^2 \big(\langle  z \textbf{z}^q , \textbf{c} \rangle + \delta(y,z)\big) B   &\quad &+\quad & \sum\_{i\in [1,6]\\setminus\\{2\\}} &x^i T\_{i}
+                                 &\quad &= \quad & x^2 \langle z \textbf{z}^q , \textbf{W}\_V \cdot \textbf{V} \rangle                              & \quad &+ \quad & x^2 \big(\langle  z \textbf{z}^q , \textbf{c} \rangle + \delta(y,z)\big) B   &\quad &+\quad & \sum\_{i = 1,3,4,5,6} &x^i T\_{i}
 \end{aligned}
 \\]
 
@@ -426,7 +430,7 @@ Notice that the sum of each column is a commitment to the variable in the top ro
 \\(t(x) B + {\tilde{t}}(x) {\widetilde{B}}\\), a commitment to the value
 of \\(t\\) at the point \\(x\\), using the synthetic blinding factor[^2]:
 \\[
-  {\tilde{t}}(x) = x^2 \langle z \textbf{z}^q , \textbf{W}\_v \cdot \tilde{\textbf{v}} \rangle + \sum\_{i\in [1,6]\\setminus\\{2\\}} x^i \tilde{t}\_{i}
+  {\tilde{t}}(x) = x^2 \langle z \textbf{z}^q , \textbf{W}\_V \cdot \tilde{\textbf{v}} \rangle + \sum\_{i = 1,3,4,5,6} x^i \tilde{t}\_{i}
 \\]
 
 To convince the verifier that
@@ -434,7 +438,7 @@ To convince the verifier that
 the opening \\(t(x), {\tilde{t}}(x)\\) to the verifier, who uses the
 bottom row of the diagram to check consistency:
 \\[
-  t(x) B + {\tilde{t}}(x) {\widetilde{B}} \stackrel{?}{=} x^2 \langle z \textbf{z}^q , \textbf{W}\_v \cdot \textbf{V} \rangle + x^2 \big(\langle  z \textbf{z}^q , \textbf{c} \rangle + \delta(y,z)\big) B + \sum\_{i\in [1,6]\\setminus\\{2\\}} x^i T\_{i}
+  t(x) B + {\tilde{t}}(x) {\widetilde{B}} \stackrel{?}{=} x^2 \langle z \textbf{z}^q , \textbf{W}\_V \cdot \textbf{V} \rangle + x^2 \big(\langle  z \textbf{z}^q , \textbf{c} \rangle + \delta(y,z)\big) B + \sum\_{i = 1,3,4,5,6} x^i T\_{i}
 \\]
 
 [^2]: The blinding factor is synthetic in the sense that it is
@@ -551,7 +555,7 @@ The protocol begins with the prover computing commitments to the secret values \
 
 \\[
 V_i \gets \operatorname{Com}(v_i, {\widetilde{v}\_i}) = v\_i \cdot B + {\widetilde{v}\_i} \cdot {\widetilde{B}}
-\\] where \\(\widetilde{v}\_i\\) is sampled randomly.
+\\] where each \\(\widetilde{v}\_i\\) is sampled randomly.
 
 The prover then [builds constraints](#building-constraints), allocating necessary multiplication gates on the fly,
 assigning values to the multiplication left, right and output wires \\(\mathbf{a}\_{L}, \mathbf{a}\_{R}, \mathbf{a}\_{O}\\).
@@ -586,7 +590,7 @@ The next step is to flatten the constraints using \\(q\\) powers of challenge \\
 The prover factors out weights from the following inner product and pre-computes the left vector:
 
 \\[
-\langle z \textbf{z}^q , \textbf{W}\_v \cdot \textbf{V} \rangle = \langle z \textbf{z}^q \cdot \textbf{W}\_v, \textbf{V} \rangle
+\langle z \textbf{z}^q , \textbf{W}\_V \cdot \textbf{V} \rangle = \langle z \textbf{z}^q \cdot \textbf{W}\_V, \textbf{V} \rangle
 \\]
 
 This way, the prover flattens four sets of constraints in four vectors:
@@ -599,20 +603,20 @@ This way, the prover flattens four sets of constraints in four vectors:
 \mathbf{w}\_V &= z \textbf{z}^q \cdot \textbf{W}\_V,
 \end{aligned}
 \\]
-where \\(\mathbf{w}\_L, \mathbf{w}\_R, \mathbf{w}\_O\\) have length \\(n\\) and \\(\mathbf{w}\_V\\) has length \\(m\\).
+where each of \\(\mathbf{w}\_L, \mathbf{w}\_R, \mathbf{w}\_O\\) has length \\(n\\) and \\(\mathbf{w}\_V\\) has length \\(m\\).
 
 The prover then constructs the blinded polynomials and their inner product:
 
 \\[
 \begin{aligned}
-  {\mathbf{l}}(x)  &= \textbf{a}\_L \cdot x + \textbf{s}\_L \cdot x^3 + \textbf{y}^{-n} \circ (z \textbf{z}^q \cdot \textbf{W}\_R) \cdot x + \textbf{a}\_O \cdot x^2 \\\\
-  {\mathbf{r}}(x)  &= \textbf{y}^n \circ \textbf{a}\_R \cdot x + \textbf{y}^n \circ \textbf{s}\_R \cdot x^3 + z \textbf{z}^q \cdot \textbf{W}\_L \cdot x - \textbf{y}^n + z \textbf{z}^q \cdot \textbf{W}\_O \\\\
+  {\mathbf{l}}(x)  &= \textbf{a}\_L \cdot x + \textbf{s}\_L \cdot x^3 + \textbf{y}^{-n} \circ \mathbf{w}\_R \cdot x + \textbf{a}\_O \cdot x^2 \\\\
+  {\mathbf{r}}(x)  &= \textbf{y}^n \circ \textbf{a}\_R \cdot x + \textbf{y}^n \circ \textbf{s}\_R \cdot x^3 + \mathbf{w}\_L \cdot x - \textbf{y}^n + \mathbf{w}\_O \\\\
   t(x)             &= {\langle {\mathbf{l}}(x), {\mathbf{r}}(x) \rangle}
 \end{aligned}
 \\]
 
 The prover generates blinding factors for terms \\(t\_1, t\_3, t\_4, t\_5, t\_6\\) and creates Pedersen commitments to them
-(term \\(t\_0\\) is known to be zero and term \\(t\_2\\) is subject to a proof):
+(term \\(t\_0\\) is known to be zero and term \\(t\_2\\) is being proven):
 
 \\[
 \begin{aligned}
@@ -628,7 +632,7 @@ The prover computes the synthetic blinding factors \\({\tilde{t}}(x)\\) at point
 
 \\[
 \begin{aligned}
-  \tilde{t}\_2    &= \langle z \textbf{z}^q , \textbf{W}\_v \cdot \tilde{\textbf{v}} \rangle \\\\
+  \tilde{t}\_2    &= \langle \mathbf{w}\_V, \tilde{\textbf{v}} \rangle \\\\
   {\tilde{t}}(x)  &= \sum\_{i = 1}^{6} x^i \tilde{t}\_{i} \\\\
   {\tilde{e}}     &= \tilde{a} \cdot x + \tilde{o} \cdot x^2 + \tilde{s} \cdot x^3 \\\\
 \end{aligned}
