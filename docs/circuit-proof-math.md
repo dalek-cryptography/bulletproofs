@@ -26,6 +26,7 @@ We will use the notation described in the [`notation`](../notes/index.html#notat
 \end{aligned}
 \\]
 
+[bp_website]: https://crypto.stanford.edu/bulletproofs/
 
 From an arithmetic circuit to a constraint system
 -------------------------------------------------
@@ -551,14 +552,15 @@ to prove that
 Prover’s algorithm
 ------------------
 
-The protocol begins with the prover computing commitments to the secret values \\(\mathbf{v}\\):
+The protocol begins with the prover computing commitments to the secret values \\(\mathbf{v}\\) and adding all commitments to the protocol transcript.
 
 \\[
 V_i \gets \operatorname{Com}(v_i, {\widetilde{v}\_i}) = v\_i \cdot B + {\widetilde{v}\_i} \cdot {\widetilde{B}}
 \\] where each \\(\widetilde{v}\_i\\) is sampled randomly.
 
 The prover then [builds constraints](#building-constraints), allocating necessary multiplication gates on the fly,
-assigning values to the multiplication left, right and output wires \\(\mathbf{a}\_{L}, \mathbf{a}\_{R}, \mathbf{a}\_{O}\\).
+generating challenge values bound to the commitments \\(V_i\\), filling in weights \\(\textbf{W}\_L,\textbf{W}\_R,\textbf{W}\_O,\textbf{W}\_V\\), and assigning values to the left, right and output wires
+of the multiplication gates (\\(\mathbf{a}\_{L}, \mathbf{a}\_{R}, \mathbf{a}\_{O}\\)).
 
 Once all multiplication wires are assigned, the prover commits to them via vector Pedersen commitments:
 
@@ -664,8 +666,66 @@ The complete circuit proof consists of \\(13+2k\\) 32-byte elements:
 Verifier’s algorithm
 --------------------
 
-TBD.
+The input to the verifier is the aggregated proof, which contains the \\(m\\) value commitments \\(V_{(j)}\\),
+and \\(32 \cdot (13 + 2 k)\\) bytes of the proof data where \\(k = \log_2(n)\\) and \\(n\\) is a number of multiplication gates in a circuit:
+
+\\[
+  \\{A\_I, A\_O, S, T\_1, T\_3, T\_4, T\_5, T\_6, t(x), {\tilde{t}}(x), \tilde{e}, L\_k, R\_k, \\dots, L\_1, R\_1, a, b\\}
+\\]
+
+The verifier starts by adding all value commitments \\(V_i\\) to the protocol transcript.
+
+The verifier then [builds constraints](#building-constraints), allocating necessary multiplication gates on the fly and
+generating challenge values bound to the commitments \\(V_i\\).
+
+The verifier uses the Fiat-Shamir transform to obtain challenges by adding the appropriate data sequentially to the protocol transcript:
+
+1. \\(A_I, A_O, S\\) are added to obtain challenge scalars \\(y,z \in {\mathbb Z\_p}\\),
+2. \\(T_1, T_3, T_4, T_5, T_6\\) are added to obtain a challenge \\(x \in {\mathbb Z\_p}\\),
+3. \\(t(x), {\tilde{t}}(x), \tilde{e}\\) are added to obtain a challenge \\(w \in {\mathbb Z\_p}\\).
+
+The verifier computes the following scalars for the [inner product argument](../inner_product_proof/index.html):
+
+\\[
+	\\{u\_{1}^{2}, \dots, u\_{k}^{2}, u\_{1}^{-2}, \dots, u\_{k}^{-2}, s_0, \dots, s_{n-1}\\}
+\\]
+
+The goal of the verifier is to check two equations:
+
+1. First, verify the second term of the polynomial \\(t(x)\\) (see [notes](#proving-that-t_2-is-correct)):
+
+  \\[
+  \begin{aligned}
+  t(x) B + {\tilde{t}}(x) {\widetilde{B}} &\stackrel{?}{=} x^2 \langle z \textbf{z}^q , \textbf{W}\_V \cdot \textbf{V} \rangle + x^2 \big(\langle  z \textbf{z}^q , \textbf{c} \rangle + \delta(y,z)\big) B + \sum\_{i = 1,3,4,5,6} x^i T\_{i},\\\\
+  \delta(y, z) &= \langle \textbf{y}^{-n} \circ (z \textbf{z}^q \cdot \textbf{W}\_R), z \textbf{z}^q \cdot \textbf{W}\_L \rangle \\\\
+  \end{aligned}
+  \\]
+
+  If we rewrite the check as a comparison with the identity point, we get:
+  \\[
+  0 \stackrel{?}{=} x^2 \langle z \textbf{z}^q , \textbf{W}\_V \cdot \textbf{V} \rangle + x^2 \big(\langle  z \textbf{z}^q , \textbf{c} \rangle + \delta(y,z)\big) B + \sum\_{i = 1,3,4,5,6} x^i T\_{i} - t(x) B - {\tilde{t}}(x) {\widetilde{B}}
+  \\]
+
+2. Second, verify the inner product argument for the vectors \\(\mathbf{l}(x), \mathbf{r}(x)\\) that form the \\(t(x)\\) (see [inner-product protocol](../inner_product_proof/index.html#verification-equation))
+  
+  \\[
+  P' \overset ? = {\langle a \cdot {\mathbf{s}}, {\mathbf{G}} \rangle} + {\langle {\mathbf{y}^{-n}} \circ (b /{\mathbf{s}}), {\mathbf{H}} \rangle} + abQ - \sum\_{j=1}^{k} \left( L\_{j} u\_{j}^{2} + u\_{j}^{-2} R\_{j} \right).
+  \\]
+
+  Rewriting as a comparison with the identity point and expanding \\(Q = wB\\) and \\(P' = P + t(x) wB\\) as [needed for transition to the inner-product protocol](../notes/index.html#inner-product-proof):
+  
+  \\[
+  0 \overset ? = P + t(x) wB - {\langle a \cdot {\mathbf{s}}, {\mathbf{G}} \rangle} - {\langle {\mathbf{y}^{-n}} \circ (b /{\mathbf{s}}), {\mathbf{H}} \rangle} - abwB + \sum\_{j=1}^{k} \left( L\_{j} u\_{j}^{2} + u\_{j}^{-2} R\_{j} \right),
+  \\]
+  where the [definition](#proving-that-textbflx-textbfrx-are-correct) of \\(P\\) is:
+
+\\[
+\begin{aligned}
+  P &= -{\widetilde{e}} {\widetilde{B}} + x \cdot A_I + x^2 \cdot A_O - \langle \textbf{1}, \textbf{H} \rangle + W_L \cdot x + W_R \cdot x + W_O + x^3 \cdot S \\\\
+\end{aligned}
+\\]
 
 
+TBD: merge in one megacheck
 
-[bp_website]: https://crypto.stanford.edu/bulletproofs/
+
