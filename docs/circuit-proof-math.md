@@ -162,6 +162,25 @@ are multiplied by a powers of \\(z\\) between \\(z^1\\) and \\(z^q\\). Combining
 \rangle = 0
 \\]
 
+Before we proceed, we break apart the equation into individual terms and factor out “flattened constraints”:
+
+\\[
+\begin{aligned}
+\langle \textbf{a}\_L \circ \textbf{a}\_R - \textbf{a}\_O ,
+\textbf{y}^n \rangle &+
+\langle \mathbf{w}\_L, \textbf{a}\_L \rangle +
+\langle \mathbf{w}\_R, \textbf{a}\_R \rangle +
+\langle \mathbf{w}\_O, \textbf{a}\_O \rangle -
+\langle \mathbf{w}\_V, \textbf{v}    \rangle - w\_c = 0 \\\\
+\mathbf{w}\_L &\leftarrow z \textbf{z}^q \cdot \textbf{W}\_L, \\\\
+\mathbf{w}\_R &\leftarrow z \textbf{z}^q \cdot \textbf{W}\_R, \\\\
+\mathbf{w}\_O &\leftarrow z \textbf{z}^q \cdot \textbf{W}\_O, \\\\
+\mathbf{w}\_V &\leftarrow z \textbf{z}^q \cdot \textbf{W}\_V, \\\\
+w\_c          &\leftarrow \langle z \textbf{z}^q, \textbf{c} \rangle, \\\\
+\end{aligned}
+\\]
+where each of \\(\mathbf{w}\_L, \mathbf{w}\_R, \mathbf{w}\_O\\) has length \\(n\\) and \\(\mathbf{w}\_V\\) has length \\(m\\).
+
 [^1]: This is because the polynomial in terms of \\(y\\) is zero at every point
 if and only if every term of it is zero. The verifier is going to sample
 a random \\(y\\) after the prover commits to all the values forming the terms of
