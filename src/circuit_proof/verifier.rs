@@ -242,7 +242,7 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
 
         let a = proof.ipp_proof.a;
         let b = proof.ipp_proof.b;
-        let xx = x * x;
+
         let y_inv = y.invert();
         let y_inv_vec = util::exp_iter(y_inv).take(n).collect::<Vec<Scalar>>();
         let yneg_wR = wR
@@ -273,6 +273,7 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
         let mut rng = self.transcript.build_rng().finalize(&mut thread_rng());
         let r = Scalar::random(&mut rng);
 
+        let xx = x * x;
         let rxx = r * xx;
         let xxx = x * xx;
 
