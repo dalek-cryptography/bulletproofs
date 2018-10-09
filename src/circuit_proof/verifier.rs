@@ -245,7 +245,8 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
         let xx = x * x;
         let y_inv = y.invert();
         let y_inv_vec = util::exp_iter(y_inv).take(n).collect::<Vec<Scalar>>();
-        let yneg_wR = wR.iter()
+        let yneg_wR = wR
+            .iter()
             .zip(y_inv_vec.iter())
             .map(|(wRi, exp_y_inv)| wRi * exp_y_inv)
             .collect::<Vec<Scalar>>();
@@ -253,15 +254,19 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
         let delta = inner_product(&yneg_wR, &wL);
 
         // define parameters for P check
-        let g = yneg_wR.iter()
+        let g = yneg_wR
+            .iter()
             .zip(s.iter().take(n))
-            .map(|(yneg_wRi, s_i)| x*yneg_wRi - a * s_i);
+            .map(|(yneg_wRi, s_i)| x * yneg_wRi - a * s_i);
 
-        let h = y_inv_vec.iter()
+        let h = y_inv_vec
+            .iter()
             .zip(s.iter().rev().take(n))
             .zip(wL.iter())
             .zip(wO.iter())
-            .map(|(((y_inv_i, s_i_inv), wLi), wOi)| y_inv_i * (x * wLi + wOi - b * s_i_inv) - Scalar::one());
+            .map(|(((y_inv_i, s_i_inv), wLi), wOi)| {
+                y_inv_i * (x * wLi + wOi - b * s_i_inv) - Scalar::one()
+            });
 
         // Create a `TranscriptRng` from the transcript
         use rand::thread_rng;
@@ -278,7 +283,7 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
             iter::once(x) // A_I
                 .chain(iter::once(xx)) // A_O
                 .chain(iter::once(x * xx)) // S
-                .chain(wV.iter().map(|wVi| wVi*rxx)) // V
+                .chain(wV.iter().map(|wVi| wVi * rxx)) // V
                 .chain(T_scalars.iter().cloned()) // T_points
                 .chain(iter::once(
                     w * (proof.t_x - a * b) + r * (xx * (wc + delta) - proof.t_x),
@@ -288,7 +293,6 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
                 .chain(h) // H
                 .chain(x_sq.iter().cloned()) // ipp_proof.L_vec
                 .chain(x_inv_sq.iter().cloned()), // ipp_proof.R_vec
-                
             iter::once(proof.A_I.decompress())
                 .chain(iter::once(proof.A_O.decompress()))
                 .chain(iter::once(proof.S.decompress()))
@@ -299,7 +303,7 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
                 .chain(gens.G(n).map(|&G_i| Some(G_i)))
                 .chain(gens.H(n).map(|&H_i| Some(H_i)))
                 .chain(proof.ipp_proof.L_vec.iter().map(|L_i| L_i.decompress()))
-                .chain(proof.ipp_proof.R_vec.iter().map(|R_i| R_i.decompress()))
+                .chain(proof.ipp_proof.R_vec.iter().map(|R_i| R_i.decompress())),
         )
         .ok_or_else(|| R1CSError::VerificationError)?;
 
