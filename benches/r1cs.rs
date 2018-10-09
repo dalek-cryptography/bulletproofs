@@ -1,7 +1,9 @@
+#[macro_use]
+extern crate failure;
+
 extern crate bulletproofs;
-use bulletproofs::circuit_proof::assignment::Assignment;
-use bulletproofs::circuit_proof::{prover, verifier, ConstraintSystem, Variable};
-use bulletproofs::{BulletproofGens, PedersenGens, R1CSError};
+use bulletproofs::r1cs::{Assignment, ConstraintSystem, ProverCS, R1CSError, Variable, VerifierCS};
+use bulletproofs::{BulletproofGens, PedersenGens};
 
 #[macro_use]
 extern crate criterion;
@@ -76,12 +78,12 @@ impl KShuffleGadget {
         cs: &mut CS,
         x: Vec<(Variable, Assignment)>,
         y: Vec<(Variable, Assignment)>,
-    ) -> Result<(), R1CSError> {
+    ) -> Result<(), KShuffleError> {
         let one = Scalar::one();
         let z = cs.challenge_scalar(b"k-shuffle challenge");
         let neg_z = -z;
         if x.len() != y.len() {
-            return Err(R1CSError::InvalidR1CSConstruction);
+            return Err(KShuffleError::InvalidR1CSConstruction);
         }
         let k = x.len();
         if k == 1 {
@@ -166,7 +168,7 @@ impl KShuffleGadget {
         left_var: Variable,
         right_var: Variable,
         is_last_mul: bool,
-    ) -> Result<Variable, R1CSError> {
+    ) -> Result<Variable, KShuffleError> {
         let one = Scalar::one();
         let var_one = Variable::One();
         // Make multiplier gate variables
@@ -191,6 +193,30 @@ impl KShuffleGadget {
     }
 }
 
+/// Represents an error during the proof creation of verification for a KShuffle gadget.
+#[derive(Fail, Copy, Clone, Debug, Eq, PartialEq)]
+pub enum KShuffleError {
+    /// Error in the constraint system creation process
+    #[fail(display = "Invalid KShuffle constraint system construction")]
+    InvalidR1CSConstruction,
+    /// Occurs when there are insufficient generators for the proof.
+    #[fail(display = "Invalid generators size, too few generators for proof")]
+    InvalidGeneratorsLength,
+    /// Occurs when verification of an [`R1CSProof`](::r1cs::R1CSProof) fails.
+    #[fail(display = "R1CSProof did not verify correctly.")]
+    VerificationError,
+}
+
+impl From<R1CSError> for KShuffleError {
+    fn from(e: R1CSError) -> KShuffleError {
+        match e {
+            R1CSError::InvalidGeneratorsLength => KShuffleError::InvalidGeneratorsLength,
+            R1CSError::MissingAssignment => KShuffleError::InvalidR1CSConstruction,
+            R1CSError::VerificationError => KShuffleError::VerificationError,
+        }
+    }
+}
+
 // Helper functions for proof creation
 fn kshuffle_prover_cs<'a, 'b>(
     pc_gens: &'b PedersenGens,
@@ -198,7 +224,7 @@ fn kshuffle_prover_cs<'a, 'b>(
     transcript: &'a mut Transcript,
     input: &Vec<u64>,
     output: &Vec<u64>,
-) -> Result<(prover::ProverCS<'a, 'b>, Vec<CompressedRistretto>), R1CSError> {
+) -> Result<(ProverCS<'a, 'b>, Vec<CompressedRistretto>), KShuffleError> {
     let k = input.len();
 
     // Prover makes a `ConstraintSystem` instance representing a shuffle gadget
@@ -223,7 +249,7 @@ fn kshuffle_prover_cs<'a, 'b>(
     };
     let v_blinding: Vec<Scalar> = (0..2 * k).map(|_| Scalar::random(&mut rng)).collect();
     let (mut prover_cs, variables, commitments) =
-        prover::ProverCS::new(&bp_gens, &pc_gens, transcript, v, v_blinding.clone());
+        ProverCS::new(&bp_gens, &pc_gens, transcript, v, v_blinding.clone());
 
     // Prover allocates variables and adds constraints to the constraint system
     let in_pairs = variables[0..k]
@@ -298,12 +324,12 @@ fn kshuffle_verifier_cs<'a, 'b>(
     bp_gens: &'b BulletproofGens,
     transcript: &'a mut Transcript,
     commitments: &Vec<CompressedRistretto>,
-) -> Result<verifier::VerifierCS<'a, 'b>, R1CSError> {
+) -> Result<VerifierCS<'a, 'b>, KShuffleError> {
     let k = commitments.len() / 2;
 
     // Verifier makes a `ConstraintSystem` instance representing a shuffle gadget
     let (mut verifier_cs, variables) =
-        verifier::VerifierCS::new(&bp_gens, &pc_gens, transcript, commitments.to_vec());
+        VerifierCS::new(&bp_gens, &pc_gens, transcript, commitments.to_vec());
 
     // Verifier allocates variables and adds constraints to the constraint system
     let in_pairs = variables[0..k]
