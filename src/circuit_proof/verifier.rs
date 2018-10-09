@@ -287,10 +287,12 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
         let mega_check = RistrettoPoint::optional_multiscalar_mul(
             iter::once(x) // A_I
                 .chain(iter::once(xx)) // A_O
+                .chain(iter::once(x * xx)) // S
+                .chain(V_coeff) // V
+                .chain(T_scalars.iter().cloned()) // T_points
                 .chain(iter::once(x)) // W_L_point
                 .chain(iter::once(x)) // W_R_point
                 .chain(z_zQ_WO.iter().cloned()) // H_prime
-                .chain(iter::once(x * xx)) // S
                 .chain(iter::once(
                     w * (proof.t_x - a * b) + r * (xx * (delta + z_zQ_c) - proof.t_x),
                 )) // B
@@ -298,24 +300,23 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
                 .chain(g) // G
                 .chain(h) // H
                 .chain(x_sq.iter().cloned()) // ipp_proof.L_vec
-                .chain(x_inv_sq.iter().cloned()) // ipp_proof.R_vec
-                .chain(V_coeff) // V
-                .chain(T_scalars.iter().cloned()), // T_points
+                .chain(x_inv_sq.iter().cloned()), // ipp_proof.R_vec
+                
             iter::once(proof.A_I.decompress())
                 .chain(iter::once(proof.A_O.decompress()))
+                .chain(iter::once(proof.S.decompress()))
+                .chain(self.V.iter().map(|V_i| V_i.decompress()))
+                .chain(T_points.iter().map(|T_i| T_i.decompress()))
                 .chain(iter::once(Some(W_L_point)))
                 .chain(iter::once(Some(W_R_point)))
                 // W_O_point = <h * y^-n , z * z^Q * W_O>, line 83
                 .chain(H_prime.iter().map(|&H_i| Some(H_i)))
-                .chain(iter::once(proof.S.decompress()))
                 .chain(iter::once(Some(self.pc_gens.B)))
                 .chain(iter::once(Some(self.pc_gens.B_blinding)))
                 .chain(gens.G(n).map(|&G_i| Some(G_i)))
                 .chain(gens.H(n).map(|&H_i| Some(H_i)))
                 .chain(proof.ipp_proof.L_vec.iter().map(|L_i| L_i.decompress()))
                 .chain(proof.ipp_proof.R_vec.iter().map(|R_i| R_i.decompress()))
-                .chain(self.V.iter().map(|V_i| V_i.decompress()))
-                .chain(T_points.iter().map(|T_i| T_i.decompress())),
         )
         .ok_or_else(|| R1CSError::VerificationError)?;
 
