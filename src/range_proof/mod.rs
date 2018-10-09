@@ -222,7 +222,8 @@ impl RangeProof {
             .map(|(j, p)| {
                 p.assign_position(j)
                     .expect("We already checked the parameters, so this should never happen")
-            }).unzip();
+            })
+            .unzip();
 
         let value_commitments: Vec<_> = bit_commitments.iter().map(|c| c.V_j).collect();
 
