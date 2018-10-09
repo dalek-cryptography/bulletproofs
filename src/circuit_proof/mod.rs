@@ -13,6 +13,20 @@ use self::assignment::Assignment;
 use errors::R1CSError;
 use inner_product_proof::InnerProductProof;
 
+/// A proof of some statement specified by a [`ConstraintSystem`].
+///
+/// Statements are specified by writing gadget functions which add
+/// constraints to a `ConstraintSystem` implementation.  To construct
+/// an `R1CSProof`, a prover constructs a
+/// [`ProverCS`](::r1cs::ProverCS), then passes it to gadget functions
+/// to build the constraint system, then consumes the constraint
+/// system using [`ProverCS::prove`](::r1cs::ProverCS::prove) to
+/// produce an `R1CSProof`.  To verify an `R1CSProof`, a verifier
+/// constructs a [`VerifierCS`](::r1cs::VerifierCS), then passes it to
+/// the same gadget functions to (re)build the constraint system, then
+/// consumes the constraint system using
+/// [`VerifierCS::verify`](::r1cs::VerifierCS::verify) to verify the
+/// proof.
 #[derive(Clone, Debug)]
 #[allow(non_snake_case)]
 pub struct R1CSProof {
@@ -58,8 +72,9 @@ pub enum Variable {
     One(),
 }
 
-/// Represents a linear combination of `Variables`.  Each term is
-/// represented by a `(Variable, Scalar)` pair.
+/// Represents a linear combination of
+/// [`Variables`](::r1cs::Variable).  Each term is represented by a
+/// `(Variable, Scalar)` pair.
 #[derive(Clone, Debug)]
 pub struct LinearCombination {
     terms: Vec<(Variable, Scalar)>,
@@ -93,6 +108,18 @@ impl<'a> FromIterator<&'a (Variable, Scalar)> for LinearCombination {
     }
 }
 
+/// The interface for a constraint system, abstracting over the prover
+/// and verifier's roles.
+///
+/// Statements to be proved by an [`R1CSProof`] are specified by
+/// programmatically constructing constraints.  These constraints need
+/// to be identical between the prover and verifier, since the prover
+/// and verifier need to construct the same statement.
+///
+/// To prevent code duplication or mismatches between the prover and
+/// verifier, gadgets for the constraint system should be written
+/// using the `ConstraintSystem` trait, so that the prover and
+/// verifier share the logic for specifying constraints.
 pub trait ConstraintSystem {
     /// Allocate variables for left, right, and output wires of multiplication,
     /// and assign them the Assignments that are passed in.

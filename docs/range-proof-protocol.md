@@ -31,7 +31,7 @@ S_{(j)} &\gets \operatorname{Com}({\mathbf{s}}\_{L, (j)}, {\mathbf{s}}\_{R, (j)}
 \\] where \\(\widetilde{v}\_{(j)}, \widetilde{a}\_{(j)}, \widetilde{s}\_{(j)}\\) are sampled randomly
 from \\({\mathbb Z\_p}\\) and \\(\mathbf{s}\_{L, (j)}, \mathbf{s}\_{R, (j)}\\) are sampled randomly from \\({\mathbb Z\_p}^{n}\\).
 
-The parties all send their \\(V_{(j)}\\), \\(A_{(j)}\\), and \\(S_{(j)}\\) values to the dealer as `ValueCommitment`. The dealer adds each \\(V_{(j)}\\) value to the protocol transcript, in order. The dealer then computes \\(A\\) and \\(S\\) as follows:
+The parties all send their \\(V_{(j)}\\), \\(A_{(j)}\\), and \\(S_{(j)}\\) values to the dealer as `BitCommitment`. The dealer adds each \\(V_{(j)}\\) value to the protocol transcript, in order. The dealer then computes \\(A\\) and \\(S\\) as follows:
 
 \\[
 \begin{aligned}
@@ -40,9 +40,9 @@ The parties all send their \\(V_{(j)}\\), \\(A_{(j)}\\), and \\(S_{(j)}\\) value
 \end{aligned}
 \\]
 
-The dealer adds \\(A\\) and \\(S\\) to the protocol transcript and obtains challenge scalars \\(y,z \in {\mathbb Z\_p}\\) from the transcript. The dealer sends \\(y, z\\) as `ValueChallenge` to all of the parties.
+The dealer adds \\(A\\) and \\(S\\) to the protocol transcript and obtains challenge scalars \\(y,z \in {\mathbb Z\_p}\\) from the transcript. The dealer sends \\(y, z\\) as `BitChallenge` to all of the parties.
 
-Using their secret vectors and the challenges \\(y, z\\) from `ValueChallenge`, each party constructs vector polynomials:
+Using their secret vectors and the challenges \\(y, z\\) from `BitChallenge`, each party constructs vector polynomials:
 \\[
 \begin{aligned}
   {\mathbf{l}}\_{(j)}(x) &= {\mathbf{l}}\_{0, (j)} + {\mathbf{l}}\_{1, (j)} x \\\\
