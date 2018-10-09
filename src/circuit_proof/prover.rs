@@ -13,6 +13,19 @@ use generators::{BulletproofGens, PedersenGens};
 use inner_product_proof::InnerProductProof;
 use transcript::TranscriptProtocol;
 
+/// A [`ConstraintSystem`] implementation for use by the prover.
+///
+/// The lifecycle of a `ProverCS` is as follows.  The proving code
+/// assembles openings `(v, v_blinding)` to the commitments to the
+/// inputs to the constraint system, then passes them, along with
+/// generators and a transcript, to [`ProverCS::new`].  This
+/// initializes the `ProverCS` and returns [`Variable`]s corresponding
+/// to the inputs.
+///
+/// The prover can then pass the `ProverCS` and the external variables
+/// to gadget code to build the constraints, before finally calling
+/// [`ProverCS::prove`], which consumes the `ProverCS`, synthesizes
+/// the witness, and constructs the proof.
 pub struct ProverCS<'a, 'b> {
     transcript: &'a mut Transcript,
     bp_gens: &'b BulletproofGens,
@@ -71,6 +84,43 @@ impl<'a, 'b> ConstraintSystem for ProverCS<'a, 'b> {
 }
 
 impl<'a, 'b> ProverCS<'a, 'b> {
+    /// Construct an empty constraint system with specified external
+    /// input variables.
+    ///
+    /// # Inputs
+    ///
+    /// The `bp_gens` and `pc_gens` are generators for Bulletproofs
+    /// and for the Pedersen commitments, respectively.  The
+    /// [`BulletproofGens`] should have `gens_capacity` greater than
+    /// the number of multiplication constraints that will eventually
+    /// be added into the constraint system.
+    ///
+    /// The `transcript` parameter is a Merlin proof transcript.  The
+    /// `ProverCS` holds onto the `&mut Transcript` until it consumes
+    /// itself during [`ProverCS::prove`], releasing its borrow of the
+    /// transcript.  This ensures that the transcript cannot be
+    /// altered except by the `ProverCS` before proving is complete.
+    ///
+    /// The `v` and `v_blinding` parameters are openings to the
+    /// commitments to the external variables for the constraint
+    /// system.  Passing the opening (the value together with the
+    /// blinding factor) makes it possible to reference pre-existing
+    /// commitments in the constraint system.  All external variables
+    /// must be passed up-front, so that challenges produced by
+    /// [`ConstraintSystem::challenge_scalar`] are bound to the
+    /// external variables.
+    ///
+    /// # Returns
+    ///
+    /// Returns a tuple `(cs, vars, commitments)`.
+    ///
+    /// The first element is the newly constructed constraint system.
+    ///
+    /// The second element is a list of [`Variable`]s corresponding to
+    /// the external inputs, which can be used to form constraints.
+    ///
+    /// The third element is a list of the Pedersen commitments to the
+    /// external inputs, returned for convenience.
     pub fn new(
         bp_gens: &'b BulletproofGens,
         pc_gens: &'b PedersenGens,
@@ -174,9 +224,9 @@ impl<'a, 'b> ProverCS<'a, 'b> {
             let pad = temp_n.next_power_of_two() - temp_n;
             for _ in 0..pad {
                 let _ = self.assign_multiplier(
-                    Assignment::zero(),
-                    Assignment::zero(),
-                    Assignment::zero(),
+                    Scalar::zero().into(),
+                    Scalar::zero().into(),
+                    Scalar::zero().into(),
                 );
             }
         }
@@ -219,13 +269,15 @@ impl<'a, 'b> ProverCS<'a, 'b> {
             iter::once(&self.pc_gens.B_blinding)
                 .chain(gens.G(n))
                 .chain(gens.H(n)),
-        ).compress();
+        )
+        .compress();
 
         // A_O = <a_O, G> + o_blinding * B_blinding
         let A_O = RistrettoPoint::multiscalar_mul(
             iter::once(&o_blinding).chain(self.a_O.iter()),
             iter::once(&self.pc_gens.B_blinding).chain(gens.G(n)),
-        ).compress();
+        )
+        .compress();
 
         // S = <s_L, G> + <s_R, H> + s_blinding * B_blinding
         let S = RistrettoPoint::multiscalar_mul(
@@ -233,7 +285,8 @@ impl<'a, 'b> ProverCS<'a, 'b> {
             iter::once(&self.pc_gens.B_blinding)
                 .chain(gens.G(n))
                 .chain(gens.H(n)),
-        ).compress();
+        )
+        .compress();
 
         self.transcript.commit_point(b"A_I", &A_I);
         self.transcript.commit_point(b"A_O", &A_O);
@@ -250,13 +303,13 @@ impl<'a, 'b> ProverCS<'a, 'b> {
         let mut r_poly = util::VecPoly3::zero(n);
 
         let mut exp_y = Scalar::one(); // y^n starting at n=0
-        let mut exp_y_inv = Scalar::one(); // y^-n starting at n=0
         let y_inv = y.invert();
+        let exp_y_inv = util::exp_iter(y_inv).take(n).collect::<Vec<_>>();
 
         for i in 0..n {
             // l_poly.0 = 0
             // l_poly.1 = a_L + y^-n * (z * z^Q * W_R)
-            l_poly.1[i] = self.a_L[i] + exp_y_inv * z_zQ_WR[i];
+            l_poly.1[i] = self.a_L[i] + exp_y_inv[i] * z_zQ_WR[i];
             // l_poly.2 = a_O
             l_poly.2[i] = self.a_O[i];
             // l_poly.3 = s_L
@@ -270,7 +323,6 @@ impl<'a, 'b> ProverCS<'a, 'b> {
             r_poly.3[i] = exp_y * s_R[i];
 
             exp_y = exp_y * y; // y^i -> y^(i+1)
-            exp_y_inv = exp_y_inv * y_inv; // y^-i -> y^-(i+1)
         }
 
         let t_poly = l_poly.inner_product(&r_poly);
@@ -330,7 +382,7 @@ impl<'a, 'b> ProverCS<'a, 'b> {
         let ipp_proof = InnerProductProof::create(
             self.transcript,
             &Q,
-            util::exp_iter(y.invert()),
+            &exp_y_inv,
             gens.G(n).cloned().collect(),
             gens.H(n).cloned().collect(),
             l_vec,

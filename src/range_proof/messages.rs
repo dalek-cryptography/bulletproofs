@@ -4,56 +4,60 @@
 //! For more explanation of how the `dealer`, `party`, and `messages` modules orchestrate the protocol execution, see
 //! [the API for the aggregated multiparty computation protocol](../aggregation/index.html#api-for-the-aggregated-multiparty-computation-protocol).
 
-use curve25519_dalek::ristretto::RistrettoPoint;
+use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
 
 use generators::{BulletproofGens, PedersenGens};
 
-/// XXX rename this to `BitCommitment`
+/// A commitment to the bits of a party's value.
 #[derive(Serialize, Deserialize, Copy, Clone, Debug)]
-pub struct ValueCommitment {
-    pub V_j: RistrettoPoint,
-    pub A_j: RistrettoPoint,
-    pub S_j: RistrettoPoint,
+pub struct BitCommitment {
+    pub(super) V_j: CompressedRistretto,
+    pub(super) A_j: RistrettoPoint,
+    pub(super) S_j: RistrettoPoint,
 }
 
+/// Challenge values derived from all parties' [`BitCommitment`]s.
 #[derive(Serialize, Deserialize, Copy, Clone, Debug)]
-pub struct ValueChallenge {
-    pub y: Scalar,
-    pub z: Scalar,
+pub struct BitChallenge {
+    pub(super) y: Scalar,
+    pub(super) z: Scalar,
 }
 
+/// A commitment to a party's polynomial coefficents.
 #[derive(Serialize, Deserialize, Copy, Clone, Debug)]
 pub struct PolyCommitment {
-    pub T_1_j: RistrettoPoint,
-    pub T_2_j: RistrettoPoint,
+    pub(super) T_1_j: RistrettoPoint,
+    pub(super) T_2_j: RistrettoPoint,
 }
 
+/// Challenge values derived from all parties' [`PolyCommitment`]s.
 #[derive(Serialize, Deserialize, Copy, Clone, Debug)]
 pub struct PolyChallenge {
-    pub x: Scalar,
+    pub(super) x: Scalar,
 }
 
+/// A party's proof share, ready for aggregation into the final
+/// [`RangeProof`](::RangeProof).
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ProofShare {
-    pub t_x: Scalar,
-    pub t_x_blinding: Scalar,
-    pub e_blinding: Scalar,
-
-    pub l_vec: Vec<Scalar>,
-    pub r_vec: Vec<Scalar>,
+    pub(super) t_x: Scalar,
+    pub(super) t_x_blinding: Scalar,
+    pub(super) e_blinding: Scalar,
+    pub(super) l_vec: Vec<Scalar>,
+    pub(super) r_vec: Vec<Scalar>,
 }
 
 impl ProofShare {
     /// Audit an individual proof share to determine whether it is
     /// malformed.
-    pub(crate) fn audit_share(
+    pub(super) fn audit_share(
         &self,
         bp_gens: &BulletproofGens,
         pc_gens: &PedersenGens,
         j: usize,
-        value_commitment: &ValueCommitment,
-        value_challenge: &ValueChallenge,
+        bit_commitment: &BitCommitment,
+        bit_challenge: &BitChallenge,
         poly_commitment: &PolyCommitment,
         poly_challenge: &PolyChallenge,
     ) -> Result<(), ()> {
@@ -65,7 +69,7 @@ impl ProofShare {
         use util;
 
         let n = self.l_vec.len();
-        let (y, z) = (&value_challenge.y, &value_challenge.z);
+        let (y, z) = (&bit_challenge.y, &bit_challenge.z);
         let x = &poly_challenge.x;
 
         // Precompute some variables
@@ -96,8 +100,8 @@ impl ProofShare {
                 .chain(iter::once(-self.e_blinding))
                 .chain(g)
                 .chain(h),
-            iter::once(&value_commitment.A_j)
-                .chain(iter::once(&value_commitment.S_j))
+            iter::once(&bit_commitment.A_j)
+                .chain(iter::once(&bit_commitment.S_j))
                 .chain(iter::once(&pc_gens.B_blinding))
                 .chain(bp_gens.share(j).G(n))
                 .chain(bp_gens.share(j).H(n)),
@@ -105,6 +109,8 @@ impl ProofShare {
         if !P_check.is_identity() {
             return Err(());
         }
+
+        let V_j = bit_commitment.V_j.decompress().ok_or(())?;
 
         let sum_of_powers_y = util::sum_of_powers(&y, n);
         let sum_of_powers_2 = util::sum_of_powers(&Scalar::from(2u64), n);
@@ -115,7 +121,7 @@ impl ProofShare {
                 .chain(iter::once(x * x))
                 .chain(iter::once(delta - self.t_x))
                 .chain(iter::once(-self.t_x_blinding)),
-            iter::once(&value_commitment.V_j)
+            iter::once(&V_j)
                 .chain(iter::once(&poly_commitment.T_1_j))
                 .chain(iter::once(&poly_commitment.T_2_j))
                 .chain(iter::once(&pc_gens.B))
