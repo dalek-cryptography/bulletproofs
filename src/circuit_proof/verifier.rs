@@ -274,15 +274,16 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
         let r = Scalar::random(&mut rng);
 
         let rxx = r * xx;
+        let xxx = x * xx;
 
         // group the T_scalars and T_points together
-        let T_scalars = [r * x, rxx * x, rxx * xx, rxx * xx * x, rxx * xx * xx];
+        let T_scalars = [r * x, rxx * x, rxx * xx, rxx * xxx, rxx * xx * xx];
         let T_points = [proof.T_1, proof.T_3, proof.T_4, proof.T_5, proof.T_6];
 
         let mega_check = RistrettoPoint::optional_multiscalar_mul(
             iter::once(x) // A_I
                 .chain(iter::once(xx)) // A_O
-                .chain(iter::once(x * xx)) // S
+                .chain(iter::once(xxx)) // S
                 .chain(wV.iter().map(|wVi| wVi * rxx)) // V
                 .chain(T_scalars.iter().cloned()) // T_points
                 .chain(iter::once(
