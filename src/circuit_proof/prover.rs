@@ -297,7 +297,7 @@ impl<'a, 'b> ProverCS<'a, 'b> {
         let y = self.transcript.challenge_scalar(b"y");
         let z = self.transcript.challenge_scalar(b"z");
 
-        let (z_zQ_WL, z_zQ_WR, z_zQ_WO, z_zQ_WV) = self.flattened_constraints(&z);
+        let (wL, wR, wO, wV) = self.flattened_constraints(&z);
 
         let mut l_poly = util::VecPoly3::zero(n);
         let mut r_poly = util::VecPoly3::zero(n);
@@ -309,15 +309,15 @@ impl<'a, 'b> ProverCS<'a, 'b> {
         for i in 0..n {
             // l_poly.0 = 0
             // l_poly.1 = a_L + y^-n * (z * z^Q * W_R)
-            l_poly.1[i] = self.a_L[i] + exp_y_inv[i] * z_zQ_WR[i];
+            l_poly.1[i] = self.a_L[i] + exp_y_inv[i] * wR[i];
             // l_poly.2 = a_O
             l_poly.2[i] = self.a_O[i];
             // l_poly.3 = s_L
             l_poly.3[i] = s_L[i];
             // r_poly.0 = (z * z^Q * W_O) - y^n
-            r_poly.0[i] = z_zQ_WO[i] - exp_y;
+            r_poly.0[i] = wO[i] - exp_y;
             // r_poly.1 = y^n * a_R + (z * z^Q * W_L)
-            r_poly.1[i] = exp_y * self.a_R[i] + z_zQ_WL[i];
+            r_poly.1[i] = exp_y * self.a_R[i] + wL[i];
             // r_poly.2 = 0
             // r_poly.3 = y^n * s_R
             r_poly.3[i] = exp_y * s_R[i];
@@ -349,7 +349,7 @@ impl<'a, 'b> ProverCS<'a, 'b> {
 
         // t_2_blinding = <z*z^Q, W_V * v_blinding>
         // in the t_x_blinding calculations, line 76.
-        let t_2_blinding = z_zQ_WV
+        let t_2_blinding = wV
             .iter()
             .zip(self.v_blinding.iter())
             .map(|(c, v_blinding)| c * v_blinding)
