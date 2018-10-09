@@ -258,7 +258,7 @@ Add \\(\delta(y, z) = \langle \mathbf{y}^{-n} \circ \mathbf{w}\_R, \mathbf{w}\_L
 \\[
 \begin{aligned}
 w\_c + \langle \mathbf{w}\_V, \mathbf{v} \rangle +
-\delta(y, z) \\\\
+\delta(y, z)
 &= \langle \mathbf{a}\_L + \mathbf{y}^{-n} \circ \mathbf{w}\_R, 
 \mathbf{y}^n \circ \mathbf{a}\_R \rangle + 
 \langle \mathbf{a}\_L,
@@ -273,7 +273,7 @@ Merge the terms containing \\(\mathbf{w}\_L\\):
 
 \\[
 \begin{aligned}
-w\_c + \langle \mathbf{w}\_V, \mathbf{v} \rangle + \delta(y, z) \\\\
+w\_c + \langle \mathbf{w}\_V, \mathbf{v} \rangle + \delta(y, z)
 &= \langle \mathbf{a}\_L + \mathbf{y}^{-n} \circ \mathbf{w}\_R, 
 \mathbf{y}^n \circ \mathbf{a}\_R \rangle + 
 \langle \mathbf{a}\_L + \mathbf{y}^{-n} \circ \mathbf{w}\_R,
