@@ -1,11 +1,15 @@
-Arithmetic Circuit Proofs
-=========================
+Constraint System Proofs
+========================
 
-An arithmetic circuit is a directed acyclic graph, where every node with indegree zero is an input gate, and every other node is either a multiplication gate or an addition gate. Multiplication gates can either be variable multiplication gates, where two variables are multiplied together, or constant multiplication gates, where a variable is multiplied by a constant. Addition gates can also be either variable addition gates or constant addition gates.
+_Constraint system_ is a system that defines arithmetic constraints over a set of variables.
+The proof system allows _a verifier_ to specify the constraints, for which _a prover_ is asked to generate a valid proof.
+The resulting proof is _zero-knowledge_: while the constraints are known to both the prover and the verifier, the variables remain secret.
 
-The goal of an *arithmetic circuit proof* is for a prover to convince a verifier that a particular set of values \\({\mathbf{v}}\\) satisfy the constraints represented by the arithmetic circuit, without revealing any additional information about the values \\({\mathbf{v}}\\).
+The constraint system we use is specifically a _rank-1 quadratic constraint system_ or _R1CS_.
+Such system allows expressing linear constraints over _individual variables_ as well as _multiplications of variables_.
 
-The prover will use the efficient [inner product protocol](../inner_product_proof/index.html) to do this, so we want to work towards expressing the arithmetic circuit's conditions in terms of a single inner product. The prover begins with a vector of secret values \\({\mathbf{v}}\\), and a vector of Pedersen commitments to those secret values \\({\mathbf{V}}\\). The prover will send \\({\mathbf{V}}\\) to the verifier, along with the proof.
+The proving system uses efficient [inner product protocol](../inner_product_proof/index.html) by expressing all the constraints in terms of a single inner product.
+The following notes describe in detail how this is accomplished.
 
 Notation
 --------
@@ -28,32 +32,47 @@ We will use the notation described in the [`notation`](../notes/index.html#notat
 
 [bp_website]: https://crypto.stanford.edu/bulletproofs/
 
-From an arithmetic circuit to a constraint system
--------------------------------------------------
+Constraint system
+-----------------
 
-An arithmetic circuit represents a set of _constraints_ on some inputs, where the constraints are satisfied if and only if the inputs are correctly applied to the circuit and all of the gates in the arithmetic circuit graph perform their operations correctly. Therefore, an arithmetic circuit can also be expressed as a set of constraints on inputs.
+The constraint system consists of two sets of constraints: [multiplication gates](#multiplication-gates) and [linear constraints](#linear-constraints) in terms of the [variables](#variables).
 
-One type of gate in an arithmetic circuit is a _variable multiplication gate_, which takes two input variables and multiplies them to get an output. If for all of the multiplication gates in a circuit, \\(\mathbf{a}\_L\\) is the vector of the first input to each gate, \\(\mathbf{a}\_R\\) is the vector of the second input to each gate, and \\(\mathbf{a}\_O\\) is the vector of results, then the following equation will represent the relationship between the wires of all the multiplication gates in the circuit:
+### Variables
+
+There are two kinds of variables in the constraint system:
+
+1. \\(m\\) **high-level** variables, the input secrets \\(\mathbf{v}\\),
+2. \\(n\\) **low-level** variables, the internal inputs and outputs of the [multiplication gates](#multiplication-gates).
+
+### Multiplication gates
+
+Each multiplication gate takes two input variables and multiplies them to get an output.
+That relation for all multiplication gates is represented by \\(n\\) constraints:
 
 \\[
-\mathbf{a}\_L \circ \mathbf{a}\_R = \mathbf{a}\_O
+\mathbf{a}\_L \circ \mathbf{a}\_R = \mathbf{a}\_O,
 \\]
+where:
+* \\(\mathbf{a}\_L\\) is the vector of the first input to each gate,
+* \\(\mathbf{a}\_R\\) is the vector of the second input to each gate,
+* \\(\mathbf{a}\_O\\) is the vector of multiplication results.
 
-Other types of gates in arithmetic circuits can be represented as a collection of linear constraints:
+### Linear constraints
 
-* _constant multiplication gates_ are represented by multiplying the input variable by a corresponding constant in a matrix (\\(\mathbf{W}\_L, \mathbf{W}\_R, \mathbf{W}\_O, \mathbf{W}\_V\\)),
-* _constant addition gates_ are represented by multiplying the input variable by one and adding the constant in \\( \mathbf{c}\\),
-* _variable addition gates_ are represented by multiplying both input variables by one.
-
-All of these constraints are represented together in the following equation:
+Linear constraints are expressed using a vector of \\(q\\) equations that use linear combinations of the [variables](#variables):
 
 \\[
 \mathbf{W}\_L \cdot \mathbf{a}\_L +
 \mathbf{W}\_R \cdot \mathbf{a}\_R +
 \mathbf{W}\_O \cdot \mathbf{a}\_O =
 \mathbf{W}\_V \cdot \mathbf{v} +
-\mathbf{c}
+\mathbf{c},
 \\]
+where:
+
+* \\(\mathbf{W}\_L, \mathbf{W}\_R, \mathbf{W}\_O\\) are weights applied to the respective inputs and outputs of the [multiplication gates](#multiplication-gates) (low-level [variables](#variables)),
+* \\(\mathbf{W}\_V\\) are weights applied to the high-level [variables](#variables) \\(\mathbf{v}\\),
+* \\(\mathbf{c}\\) is a vector of constant terms used in the linear constraints.
 
 
 ### Building constraints
@@ -66,28 +85,25 @@ generated by verifier to a prover.
 The prover starts out by committing to its secret inputs \\(\mathbf{v}\\)
 and obtaining \\(m\\) _variables_ representing these inputs.
 
-Then, the prover creates linear combinations of available variables that can be of two kinds:
-
-1. _high-level_: the input secrets \\(\mathbf{v}\\),
-2. or _low-level_: the internal inputs and outputs of multiplication gates \\(\mathbf{a}\_L, \mathbf{a}\_R, \mathbf{a}\_O\\).
+Then, the prover creates linear combinations of available [variables](#variables)
 
 The prover performs a combination of the following operations to generate the circuit
 using linear constraints and multiplication gates:
 
-1. **Allocate a multiplier:** a new multiplication gate is added represented by 3 variables \\(a_L, a_R, a_O\\), for left input, right input and output value respectively.
-2. **Add a constraint:** a linear combination of any number of variables is encoded into appropriate positions in matrices \\(\mathbf{W}\_L, \mathbf{W}\_R, \mathbf{W}\_O, \mathbf{W}\_V\\) and a vector of constants \\(\mathbf{c}\\).
-3. **Request a challenge scalar:** a random scalar returned in response to committed high-level variables.
+1. **Allocate a multiplier:** a new [multiplication gate](#multiplication-gates) is added represented by three [low-level variables](#variables) \\(a_L, a_R, a_O\\), for left input, right input and output value respectively.
+2. **Add a constraint:** a [linear combination](#linear-constraints) of any number of [variables](#variables) is encoded into appropriate positions in matrices \\(\mathbf{W}\_L, \mathbf{W}\_R, \mathbf{W}\_O, \mathbf{W}\_V\\) and a vector of constants \\(\mathbf{c}\\).
+3. **Request a challenge scalar:** a random scalar returned in response to committed [high-level variables](#variables).
+
 
 ### Unconstrained variables
 
 Often a circuit is formed using _gadgets_: subcircuits that represent various constraints defined in a higher-level protocol.
 The “wires” connecting such subcircuits are called _uncommitted variables_ and created from left and right variables \\(a\_L, a\_R\\) of
-auxilliary multiplication gates (output variables \\(a\_O\\) intentionally left unconstrained).
-
+additional multiplication gates (output variables \\(a\_O\\) are intentionally left unconstrained).
 
 ### Circuit as a challenge
 
-Challenge scalars can be used to construct circuits more efficiently.
+Intermediate challenge scalars can be used to construct circuits more efficiently.
 
 For example, a proof of permutation (verifiable shuffle) can be done by proving equality of
 two polynomials sampled at a challenge point, where roots of each polynomial
@@ -97,17 +113,23 @@ represent secret values of the corresponding side of a permutation:
  \\{a,b\\} = \\{c,d\\}  \iff  (a-x)\cdot(b-x) = (c-x)\cdot(d-x),
 \\] where \\(x\\) is a random challenge, sampled after all values \\(a,b,c,d\\) are committed.
 
-Making a proof of permutation using a static circuit would require
-building a [sorting network][sorting_network] that requires significantly more multiplication gates.
+Making a proof of permutation using a static circuit may require
+building a [sorting network][sorting_network] that would use significantly more multiplication gates.
+
+**Important:** since challenges in the linear constraints are bound only to [high-level variables](#variables),
+using them to implement high-level protocols requires proving the soundness of the system as a _whole_.
+Individual gadgets can be proven to be sound only when they do not use such challenges.
+This caveat does not apply to the challenges used to implement the underlying proof system (\\(y, z, x, w\\)),
+as these are produced after all variables (including low-level ones) are committed.
 
 [sorting_network]: https://en.wikipedia.org/wiki/Sorting_network
 
 
 ### Representation of constraints
 
-The matrices \\(\mathbf{W}\_L, \mathbf{W}\_R, \mathbf{W}\_O, \mathbf{W}\_V\\) are usually very sparse:
-most constraints apply to very few variables. As a result, constraints are represented as lists
-of pairs \\((i, w)\\) where \\(i\\) is a variable index, and `w` is its (non-zero) weight.
+The matrices \\(\mathbf{W}\_L, \mathbf{W}\_R, \mathbf{W}\_O, \mathbf{W}\_V\\) are typically very sparse
+because most constraints apply only to a few variables. As a result, constraints are represented as short lists
+of pairs \\((i, w)\\) where \\(i\\) is an index of a variable, and `w` is its (non-zero) weight.
 
 Multiplication of a matrix by a vector is implemented via multiplication of each weight \\(w\\) by 
 a scalar in the vector at a corresponding index \\(i\\). This way, all zero-weight terms are automatically skipped.
