@@ -32,6 +32,9 @@ bincode = "1"
 avx2_backend = ["curve25519-dalek/avx2_backend"]
 
 [[bench]]
-name = "bulletproofs"
+name = "range_proof"
 harness = false
 
+[[bench]]
+name = "r1cs"
+harness = false
