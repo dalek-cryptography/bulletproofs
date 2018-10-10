@@ -485,15 +485,15 @@ Proving that \\(\mathbf{l}(x)\\), \\(\mathbf{r}(x)\\) are correct
 
 We want to relate \\({\mathbf{l}}(x)\\) and \\({\mathbf{r}}(x)\\) to commitments
 to \\({\mathbf{a}}\_{L}\\), \\({\mathbf{a}}\_{R}\\), \\({\mathbf{s}}\_{L}\\), and
-\\({\mathbf{s}}\_{R}\\). Since \\[
+\\({\mathbf{s}}\_{R}\\). Since
+\\[
 {\mathbf{r}}(x) = \mathbf{y}^n \circ \mathbf{a}\_R \cdot x + \mathbf{y}^n \circ \mathbf{s}\_R \cdot x^3 + \mathbf{w}\_L \cdot x - \mathbf{y}^n + \mathbf{w}\_O
 \\]
 we need commitments to \\({\mathbf{y}}^{n} \circ {\mathbf{a}}\_{R}\\) and
-\\({\mathbf{y}}^{n} \circ {\mathbf{s}}\_{R}\\). However, since the prover
-must form commitments before receiving the verifier’s challenge \\(y\\), the
-prover can only commit to \\({\mathbf{a}}\_{R}\\) and \\({\mathbf{s}}\_{R}\\). Since the prover’s
-commitments are to \\({\mathbf{a}}\_{R}\\) and \\({\mathbf{s}}\_{R}\\), the verifier needs to transmute
-the prover’s commitment over
+\\({\mathbf{y}}^{n} \circ {\mathbf{s}}\_{R}\\). However, the prover
+must form commitments before receiving the verifier’s challenge \\(y\\),
+so they can only commit to \\({\mathbf{a}}\_{R}\\) and \\({\mathbf{s}}\_{R}\\),
+requiring the verifier to transmute the prover’s commitment over
 \\(
 ({\mathbf{a}}\_{L},{\mathbf{a}}\_{R}, {\widetilde{a}})
 \\)
@@ -502,6 +502,7 @@ into a commitment over
 ({\mathbf{a}}\_{L}, {\mathbf{y}}^{n} \circ {\mathbf{a}}\_{R}, {\widetilde{a}})
 \\)
 (and similarly for \\({\mathbf{s}}\_{R}\\)).
+
 To do this, notice that
 \\[
 \begin{aligned}
