@@ -106,23 +106,25 @@ Examples:
 
 ### Uncommitted variables
 
-Often a [gadget](#gadgets) needs an internal variable to connect with another gadget,
+Often a [gadget](#gadgets) needs a variable to connect with another gadget,
 or to implement its internal logic, without requiring a distinct [high-level variable](#variables) commitment \\(V\_i\\) for it.
 Such **uncommitted variables** are created from left and right variables \\(a\_L, a\_R\\) of additional multiplication gates.
 Output variables \\(a\_O\\) are not used for this purpose because
 they are implicitly constrained by a [multiplication gate](#multiplication-gates)
 and cannot be used as independent uncommitted variables.
 
-Note: uncommitted variables have their name due to lack of the individual commitments,
+**Important:** uncommitted variables have their name due to lack of the individual commitments \\(V\_i\\),
 but they are still committed collectively with all [low-level variables](#variables)
 using a single vector Pedersen commitment \\(A\_I\\) as required by the underlying proof protocol.
+The distinction is important when [building constraints](#building-constraints) using [challenges](#gadget-as-a-challenge),
+which are bound only to the high-level variables, but not to the low-level variables (hence, “uncommitted”).
 
 
 ### Gadget as a challenge
 
-Intermediate challenge scalars can be used to construct gadgets more efficiently.
+Intermediate challenge scalars can be used to construct [gadgets](#gadgets) more efficiently.
 
-For example, a proof of permutation (“verifiable shuffle”) can be done by proving equality of
+For example, a shuffle gadgets (“proof of permutation”) can be done by proving equality of
 two polynomials sampled at a challenge point, where roots of each polynomial
 represent secret values of the corresponding side of a permutation:
 
