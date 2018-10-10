@@ -99,8 +99,9 @@ that implement features of a higher-level protocol.
 The “wires” that connect the gadgets are called _uncommitted variables_.
 
 Uncommitted variables are created from left and right variables \\(a\_L, a\_R\\) of additional multiplication gates.
-Output variables \\(a\_O\\) are implicitly constrained by a [multiplication gate](#multiplication-gates),
-so they cannot be used as independent uncommitted variables.
+Output variables \\(a\_O\\) are not used for this purpose because
+they are implicitly constrained by a [multiplication gate](#multiplication-gates)
+and cannot be used as independent uncommitted variables.
 
 
 ### Gadget as a challenge
