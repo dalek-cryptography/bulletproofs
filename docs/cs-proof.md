@@ -1,14 +1,15 @@
 Constraint System Proofs
 ========================
 
-_Constraint system_ is a system that defines arithmetic constraints over a set of variables.
-The proof system allows _a verifier_ to specify the constraints, for which _a prover_ is asked to generate a valid proof.
-The resulting proof is _zero-knowledge_: while the constraints are known to both the prover and the verifier, the variables remain secret.
+A **constraint system** is a system that defines arithmetic constraints over a set of variables.
+The proof system allows a **verifier** to specify the constraints, for which a **prover** is asked to generate a valid proof.
+The resulting proof is zero-knowledge: the constraints are known to both the prover and the verifier, but the variables remain secret.
 
-The constraint system we use is specifically a _rank-1 quadratic constraint system_ or _R1CS_.
-Such system allows expressing linear constraints over _individual variables_ as well as _multiplications of variables_.
+The constraint system we use is specifically a **rank-1 quadratic constraint system** or **R1CS**.
+Such system allows expressing linear constraints over individual variables as well as multiplications of these variables.
 
-The proving system uses efficient [inner product protocol](../inner_product_proof/index.html) by expressing all the constraints in terms of a single inner product.
+The proving system uses efficient [inner product protocol](../inner_product_proof/index.html)
+by expressing all the constraints in terms of a single inner product.
 The following notes describe in detail how this is accomplished.
 
 Notation
@@ -92,16 +93,29 @@ Then, the prover performs a combination of the following operations to generate 
 3. **Request a challenge scalar:** a random scalar returned in response to committed [high-level variables](#variables).
 
 
+### Gadgets
+
+Gadgets are buildings blocks of a constraint system that map to some functions in a higher-level protocol.
+Gadgets receive some [variables](#variables) as inputs, may [allocate more variables](#building-constraints) for internal use,
+and produce constrains involving all these variables.
+
+Examples:
+* a **shuffle gadget** creates constraints that prove that two sets of variables are equal up to a permutation;
+* a **range proof gadget** checks that a given value is composed of a specific number of bits.
+
+
 ### Uncommitted variables
 
-Often a constraint system is composed of _gadgets_: subsets of constraints
-that implement features of a higher-level protocol.
-The “wires” that connect the gadgets are called _uncommitted variables_.
-
-Uncommitted variables are created from left and right variables \\(a\_L, a\_R\\) of additional multiplication gates.
+Often a [gadget](#gadgets) needs an internal variable to connect with another gadget,
+or to implement its internal logic, without requiring a distinct [high-level variable](#variables) commitment \\(V\_i\\) for it.
+Such **uncommitted variables** are created from left and right variables \\(a\_L, a\_R\\) of additional multiplication gates.
 Output variables \\(a\_O\\) are not used for this purpose because
 they are implicitly constrained by a [multiplication gate](#multiplication-gates)
 and cannot be used as independent uncommitted variables.
+
+Note: uncommitted variables have their name due to lack of the individual commitments,
+but they are still committed collectively with all [low-level variables](#variables)
+using a single vector Pedersen commitment \\(A\_I\\) as required by the underlying proof protocol.
 
 
 ### Gadget as a challenge
@@ -132,7 +146,7 @@ as these are produced after all variables (including low-level ones) are committ
 
 The matrices \\(\mathbf{W}\_L, \mathbf{W}\_R, \mathbf{W}\_O, \mathbf{W}\_V\\) are typically very sparse
 because most constraints apply only to a few variables. As a result, constraints are represented as short lists
-of pairs \\((i, w)\\) where \\(i\\) is an index of a variable, and `w` is its (non-zero) weight.
+of pairs \\((i, w)\\) where \\(i\\) is an index of a variable, and \\(w\\) is its (non-zero) weight.
 
 Multiplication of a matrix by a vector is implemented via multiplication of each weight \\(w\\) by 
 a scalar in the vector at a corresponding index \\(i\\). This way, all zero-weight terms are automatically skipped.
