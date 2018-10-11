@@ -246,7 +246,7 @@ This arrangement will allow us to verify relations between the resulting inner p
 its vectors and the commitments to high-level and low-level [variables](#variables).
 
 The choice of placing \\({\mathbf{a}}\_{O}\\) on the same side with \\({\mathbf{a}}\_{L}\\) is arbitrary:
-the proof would still work if it was rearranged on the right-hand side instead.
+the proof would still work if \\({\mathbf{a}}\_{O}\\) was rearranged on the right-hand side instead.
 
 If we reorder terms, we get:
 
