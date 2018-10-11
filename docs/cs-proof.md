@@ -421,9 +421,9 @@ which represent the left and right sides of the input to the inner-product equat
 \\[
 \begin{aligned}
   {\mathbf{l}}(x) &= (\mathbf{a}\_L + \mathbf{s}\_L \cdot x^2) \cdot x + \mathbf{y}^{-n} \circ \mathbf{w}\_R \cdot x + \mathbf{a}\_O \cdot x^2 \\\\
-  &= \mathbf{a}\_L \cdot x + \mathbf{s}\_L \cdot x^3 + \mathbf{y}^{-n} \circ \mathbf{w}\_R \cdot x + \mathbf{a}\_O \cdot x^2 \\\\
+                  &= \mathbf{a}\_L \cdot x + \mathbf{s}\_L \cdot x^3 + \mathbf{y}^{-n} \circ \mathbf{w}\_R \cdot x + \mathbf{a}\_O \cdot x^2 \\\\
   {\mathbf{r}}(x) &= \mathbf{y}^n \circ (\mathbf{a}\_R + \mathbf{s}\_R \cdot x^2) \cdot x + \mathbf{w}\_L \cdot x - \mathbf{y}^n + \mathbf{w}\_O \\\\
-  &= \mathbf{y}^n \circ \mathbf{a}\_R \cdot x + \mathbf{y}^n \circ \mathbf{s}\_R \cdot x^3 + \mathbf{w}\_L \cdot x - \mathbf{y}^n + \mathbf{w}\_O
+                  &= \mathbf{y}^n \circ \mathbf{a}\_R \cdot x + \mathbf{y}^n \circ \mathbf{s}\_R \cdot x^3 + \mathbf{w}\_L \cdot x - \mathbf{y}^n + \mathbf{w}\_O
 \end{aligned}
 \\]
 
@@ -556,18 +556,18 @@ A_O &= \widetilde{B} \cdot \tilde{o} + \langle \mathbf{G} , \mathbf{a}\_O \rangl
 W_L &= \langle \mathbf{y}^{-n} \circ \mathbf{w}\_L, \mathbf{H} \rangle \\\\
 W_R &= \langle \mathbf{y}^{-n} \circ \mathbf{w}\_R, \mathbf{G} \rangle \\\\
 W_O &= \langle \mathbf{y}^{-n} \circ \mathbf{w}\_O, \mathbf{H} \rangle \\\\
-S &= \widetilde{B} \cdot \tilde{s} + \langle \mathbf{G} , \mathbf{s}\_L \rangle + \langle \mathbf{H}, \mathbf{s}\_R \rangle
+S   &= \widetilde{B} \cdot \tilde{s} + \langle \mathbf{G} , \mathbf{s}\_L \rangle + \langle \mathbf{H}, \mathbf{s}\_R \rangle
 \end{aligned}
 \\]
 
 The prover forms these commitments, and sends them to the verifier.
 
-For reference, here are the equations for \\({\mathbf{l}}(x)\\) and \\({\mathbf{r}}(x)\\):
+For reference, here are the equations for \\({\mathbf{l}}(x)\\) and transmuted \\({\mathbf{r}}(x)\\):
 
 \\[
 \begin{aligned}
-  {\mathbf{l}}(x)  &= \mathbf{a}\_L \cdot x + \mathbf{s}\_L \cdot x^3 + \mathbf{y}^{-n} \circ \mathbf{w}\_R \cdot x + \mathbf{a}\_O \cdot x^2 \\\\
-  {\mathbf{r}}(x)  &= \mathbf{y}^n \circ \mathbf{a}\_R \cdot x + \mathbf{y}^n \circ \mathbf{s}\_R \cdot x^3 + \mathbf{w}\_L \cdot x - \mathbf{y}^n + \mathbf{w}\_O
+                        \mathbf{l}(x)  &= \mathbf{a}\_L \cdot x + \mathbf{s}\_L \cdot x^3 + \mathbf{y}^{-n} \circ \mathbf{w}\_R \cdot x + \mathbf{a}\_O \cdot x^2 \\\\
+  \mathbf{y}^{-n} \circ \mathbf{r}(x)  &= \mathbf{a}\_R \cdot x + \mathbf{s}\_R \cdot x^3 + \mathbf{y}^{-n} \circ \mathbf{w}\_L \cdot x - \mathbf{1}^n + \mathbf{y}^{-n} \circ \mathbf{w}\_O
 \end{aligned}
 \\]
 
@@ -607,6 +607,94 @@ if the prover is honest, this is
 so the verifier uses \\(P\\) and \\(t(x)\\) as inputs to the [inner product protocol](../notes/index.html#inner-product-proof)
 to prove that
 \\(t(x) = {\langle {\mathbf{l}}(x), {\mathbf{r}}(x) \rangle}\\).
+
+
+Padding \\(\mathbf{l}(x)\\) and \\(\mathbf{r}(x)\\) for the inner product proof
+-------------------------------------------------------------------------------
+
+The above discussion did not have restrictions on the value \\(n\\).
+However, the [inner product argument](../notes/index.html#inner-product-proof)
+requires the input vectors to have power-of-two elements: \\(n^{+} = 2^k\\).
+To resolve this mismatch, we need to specify how to pad vectors \\(\mathbf{l}(x), \mathbf{r}(x)\\)
+and related commitments before we can use the inner product argument.
+
+Our goal is to translate the _padding of the constraint system_ into the _padding of proof data_,
+so we can keep the constraint system small and perform less computations in proving and verification.
+
+We start by padding the entire constraint system:
+multipliers are padded with all-zero assignments \\(a\_{L,j}, a\_{R,j}, a\_{O,j}\\),
+all-zero blinding factors \\(s\_{L,j}, s\_{R,j}\\),
+and all-zero weights \\(W\_{R,i,j}, W\_{L,i,j}, W\_{O,i,j}\\),
+for all constraints \\(i \in [0, q)\\) and all additional multipliers \\(j \in [n,n')\\):
+
+\\[
+\begin{aligned}
+\mathbf{a}\_L^{+} &= \mathbf{a}\_L \hspace{0.1cm} || \hspace{0.1cm} [0,...,0] \\\\
+\mathbf{a}\_R^{+} &= \mathbf{a}\_R \hspace{0.1cm} || \hspace{0.1cm} [0,...,0] \\\\
+\mathbf{a}\_O^{+} &= \mathbf{a}\_O \hspace{0.1cm} || \hspace{0.1cm} [0,...,0] \\\\
+\mathbf{s}\_L^{+} &= \mathbf{s}\_L \hspace{0.1cm} || \hspace{0.1cm} [0,...,0] \\\\
+\mathbf{s}\_R^{+} &= \mathbf{s}\_R \hspace{0.1cm} || \hspace{0.1cm} [0,...,0] \\\\
+\mathbf{W}\_L^{+} &= \mathbf{W}\_L \hspace{0.1cm} || \hspace{0.1cm} [[0,...,0],...,[0,...,0]] \\\\
+\mathbf{W}\_R^{+} &= \mathbf{W}\_R \hspace{0.1cm} || \hspace{0.1cm} [[0,...,0],...,[0,...,0]] \\\\
+\mathbf{W}\_O^{+} &= \mathbf{W}\_O \hspace{0.1cm} || \hspace{0.1cm} [[0,...,0],...,[0,...,0]] \\\\
+\end{aligned}
+\\]
+
+As a result, the vectors of generators \\(\mathbf{G},\mathbf{H}\\) and challenges \\(\mathbf{y}^n\\) are extended:
+
+\\[
+\begin{aligned}
+\mathbf{G}^{+}     &= \mathbf{G}   \hspace{0.1cm} || \hspace{0.1cm} [G_n,...,G_{n^{+}-1}] \\\\
+\mathbf{H}^{+}     &= \mathbf{H}   \hspace{0.1cm} || \hspace{0.1cm} [H_n,...,H_{n^{+}-1}] \\\\
+\mathbf{y}^{n^{+}} &= \mathbf{y}^n \hspace{0.1cm} || \hspace{0.1cm} [y^n,...,y^{n^{+}-1}] \\\\
+\end{aligned}
+\\]
+
+The low-level variables are padded with zeroes, so their commitments remain unchanged:
+
+\\[
+\begin{aligned}
+A_I^{+} &= \widetilde{B} \cdot \tilde{a} + \langle \mathbf{G}^{+} , \mathbf{a}\_L^{+} \rangle + \langle \mathbf{H}^{+}, \mathbf{a}\_R^{+} \rangle &{}={}& A_I \\\\
+A_O^{+} &= \widetilde{B} \cdot \tilde{o} + \langle \mathbf{G}^{+} , \mathbf{a}\_O^{+} \rangle                                                     &{}={}& A_O \\\\
+S^{+}   &= \widetilde{B} \cdot \tilde{s} + \langle \mathbf{G}^{+} , \mathbf{s}\_L^{+} \rangle + \langle \mathbf{H}^{+}, \mathbf{s}\_R^{+} \rangle &{}={}& S
+\end{aligned}
+\\]
+
+The flattened weight vectors \\(\mathbf{w}\_{L,R,O}\\) are padded with \\((n^{+} - n)\\) zeroes
+because the corresponding weights are padded with zeroes:
+\\[
+\begin{aligned}
+\mathbf{w}\_L^{+} &= z \mathbf{z}^q \cdot \mathbf{W}\_L^{+}  &{}={}& (z \mathbf{z}^q \cdot \mathbf{W}\_L) || (z \mathbf{z}^q \cdot [0,...,0]) &{}={}& \mathbf{w}\_L || [0,...,0], \\\\
+\mathbf{w}\_R^{+} &= z \mathbf{z}^q \cdot \mathbf{W}\_R^{+}  &{}={}& (z \mathbf{z}^q \cdot \mathbf{W}\_R) || (z \mathbf{z}^q \cdot [0,...,0]) &{}={}& \mathbf{w}\_R || [0,...,0], \\\\
+\mathbf{w}\_O^{+} &= z \mathbf{z}^q \cdot \mathbf{W}\_O^{+}  &{}={}& (z \mathbf{z}^q \cdot \mathbf{W}\_O) || (z \mathbf{z}^q \cdot [0,...,0]) &{}={}& \mathbf{w}\_O || [0,...,0]. \\\\
+\end{aligned}
+\\]
+
+The \\(\delta(y,z)\\) remains unchanged because the padding weights are zeroes:
+
+\\[
+\begin{aligned}
+\delta(y, z)^{+} &= \langle \mathbf{y}^{-n^{+}} \circ \mathbf{w}\_R^{+}, \mathbf{w}\_L^{+} \rangle \\\\
+                 &= \langle \mathbf{y}^{-n} \circ \mathbf{w}\_R, \mathbf{w}\_L \rangle      +     \langle [y^n,...,y^{n^{+}-1}] \circ [0,...,0], [0,...,0] \rangle \\\\
+                 &= \langle \mathbf{y}^{-n} \circ \mathbf{w}\_R, \mathbf{w}\_L \rangle      +     0 \\\\
+                 &= \delta(y, z)
+\end{aligned}
+\\]
+
+Finally, \\(\mathbf{l}(x)\\) is padded with zeroes and \\(\mathbf{r}(x)\\) is padded with additional powers of \\(y\\) in its 0th term:
+
+\\[
+\begin{aligned}
+\mathbf{l}(x)^{+} &= \mathbf{a}\_L^{+} \cdot x + \mathbf{s}\_L^{+} \cdot x^3 + \mathbf{y}^{-n^{+}} \circ \mathbf{w}\_R^{+} \cdot x + \mathbf{a}\_O^{+} \cdot x^2 \\\\
+                  &= \mathbf{a}\_L \cdot x + \mathbf{s}\_L \cdot x^3 + \mathbf{y}^{-n} \circ \mathbf{w}\_R \cdot x + \mathbf{a}\_O \cdot x^2 \\\\
+                  &  \hspace{0.5cm} || \hspace{0.1cm} [0,...,0] \cdot x + [0,...,0] \cdot x^3 + [y^n,...,y^{n^{+}-1}] \circ [0,...,0] \cdot x + [0,...,0] \cdot x^2 \\\\
+                  &= \mathbf{l}(x) || [0,...,0] \\\\
+\mathbf{r}(x)^{+} &= \mathbf{y}^{n^{+}} \circ \mathbf{a}\_R^{+} \cdot x + \mathbf{y}^{n^{+}} \circ \mathbf{s}\_R^{+} \cdot x^3 + \mathbf{w}\_L^{+} \cdot x - \mathbf{y}^{n^{+}} + \mathbf{w}\_O^{+} \\\\
+				  &= \mathbf{y}^n \circ \mathbf{a}\_R \cdot x + \mathbf{y}^n \circ \mathbf{s}\_R \cdot x^3 + \mathbf{w}\_L \cdot x - \mathbf{y}^n + \mathbf{w}\_O \\\\
+				  &  \hspace{0.5cm} || \hspace{0.1cm} [y^n,...,y^{n^{+}-1}] \circ [0,...,0] \cdot x + [y^n,...,y^{n^{+}-1}] \circ [0,...,0] \cdot x^3 + [0,...,0] \cdot x - [y^n,...,y^{n^{+}-1}] + [0,...,0] \\\\
+				  &= \mathbf{r}(x) || [-y^n,...,-y^{n^{+}-1}]
+\end{aligned}
+\\]
 
 
 
