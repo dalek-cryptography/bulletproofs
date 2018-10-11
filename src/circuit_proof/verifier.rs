@@ -144,9 +144,9 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
     ///
     /// Returns a tuple of
     /// ```text
-    /// (z_zQ_WL, z_zQ_WR, z_zQ_WO, z_zQ_WV, z_zQ_c)
+    /// (wL, wR, wO, wV, wc)
     /// ```
-    /// where `z_zQ_WL` is \\( z \cdot z^Q \cdot W_L \\), etc.
+    /// where `w{L,R,O}` is \\( z \cdot z^Q \cdot W_{L,R,O} \\).
     fn flattened_constraints(
         &mut self,
         z: &Scalar,
@@ -154,37 +154,37 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
         let n = self.num_vars;
         let m = self.V.len();
 
-        let mut z_zQ_WL = vec![Scalar::zero(); n];
-        let mut z_zQ_WR = vec![Scalar::zero(); n];
-        let mut z_zQ_WO = vec![Scalar::zero(); n];
-        let mut z_zQ_WV = vec![Scalar::zero(); m];
-        let mut z_zQ_c = Scalar::zero();
+        let mut wL = vec![Scalar::zero(); n];
+        let mut wR = vec![Scalar::zero(); n];
+        let mut wO = vec![Scalar::zero(); n];
+        let mut wV = vec![Scalar::zero(); m];
+        let mut wc = Scalar::zero();
 
         let mut exp_z = *z;
         for lc in self.constraints.iter() {
             for (var, coeff) in &lc.terms {
                 match var {
                     Variable::MultiplierLeft(i) => {
-                        z_zQ_WL[*i] += exp_z * coeff;
+                        wL[*i] += exp_z * coeff;
                     }
                     Variable::MultiplierRight(i) => {
-                        z_zQ_WR[*i] += exp_z * coeff;
+                        wR[*i] += exp_z * coeff;
                     }
                     Variable::MultiplierOutput(i) => {
-                        z_zQ_WO[*i] += exp_z * coeff;
+                        wO[*i] += exp_z * coeff;
                     }
                     Variable::Committed(i) => {
-                        z_zQ_WV[*i] -= exp_z * coeff;
+                        wV[*i] -= exp_z * coeff;
                     }
                     Variable::One() => {
-                        z_zQ_c -= exp_z * coeff;
+                        wc -= exp_z * coeff;
                     }
                 }
             }
             exp_z *= z;
         }
 
-        (z_zQ_WL, z_zQ_WR, z_zQ_WO, z_zQ_WV, z_zQ_c)
+        (wL, wR, wO, wV, wc)
     }
 
     /// Consume this `VerifierCS` and attempt to verify the supplied `proof`.
@@ -212,18 +212,12 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
         // We are performing a single-party circuit proof, so party index is 0.
         let gens = self.bp_gens.share(0);
 
-        // Create a `TranscriptRng` from the transcript
-        use rand::thread_rng;
-        let mut rng = self.transcript.build_rng().finalize(&mut thread_rng());
-
         self.transcript.commit_point(b"A_I", &proof.A_I);
         self.transcript.commit_point(b"A_O", &proof.A_O);
         self.transcript.commit_point(b"S", &proof.S);
 
         let y = self.transcript.challenge_scalar(b"y");
         let z = self.transcript.challenge_scalar(b"z");
-
-        let (z_zQ_WL, z_zQ_WR, z_zQ_WO, z_zQ_WV, z_zQ_c) = self.flattened_constraints(&z);
 
         self.transcript.commit_point(b"T_1", &proof.T_1);
         self.transcript.commit_point(b"T_3", &proof.T_3);
@@ -241,83 +235,77 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
 
         let w = self.transcript.challenge_scalar(b"w");
 
-        let r = Scalar::random(&mut rng);
-        let xx = x * x;
-        let y_inv = y.invert();
-
-        // Calculate points that represent the matrices
-        let H_prime: Vec<RistrettoPoint> = gens
-            .H(n)
-            .zip(util::exp_iter(y_inv))
-            .map(|(H_i, exp_y_inv)| H_i * exp_y_inv)
-            .collect();
-
-        // W_L_point = <h * y^-n , z * z^Q * W_L>, line 81
-        let W_L_point = RistrettoPoint::vartime_multiscalar_mul(&z_zQ_WL, &H_prime);
-
-        // W_R_point = <g , y^-n * z * z^Q * W_R>, line 82
-        let y_n_z_zQ_WR = z_zQ_WR
-            .iter()
-            .zip(util::exp_iter(y.invert()))
-            .map(|(W_R_right_i, exp_y_inv)| W_R_right_i * exp_y_inv)
-            .collect::<Vec<Scalar>>();
-        let W_R_point = RistrettoPoint::vartime_multiscalar_mul(&y_n_z_zQ_WR, gens.G(n));
-
-        // W_O_point = <h * y^-n , z * z^Q * W_O>, line 83
-        let W_O_point = RistrettoPoint::vartime_multiscalar_mul(&z_zQ_WO, &H_prime);
+        let (wL, wR, wO, wV, wc) = self.flattened_constraints(&z);
 
         // Get IPP variables
-        let (x_sq, x_inv_sq, s) = proof.ipp_proof.verification_scalars(self.transcript);
-        let s_inv = s.iter().rev().take(n);
+        let (u_sq, u_inv_sq, s) = proof.ipp_proof.verification_scalars(self.transcript);
+
         let a = proof.ipp_proof.a;
         let b = proof.ipp_proof.b;
 
-        // define parameters for P check
-        let g = s.iter().take(n).map(|s_i| -a * s_i);
-        let h = s_inv
-            .zip(util::exp_iter(y.invert()))
-            .map(|(s_i_inv, exp_y_inv)| -exp_y_inv * b * s_i_inv - Scalar::one());
+        let y_inv = y.invert();
+        let y_inv_vec = util::exp_iter(y_inv).take(n).collect::<Vec<Scalar>>();
+        let yneg_wR = wR
+            .iter()
+            .zip(y_inv_vec.iter())
+            .map(|(wRi, exp_y_inv)| wRi * exp_y_inv)
+            .collect::<Vec<Scalar>>();
 
-        // define parameters for t check
-        let delta = inner_product(&y_n_z_zQ_WR, &z_zQ_WL);
+        let delta = inner_product(&yneg_wR, &wL);
+
+        // define parameters for P check
+        let g_scalars = yneg_wR
+            .iter()
+            .zip(s.iter().take(n))
+            .map(|(yneg_wRi, s_i)| x * yneg_wRi - a * s_i);
+
+        let h_scalars = y_inv_vec
+            .iter()
+            .zip(s.iter().rev().take(n))
+            .zip(wL.iter())
+            .zip(wO.iter())
+            .map(|(((y_inv_i, s_i_inv), wLi), wOi)| {
+                y_inv_i * (x * wLi + wOi - b * s_i_inv) - Scalar::one()
+            });
+
+        // Create a `TranscriptRng` from the transcript
+        use rand::thread_rng;
+        let mut rng = self.transcript.build_rng().finalize(&mut thread_rng());
+        let r = Scalar::random(&mut rng);
+
+        let xx = x * x;
         let rxx = r * xx;
-        let V_coeff = z_zQ_WV.iter().map(|W_V_i| rxx * W_V_i);
+        let xxx = x * xx;
 
         // group the T_scalars and T_points together
-        let T_scalars = [r * x, rxx * x, rxx * xx, rxx * xx * x, rxx * xx * xx];
+        let T_scalars = [r * x, rxx * x, rxx * xx, rxx * xxx, rxx * xx * xx];
         let T_points = [proof.T_1, proof.T_3, proof.T_4, proof.T_5, proof.T_6];
 
         let mega_check = RistrettoPoint::optional_multiscalar_mul(
             iter::once(x) // A_I
                 .chain(iter::once(xx)) // A_O
-                .chain(iter::once(x)) // W_L_point
-                .chain(iter::once(x)) // W_R_point
-                .chain(iter::once(Scalar::one())) // W_O_point
-                .chain(iter::once(x * xx)) // S
+                .chain(iter::once(xxx)) // S
+                .chain(wV.iter().map(|wVi| wVi * rxx)) // V
+                .chain(T_scalars.iter().cloned()) // T_points
                 .chain(iter::once(
-                    w * (proof.t_x - a * b) + r * (xx * (delta + z_zQ_c) - proof.t_x),
+                    w * (proof.t_x - a * b) + r * (xx * (wc + delta) - proof.t_x),
                 )) // B
                 .chain(iter::once(-proof.e_blinding - r * proof.t_x_blinding)) // B_blinding
-                .chain(g) // G
-                .chain(h) // H
-                .chain(x_sq.iter().cloned()) // ipp_proof.L_vec
-                .chain(x_inv_sq.iter().cloned()) // ipp_proof.R_vec
-                .chain(V_coeff) // V
-                .chain(T_scalars.iter().cloned()), // T_points
+                .chain(g_scalars) // G
+                .chain(h_scalars) // H
+                .chain(u_sq.iter().cloned()) // ipp_proof.L_vec
+                .chain(u_inv_sq.iter().cloned()), // ipp_proof.R_vec
             iter::once(proof.A_I.decompress())
                 .chain(iter::once(proof.A_O.decompress()))
-                .chain(iter::once(Some(W_L_point)))
-                .chain(iter::once(Some(W_R_point)))
-                .chain(iter::once(Some(W_O_point)))
                 .chain(iter::once(proof.S.decompress()))
+                .chain(self.V.iter().map(|V_i| V_i.decompress()))
+                .chain(T_points.iter().map(|T_i| T_i.decompress()))
                 .chain(iter::once(Some(self.pc_gens.B)))
                 .chain(iter::once(Some(self.pc_gens.B_blinding)))
                 .chain(gens.G(n).map(|&G_i| Some(G_i)))
                 .chain(gens.H(n).map(|&H_i| Some(H_i)))
                 .chain(proof.ipp_proof.L_vec.iter().map(|L_i| L_i.decompress()))
-                .chain(proof.ipp_proof.R_vec.iter().map(|R_i| R_i.decompress()))
-                .chain(self.V.iter().map(|V_i| V_i.decompress()))
-                .chain(T_points.iter().map(|T_i| T_i.decompress())),
+                .chain(proof.ipp_proof.R_vec.iter().map(|R_i| R_i.decompress())),
         )
         .ok_or_else(|| R1CSError::VerificationError)?;
 
