@@ -804,8 +804,8 @@ where the [definition](#proving-that-mathbflx-mathbfrx-are-correct) of \\(P\\) i
 \end{aligned}
 \\]
 
-The verifier combines two equations in one by sampling a random factor \\(c \\; {\xleftarrow{\\$}} \\; {\mathbb Z\_p}\\),
-multiplying the first equation by \\(c\\), and adding it with the second equation.
+The verifier combines two equations in one by sampling a random factor \\(r \\; {\xleftarrow{\\$}} \\; {\mathbb Z\_p}\\),
+multiplying the first equation by \\(r\\), and adding it with the second equation.
 
 Finally, verifier groups all scalars by each point and performs a single multiscalar multiplication:
 
@@ -814,10 +814,10 @@ Finally, verifier groups all scalars by each point and performs a single multisc
 0 \quad \stackrel{?}{=} & \quad x       \cdot A\_I \\\\
                       + & \quad x^2     \cdot A\_O \\\\
                       + & \quad x^3     \cdot S \\\\
-                      + & \quad \langle c x^2 \mathbf{w}\_V, \mathbf{V} \rangle \\\\
-                      + & \quad \sum\_{i = 1,3,4,5,6} c x^i T\_{i} \\\\
-                      + & \quad \Big(w \big(t(x) - ab\big) + c \big(x^2 (w\_c + \delta(y,z)) - t(x)\big) \Big) \cdot B \\\\
-                      + & \quad (-{\widetilde{e}} - c{\tilde{t}}(x)) \cdot \widetilde{B} \\\\
+                      + & \quad \langle r x^2 \mathbf{w}\_V, \mathbf{V} \rangle \\\\
+                      + & \quad \sum\_{i = 1,3,4,5,6} r x^i T\_{i} \\\\
+                      + & \quad \Big(w \big(t(x) - ab\big) + r \big(x^2 (w\_c + \delta(y,z)) - t(x)\big) \Big) \cdot B \\\\
+                      + & \quad (-{\widetilde{e}} - r{\tilde{t}}(x)) \cdot \widetilde{B} \\\\
                       + & \quad {\langle x \mathbf{y}^{-n} \circ \mathbf{w}\_R - a\mathbf{s}, \mathbf{G} \rangle}\\\\
                       + & \quad {\langle -\mathbf{1} + \mathbf{y}^{-n} \circ \big( x \mathbf{w}\_L + \mathbf{w}\_O - (b /{\mathbf{s}}) \big), \mathbf{H} \rangle}\\\\
                       + & \quad {\langle [u_{1}^2,    \dots, u_{k}^2    ], [L_1, \dots, L_{k}] \rangle}\\\\
