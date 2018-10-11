@@ -681,7 +681,7 @@ The \\(\delta(y,z)\\) remains unchanged because the padding weights are zeroes:
 \end{aligned}
 \\]
 
-Finally, \\(\mathbf{l}(x)\\) is padded with zeroes and \\(\mathbf{r}(x)\\) is padded with additional powers of \\(y\\) in its 0th term:
+Vector polynomials \\(\mathbf{l}(x)\\) is padded with zeroes and \\(\mathbf{r}(x)\\) is padded with additional powers of \\(y\\) in its 0th term:
 
 \\[
 \begin{aligned}
@@ -693,6 +693,15 @@ Finally, \\(\mathbf{l}(x)\\) is padded with zeroes and \\(\mathbf{r}(x)\\) is pa
                   &= \mathbf{y}^n \circ \mathbf{a}\_R \cdot x + \mathbf{y}^n \circ \mathbf{s}\_R \cdot x^3 + \mathbf{w}\_L \cdot x - \mathbf{y}^n + \mathbf{w}\_O \\\\
                   &  \hspace{0.5cm} || \hspace{0.1cm} [y^n,...,y^{n^{+}-1}] \circ [0,...,0] \cdot x + [y^n,...,y^{n^{+}-1}] \circ [0,...,0] \cdot x^3 + [0,...,0] \cdot x - [y^n,...,y^{n^{+}-1}] + [0,...,0] \\\\
                   &= \mathbf{r}(x) || [-y^n,...,-y^{n^{+}-1}]
+\end{aligned}
+\\]
+
+The commitments to these vector polynomials are also padded (\\(W\_{L,R,O}\\) remain unchanged because the weights are padded with zeroes):
+
+\\[
+\begin{aligned}
+  P^{+} &= -{\widetilde{e}} {\widetilde{B}} + x \cdot A_I + x^2 \cdot A_O - \langle \mathbf{1}, \mathbf{H}^{+} \rangle + W_L \cdot x + W_R \cdot x + W_O + x^3 \cdot S \\\\
+        &= P - \langle \mathbf{1}, [H_n,...,H_{n^{+}-1}] \rangle
 \end{aligned}
 \\]
 
@@ -708,6 +717,7 @@ t(x)^{+} &= {\langle {\mathbf{l}}(x)^{+}, {\mathbf{r}}(x)^{+} \rangle} \\\\
 \\]
 
 This implies that the terms \\(t\_{0, 1, 2, 3, 4, 5, 6}\\) also remain unchanged.
+
 
 Prover’s algorithm
 ------------------
@@ -864,10 +874,21 @@ The verifier flattens constraints:
 \\]
 where each of \\(\mathbf{w}\_L, \mathbf{w}\_R, \mathbf{w}\_O\\) has length \\(n\\) and \\(\mathbf{w}\_V\\) has length \\(m\\).
 
+The verifier [pads](#padding-mathbflx-and-mathbfrx-for-the-inner-product-proof) the generators \\(\mathbf{G},\mathbf{H}\\) and challenges \\(\mathbf{y}^n\\) to a power-of-two \\(n^{+}\\):
+
+\\[
+\begin{aligned}
+             n^{+} &= 2^{\lceil \log_2 n \rceil} \\\\
+\mathbf{G}^{+}     &= \mathbf{G}   \hspace{0.1cm} || \hspace{0.1cm} [G_n,...,G_{n^{+}-1}] \\\\
+\mathbf{H}^{+}     &= \mathbf{H}   \hspace{0.1cm} || \hspace{0.1cm} [H_n,...,H_{n^{+}-1}] \\\\
+\mathbf{y}^{n^{+}} &= \mathbf{y}^n \hspace{0.1cm} || \hspace{0.1cm} [y^n,...,y^{n^{+}-1}] \\\\
+\end{aligned}
+\\]
+
 The verifier computes the following scalars for the [inner product argument](../inner_product_proof/index.html):
 
 \\[
-	\\{u\_{1}^{2}, \dots, u\_{k}^{2}, u\_{1}^{-2}, \dots, u\_{k}^{-2}, s_0, \dots, s_{n-1}\\}
+	\\{u\_{1}^{2}, \dots, u\_{k}^{2}, u\_{1}^{-2}, \dots, u\_{k}^{-2}, s_0, \dots, s_{n^{+}-1}\\}
 \\]
 
 The goal of the verifier is to check two equations.
@@ -891,19 +912,19 @@ If we rewrite the check as a comparison with the identity point, we get:
 **Second**, verify the inner product argument for the vectors \\(\mathbf{l}(x), \mathbf{r}(x)\\) that form the \\(t(x)\\) (see [inner-product protocol](../inner_product_proof/index.html#verification-equation))
   
 \\[
-P' \overset ? = {\langle a \cdot {\mathbf{s}}, {\mathbf{G}} \rangle} + {\langle {\mathbf{y}^{-n}} \circ (b /{\mathbf{s}}), {\mathbf{H}} \rangle} + abQ - \sum\_{j=1}^{k} \left( L\_{j} u\_{j}^{2} + u\_{j}^{-2} R\_{j} \right).
+P' \overset ? = {\langle a \cdot \mathbf{s}, \mathbf{G}^{+} \rangle} + {\langle {\mathbf{y}^{-n^{+}}} \circ (b /{\mathbf{s}}), \mathbf{H}^{+} \rangle} + abQ - \sum\_{j=1}^{k} \left( L\_{j} u\_{j}^{2} + u\_{j}^{-2} R\_{j} \right).
 \\]
 
-Rewriting as a comparison with the identity point and expanding \\(Q = wB\\) and \\(P' = P + t(x) wB\\) as [needed for transition to the inner-product protocol](../notes/index.html#inner-product-proof):
+Rewriting as a comparison with the identity point and expanding \\(Q = wB\\) and \\(P' = P^{+} + t(x) wB\\) as [needed for transition to the inner-product protocol](../notes/index.html#inner-product-proof):
 
 \\[
-0 \overset ? = P + t(x) wB - {\langle a \cdot {\mathbf{s}}, {\mathbf{G}} \rangle} - {\langle {\mathbf{y}^{-n}} \circ (b /{\mathbf{s}}), {\mathbf{H}} \rangle} - abwB + \sum\_{j=1}^{k} \left( L\_{j} u\_{j}^{2} + u\_{j}^{-2} R\_{j} \right),
+0 \overset ? = P^{+} + t(x) wB - {\langle a \cdot \mathbf{s}, \mathbf{G}^{+} \rangle} - {\langle \mathbf{y}^{-n^{+}} \circ (b /\mathbf{s}), \mathbf{H}^{+} \rangle} - abwB + \sum\_{j=1}^{k} \left( L\_{j} u\_{j}^{2} + u\_{j}^{-2} R\_{j} \right),
 \\]
-where the [definition](#proving-that-mathbflx-mathbfrx-are-correct) of \\(P\\) is:
+where the [definition](#proving-that-mathbflx-mathbfrx-are-correct) of \\(P^{+}\\) is:
 
 \\[
 \begin{aligned}
-  P   = -{\widetilde{e}} {\widetilde{B}} + x \cdot A_I + x^2 \cdot A_O - \langle \mathbf{1}, \mathbf{H} \rangle + W_L \cdot x + W_R \cdot x + W_O + x^3 \cdot S
+  P^{+}   = -{\widetilde{e}} {\widetilde{B}} + x \cdot A_I + x^2 \cdot A_O - \langle \mathbf{1}, \mathbf{H}^{+} \rangle + W_L \cdot x + W_R \cdot x + W_O + x^3 \cdot S
 \end{aligned}
 \\]
 \\[
@@ -928,8 +949,8 @@ Finally, verifier groups all scalars by each point and performs a single multisc
                       + & \quad \sum\_{i = 1,3,4,5,6} r x^i T\_{i} \\\\
                       + & \quad \Big(w \big(t(x) - ab\big) + r \big(x^2 (w\_c + \delta(y,z)) - t(x)\big) \Big) \cdot B \\\\
                       + & \quad (-{\widetilde{e}} - r{\tilde{t}}(x)) \cdot \widetilde{B} \\\\
-                      + & \quad {\langle x \mathbf{y}^{-n} \circ \mathbf{w}\_R - a\mathbf{s}, \mathbf{G} \rangle}\\\\
-                      + & \quad {\langle -\mathbf{1} + \mathbf{y}^{-n} \circ \big( x \mathbf{w}\_L + \mathbf{w}\_O - (b /{\mathbf{s}}) \big), \mathbf{H} \rangle}\\\\
+                      + & \quad {\langle \big( x \mathbf{y}^{-n^{+}} \circ \mathbf{w}\_R \big) || [0,...,0] - a\mathbf{s}, \mathbf{G}^{+} \rangle}\\\\
+                      + & \quad {\langle -\mathbf{1} + \mathbf{y}^{-n^{+}} \circ \big( (x \mathbf{w}\_L + \mathbf{w}\_O) || [0,...,0] - (b /{\mathbf{s}}) \big), \mathbf{H}^{+} \rangle}\\\\
                       + & \quad {\langle [u_{1}^2,    \dots, u_{k}^2    ], [L_1, \dots, L_{k}] \rangle}\\\\
                       + & \quad {\langle [u_{1}^{-2}, \dots, u_{k}^{-2} ], [R_1, \dots, R_{k}] \rangle}
 \end{aligned}
