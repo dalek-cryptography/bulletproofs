@@ -1,4 +1,4 @@
-#![doc(include = "../docs/circuit-proof-math.md")]
+#![doc(include = "../docs/cs-proof.md")]
 
 pub mod assignment;
 pub mod prover;

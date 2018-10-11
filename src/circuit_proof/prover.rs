@@ -292,7 +292,7 @@ impl<'a, 'b> ProverCS<'a, 'b> {
         self.transcript.commit_point(b"A_O", &A_O);
         self.transcript.commit_point(b"S", &S);
 
-        // 4. ???
+        // 4. Compute blinded vector polynomials l(x) and r(x)
 
         let y = self.transcript.challenge_scalar(b"y");
         let z = self.transcript.challenge_scalar(b"z");
