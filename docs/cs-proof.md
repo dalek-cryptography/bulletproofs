@@ -684,9 +684,10 @@ The prover generates blinding factors for terms \\(t\_1, t\_3, t\_4, t\_5, t\_6\
 \\]
 
 The prover adds \\(T_1, T_3, T_4, T_5, T_6\\) to the protocol transcript
-and obtains challenge scalar \\(x \in {\mathbb Z\_p}\\) from the transcript.
+and obtains a challenge scalar \\(x \in {\mathbb Z\_p}\\) from the transcript.
 
-The prover computes the synthetic blinding factors \\({\tilde{t}}(x)\\) at point \\(x\\) and \\(\tilde{e}\\):
+Using the concrete value \\(x\\), the prover computes
+the synthetic blinding factors \\({\tilde{t}}(x)\\) and \\(\tilde{e}\\):
 
 \\[
 \begin{aligned}
@@ -822,6 +823,6 @@ Finally, verifier groups all scalars by each point and performs a single multisc
                       + & \quad {\langle [u_{1}^2,    \dots, u_{k}^2    ], [L_1, \dots, L_{k}] \rangle}\\\\
                       + & \quad {\langle [u_{1}^{-2}, \dots, u_{k}^{-2} ], [R_1, \dots, R_{k}] \rangle}
 \end{aligned}
-\\] where \\(1/{\mathbf{s}}\\) are inverses of \\(\mathbf{s}\\), computed as a reversed list of \\(\mathbf{s}\\).
+\\] where \\(1/{\mathbf{s}}\\) are inverses of \\(\mathbf{s}\\), computed as a [reversed list](../inner_product_proof/index.html#verifiers-algorithm) of \\(\mathbf{s}\\).
 
 
