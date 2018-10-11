@@ -234,12 +234,19 @@ Rearranging into a single inner product statement
 -------------------------------------------------
 
 We want to work towards expressing the constraints in terms of a single inner product,
-so that we can use the inner product argument to represent it in a more compact and efficient-to-verify form. 
-Our goal is to rearrange the equation above so that terms
+so that we can use the [inner product argument](../notes/index.html#inner-product-proof)
+to represent it in a more compact and efficient-to-verify form. 
+To do that we will rearrange the above equation so that terms
 involving \\({\mathbf{a}}\_{L}\\) and \\({\mathbf{a}}\_{O}\\) appear only on the left-hand side, terms
 involving \\({\mathbf{a}}\_{R}\\) appear only on the right-hand side, and
 non-secret terms (which the verifier can compute on its own) are
 factored out into a new term \\(\delta(y, z) \\).
+
+This arrangement will allow us to verify relations between the resulting inner product,
+its vectors and the commitments to high-level and low-level [variables](#variables).
+
+The choice of placing \\({\mathbf{a}}\_{O}\\) on the same side with \\({\mathbf{a}}\_{L}\\) is arbitrary:
+the proof would still work if it was rearranged on the right-hand side instead.
 
 If we reorder terms, we get:
 
@@ -253,46 +260,51 @@ w\_c + \langle \mathbf{w}\_V, \mathbf{v} \rangle
 \langle \mathbf{w}\_O, \mathbf{a}\_O \rangle
 \\]
 
+Rearrange \\(\langle \mathbf{a}\_L \circ \mathbf{a}\_R, \mathbf{y}^n \rangle\\) into
+\\(\langle \mathbf{a}\_L, \mathbf{y}^n \circ \mathbf{a}\_R \rangle\\):
+
+\\[
+w\_c + \langle \mathbf{w}\_V, \mathbf{v} \rangle
+=
+\langle \mathbf{a}\_L, \mathbf{y}^n \circ \mathbf{a}\_R \rangle -
+\langle \mathbf{a}\_O, \mathbf{y}^n \rangle +
+\langle \mathbf{w}\_L, \mathbf{a}\_L \rangle +
+\langle \mathbf{w}\_R, \mathbf{a}\_R \rangle +
+\langle \mathbf{w}\_O, \mathbf{a}\_O \rangle
+\\]
+
+
 Merge the statements containing \\(\mathbf{a}\_O \\):
 
 \\[
 w\_c + \langle \mathbf{w}\_V, \mathbf{v} \rangle
 =
-\langle \mathbf{a}\_L, 
-\mathbf{y}^n \circ \mathbf{a}\_R \rangle + 
-\langle \mathbf{a}\_L,
-\mathbf{w}\_L +
-\langle \mathbf{a}\_O, 
--\mathbf{y}^n + \mathbf{w}\_O \rangle +
-\langle \mathbf{a}\_R, 
-\mathbf{w}\_R \rangle
+\langle \mathbf{a}\_L, \mathbf{y}^n \circ \mathbf{a}\_R \rangle + 
+\langle \mathbf{a}\_L, \mathbf{w}\_L                    \rangle +
+\langle \mathbf{a}\_O, -\mathbf{y}^n + \mathbf{w}\_O    \rangle +
+\langle \mathbf{a}\_R, \mathbf{w}\_R                    \rangle
 \\]
 
 Multiply the \\( \langle \mathbf{a}\_R, 
 \mathbf{w}\_R \rangle \\) term by \\(\mathbf{y}^n\\) one one side of the inner product and by \\(\mathbf{y}^{-n}\\) on the other side:
 
 \\[
-w\_c + \langle \mathbf{w}\_V, \mathbf{v} \rangle =
-\langle \mathbf{a}\_L, 
-\mathbf{y}^n \circ \mathbf{a}\_R \rangle + 
-\langle \mathbf{a}\_L,
-\mathbf{w}\_L \rangle +
-\langle \mathbf{a}\_O, 
--\mathbf{y}^n + \mathbf{w}\_O \rangle +
-\langle \mathbf{y}^n \circ \mathbf{a}\_R, 
-\mathbf{y}^{-n} \circ \mathbf{w}\_R \rangle
+w\_c + \langle \mathbf{w}\_V, \mathbf{v} \rangle
+=
+\langle \mathbf{a}\_L,                    \mathbf{y}^n \circ \mathbf{a}\_R    \rangle + 
+\langle \mathbf{a}\_L,                    \mathbf{w}\_L                       \rangle +
+\langle \mathbf{a}\_O,                   -\mathbf{y}^n + \mathbf{w}\_O        \rangle +
+\langle \mathbf{y}^n \circ \mathbf{a}\_R, \mathbf{y}^{-n} \circ \mathbf{w}\_R \rangle
 \\]
 
 Merge the statements containing \\(\mathbf{y}^n \circ \mathbf{a}\_R\\):
 
 \\[
-w\_c + \langle \mathbf{w}\_V, \mathbf{v} \rangle =
-\langle \mathbf{a}\_L + \mathbf{y}^{-n} \circ \mathbf{w}\_R, 
-\mathbf{y}^n \circ \mathbf{a}\_R \rangle + 
-\langle \mathbf{a}\_L,
-\mathbf{w}\_L \rangle +
-\langle \mathbf{a}\_O, 
--\mathbf{y}^n + \mathbf{w}\_O \rangle
+w\_c + \langle \mathbf{w}\_V, \mathbf{v} \rangle
+=
+\langle \mathbf{a}\_L + \mathbf{y}^{-n} \circ \mathbf{w}\_R, \mathbf{y}^n \circ \mathbf{a}\_R \rangle + 
+\langle \mathbf{a}\_L,                                       \mathbf{w}\_L                    \rangle +
+\langle \mathbf{a}\_O,                                      -\mathbf{y}^n + \mathbf{w}\_O     \rangle
 \\]
 
 Add \\(\delta(y, z) = \langle \mathbf{y}^{-n} \circ \mathbf{w}\_R, \mathbf{w}\_L \rangle \\) to both sides:
@@ -301,13 +313,12 @@ Add \\(\delta(y, z) = \langle \mathbf{y}^{-n} \circ \mathbf{w}\_R, \mathbf{w}\_L
 \begin{aligned}
 w\_c + \langle \mathbf{w}\_V, \mathbf{v} \rangle +
 \delta(y, z)
-&= \langle \mathbf{a}\_L + \mathbf{y}^{-n} \circ \mathbf{w}\_R, 
-\mathbf{y}^n \circ \mathbf{a}\_R \rangle + 
-\langle \mathbf{a}\_L,
-\mathbf{w}\_L \rangle \\\\ &+
-\langle \mathbf{a}\_O, 
--\mathbf{y}^n + \mathbf{w}\_O \rangle + 
-\langle \mathbf{y}^{-n} \circ \mathbf{w}\_R, \mathbf{w}\_L \rangle
+&=
+\langle \mathbf{a}\_L + \mathbf{y}^{-n} \circ \mathbf{w}\_R, \mathbf{y}^n \circ \mathbf{a}\_R \rangle + 
+\langle \mathbf{a}\_L,                       \mathbf{w}\_L                \rangle \\\\ 
+&+
+\langle \mathbf{a}\_O,                      -\mathbf{y}^n + \mathbf{w}\_O \rangle + 
+\langle \mathbf{y}^{-n} \circ \mathbf{w}\_R, \mathbf{w}\_L                \rangle
 \end{aligned}
 \\]
 
@@ -595,7 +606,7 @@ to compute
 \\]
 if the prover is honest, this is
 \\(P = {\langle {\mathbf{l}}(x), {\mathbf{G}} \rangle} + {\langle {\mathbf{r}}(x), {\mathbf{H}}' \rangle}\\),
-so the verifier uses \\(P\\) and \\(t(x)\\) as inputs to the inner-product protocol
+so the verifier uses \\(P\\) and \\(t(x)\\) as inputs to the [inner product protocol](../notes/index.html#inner-product-proof)
 to prove that
 \\(t(x) = {\langle {\mathbf{l}}(x), {\mathbf{r}}(x) \rangle}\\).
 
