@@ -238,7 +238,7 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
         let (wL, wR, wO, wV, wc) = self.flattened_constraints(&z);
 
         // Get IPP variables
-        let (x_sq, x_inv_sq, s) = proof.ipp_proof.verification_scalars(self.transcript);
+        let (u_sq, u_inv_sq, s) = proof.ipp_proof.verification_scalars(self.transcript);
 
         let a = proof.ipp_proof.a;
         let b = proof.ipp_proof.b;
@@ -254,12 +254,12 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
         let delta = inner_product(&yneg_wR, &wL);
 
         // define parameters for P check
-        let g = yneg_wR
+        let g_scalars = yneg_wR
             .iter()
             .zip(s.iter().take(n))
             .map(|(yneg_wRi, s_i)| x * yneg_wRi - a * s_i);
 
-        let h = y_inv_vec
+        let h_scalars = y_inv_vec
             .iter()
             .zip(s.iter().rev().take(n))
             .zip(wL.iter())
@@ -291,10 +291,10 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
                     w * (proof.t_x - a * b) + r * (xx * (wc + delta) - proof.t_x),
                 )) // B
                 .chain(iter::once(-proof.e_blinding - r * proof.t_x_blinding)) // B_blinding
-                .chain(g) // G
-                .chain(h) // H
-                .chain(x_sq.iter().cloned()) // ipp_proof.L_vec
-                .chain(x_inv_sq.iter().cloned()), // ipp_proof.R_vec
+                .chain(g_scalars) // G
+                .chain(h_scalars) // H
+                .chain(u_sq.iter().cloned()) // ipp_proof.L_vec
+                .chain(u_inv_sq.iter().cloned()), // ipp_proof.R_vec
             iter::once(proof.A_I.decompress())
                 .chain(iter::once(proof.A_O.decompress()))
                 .chain(iter::once(proof.S.decompress()))
