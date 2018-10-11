@@ -690,13 +690,24 @@ Finally, \\(\mathbf{l}(x)\\) is padded with zeroes and \\(\mathbf{r}(x)\\) is pa
                   &  \hspace{0.5cm} || \hspace{0.1cm} [0,...,0] \cdot x + [0,...,0] \cdot x^3 + [y^n,...,y^{n^{+}-1}] \circ [0,...,0] \cdot x + [0,...,0] \cdot x^2 \\\\
                   &= \mathbf{l}(x) || [0,...,0] \\\\
 \mathbf{r}(x)^{+} &= \mathbf{y}^{n^{+}} \circ \mathbf{a}\_R^{+} \cdot x + \mathbf{y}^{n^{+}} \circ \mathbf{s}\_R^{+} \cdot x^3 + \mathbf{w}\_L^{+} \cdot x - \mathbf{y}^{n^{+}} + \mathbf{w}\_O^{+} \\\\
-				  &= \mathbf{y}^n \circ \mathbf{a}\_R \cdot x + \mathbf{y}^n \circ \mathbf{s}\_R \cdot x^3 + \mathbf{w}\_L \cdot x - \mathbf{y}^n + \mathbf{w}\_O \\\\
-				  &  \hspace{0.5cm} || \hspace{0.1cm} [y^n,...,y^{n^{+}-1}] \circ [0,...,0] \cdot x + [y^n,...,y^{n^{+}-1}] \circ [0,...,0] \cdot x^3 + [0,...,0] \cdot x - [y^n,...,y^{n^{+}-1}] + [0,...,0] \\\\
-				  &= \mathbf{r}(x) || [-y^n,...,-y^{n^{+}-1}]
+                  &= \mathbf{y}^n \circ \mathbf{a}\_R \cdot x + \mathbf{y}^n \circ \mathbf{s}\_R \cdot x^3 + \mathbf{w}\_L \cdot x - \mathbf{y}^n + \mathbf{w}\_O \\\\
+                  &  \hspace{0.5cm} || \hspace{0.1cm} [y^n,...,y^{n^{+}-1}] \circ [0,...,0] \cdot x + [y^n,...,y^{n^{+}-1}] \circ [0,...,0] \cdot x^3 + [0,...,0] \cdot x - [y^n,...,y^{n^{+}-1}] + [0,...,0] \\\\
+                  &= \mathbf{r}(x) || [-y^n,...,-y^{n^{+}-1}]
 \end{aligned}
 \\]
 
+The inner product \\(t(x)\\) remains unchanged because the non-zero padding in the right vector gets multiplied with the zero padding in the left vector:
 
+\\[
+\begin{aligned}
+t(x)^{+} &= {\langle {\mathbf{l}}(x)^{+}, {\mathbf{r}}(x)^{+} \rangle} \\\\
+         &= {\langle {\mathbf{l}}(x), {\mathbf{r}}(x) \rangle} + {\langle [0,...,0], [-y^n,...,-y^{n^{+}-1}] \rangle} \\\\
+         &= {\langle {\mathbf{l}}(x), {\mathbf{r}}(x) \rangle} + 0 \\\\
+         &= t(x)
+\end{aligned}
+\\]
+
+This implies that the terms \\(t\_{0, 1, 2, 3, 4, 5, 6}\\) also remain unchanged.
 
 Prover’s algorithm
 ------------------
@@ -789,15 +800,28 @@ The prover adds \\(t(x), {\tilde{t}}(x), {\tilde{e}}\\) to the protocol transcri
 	Q \gets  w \cdot B
 \\]
 
-The prover evaluates polynomials \\(\mathbf{l}(x), \mathbf{r}(x)\\) and performs the [inner product argument](../inner_product_proof/index.html) to prove the relation:
+The prover evaluates polynomials \\(\mathbf{l}(x), \mathbf{r}(x)\\) and
+[pads them to the next power of two](#padding-mathbflx-and-mathbfrx-for-the-inner-product-proof) \\(n \rightarrow n^{+}\\):
+
+\\[
+\begin{aligned}
+             n^{+} &= 2^{\lceil \log_2 n \rceil} \\\\
+\mathbf{l}^{+}     &= \mathbf{l}(x) \hspace{0.1cm} || \hspace{0.1cm} [0,...,0] \\\\
+\mathbf{r}^{+}     &= \mathbf{r}(x) \hspace{0.1cm} || \hspace{0.1cm} [-y^n,...,-y^{n^{+}-1}] \\\\
+\mathbf{G}^{+}     &= \mathbf{G}    \hspace{0.1cm} || \hspace{0.1cm} [G_n,...,G_{n^{+}-1}] \\\\
+{\mathbf{H}'}^{+}  &= \mathbf{H}'   \hspace{0.1cm} || \hspace{0.1cm} \Big( [y^{-n},...,y^{-(n^{+}-1)}] \circ [H_n,...,H_{n^{+}-1}] \Big) \\\\
+\end{aligned}
+\\]
+
+Finally, the prover performs the [inner product argument](../inner_product_proof/index.html) to prove the relation:
 \\[
 \operatorname{PK}\left\\{
-  ({\mathbf{G}}, {\mathbf{H}}' \in {\mathbb G}^{n}, P', Q \in {\mathbb G}; {\mathbf{l}}, {\mathbf{r}} \in {\mathbb Z\_p}^{n})
-  : P' = {\langle {\mathbf{l}}, {\mathbf{G}} \rangle} + {\langle {\mathbf{r}}, {\mathbf{H}}' \rangle} + {\langle {\mathbf{l}}, {\mathbf{r}} \rangle} Q
+  (\mathbf{G}^{+}, {\mathbf{H}'}^{+} \in {\mathbb G}^{n^{+}}, P', Q \in {\mathbb G}; \mathbf{l}^{+}, \mathbf{r}^{+} \in {\mathbb Z\_p}^{n^{+}})
+  : P' = {\langle \mathbf{l}^{+}, \mathbf{G}^{+} \rangle} + {\langle \mathbf{r}^{+}, {\mathbf{H}'}^{+} \rangle} + {\langle \mathbf{l}^{+}, \mathbf{r}^{+} \rangle} Q
 \right\\}
-\\] where \\({\mathbf{H}}' = {\mathbf{y}}^{-n} \circ {\mathbf{H}}\\).
+\\] where \\({\mathbf{H}'}^{+} = {\mathbf{y}}^{-n^{+}} \circ \mathbf{H}^{+}\\).
 
-The result of the inner product proof is a list of \\(2k\\) points and \\(2\\) scalars, where \\(k = \log_2(n)\\): \\(\\{L\_k, R\_k, \\dots, L\_1, R\_1, a, b\\}\\).
+The result of the inner product proof is a list of \\(2k\\) points and \\(2\\) scalars, where \\(k = \lceil \log_2(n) \rceil\\): \\(\\{L\_k, R\_k, \\dots, L\_1, R\_1, a, b\\}\\).
 
 The complete proof consists of \\(13+2k\\) 32-byte elements:
 \\[
@@ -810,7 +834,7 @@ Verifier’s algorithm
 --------------------
 
 The input to the verifier is the aggregated proof, which contains the \\(m\\) value commitments \\(V_{(j)}\\),
-and \\(32 \cdot (13 + 2 k)\\) bytes of the proof data where \\(k = \log_2(n)\\) and \\(n\\) is a number of [multiplication gates](#multiplication-gates):
+and \\(32 \cdot (13 + 2 k)\\) bytes of the proof data where \\(k = \lceil \log_2(n) \rceil\\) and \\(n\\) is a number of [multiplication gates](#multiplication-gates):
 
 \\[
   \\{A\_I, A\_O, S, T\_1, T\_3, T\_4, T\_5, T\_6, t(x), {\tilde{t}}(x), \tilde{e}, L\_k, R\_k, \\dots, L\_1, R\_1, a, b\\}
