@@ -219,19 +219,11 @@ impl<'a, 'b> ProverCS<'a, 'b> {
         // 0. Pad zeros to the next power of two (or do that implicitly when creating vectors)
 
         // If the number of multiplications is not 0 or a power of 2, then pad the circuit.
-        let temp_n = self.a_L.len();
-        if !(temp_n == 0 || temp_n.is_power_of_two()) {
-            let pad = temp_n.next_power_of_two() - temp_n;
-            for _ in 0..pad {
-                let _ = self.assign_multiplier(
-                    Scalar::zero().into(),
-                    Scalar::zero().into(),
-                    Scalar::zero().into(),
-                );
-            }
-        }
         let n = self.a_L.len();
-        if self.bp_gens.gens_capacity < n {
+        let padded_n = self.a_L.len().next_power_of_two();
+        let pad = padded_n - n;
+
+        if self.bp_gens.gens_capacity < padded_n {
             return Err(R1CSError::InvalidGeneratorsLength);
         }
 
@@ -304,7 +296,7 @@ impl<'a, 'b> ProverCS<'a, 'b> {
 
         let mut exp_y = Scalar::one(); // y^n starting at n=0
         let y_inv = y.invert();
-        let exp_y_inv = util::exp_iter(y_inv).take(n).collect::<Vec<_>>();
+        let exp_y_inv = util::exp_iter(y_inv).take(padded_n).collect::<Vec<_>>();
 
         for i in 0..n {
             // l_poly.0 = 0
@@ -366,8 +358,16 @@ impl<'a, 'b> ProverCS<'a, 'b> {
 
         let t_x = t_poly.eval(x);
         let t_x_blinding = t_blinding_poly.eval(x);
-        let l_vec = l_poly.eval(x);
-        let r_vec = r_poly.eval(x);
+        let l_vec = l_poly.eval(x).into_iter()
+            .chain(iter::repeat(Scalar::zero()).take(pad)).collect::<Vec<_>>();
+        let mut r_vec = r_poly.eval(x).into_iter()
+            .chain(iter::repeat(Scalar::zero()).take(pad)).collect::<Vec<_>>();
+
+        for i in n..padded_n {
+            r_vec[i] = -exp_y;
+            exp_y = exp_y * y; // y^i -> y^(i+1)
+        }
+
         let e_blinding = x * (i_blinding + x * (o_blinding + x * s_blinding));
 
         self.transcript.commit_scalar(b"t_x", &t_x);
@@ -383,8 +383,8 @@ impl<'a, 'b> ProverCS<'a, 'b> {
             self.transcript,
             &Q,
             &exp_y_inv,
-            gens.G(n).cloned().collect(),
-            gens.H(n).cloned().collect(),
+            gens.G(padded_n).cloned().collect(),
+            gens.H(padded_n).cloned().collect(),
             l_vec,
             r_vec,
         );
