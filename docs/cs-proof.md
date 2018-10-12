@@ -713,14 +713,14 @@ Vector polynomial \\(\mathbf{l}(x)\\) is padded with zeroes:
 \end{aligned}
 \\]
 
-Vector polynomial \\(\mathbf{r}(x)\\) is padded with additional powers of \\(y\\):
+Vector polynomial \\(\mathbf{r}(x)\\) is padded with additional (negated) powers of \\(y\\):
 
 \\[
 \begin{aligned}
 \mathbf{r}(x)^{+} &= \mathbf{y}^{n^{+}} \circ \mathbf{a}\_R^{+} \cdot x + \mathbf{y}^{n^{+}} \circ \mathbf{s}\_R^{+} \cdot x^3 + \mathbf{w}\_L^{+} \cdot x - \mathbf{y}^{n^{+}} + \mathbf{w}\_O^{+} \\\\
                   &= \mathbf{y}^n \circ \mathbf{a}\_R \cdot x + \mathbf{y}^n \circ \mathbf{s}\_R \cdot x^3 + \mathbf{w}\_L \cdot x - \mathbf{y}^n + \mathbf{w}\_O \\\\
                   &  \hspace{0.5cm} || \hspace{0.1cm} [y^n,...,y^{n^{+}-1}] \circ \mathbf{0} \cdot x + [y^n,...,y^{n^{+}-1}] \circ \mathbf{0} \cdot x^3 + \mathbf{0} \cdot x - [y^n,...,y^{n^{+}-1}] + \mathbf{0} \\\\
-                  &= \mathbf{r}(x) || [y^n,...,y^{n^{+}-1}]
+                  &= \mathbf{r}(x) || [-y^n,...,-y^{n^{+}-1}]
 \end{aligned}
 \\]
 
@@ -846,7 +846,7 @@ The prover evaluates polynomials \\(\mathbf{l}(x), \mathbf{r}(x)\\) and
 \begin{aligned}
              n^{+} &= 2^{\lceil \log_2 n \rceil} \\\\
 \mathbf{l}^{+}     &= \mathbf{l}(x) \hspace{0.1cm} || \hspace{0.1cm} \mathbf{0} \\\\
-\mathbf{r}^{+}     &= \mathbf{r}(x) \hspace{0.1cm} || \hspace{0.1cm} [y^n,...,y^{n^{+}-1}]
+\mathbf{r}^{+}     &= \mathbf{r}(x) \hspace{0.1cm} || \hspace{0.1cm} [-y^n,...,-y^{n^{+}-1}]
 \end{aligned}
 \\]
 
