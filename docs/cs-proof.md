@@ -621,32 +621,43 @@ and related commitments before we can use the inner product argument.
 Our goal is to translate the _padding of the constraint system_ into the _padding of proof data_,
 so we can keep the constraint system small and perform less computations in proving and verification.
 
+We will use the following notation for the padding:
+
+\\[
+\begin{aligned}
+                           n^{+} &= 2^{\lceil \log_2 n \rceil} \\\\
+                      {\Delta n} &= n^{+} - n \\\\
+           \mathbf{0}^{\Delta n} &= [0,...,0] \\\\
+  \mathbf{0}^{q \times \Delta n} &= [[0,...,0], ..., [0,...,0]]
+\end{aligned}
+\\]
+
 We start by padding the entire constraint system:
 multipliers are padded with all-zero assignments \\(a\_{L,j}, a\_{R,j}, a\_{O,j}\\),
 all-zero blinding factors \\(s\_{L,j}, s\_{R,j}\\),
 and all-zero weights \\(W\_{R,i,j}, W\_{L,i,j}, W\_{O,i,j}\\),
-for all constraints \\(i \in [0, q)\\) and all additional multipliers \\(j \in [n,n')\\):
+for all constraints \\(i \in [0, q)\\) and all additional multipliers \\(j \in [n,n^{+})\\):
 
 \\[
 \begin{aligned}
-\mathbf{a}\_L^{+} &= \mathbf{a}\_L \hspace{0.1cm} || \hspace{0.1cm} [0,...,0] \\\\
-\mathbf{a}\_R^{+} &= \mathbf{a}\_R \hspace{0.1cm} || \hspace{0.1cm} [0,...,0] \\\\
-\mathbf{a}\_O^{+} &= \mathbf{a}\_O \hspace{0.1cm} || \hspace{0.1cm} [0,...,0] \\\\
-\mathbf{s}\_L^{+} &= \mathbf{s}\_L \hspace{0.1cm} || \hspace{0.1cm} [0,...,0] \\\\
-\mathbf{s}\_R^{+} &= \mathbf{s}\_R \hspace{0.1cm} || \hspace{0.1cm} [0,...,0] \\\\
-\mathbf{W}\_L^{+} &= \mathbf{W}\_L \hspace{0.1cm} || \hspace{0.1cm} [[0,...,0],...,[0,...,0]] \\\\
-\mathbf{W}\_R^{+} &= \mathbf{W}\_R \hspace{0.1cm} || \hspace{0.1cm} [[0,...,0],...,[0,...,0]] \\\\
-\mathbf{W}\_O^{+} &= \mathbf{W}\_O \hspace{0.1cm} || \hspace{0.1cm} [[0,...,0],...,[0,...,0]] \\\\
+\mathbf{a}\_L^{+} &= \mathbf{a}\_L \hspace{0.1cm} || \hspace{0.1cm} \mathbf{0}^{\Delta n} \\\\
+\mathbf{a}\_R^{+} &= \mathbf{a}\_R \hspace{0.1cm} || \hspace{0.1cm} \mathbf{0}^{\Delta n} \\\\
+\mathbf{a}\_O^{+} &= \mathbf{a}\_O \hspace{0.1cm} || \hspace{0.1cm} \mathbf{0}^{\Delta n} \\\\
+\mathbf{s}\_L^{+} &= \mathbf{s}\_L \hspace{0.1cm} || \hspace{0.1cm} \mathbf{0}^{\Delta n} \\\\
+\mathbf{s}\_R^{+} &= \mathbf{s}\_R \hspace{0.1cm} || \hspace{0.1cm} \mathbf{0}^{\Delta n} \\\\
+\mathbf{W}\_L^{+} &= \mathbf{W}\_L \hspace{0.1cm} || \hspace{0.1cm} \mathbf{0}^{q \times \Delta n} \\\\
+\mathbf{W}\_R^{+} &= \mathbf{W}\_R \hspace{0.1cm} || \hspace{0.1cm} \mathbf{0}^{q \times \Delta n} \\\\
+\mathbf{W}\_O^{+} &= \mathbf{W}\_O \hspace{0.1cm} || \hspace{0.1cm} \mathbf{0}^{q \times \Delta n} \\\\
 \end{aligned}
 \\]
 
-As a result, the vectors of generators \\(\mathbf{G},\mathbf{H}\\) and challenges \\(\mathbf{y}^n\\) are extended:
+As a result, we have to take larger slices of the vectors of generators \\(\mathbf{G},\mathbf{H}\\) and more powers of the challenge \\(y\\):
 
 \\[
 \begin{aligned}
 \mathbf{G}^{+}     &= \mathbf{G}   \hspace{0.1cm} || \hspace{0.1cm} [G_n,...,G_{n^{+}-1}] \\\\
 \mathbf{H}^{+}     &= \mathbf{H}   \hspace{0.1cm} || \hspace{0.1cm} [H_n,...,H_{n^{+}-1}] \\\\
-\mathbf{y}^{n^{+}} &= \mathbf{y}^n \hspace{0.1cm} || \hspace{0.1cm} [y^n,...,y^{n^{+}-1}] \\\\
+\mathbf{y}^{n^{+}} &= \mathbf{y}^n \hspace{0.1cm} || \hspace{0.1cm} y^n \mathbf{y}^{\Delta n} \\\\
 \end{aligned}
 \\]
 
@@ -654,19 +665,31 @@ The low-level variables are padded with zeroes, so their commitments remain unch
 
 \\[
 \begin{aligned}
-A_I^{+} &= \widetilde{B} \cdot \tilde{a} + \langle \mathbf{G}^{+} , \mathbf{a}\_L^{+} \rangle + \langle \mathbf{H}^{+}, \mathbf{a}\_R^{+} \rangle &{}={}& A_I \\\\
-A_O^{+} &= \widetilde{B} \cdot \tilde{o} + \langle \mathbf{G}^{+} , \mathbf{a}\_O^{+} \rangle                                                     &{}={}& A_O \\\\
-S^{+}   &= \widetilde{B} \cdot \tilde{s} + \langle \mathbf{G}^{+} , \mathbf{s}\_L^{+} \rangle + \langle \mathbf{H}^{+}, \mathbf{s}\_R^{+} \rangle &{}={}& S
+A_I^{+} &= \widetilde{B} \cdot \tilde{a} + \langle \mathbf{G}^{+}, \mathbf{a}\_L^{+} \rangle + \langle \mathbf{H}^{+}, \mathbf{a}\_R^{+} \rangle \\\\
+        &= \widetilde{B} \cdot \tilde{a} + \langle \mathbf{G}, \mathbf{a}\_L \rangle + \langle \mathbf{H}, \mathbf{a}\_R \rangle +
+           \langle [G_n, ..., G_{n^{+}-1}], \mathbf{0}^{\Delta n} \rangle + \langle [H_n, ..., H_{n^{+}-1}], \mathbf{0}^{\Delta n} \rangle \\\\
+		&= \widetilde{B} \cdot \tilde{a} + \langle \mathbf{G}, \mathbf{a}\_L \rangle + \langle \mathbf{H}, \mathbf{a}\_R \rangle + 
+		   0 \\\\
+        &= A_I \\\\
 \end{aligned}
 \\]
 
-The flattened weight vectors \\(\mathbf{w}\_{L,R,O}\\) are padded with \\((n^{+} - n)\\) zeroes
+Similarly, \\(A_O\\) and \\(S\\) are unchanged:
+
+\\[
+\begin{aligned}
+A_O^{+} &= A_O \\\\
+S^{+}   &= S
+\end{aligned}
+\\]
+
+The flattened weight vectors \\(\mathbf{w}\_{L,R,O}\\) are padded with \\(\Delta n\\) zeroes
 because the corresponding weights are padded with zeroes:
 \\[
 \begin{aligned}
-\mathbf{w}\_L^{+} &= z \mathbf{z}^q \cdot \mathbf{W}\_L^{+}  &{}={}& (z \mathbf{z}^q \cdot \mathbf{W}\_L) || (z \mathbf{z}^q \cdot [0,...,0]) &{}={}& \mathbf{w}\_L || [0,...,0], \\\\
-\mathbf{w}\_R^{+} &= z \mathbf{z}^q \cdot \mathbf{W}\_R^{+}  &{}={}& (z \mathbf{z}^q \cdot \mathbf{W}\_R) || (z \mathbf{z}^q \cdot [0,...,0]) &{}={}& \mathbf{w}\_R || [0,...,0], \\\\
-\mathbf{w}\_O^{+} &= z \mathbf{z}^q \cdot \mathbf{W}\_O^{+}  &{}={}& (z \mathbf{z}^q \cdot \mathbf{W}\_O) || (z \mathbf{z}^q \cdot [0,...,0]) &{}={}& \mathbf{w}\_O || [0,...,0]. \\\\
+\mathbf{w}\_L^{+} &= z \mathbf{z}^q \cdot \mathbf{W}\_L^{+}  &{}={}& (z \mathbf{z}^q \cdot \mathbf{W}\_L) || (z \mathbf{z}^q \cdot \mathbf{0}^{\Delta n}) &{}={}& \mathbf{w}\_L || \mathbf{0}^{\Delta n}, \\\\
+\mathbf{w}\_R^{+} &= z \mathbf{z}^q \cdot \mathbf{W}\_R^{+}  &{}={}& (z \mathbf{z}^q \cdot \mathbf{W}\_R) || (z \mathbf{z}^q \cdot \mathbf{0}^{\Delta n}) &{}={}& \mathbf{w}\_R || \mathbf{0}^{\Delta n}, \\\\
+\mathbf{w}\_O^{+} &= z \mathbf{z}^q \cdot \mathbf{W}\_O^{+}  &{}={}& (z \mathbf{z}^q \cdot \mathbf{W}\_O) || (z \mathbf{z}^q \cdot \mathbf{0}^{\Delta n}) &{}={}& \mathbf{w}\_O || \mathbf{0}^{\Delta n}. \\\\
 \end{aligned}
 \\]
 
@@ -675,26 +698,34 @@ The \\(\delta(y,z)\\) remains unchanged because the padding weights are zeroes:
 \\[
 \begin{aligned}
 \delta(y, z)^{+} &= \langle \mathbf{y}^{-n^{+}} \circ \mathbf{w}\_R^{+}, \mathbf{w}\_L^{+} \rangle \\\\
-                 &= \langle \mathbf{y}^{-n} \circ \mathbf{w}\_R, \mathbf{w}\_L \rangle      +     \langle [y^n,...,y^{n^{+}-1}] \circ [0,...,0], [0,...,0] \rangle \\\\
+                 &= \langle \mathbf{y}^{-n} \circ \mathbf{w}\_R, \mathbf{w}\_L \rangle      +     \langle [y^n,...,y^{n^{+}-1}] \circ \mathbf{0}^{\Delta n}, \mathbf{0}^{\Delta n} \rangle \\\\
                  &= \langle \mathbf{y}^{-n} \circ \mathbf{w}\_R, \mathbf{w}\_L \rangle      +     0 \\\\
                  &= \delta(y, z)
 \end{aligned}
 \\]
 
-Vector polynomials \\(\mathbf{l}(x)\\) is padded with zeroes and \\(\mathbf{r}(x)\\) is padded with additional powers of \\(y\\) in its 0th term:
+Vector polynomial \\(\mathbf{l}(x)\\) is padded with zeroes:
 
 \\[
 \begin{aligned}
 \mathbf{l}(x)^{+} &= \mathbf{a}\_L^{+} \cdot x + \mathbf{s}\_L^{+} \cdot x^3 + \mathbf{y}^{-n^{+}} \circ \mathbf{w}\_R^{+} \cdot x + \mathbf{a}\_O^{+} \cdot x^2 \\\\
                   &= \mathbf{a}\_L \cdot x + \mathbf{s}\_L \cdot x^3 + \mathbf{y}^{-n} \circ \mathbf{w}\_R \cdot x + \mathbf{a}\_O \cdot x^2 \\\\
-                  &  \hspace{0.5cm} || \hspace{0.1cm} [0,...,0] \cdot x + [0,...,0] \cdot x^3 + [y^n,...,y^{n^{+}-1}] \circ [0,...,0] \cdot x + [0,...,0] \cdot x^2 \\\\
-                  &= \mathbf{l}(x) || [0,...,0] \\\\
-\mathbf{r}(x)^{+} &= \mathbf{y}^{n^{+}} \circ \mathbf{a}\_R^{+} \cdot x + \mathbf{y}^{n^{+}} \circ \mathbf{s}\_R^{+} \cdot x^3 + \mathbf{w}\_L^{+} \cdot x - \mathbf{y}^{n^{+}} + \mathbf{w}\_O^{+} \\\\
-                  &= \mathbf{y}^n \circ \mathbf{a}\_R \cdot x + \mathbf{y}^n \circ \mathbf{s}\_R \cdot x^3 + \mathbf{w}\_L \cdot x - \mathbf{y}^n + \mathbf{w}\_O \\\\
-                  &  \hspace{0.5cm} || \hspace{0.1cm} [y^n,...,y^{n^{+}-1}] \circ [0,...,0] \cdot x + [y^n,...,y^{n^{+}-1}] \circ [0,...,0] \cdot x^3 + [0,...,0] \cdot x - [y^n,...,y^{n^{+}-1}] + [0,...,0] \\\\
-                  &= \mathbf{r}(x) || [-y^n,...,-y^{n^{+}-1}]
+                  &  \hspace{0.5cm} || \hspace{0.1cm} \mathbf{0}^{\Delta n} \cdot x + \mathbf{0}^{\Delta n} \cdot x^3 + y^n \mathbf{y}^{\Delta n} \circ \mathbf{0}^{\Delta n} \cdot x + \mathbf{0}^{\Delta n} \cdot x^2 \\\\
+                  &= \mathbf{l}(x) || \mathbf{0}^{\Delta n} \\\\
 \end{aligned}
 \\]
+
+Vector polynomial \\(\mathbf{r}(x)\\) is padded with additional powers of \\(y\\):
+
+\\[
+\begin{aligned}
+\mathbf{r}(x)^{+} &= \mathbf{y}^{n^{+}} \circ \mathbf{a}\_R^{+} \cdot x + \mathbf{y}^{n^{+}} \circ \mathbf{s}\_R^{+} \cdot x^3 + \mathbf{w}\_L^{+} \cdot x - \mathbf{y}^{n^{+}} + \mathbf{w}\_O^{+} \\\\
+                  &= \mathbf{y}^n \circ \mathbf{a}\_R \cdot x + \mathbf{y}^n \circ \mathbf{s}\_R \cdot x^3 + \mathbf{w}\_L \cdot x - \mathbf{y}^n + \mathbf{w}\_O \\\\
+                  &  \hspace{0.5cm} || \hspace{0.1cm} y^n \mathbf{y}^{\Delta n} \circ \mathbf{0}^{\Delta n} \cdot x + y^n \mathbf{y}^{\Delta n} \circ \mathbf{0}^{\Delta n} \cdot x^3 + \mathbf{0}^{\Delta n} \cdot x - y^n \mathbf{y}^{\Delta n} + \mathbf{0}^{\Delta n} \\\\
+                  &= \mathbf{r}(x) || y^n \mathbf{y}^{\Delta n}
+\end{aligned}
+\\]
+
 
 The commitments to these vector polynomials are also padded (\\(W\_{L,R,O}\\) remain unchanged because the weights are padded with zeroes):
 
@@ -710,7 +741,7 @@ The inner product \\(t(x)\\) remains unchanged because the non-zero padding in t
 \\[
 \begin{aligned}
 t(x)^{+} &= {\langle {\mathbf{l}}(x)^{+}, {\mathbf{r}}(x)^{+} \rangle} \\\\
-         &= {\langle {\mathbf{l}}(x), {\mathbf{r}}(x) \rangle} + {\langle [0,...,0], [-y^n,...,-y^{n^{+}-1}] \rangle} \\\\
+         &= {\langle {\mathbf{l}}(x), {\mathbf{r}}(x) \rangle} + {\langle \mathbf{0}^{\Delta n}, y^n \mathbf{y}^{\Delta n} \rangle} \\\\
          &= {\langle {\mathbf{l}}(x), {\mathbf{r}}(x) \rangle} + 0 \\\\
          &= t(x)
 \end{aligned}
@@ -816,10 +847,17 @@ The prover evaluates polynomials \\(\mathbf{l}(x), \mathbf{r}(x)\\) and
 \\[
 \begin{aligned}
              n^{+} &= 2^{\lceil \log_2 n \rceil} \\\\
-\mathbf{l}^{+}     &= \mathbf{l}(x) \hspace{0.1cm} || \hspace{0.1cm} [0,...,0] \\\\
-\mathbf{r}^{+}     &= \mathbf{r}(x) \hspace{0.1cm} || \hspace{0.1cm} [-y^n,...,-y^{n^{+}-1}] \\\\
+\mathbf{l}^{+}     &= \mathbf{l}(x) \hspace{0.1cm} || \hspace{0.1cm} \mathbf{0}^{\Delta n} \\\\
+\mathbf{r}^{+}     &= \mathbf{r}(x) \hspace{0.1cm} || \hspace{0.1cm} y^n \mathbf{y}^{\Delta n}
+\end{aligned}
+\\]
+
+The prover also takes a larger slice of the generators \\(\mathbf{G}, \mathbf{H}\\):
+
+\\[
+\begin{aligned}
 \mathbf{G}^{+}     &= \mathbf{G}    \hspace{0.1cm} || \hspace{0.1cm} [G_n,...,G_{n^{+}-1}] \\\\
-{\mathbf{H}'}^{+}  &= \mathbf{H}'   \hspace{0.1cm} || \hspace{0.1cm} \Big( [y^{-n},...,y^{-(n^{+}-1)}] \circ [H_n,...,H_{n^{+}-1}] \Big) \\\\
+{\mathbf{H}'}^{+}  &= \mathbf{H}'   \hspace{0.1cm} || \hspace{0.1cm} \Big( y^n \mathbf{y}^{\Delta n} \circ [H_n,...,H_{n^{+}-1}] \Big) \\\\
 \end{aligned}
 \\]
 
@@ -874,11 +912,13 @@ The verifier flattens constraints:
 \\]
 where each of \\(\mathbf{w}\_L, \mathbf{w}\_R, \mathbf{w}\_O\\) has length \\(n\\) and \\(\mathbf{w}\_V\\) has length \\(m\\).
 
-The verifier [pads](#padding-mathbflx-and-mathbfrx-for-the-inner-product-proof) the generators \\(\mathbf{G},\mathbf{H}\\) and challenges \\(\mathbf{y}^n\\) to a power-of-two \\(n^{+}\\):
+The verifier [pads the proof data](#padding-mathbflx-and-mathbfrx-for-the-inner-product-proof)
+by taking a larger slice of the generators \\(\mathbf{G},\mathbf{H}\\) and more powers of challenges \\(\mathbf{y}^n\\) to a power-of-two \\(n^{+}\\):
 
 \\[
 \begin{aligned}
              n^{+} &= 2^{\lceil \log_2 n \rceil} \\\\
+          \Delta n &= n^{+} - n \\\\
 \mathbf{G}^{+}     &= \mathbf{G}   \hspace{0.1cm} || \hspace{0.1cm} [G_n,...,G_{n^{+}-1}] \\\\
 \mathbf{H}^{+}     &= \mathbf{H}   \hspace{0.1cm} || \hspace{0.1cm} [H_n,...,H_{n^{+}-1}] \\\\
 \mathbf{y}^{n^{+}} &= \mathbf{y}^n \hspace{0.1cm} || \hspace{0.1cm} [y^n,...,y^{n^{+}-1}] \\\\
@@ -949,8 +989,8 @@ Finally, verifier groups all scalars by each point and performs a single multisc
                       + & \quad \sum\_{i = 1,3,4,5,6} r x^i T\_{i} \\\\
                       + & \quad \Big(w \big(t(x) - ab\big) + r \big(x^2 (w\_c + \delta(y,z)) - t(x)\big) \Big) \cdot B \\\\
                       + & \quad (-{\widetilde{e}} - r{\tilde{t}}(x)) \cdot \widetilde{B} \\\\
-                      + & \quad {\langle \big( x \mathbf{y}^{-n^{+}} \circ \mathbf{w}\_R \big) || [0,...,0] - a\mathbf{s}, \mathbf{G}^{+} \rangle}\\\\
-                      + & \quad {\langle -\mathbf{1} + \mathbf{y}^{-n^{+}} \circ \big( (x \mathbf{w}\_L + \mathbf{w}\_O) || [0,...,0] - (b /{\mathbf{s}}) \big), \mathbf{H}^{+} \rangle}\\\\
+                      + & \quad {\langle \big( x \mathbf{y}^{-n} \circ \mathbf{w}\_R \big) || \mathbf{0}^{\Delta n} - a\mathbf{s}, \mathbf{G}^{+} \rangle}\\\\
+                      + & \quad {\langle -\mathbf{1} + \mathbf{y}^{-n^{+}} \circ \big( (x \mathbf{w}\_L + \mathbf{w}\_O) || \mathbf{0}^{\Delta n} - (b /{\mathbf{s}}) \big), \mathbf{H}^{+} \rangle}\\\\
                       + & \quad {\langle [u_{1}^2,    \dots, u_{k}^2    ], [L_1, \dots, L_{k}] \rangle}\\\\
                       + & \quad {\langle [u_{1}^{-2}, \dots, u_{k}^{-2} ], [R_1, \dots, R_{k}] \rangle}
 \end{aligned}
