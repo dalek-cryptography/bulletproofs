@@ -189,7 +189,6 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
 
     /// Consume this `VerifierCS` and attempt to verify the supplied `proof`.
     pub fn verify(mut self, proof: &R1CSProof) -> Result<(), R1CSError> {
-
         // If the number of multiplications is not 0 or a power of 2, then pad the circuit.
         let n = self.num_vars;
         let padded_n = self.num_vars.next_power_of_two();
@@ -237,7 +236,9 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
         let b = proof.ipp_proof.b;
 
         let y_inv = y.invert();
-        let y_inv_vec = util::exp_iter(y_inv).take(padded_n).collect::<Vec<Scalar>>();
+        let y_inv_vec = util::exp_iter(y_inv)
+            .take(padded_n)
+            .collect::<Vec<Scalar>>();
         let yneg_wR = wR
             .into_iter()
             .zip(y_inv_vec.iter())

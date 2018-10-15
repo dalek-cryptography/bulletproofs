@@ -122,11 +122,7 @@ fn example_gadget_test() {
     assert!(example_gadget_roundtrip_helper(3, 4, 6, 1, 40, 10).is_err());
 }
 
-
-
-
 /// Shuffle gadget tests
-
 
 /* 
 K-SHUFFLE GADGET SPECIFICATION:
@@ -326,7 +322,6 @@ impl KShuffleGadget {
     }
 }
 
-
 // Helper functions for proof creation
 fn kshuffle_prover_cs<'a, 'b>(
     pc_gens: &'b PedersenGens,
@@ -404,13 +399,12 @@ fn kshuffle_verifier_cs<'a, 'b>(
     Ok(verifier_cs)
 }
 
-
 fn shuffle_gadget_test_helper(k: usize) {
-    use rand::Rng;
     use merlin::Transcript;
+    use rand::Rng;
 
     let pc_gens = PedersenGens::default();
-    let bp_gens = BulletproofGens::new((2*k).next_power_of_two(), 1);
+    let bp_gens = BulletproofGens::new((2 * k).next_power_of_two(), 1);
 
     let mut transcript = Transcript::new(b"ShuffleTest");
     transcript.commit_bytes(b"k", Scalar::from(k as u64).as_bytes());
@@ -422,7 +416,7 @@ fn shuffle_gadget_test_helper(k: usize) {
         let input: Vec<u64> = (0..k).map(|_| rng.gen_range(min, max)).collect();
         let mut output = input.clone();
         rand::thread_rng().shuffle(&mut output);
-        
+
         let mut prover_transcript = transcript.clone();
         let (prover_cs, commits) =
             kshuffle_prover_cs(&pc_gens, &bp_gens, &mut prover_transcript, &input, &output)
@@ -442,28 +436,46 @@ fn shuffle_gadget_test_helper(k: usize) {
 }
 
 #[test]
-fn shuffle_gadget_test_1() { shuffle_gadget_test_helper(1); }
+fn shuffle_gadget_test_1() {
+    shuffle_gadget_test_helper(1);
+}
 
 #[test]
-fn shuffle_gadget_test_2() { shuffle_gadget_test_helper(2); }
+fn shuffle_gadget_test_2() {
+    shuffle_gadget_test_helper(2);
+}
 
 #[test]
-fn shuffle_gadget_test_3() { shuffle_gadget_test_helper(3); }
+fn shuffle_gadget_test_3() {
+    shuffle_gadget_test_helper(3);
+}
 
 #[test]
-fn shuffle_gadget_test_4() { shuffle_gadget_test_helper(4); }
+fn shuffle_gadget_test_4() {
+    shuffle_gadget_test_helper(4);
+}
 
 #[test]
-fn shuffle_gadget_test_5() { shuffle_gadget_test_helper(5); }
+fn shuffle_gadget_test_5() {
+    shuffle_gadget_test_helper(5);
+}
 
 #[test]
-fn shuffle_gadget_test_6() { shuffle_gadget_test_helper(6); }
+fn shuffle_gadget_test_6() {
+    shuffle_gadget_test_helper(6);
+}
 
 #[test]
-fn shuffle_gadget_test_7() { shuffle_gadget_test_helper(7); }
+fn shuffle_gadget_test_7() {
+    shuffle_gadget_test_helper(7);
+}
 
 #[test]
-fn shuffle_gadget_test_24() { shuffle_gadget_test_helper(24); }
+fn shuffle_gadget_test_24() {
+    shuffle_gadget_test_helper(24);
+}
 
 #[test]
-fn shuffle_gadget_test_42() { shuffle_gadget_test_helper(42); }
+fn shuffle_gadget_test_42() {
+    shuffle_gadget_test_helper(42);
+}

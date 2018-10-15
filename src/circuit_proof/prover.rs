@@ -358,10 +358,16 @@ impl<'a, 'b> ProverCS<'a, 'b> {
 
         let t_x = t_poly.eval(x);
         let t_x_blinding = t_blinding_poly.eval(x);
-        let l_vec = l_poly.eval(x).into_iter()
-            .chain(iter::repeat(Scalar::zero()).take(pad)).collect::<Vec<_>>();
-        let mut r_vec = r_poly.eval(x).into_iter()
-            .chain(iter::repeat(Scalar::zero()).take(pad)).collect::<Vec<_>>();
+        let l_vec = l_poly
+            .eval(x)
+            .into_iter()
+            .chain(iter::repeat(Scalar::zero()).take(pad))
+            .collect::<Vec<_>>();
+        let mut r_vec = r_poly
+            .eval(x)
+            .into_iter()
+            .chain(iter::repeat(Scalar::zero()).take(pad))
+            .collect::<Vec<_>>();
 
         for i in n..padded_n {
             r_vec[i] = -exp_y;
