@@ -911,7 +911,7 @@ The verifier flattens constraints:
 where each of \\(\mathbf{w}\_L, \mathbf{w}\_R, \mathbf{w}\_O\\) has length \\(n\\) and \\(\mathbf{w}\_V\\) has length \\(m\\).
 
 The verifier [pads the proof data](#padding-mathbflx-and-mathbfrx-for-the-inner-product-proof)
-by taking a larger slice of the generators \\(\mathbf{G},\mathbf{H}\\) and more powers of challenges \\(\mathbf{y}^n\\) to a power-of-two \\(n^{+}\\):
+by taking a larger slice of the generators \\(\mathbf{G},\mathbf{H}\\) and more powers of challenges \\(y\\) up to \\((n^{+}-1)\\):
 
 \\[
 \begin{aligned}
