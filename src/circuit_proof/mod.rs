@@ -4,6 +4,9 @@ pub mod assignment;
 pub mod prover;
 pub mod verifier;
 
+#[cfg(test)]
+mod tests;
+
 use std::iter::FromIterator;
 
 use curve25519_dalek::ristretto::CompressedRistretto;
@@ -157,131 +160,4 @@ pub trait ConstraintSystem {
     /// that the constraints are sound, it is **also** the user's
     /// responsibility to ensure that each challenge circuit is sound.
     fn challenge_scalar(&mut self, label: &'static [u8]) -> Scalar;
-}
-
-#[cfg(test)]
-mod tests {
-    use super::assignment::Assignment;
-    use super::prover::ProverCS;
-    use super::verifier::VerifierCS;
-    use super::*;
-
-    use errors::R1CSError;
-    use generators::{BulletproofGens, PedersenGens};
-
-    use curve25519_dalek::scalar::Scalar;
-    use merlin::Transcript;
-
-    use rand::thread_rng;
-
-    /// Constrains (a1 + a2) * (b1 + b2) = (c1 + c2),
-    /// where c2 is a constant.
-    #[allow(non_snake_case)]
-    fn example_gadget<CS: ConstraintSystem>(
-        cs: &mut CS,
-        a1: (Variable, Assignment),
-        a2: (Variable, Assignment),
-        b1: (Variable, Assignment),
-        b2: (Variable, Assignment),
-        c1: (Variable, Assignment),
-        c2: Scalar,
-    ) -> Result<(), R1CSError> {
-        // Make low-level variables (aL = v_a1 + v_a2, aR = v_b1 + v_b2, aO = v_c1 + v_c2)
-        let (aL, aR, aO) =
-            cs.assign_multiplier(a1.1 + a2.1, b1.1 + b2.1, c1.1 + Assignment::from(c2))?;
-
-        // Tie high-level and low-level variables together
-        let one = Scalar::one();
-        cs.add_constraint([(aL, -one), (a1.0, one), (a2.0, one)].iter().collect());
-        cs.add_constraint([(aR, -one), (b1.0, one), (b2.0, one)].iter().collect());
-        cs.add_constraint(
-            [(aO, -one), (c1.0, one), (Variable::One(), c2)]
-                .iter()
-                .collect(),
-        );
-
-        Ok(())
-    }
-
-    fn blinding_helper(len: usize) -> Vec<Scalar> {
-        (0..len)
-            .map(|_| Scalar::random(&mut thread_rng()))
-            .collect()
-    }
-
-    fn example_gadget_roundtrip_helper(
-        a1: u64,
-        a2: u64,
-        b1: u64,
-        b2: u64,
-        c1: u64,
-        c2: u64,
-    ) -> Result<(), R1CSError> {
-        // Common
-        let pc_gens = PedersenGens::default();
-        let bp_gens = BulletproofGens::new(128, 1);
-
-        // Prover's scope
-        let (proof, commitments) = {
-            // 0. Construct transcript
-            let mut transcript = Transcript::new(b"R1CSExampleGadget");
-
-            // 1. Construct HL witness
-            let v: Vec<_> = [a1, a2, b1, b2, c1]
-                .iter()
-                .map(|x| Scalar::from(*x))
-                .collect();
-            let v_blinding = blinding_helper(v.len());
-
-            // 2. Construct CS
-            let (mut cs, vars, commitments) =
-                ProverCS::new(&bp_gens, &pc_gens, &mut transcript, v.clone(), v_blinding);
-
-            // 3. Add gadgets
-            example_gadget(
-                &mut cs,
-                (vars[0], v[0].into()),
-                (vars[1], v[1].into()),
-                (vars[2], v[2].into()),
-                (vars[3], v[3].into()),
-                (vars[4], v[4].into()),
-                c2.into(),
-            )?;
-
-            // 4. Prove.
-            let proof = cs.prove()?;
-
-            (proof, commitments)
-        };
-
-        // Verifier logic
-
-        // 0. Construct transcript
-        let mut transcript = Transcript::new(b"R1CSExampleGadget");
-
-        // 1. Construct CS using commitments to HL witness
-        let (mut cs, vars) = VerifierCS::new(&bp_gens, &pc_gens, &mut transcript, commitments);
-
-        // 2. Add gadgets
-        example_gadget(
-            &mut cs,
-            (vars[0], Assignment::Missing()),
-            (vars[1], Assignment::Missing()),
-            (vars[2], Assignment::Missing()),
-            (vars[3], Assignment::Missing()),
-            (vars[4], Assignment::Missing()),
-            c2.into(),
-        )?;
-
-        // 3. Verify.
-        cs.verify(&proof).map_err(|_| R1CSError::VerificationError)
-    }
-
-    #[test]
-    fn example_gadget_test() {
-        // (3 + 4) * (6 + 1) = (40 + 9)
-        assert!(example_gadget_roundtrip_helper(3, 4, 6, 1, 40, 9).is_ok());
-        // (3 + 4) * (6 + 1) != (40 + 10)
-        assert!(example_gadget_roundtrip_helper(3, 4, 6, 1, 40, 10).is_err());
-    }
 }
