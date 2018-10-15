@@ -135,7 +135,7 @@ pub fn scalar_exp_vartime(x: &Scalar, mut n: u64) -> Scalar {
 /// squaring \\(x\\) and multiplying it by \\(s_{i-1}\\) at each iteration.
 ///
 /// Lets apply this to \\(n\\) which is not a power of two. The intuition behind the generalized
-/// algorithm is to combine all intermediate power-of-two-degree polynomials corresponding to the 
+/// algorithm is to combine all intermediate power-of-two-degree polynomials corresponding to the
 /// bits of \\(n\\) that are equal to 1.
 ///
 /// 1. Represent \\(n\\) in binary.
@@ -179,15 +179,17 @@ pub fn sum_of_powers(x: &Scalar, mut n: usize) -> Scalar {
         // take a bit from n
         let bit = n & 1;
         n = n >> 1;
-        
+
         if bit == 1 {
             // `n` is not secret, so it's okay to be vartime on bits of `n`.
             result += f * s;
-            if n > 0 { // avoid multiplication if no bits left
+            if n > 0 {
+                // avoid multiplication if no bits left
                 f = f * p;
             }
         }
-        if n > 0 { // avoid multiplication if no bits left
+        if n > 0 {
+            // avoid multiplication if no bits left
             s = s + p * s;
             p = p * p;
         }
