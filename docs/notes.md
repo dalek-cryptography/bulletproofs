@@ -19,6 +19,8 @@ The primary motivation is that our implementation uses additive notation, and
 we would like our description of the protocol to use the same notation as the
 implementation.
 
+[bulletproofs_paper]: https://eprint.iacr.org/2017/1066.pdf
+
 In general, we use lower-case letters
 \\(a, b, c\\)
 for scalars in
@@ -609,7 +611,10 @@ additional and final step involves sending a pair of scalars
 Aggregated Range Proof
 ======================
 
-We want to take advantage of the logarithmic size of the inner-product protocol, by creating an aggregated range proof for \\(m\\) values that is smaller than \\(m\\) individual range proofs.
+The goal of an _aggregated range proof_ is to enable a group of parties to produce proofs of their individual statements
+(individual range proofs for the corresponding value commitments), that can be aggregated in a more compact proof.
+This is enabled by a logarithmic size of the inner-product protocol: an aggregated range proof for \\(m\\)
+values is smaller than \\(m\\) individual range proofs.
 
 The aggregation protocol is a multi-party computation protocol, involving \\(m\\) parties (one party per value) and one dealer, where the parties don't reveal their secrets to each other. The parties share their commitments with the dealer, and the dealer generates and returns challenge variables. The parties then share their proof shares with the dealer, and the dealer combines their shares to create an aggregated proof. 
 
@@ -881,4 +886,23 @@ With these observations, we can simplify the combined \\(m\\)-party statement ab
 \end{aligned}
 \\]
 
-[bulletproofs_paper]: https://eprint.iacr.org/2017/1066.pdf
+
+
+Aggregated Constraint System Proofs
+===================================
+
+(Under development.)
+
+Range proofs can be naturally aggregated keeping each statement independent.
+For constraint systems proofs, two options exist:
+
+1. each party can prove satisfiability of **their own constraint system** (systems can be distinct);
+2. parties can collaborate to prove satisfiability of a **single constraint system** without having to reveal secrets to each other.
+
+The aggregation of distinct proofs can be done in the very similar way
+to the aggregation of range proofs and is useful pure for the space savings (just like with the range proofs).
+
+The collaborative construction of a proof of a single constraint system requires a different framework,
+but is very useful for computations that increase privacy for each party, e.g. by allowing them to mix their inputs,
+while not making them share secrets between each other.
+
