@@ -11,6 +11,7 @@ extern crate digest;
 extern crate rand;
 extern crate sha3;
 
+extern crate clear_on_drop;
 extern crate curve25519_dalek;
 extern crate merlin;
 extern crate subtle;
