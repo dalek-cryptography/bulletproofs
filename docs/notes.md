@@ -1,15 +1,22 @@
 This module contains notes on how and why Bulletproofs work.
 
-The documentation is laid out roughly as follows.  General notes on
-the range proof and inner-product proofs are here.  The description of
-each protocol is contained in the respective [`range_proof`][rp_notes] and
-[`inner_product_proof`][ipp_notes] modules.  Finally, structs from those modules
-are publicly re-exported from the crate root, so that the external
-documentation describes how to use the API, while the internal
+* [Notation](#notation)
+* [Range proofs from inner products](#range-proofs-from-inner-products)
+* [Inner product proof](#inner-product-proof)
+* [Aggregated range proof](#aggregated-range-proof)
+* [Constraint system proof](#constraint-system-proof)
+
+For description of the protocols see the following modules:
+
+* [`range_proof`](../range_proof/index.html) — aggregated range proof protocol
+* [`range_proof_mpc`](../range_proof_mpc/index.html) — multi-party API for range proof aggregation
+* [`inner_product_proof`](../inner_product_proof/index.html) — inner product argument protocol
+* [`circuit_proof`](../circuit_proof/index.html) — constraint system proof protocol
+
+The types from the above modules are publicly re-exported from the crate root,
+so that the external documentation describes how to use the API, while the internal
 documentation describes how it works.
 
-[rp_notes]: https://doc-internal.dalek.rs/ristretto_bulletproofs/range_proof/index.html
-[ipp_notes]: https://doc-internal.dalek.rs/ristretto_bulletproofs/inner_product_proof/index.html
 
 Notation
 ========
