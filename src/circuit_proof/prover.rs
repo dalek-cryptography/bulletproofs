@@ -1,5 +1,6 @@
 #![allow(non_snake_case)]
 
+use clear_on_drop::clear::Clear;
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::MultiscalarMul;
@@ -36,6 +37,29 @@ pub struct ProverCS<'a, 'b> {
     a_O: Vec<Scalar>,
     v: Vec<Scalar>,
     v_blinding: Vec<Scalar>,
+}
+
+/// Overwrite secrets with null bytes when they go out of scope.
+impl<'a, 'b> Drop for ProverCS<'a, 'b> {
+    fn drop(&mut self) {
+        self.v.clear();
+        self.v_blinding.clear();
+
+        // Important: due to how ClearOnDrop auto-implements InitializableFromZeroed
+        // for T: Default, calling .clear() on Vec compiles, but does not
+        // clear the content. Instead, it only clears the Vec's header.
+        // Clearing the underlying buffer item-by-item will do the job, but will
+        // keep the header as-is, which is fine since the header does not contain secrets.
+        for e in self.a_L.iter_mut() {
+            e.clear();
+        }
+        for e in self.a_R.iter_mut() {
+            e.clear();
+        }
+        for e in self.a_O.iter_mut() {
+            e.clear();
+        }
+    }
 }
 
 impl<'a, 'b> ConstraintSystem for ProverCS<'a, 'b> {
@@ -250,8 +274,8 @@ impl<'a, 'b> ProverCS<'a, 'b> {
         let o_blinding = Scalar::random(&mut rng);
         let s_blinding = Scalar::random(&mut rng);
 
-        let s_L: Vec<Scalar> = (0..n).map(|_| Scalar::random(&mut rng)).collect();
-        let s_R: Vec<Scalar> = (0..n).map(|_| Scalar::random(&mut rng)).collect();
+        let mut s_L: Vec<Scalar> = (0..n).map(|_| Scalar::random(&mut rng)).collect();
+        let mut s_R: Vec<Scalar> = (0..n).map(|_| Scalar::random(&mut rng)).collect();
 
         // A_I = <a_L, G> + <a_R, H> + i_blinding * B_blinding
         let A_I = RistrettoPoint::multiscalar_mul(
@@ -389,6 +413,16 @@ impl<'a, 'b> ProverCS<'a, 'b> {
             l_vec,
             r_vec,
         );
+
+        // We do not yet have a ClearOnDrop wrapper for Vec<Scalar>.
+        // When PR 202 [1] is merged, we can simply wrap s_L and s_R at the point of creation.
+        // [1] https://github.com/dalek-cryptography/curve25519-dalek/pull/202
+        for e in s_L.iter_mut() {
+            e.clear();
+        }
+        for e in s_R.iter_mut() {
+            e.clear();
+        }
 
         Ok(R1CSProof {
             A_I,
