@@ -421,9 +421,9 @@ which represent the left and right sides of the input to the inner-product equat
 \\[
 \begin{aligned}
   {\mathbf{l}}(x) &= (\mathbf{a}\_L + \mathbf{s}\_L \cdot x^2) \cdot x + \mathbf{y}^{-n} \circ \mathbf{w}\_R \cdot x + \mathbf{a}\_O \cdot x^2 \\\\
-  &= \mathbf{a}\_L \cdot x + \mathbf{s}\_L \cdot x^3 + \mathbf{y}^{-n} \circ \mathbf{w}\_R \cdot x + \mathbf{a}\_O \cdot x^2 \\\\
+                  &= \mathbf{a}\_L \cdot x + \mathbf{s}\_L \cdot x^3 + \mathbf{y}^{-n} \circ \mathbf{w}\_R \cdot x + \mathbf{a}\_O \cdot x^2 \\\\
   {\mathbf{r}}(x) &= \mathbf{y}^n \circ (\mathbf{a}\_R + \mathbf{s}\_R \cdot x^2) \cdot x + \mathbf{w}\_L \cdot x - \mathbf{y}^n + \mathbf{w}\_O \\\\
-  &= \mathbf{y}^n \circ \mathbf{a}\_R \cdot x + \mathbf{y}^n \circ \mathbf{s}\_R \cdot x^3 + \mathbf{w}\_L \cdot x - \mathbf{y}^n + \mathbf{w}\_O
+                  &= \mathbf{y}^n \circ \mathbf{a}\_R \cdot x + \mathbf{y}^n \circ \mathbf{s}\_R \cdot x^3 + \mathbf{w}\_L \cdot x - \mathbf{y}^n + \mathbf{w}\_O
 \end{aligned}
 \\]
 
@@ -556,18 +556,18 @@ A_O &= \widetilde{B} \cdot \tilde{o} + \langle \mathbf{G} , \mathbf{a}\_O \rangl
 W_L &= \langle \mathbf{y}^{-n} \circ \mathbf{w}\_L, \mathbf{H} \rangle \\\\
 W_R &= \langle \mathbf{y}^{-n} \circ \mathbf{w}\_R, \mathbf{G} \rangle \\\\
 W_O &= \langle \mathbf{y}^{-n} \circ \mathbf{w}\_O, \mathbf{H} \rangle \\\\
-S &= \widetilde{B} \cdot \tilde{s} + \langle \mathbf{G} , \mathbf{s}\_L \rangle + \langle \mathbf{H}, \mathbf{s}\_R \rangle
+S   &= \widetilde{B} \cdot \tilde{s} + \langle \mathbf{G} , \mathbf{s}\_L \rangle + \langle \mathbf{H}, \mathbf{s}\_R \rangle
 \end{aligned}
 \\]
 
 The prover forms these commitments, and sends them to the verifier.
 
-For reference, here are the equations for \\({\mathbf{l}}(x)\\) and \\({\mathbf{r}}(x)\\):
+For reference, here are the equations for \\({\mathbf{l}}(x)\\), and \\({\mathbf{r}}(x)\\) multiplied by \\(\mathbf{y}^{-n}\\):
 
 \\[
 \begin{aligned}
-  {\mathbf{l}}(x)  &= \mathbf{a}\_L \cdot x + \mathbf{s}\_L \cdot x^3 + \mathbf{y}^{-n} \circ \mathbf{w}\_R \cdot x + \mathbf{a}\_O \cdot x^2 \\\\
-  {\mathbf{r}}(x)  &= \mathbf{y}^n \circ \mathbf{a}\_R \cdot x + \mathbf{y}^n \circ \mathbf{s}\_R \cdot x^3 + \mathbf{w}\_L \cdot x - \mathbf{y}^n + \mathbf{w}\_O
+                        \mathbf{l}(x)  &= \mathbf{a}\_L \cdot x + \mathbf{s}\_L \cdot x^3 + \mathbf{y}^{-n} \circ \mathbf{w}\_R \cdot x + \mathbf{a}\_O \cdot x^2 \\\\
+  \mathbf{y}^{-n} \circ \mathbf{r}(x)  &= \mathbf{a}\_R \cdot x + \mathbf{s}\_R \cdot x^3 + \mathbf{y}^{-n} \circ \mathbf{w}\_L \cdot x - \mathbf{1}^n + \mathbf{y}^{-n} \circ \mathbf{w}\_O
 \end{aligned}
 \\]
 
@@ -608,6 +608,144 @@ so the verifier uses \\(P\\) and \\(t(x)\\) as inputs to the [inner product prot
 to prove that
 \\(t(x) = {\langle {\mathbf{l}}(x), {\mathbf{r}}(x) \rangle}\\).
 
+
+Padding \\(\mathbf{l}(x)\\) and \\(\mathbf{r}(x)\\) for the inner product proof
+-------------------------------------------------------------------------------
+
+The above discussion did not have restrictions on the value \\(n\\).
+However, the [inner product argument](../notes/index.html#inner-product-proof)
+requires the input vectors to have power-of-two elements: \\(n^{+} = 2^k\\).
+To resolve this mismatch, we need to specify how to pad vectors \\(\mathbf{l}(x), \mathbf{r}(x)\\)
+and related commitments before we can use the inner product argument.
+
+Our goal is to translate the _padding of the constraint system_ into the _padding of proof data_,
+so we can keep the constraint system small and perform less computations in proving and verification.
+
+We will use the following notation for the padding:
+
+\\[
+\begin{aligned}
+                           n^{+} &= 2^{\lceil \log_2 n \rceil} \\\\
+                      \mathbf{0} &= [0,...,0]
+\end{aligned}
+\\]
+
+We start by padding the entire constraint system:
+multipliers are padded with all-zero assignments \\(a\_{L,j}, a\_{R,j}, a\_{O,j}\\),
+all-zero blinding factors \\(s\_{L,j}, s\_{R,j}\\),
+and all-zero weights \\(W\_{R,i,j}, W\_{L,i,j}, W\_{O,i,j}\\),
+for all constraints \\(i \in [0, q)\\) and all additional multipliers \\(j \in [n,n^{+})\\):
+
+\\[
+\begin{aligned}
+\mathbf{a}\_L^{+} &= \mathbf{a}\_L \hspace{0.1cm} || \hspace{0.1cm} \mathbf{0} \\\\
+\mathbf{a}\_R^{+} &= \mathbf{a}\_R \hspace{0.1cm} || \hspace{0.1cm} \mathbf{0} \\\\
+\mathbf{a}\_O^{+} &= \mathbf{a}\_O \hspace{0.1cm} || \hspace{0.1cm} \mathbf{0} \\\\
+\mathbf{s}\_L^{+} &= \mathbf{s}\_L \hspace{0.1cm} || \hspace{0.1cm} \mathbf{0} \\\\
+\mathbf{s}\_R^{+} &= \mathbf{s}\_R \hspace{0.1cm} || \hspace{0.1cm} \mathbf{0} \\\\
+\mathbf{W}\_L^{+} &= \mathbf{W}\_L \hspace{0.1cm} || \hspace{0.1cm} [\mathbf{0}, ..., \mathbf{0}] \\\\
+\mathbf{W}\_R^{+} &= \mathbf{W}\_R \hspace{0.1cm} || \hspace{0.1cm} [\mathbf{0}, ..., \mathbf{0}] \\\\
+\mathbf{W}\_O^{+} &= \mathbf{W}\_O \hspace{0.1cm} || \hspace{0.1cm} [\mathbf{0}, ..., \mathbf{0}] \\\\
+\end{aligned}
+\\]
+
+As a result, we have to take larger slices of the vectors of generators \\(\mathbf{G},\mathbf{H}\\) and more powers of the challenge \\(y\\):
+
+\\[
+\begin{aligned}
+\mathbf{G}^{+}     &= \mathbf{G}   \hspace{0.1cm} || \hspace{0.1cm} [G_n,...,G_{n^{+}-1}] \\\\
+\mathbf{H}^{+}     &= \mathbf{H}   \hspace{0.1cm} || \hspace{0.1cm} [H_n,...,H_{n^{+}-1}] \\\\
+\mathbf{y}^{n^{+}} &= \mathbf{y}^n \hspace{0.1cm} || \hspace{0.1cm} [y^n,...,y^{n^{+}-1}] \\\\
+\end{aligned}
+\\]
+
+The low-level variables are padded with zeroes, so their commitments remain unchanged:
+
+\\[
+\begin{aligned}
+A_I^{+} &= \widetilde{B} \cdot \tilde{a} + \langle \mathbf{G}^{+}, \mathbf{a}\_L^{+} \rangle + \langle \mathbf{H}^{+}, \mathbf{a}\_R^{+} \rangle \\\\
+        &= \widetilde{B} \cdot \tilde{a} + \langle \mathbf{G}, \mathbf{a}\_L \rangle + \langle \mathbf{H}, \mathbf{a}\_R \rangle +
+           \langle [G_n, ..., G_{n^{+}-1}], \mathbf{0} \rangle + \langle [H_n, ..., H_{n^{+}-1}], \mathbf{0} \rangle \\\\
+		&= \widetilde{B} \cdot \tilde{a} + \langle \mathbf{G}, \mathbf{a}\_L \rangle + \langle \mathbf{H}, \mathbf{a}\_R \rangle + 
+		   0 \\\\
+        &= A_I \\\\
+\end{aligned}
+\\]
+
+Similarly, \\(A_O\\) and \\(S\\) are unchanged:
+
+\\[
+\begin{aligned}
+A_O^{+} &= A_O \\\\
+S^{+}   &= S
+\end{aligned}
+\\]
+
+The flattened weight vectors \\(\mathbf{w}\_{L,R,O}\\) are padded with zeroes
+because the corresponding weights are padded with zeroes:
+\\[
+\begin{aligned}
+\mathbf{w}\_L^{+} &= z \mathbf{z}^q \cdot \mathbf{W}\_L^{+}  &{}={}& (z \mathbf{z}^q \cdot \mathbf{W}\_L) || (z \mathbf{z}^q \cdot \mathbf{0}) &{}={}& \mathbf{w}\_L || \mathbf{0}, \\\\
+\mathbf{w}\_R^{+} &= z \mathbf{z}^q \cdot \mathbf{W}\_R^{+}  &{}={}& (z \mathbf{z}^q \cdot \mathbf{W}\_R) || (z \mathbf{z}^q \cdot \mathbf{0}) &{}={}& \mathbf{w}\_R || \mathbf{0}, \\\\
+\mathbf{w}\_O^{+} &= z \mathbf{z}^q \cdot \mathbf{W}\_O^{+}  &{}={}& (z \mathbf{z}^q \cdot \mathbf{W}\_O) || (z \mathbf{z}^q \cdot \mathbf{0}) &{}={}& \mathbf{w}\_O || \mathbf{0}. \\\\
+\end{aligned}
+\\]
+
+The \\(\delta(y,z)\\) remains unchanged because the padding weights are zeroes:
+
+\\[
+\begin{aligned}
+\delta(y, z)^{+} &= \langle \mathbf{y}^{-n^{+}} \circ \mathbf{w}\_R^{+}, \mathbf{w}\_L^{+} \rangle \\\\
+                 &= \langle \mathbf{y}^{-n} \circ \mathbf{w}\_R, \mathbf{w}\_L \rangle      +     \langle [y^n,...,y^{n^{+}-1}] \circ \mathbf{0}, \mathbf{0} \rangle \\\\
+                 &= \langle \mathbf{y}^{-n} \circ \mathbf{w}\_R, \mathbf{w}\_L \rangle      +     0 \\\\
+                 &= \delta(y, z)
+\end{aligned}
+\\]
+
+Vector polynomial \\(\mathbf{l}(x)\\) is padded with zeroes:
+
+\\[
+\begin{aligned}
+\mathbf{l}(x)^{+} &= \mathbf{a}\_L^{+} \cdot x + \mathbf{s}\_L^{+} \cdot x^3 + \mathbf{y}^{-n^{+}} \circ \mathbf{w}\_R^{+} \cdot x + \mathbf{a}\_O^{+} \cdot x^2 \\\\
+                  &= \mathbf{a}\_L \cdot x + \mathbf{s}\_L \cdot x^3 + \mathbf{y}^{-n} \circ \mathbf{w}\_R \cdot x + \mathbf{a}\_O \cdot x^2 \\\\
+                  &  \hspace{0.5cm} || \hspace{0.1cm} \mathbf{0} \cdot x + \mathbf{0} \cdot x^3 + [y^n,...,y^{n^{+}-1}] \circ \mathbf{0} \cdot x + \mathbf{0} \cdot x^2 \\\\
+                  &= \mathbf{l}(x) || \mathbf{0} \\\\
+\end{aligned}
+\\]
+
+Vector polynomial \\(\mathbf{r}(x)\\) is padded with additional (negated) powers of \\(y\\):
+
+\\[
+\begin{aligned}
+\mathbf{r}(x)^{+} &= \mathbf{y}^{n^{+}} \circ \mathbf{a}\_R^{+} \cdot x + \mathbf{y}^{n^{+}} \circ \mathbf{s}\_R^{+} \cdot x^3 + \mathbf{w}\_L^{+} \cdot x - \mathbf{y}^{n^{+}} + \mathbf{w}\_O^{+} \\\\
+                  &= \mathbf{y}^n \circ \mathbf{a}\_R \cdot x + \mathbf{y}^n \circ \mathbf{s}\_R \cdot x^3 + \mathbf{w}\_L \cdot x - \mathbf{y}^n + \mathbf{w}\_O \\\\
+                  &  \hspace{0.5cm} || \hspace{0.1cm} [y^n,...,y^{n^{+}-1}] \circ \mathbf{0} \cdot x + [y^n,...,y^{n^{+}-1}] \circ \mathbf{0} \cdot x^3 + \mathbf{0} \cdot x - [y^n,...,y^{n^{+}-1}] + \mathbf{0} \\\\
+                  &= \mathbf{r}(x) || [-y^n,...,-y^{n^{+}-1}]
+\end{aligned}
+\\]
+
+
+The commitments to these vector polynomials are also padded (\\(W\_{L,R,O}\\) remain unchanged because the weights are padded with zeroes):
+
+\\[
+\begin{aligned}
+  P^{+} &= -{\widetilde{e}} {\widetilde{B}} + x \cdot A_I + x^2 \cdot A_O - \langle \mathbf{1}, \mathbf{H}^{+} \rangle + W_L \cdot x + W_R \cdot x + W_O + x^3 \cdot S \\\\
+        &= P - \langle \mathbf{1}, [H_n,...,H_{n^{+}-1}] \rangle
+\end{aligned}
+\\]
+
+The inner product \\(t(x)\\) remains unchanged because the non-zero padding in the right vector gets multiplied with the zero padding in the left vector:
+
+\\[
+\begin{aligned}
+t(x)^{+} &= {\langle {\mathbf{l}}(x)^{+}, {\mathbf{r}}(x)^{+} \rangle} \\\\
+         &= {\langle {\mathbf{l}}(x), {\mathbf{r}}(x) \rangle} + {\langle \mathbf{0}, [y^n,...,y^{n^{+}-1}] \rangle} \\\\
+         &= {\langle {\mathbf{l}}(x), {\mathbf{r}}(x) \rangle} + 0 \\\\
+         &= t(x)
+\end{aligned}
+\\]
+
+This implies that the terms \\(t\_{0, 1, 2, 3, 4, 5, 6}\\) also remain unchanged.
 
 
 Prover’s algorithm
@@ -701,15 +839,35 @@ The prover adds \\(t(x), {\tilde{t}}(x), {\tilde{e}}\\) to the protocol transcri
 	Q \gets  w \cdot B
 \\]
 
-The prover evaluates polynomials \\(\mathbf{l}(x), \mathbf{r}(x)\\) and performs the [inner product argument](../inner_product_proof/index.html) to prove the relation:
+The prover evaluates polynomials \\(\mathbf{l}(x), \mathbf{r}(x)\\) and
+[pads them to the next power of two](#padding-mathbflx-and-mathbfrx-for-the-inner-product-proof) \\(n \rightarrow n^{+}\\):
+
+\\[
+\begin{aligned}
+             n^{+} &= 2^{\lceil \log_2 n \rceil} \\\\
+\mathbf{l}^{+}     &= \mathbf{l}(x) \hspace{0.1cm} || \hspace{0.1cm} \mathbf{0} \\\\
+\mathbf{r}^{+}     &= \mathbf{r}(x) \hspace{0.1cm} || \hspace{0.1cm} [-y^n,...,-y^{n^{+}-1}]
+\end{aligned}
+\\]
+
+The prover also takes a larger slice of the generators \\(\mathbf{G}, \mathbf{H}\\):
+
+\\[
+\begin{aligned}
+\mathbf{G}^{+}     &= \mathbf{G}    \hspace{0.1cm} || \hspace{0.1cm} [G_n,...,G_{n^{+}-1}] \\\\
+{\mathbf{H}'}^{+}  &= \mathbf{H}'   \hspace{0.1cm} || \hspace{0.1cm} \Big( [y^n,...,y^{n^{+}-1}] \circ [H_n,...,H_{n^{+}-1}] \Big) \\\\
+\end{aligned}
+\\]
+
+Finally, the prover performs the [inner product argument](../inner_product_proof/index.html) to prove the relation:
 \\[
 \operatorname{PK}\left\\{
-  ({\mathbf{G}}, {\mathbf{H}}' \in {\mathbb G}^{n}, P', Q \in {\mathbb G}; {\mathbf{l}}, {\mathbf{r}} \in {\mathbb Z\_p}^{n})
-  : P' = {\langle {\mathbf{l}}, {\mathbf{G}} \rangle} + {\langle {\mathbf{r}}, {\mathbf{H}}' \rangle} + {\langle {\mathbf{l}}, {\mathbf{r}} \rangle} Q
+  (\mathbf{G}^{+}, {\mathbf{H}'}^{+} \in {\mathbb G}^{n^{+}}, P', Q \in {\mathbb G}; \mathbf{l}^{+}, \mathbf{r}^{+} \in {\mathbb Z\_p}^{n^{+}})
+  : P' = {\langle \mathbf{l}^{+}, \mathbf{G}^{+} \rangle} + {\langle \mathbf{r}^{+}, {\mathbf{H}'}^{+} \rangle} + {\langle \mathbf{l}^{+}, \mathbf{r}^{+} \rangle} Q
 \right\\}
-\\] where \\({\mathbf{H}}' = {\mathbf{y}}^{-n} \circ {\mathbf{H}}\\).
+\\] where \\({\mathbf{H}'}^{+} = {\mathbf{y}}^{-n^{+}} \circ \mathbf{H}^{+}\\).
 
-The result of the inner product proof is a list of \\(2k\\) points and \\(2\\) scalars, where \\(k = \log_2(n)\\): \\(\\{L\_k, R\_k, \\dots, L\_1, R\_1, a, b\\}\\).
+The result of the inner product proof is a list of \\(2k\\) points and \\(2\\) scalars, where \\(k = \lceil \log_2(n) \rceil\\): \\(\\{L\_k, R\_k, \\dots, L\_1, R\_1, a, b\\}\\).
 
 The complete proof consists of \\(13+2k\\) 32-byte elements:
 \\[
@@ -722,7 +880,7 @@ Verifier’s algorithm
 --------------------
 
 The input to the verifier is the aggregated proof, which contains the \\(m\\) value commitments \\(V_{(j)}\\),
-and \\(32 \cdot (13 + 2 k)\\) bytes of the proof data where \\(k = \log_2(n)\\) and \\(n\\) is a number of [multiplication gates](#multiplication-gates):
+and \\(32 \cdot (13 + 2 k)\\) bytes of the proof data where \\(k = \lceil \log_2(n) \rceil\\) and \\(n\\) is a number of [multiplication gates](#multiplication-gates):
 
 \\[
   \\{A\_I, A\_O, S, T\_1, T\_3, T\_4, T\_5, T\_6, t(x), {\tilde{t}}(x), \tilde{e}, L\_k, R\_k, \\dots, L\_1, R\_1, a, b\\}
@@ -752,10 +910,22 @@ The verifier flattens constraints:
 \\]
 where each of \\(\mathbf{w}\_L, \mathbf{w}\_R, \mathbf{w}\_O\\) has length \\(n\\) and \\(\mathbf{w}\_V\\) has length \\(m\\).
 
+The verifier [pads the proof data](#padding-mathbflx-and-mathbfrx-for-the-inner-product-proof)
+by taking a larger slice of the generators \\(\mathbf{G},\mathbf{H}\\) and more powers of challenges \\(y\\) up to \\((n^{+}-1)\\):
+
+\\[
+\begin{aligned}
+             n^{+} &= 2^{\lceil \log_2 n \rceil} \\\\
+\mathbf{G}^{+}     &= \mathbf{G}   \hspace{0.1cm} || \hspace{0.1cm} [G_n,...,G_{n^{+}-1}] \\\\
+\mathbf{H}^{+}     &= \mathbf{H}   \hspace{0.1cm} || \hspace{0.1cm} [H_n,...,H_{n^{+}-1}] \\\\
+\mathbf{y}^{n^{+}} &= \mathbf{y}^n \hspace{0.1cm} || \hspace{0.1cm} [y^n,...,y^{n^{+}-1}] \\\\
+\end{aligned}
+\\]
+
 The verifier computes the following scalars for the [inner product argument](../inner_product_proof/index.html):
 
 \\[
-	\\{u\_{1}^{2}, \dots, u\_{k}^{2}, u\_{1}^{-2}, \dots, u\_{k}^{-2}, s_0, \dots, s_{n-1}\\}
+	\\{u\_{1}^{2}, \dots, u\_{k}^{2}, u\_{1}^{-2}, \dots, u\_{k}^{-2}, s_0, \dots, s_{n^{+}-1}\\}
 \\]
 
 The goal of the verifier is to check two equations.
@@ -779,19 +949,19 @@ If we rewrite the check as a comparison with the identity point, we get:
 **Second**, verify the inner product argument for the vectors \\(\mathbf{l}(x), \mathbf{r}(x)\\) that form the \\(t(x)\\) (see [inner-product protocol](../inner_product_proof/index.html#verification-equation))
   
 \\[
-P' \overset ? = {\langle a \cdot {\mathbf{s}}, {\mathbf{G}} \rangle} + {\langle {\mathbf{y}^{-n}} \circ (b /{\mathbf{s}}), {\mathbf{H}} \rangle} + abQ - \sum\_{j=1}^{k} \left( L\_{j} u\_{j}^{2} + u\_{j}^{-2} R\_{j} \right).
+P' \overset ? = {\langle a \cdot \mathbf{s}, \mathbf{G}^{+} \rangle} + {\langle {\mathbf{y}^{-n^{+}}} \circ (b /{\mathbf{s}}), \mathbf{H}^{+} \rangle} + abQ - \sum\_{j=1}^{k} \left( L\_{j} u\_{j}^{2} + u\_{j}^{-2} R\_{j} \right).
 \\]
 
-Rewriting as a comparison with the identity point and expanding \\(Q = wB\\) and \\(P' = P + t(x) wB\\) as [needed for transition to the inner-product protocol](../notes/index.html#inner-product-proof):
+Rewriting as a comparison with the identity point and expanding \\(Q = wB\\) and \\(P' = P^{+} + t(x) wB\\) as [needed for transition to the inner-product protocol](../notes/index.html#inner-product-proof):
 
 \\[
-0 \overset ? = P + t(x) wB - {\langle a \cdot {\mathbf{s}}, {\mathbf{G}} \rangle} - {\langle {\mathbf{y}^{-n}} \circ (b /{\mathbf{s}}), {\mathbf{H}} \rangle} - abwB + \sum\_{j=1}^{k} \left( L\_{j} u\_{j}^{2} + u\_{j}^{-2} R\_{j} \right),
+0 \overset ? = P^{+} + t(x) wB - {\langle a \cdot \mathbf{s}, \mathbf{G}^{+} \rangle} - {\langle \mathbf{y}^{-n^{+}} \circ (b /\mathbf{s}), \mathbf{H}^{+} \rangle} - abwB + \sum\_{j=1}^{k} \left( L\_{j} u\_{j}^{2} + u\_{j}^{-2} R\_{j} \right),
 \\]
-where the [definition](#proving-that-mathbflx-mathbfrx-are-correct) of \\(P\\) is:
+where the [definition](#proving-that-mathbflx-mathbfrx-are-correct) of \\(P^{+}\\) is:
 
 \\[
 \begin{aligned}
-  P   = -{\widetilde{e}} {\widetilde{B}} + x \cdot A_I + x^2 \cdot A_O - \langle \mathbf{1}, \mathbf{H} \rangle + W_L \cdot x + W_R \cdot x + W_O + x^3 \cdot S
+  P^{+}   = -{\widetilde{e}} {\widetilde{B}} + x \cdot A_I + x^2 \cdot A_O - \langle \mathbf{1}, \mathbf{H}^{+} \rangle + W_L \cdot x + W_R \cdot x + W_O + x^3 \cdot S
 \end{aligned}
 \\]
 \\[
@@ -816,8 +986,8 @@ Finally, verifier groups all scalars by each point and performs a single multisc
                       + & \quad \sum\_{i = 1,3,4,5,6} r x^i T\_{i} \\\\
                       + & \quad \Big(w \big(t(x) - ab\big) + r \big(x^2 (w\_c + \delta(y,z)) - t(x)\big) \Big) \cdot B \\\\
                       + & \quad (-{\widetilde{e}} - r{\tilde{t}}(x)) \cdot \widetilde{B} \\\\
-                      + & \quad {\langle x \mathbf{y}^{-n} \circ \mathbf{w}\_R - a\mathbf{s}, \mathbf{G} \rangle}\\\\
-                      + & \quad {\langle -\mathbf{1} + \mathbf{y}^{-n} \circ \big( x \mathbf{w}\_L + \mathbf{w}\_O - (b /{\mathbf{s}}) \big), \mathbf{H} \rangle}\\\\
+                      + & \quad {\langle \big( x \mathbf{y}^{-n} \circ \mathbf{w}\_R \big) || \mathbf{0} - a\mathbf{s}, \mathbf{G}^{+} \rangle}\\\\
+                      + & \quad {\langle -\mathbf{1} + \mathbf{y}^{-n^{+}} \circ \big( (x \mathbf{w}\_L + \mathbf{w}\_O) || \mathbf{0} - (b /{\mathbf{s}}) \big), \mathbf{H}^{+} \rangle}\\\\
                       + & \quad {\langle [u_{1}^2,    \dots, u_{k}^2    ], [L_1, \dots, L_{k}] \rangle}\\\\
                       + & \quad {\langle [u_{1}^{-2}, \dots, u_{k}^{-2} ], [R_1, \dots, R_{k}] \rangle}
 \end{aligned}

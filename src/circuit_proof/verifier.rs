@@ -189,24 +189,16 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
 
     /// Consume this `VerifierCS` and attempt to verify the supplied `proof`.
     pub fn verify(mut self, proof: &R1CSProof) -> Result<(), R1CSError> {
-        let temp_n = self.num_vars;
-        if !(temp_n == 0 || temp_n.is_power_of_two()) {
-            let pad = temp_n.next_power_of_two() - temp_n;
-            for _ in 0..pad {
-                let _ = self.assign_multiplier(
-                    Scalar::zero().into(),
-                    Scalar::zero().into(),
-                    Scalar::zero().into(),
-                );
-            }
-        }
+        // If the number of multiplications is not 0 or a power of 2, then pad the circuit.
+        let n = self.num_vars;
+        let padded_n = self.num_vars.next_power_of_two();
+        let pad = padded_n - n;
 
         use inner_product_proof::inner_product;
         use std::iter;
         use util;
 
-        let n = self.num_vars;
-        if self.bp_gens.gens_capacity < n {
+        if self.bp_gens.gens_capacity < padded_n {
             return Err(R1CSError::InvalidGeneratorsLength);
         }
         // We are performing a single-party circuit proof, so party index is 0.
@@ -244,26 +236,29 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
         let b = proof.ipp_proof.b;
 
         let y_inv = y.invert();
-        let y_inv_vec = util::exp_iter(y_inv).take(n).collect::<Vec<Scalar>>();
+        let y_inv_vec = util::exp_iter(y_inv)
+            .take(padded_n)
+            .collect::<Vec<Scalar>>();
         let yneg_wR = wR
-            .iter()
+            .into_iter()
             .zip(y_inv_vec.iter())
             .map(|(wRi, exp_y_inv)| wRi * exp_y_inv)
+            .chain(iter::repeat(Scalar::zero()).take(pad))
             .collect::<Vec<Scalar>>();
 
-        let delta = inner_product(&yneg_wR, &wL);
+        let delta = inner_product(&yneg_wR[0..n], &wL);
 
         // define parameters for P check
         let g_scalars = yneg_wR
             .iter()
-            .zip(s.iter().take(n))
+            .zip(s.iter().take(padded_n))
             .map(|(yneg_wRi, s_i)| x * yneg_wRi - a * s_i);
 
         let h_scalars = y_inv_vec
             .iter()
-            .zip(s.iter().rev().take(n))
-            .zip(wL.iter())
-            .zip(wO.iter())
+            .zip(s.iter().rev().take(padded_n))
+            .zip(wL.into_iter().chain(iter::repeat(Scalar::zero()).take(pad)))
+            .zip(wO.into_iter().chain(iter::repeat(Scalar::zero()).take(pad)))
             .map(|(((y_inv_i, s_i_inv), wLi), wOi)| {
                 y_inv_i * (x * wLi + wOi - b * s_i_inv) - Scalar::one()
             });
@@ -302,8 +297,8 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
                 .chain(T_points.iter().map(|T_i| T_i.decompress()))
                 .chain(iter::once(Some(self.pc_gens.B)))
                 .chain(iter::once(Some(self.pc_gens.B_blinding)))
-                .chain(gens.G(n).map(|&G_i| Some(G_i)))
-                .chain(gens.H(n).map(|&H_i| Some(H_i)))
+                .chain(gens.G(padded_n).map(|&G_i| Some(G_i)))
+                .chain(gens.H(padded_n).map(|&H_i| Some(H_i)))
                 .chain(proof.ipp_proof.L_vec.iter().map(|L_i| L_i.decompress()))
                 .chain(proof.ipp_proof.R_vec.iter().map(|R_i| R_i.decompress())),
         )
