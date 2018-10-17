@@ -562,7 +562,7 @@ S   &= \widetilde{B} \cdot \tilde{s} + \langle \mathbf{G} , \mathbf{s}\_L \rangl
 
 The prover forms these commitments, and sends them to the verifier.
 
-For reference, here are the equations for \\({\mathbf{l}}(x)\\) and transmuted \\({\mathbf{r}}(x)\\):
+For reference, here are the equations for \\({\mathbf{l}}(x)\\), and \\({\mathbf{r}}(x)\\) multiplied by \\(\mathbf{y}^{-n}\\):
 
 \\[
 \begin{aligned}
