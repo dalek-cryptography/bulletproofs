@@ -42,7 +42,7 @@ pub use generators::{BulletproofGens, BulletproofGensShare, PedersenGens};
 pub use range_proof::RangeProof;
 
 #[doc(include = "../docs/aggregation-api.md")]
-pub mod rangeproof_mpc {
+pub mod range_proof_mpc {
     pub use errors::MPCError;
     pub use range_proof::dealer;
     pub use range_proof::messages;
