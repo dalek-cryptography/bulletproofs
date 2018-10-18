@@ -18,6 +18,13 @@ pub enum Assignment {
     Missing(),
 }
 
+// Default implementation is used for zeroing secrets from allocated memory via `clear_on_drop`.
+impl Default for Assignment {
+    fn default() -> Assignment {
+        Assignment::Missing()
+    }
+}
+
 impl From<Option<Scalar>> for Assignment {
     fn from(o: Option<Scalar>) -> Self {
         match o {

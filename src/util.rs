@@ -179,6 +179,34 @@ impl Drop for Poly2 {
     }
 }
 
+impl Drop for VecPoly3 {
+    fn drop(&mut self) {
+        for e in self.0.iter_mut() {
+            e.clear();
+        }
+        for e in self.1.iter_mut() {
+            e.clear();
+        }
+        for e in self.2.iter_mut() {
+            e.clear();
+        }
+        for e in self.3.iter_mut() {
+            e.clear();
+        }
+    }
+}
+
+impl Drop for Poly6 {
+    fn drop(&mut self) {
+        self.t1.clear();
+        self.t2.clear();
+        self.t3.clear();
+        self.t4.clear();
+        self.t5.clear();
+        self.t6.clear();
+    }
+}
+
 /// Raises `x` to the power `n` using binary exponentiation,
 /// with (1 to 2)*lg(n) scalar multiplications.
 /// TODO: a consttime version of this would be awfully similar to a Montgomery ladder.
