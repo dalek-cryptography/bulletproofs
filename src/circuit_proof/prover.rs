@@ -270,9 +270,9 @@ impl<'a, 'b> ProverCS<'a, 'b> {
 
         // 3. Choose blinding factors and form commitments to low-level witness data
 
-        let mut i_blinding = Scalar::random(&mut rng);
-        let mut o_blinding = Scalar::random(&mut rng);
-        let mut s_blinding = Scalar::random(&mut rng);
+        let i_blinding = Scalar::random(&mut rng);
+        let o_blinding = Scalar::random(&mut rng);
+        let s_blinding = Scalar::random(&mut rng);
 
         let mut s_L: Vec<Scalar> = (0..n).map(|_| Scalar::random(&mut rng)).collect();
         let mut s_R: Vec<Scalar> = (0..n).map(|_| Scalar::random(&mut rng)).collect();
@@ -413,10 +413,6 @@ impl<'a, 'b> ProverCS<'a, 'b> {
             l_vec,
             r_vec,
         );
-
-        i_blinding.clear();
-        o_blinding.clear();
-        s_blinding.clear();
 
         // We do not yet have a ClearOnDrop wrapper for Vec<Scalar>.
         // When PR 202 [1] is merged, we can simply wrap s_L and s_R at the point of creation.
