@@ -1262,20 +1262,39 @@ The sum of all of the columns is a vector
 Pedersen commitment to \\({\mathbf{l}}(x)\\) and \\({\mathbf{r}}(x)\\) with
 synthetic blinding factor \\({\widetilde{e}}\\).
 
-To convince the verifier that
-\\(t(x) = {\langle {\mathbf{l}}(x), {\mathbf{r}}(x) \rangle}\\), the prover
-sends \\({\widetilde{e}}\\) to the verifier, who uses the bottom row
-to compute
+To convince the verifier that \\(\mathbf{l}(x)\\) and \\(\mathbf{r}(x)\\) are computed correctly,
+the prover can send the evaluations \\(\mathbf{l}(x), \mathbf{r}(x)\\) along with \\(\tilde{e}\\) to the verifier,
+who uses the bottom row of the diagram to check the following statement:
+\\[
+\begin{aligned}
+   {\langle {\mathbf{l}}(x), {\mathbf{G}} \rangle} + {\langle {\mathbf{r}}(x), {\mathbf{H}}' \rangle} \stackrel{?}{=}
+   -{\widetilde{e}} {\widetilde{B}} + x \cdot A_I + x^2 \cdot A_O - \langle \mathbf{1}, \mathbf{H} \rangle + W_L \cdot x + W_R \cdot x + W_O + x^3 \cdot S \\\\
+\end{aligned}
+\\]
+
+
+Compressing vectors \\(\mathbf{l}(x)\\) and \\(\mathbf{r}(x)\\) with an inner product argument
+----------------------------------------------------------------------------------------------
+
+Once the verifier has checked correctness of \\(t(x)\\), \\(\mathbf{l}(x)\\) and \\(\mathbf{r}(x)\\),
+they can directly compute the inner product to verify whether \\(t(x) \stackrel{?}{=} {\langle {\mathbf{l}}(x), {\mathbf{r}}(x) \rangle}\\).
+This, however, would require transmitting \\(2n\\) 32-byte elements representing the vectors.
+
+To make the proof smaller, the prover will use the [inner product argument](../notes/index.html#inner-product-proof)
+to indirectly prove the inner product relation using \\(t(x)\\) and the vectors represented
+by a commitment \\(P = {\langle {\mathbf{l}}(x), {\mathbf{G}} \rangle} + {\langle {\mathbf{r}}(x), {\mathbf{H}}' \rangle}\\).
+
+The verifier checks the inner product proof with \\(P\\) computed using the bottom row of the diagram,
+which proves that the vectors \\(\mathbf{l}(x), \mathbf{r}(x)\\) are computed correctly:
 \\[
 \begin{aligned}
   P &= -{\widetilde{e}} {\widetilde{B}} + x \cdot A_I + x^2 \cdot A_O - \langle \mathbf{1}, \mathbf{H} \rangle + W_L \cdot x + W_R \cdot x + W_O + x^3 \cdot S \\\\
 \end{aligned}
 \\]
-if the prover is honest, this is
-\\(P = {\langle {\mathbf{l}}(x), {\mathbf{G}} \rangle} + {\langle {\mathbf{r}}(x), {\mathbf{H}}' \rangle}\\),
-so the verifier uses \\(P\\) and \\(t(x)\\) as inputs to the [inner product protocol](../notes/index.html#inner-product-proof)
-to prove that
-\\(t(x) = {\langle {\mathbf{l}}(x), {\mathbf{r}}(x) \rangle}\\).
+
+If the inner product proof with such \\(P\\) is correct, the verifier is convinced of two facts:
+that \\(t(x) = {\langle {\mathbf{l}}(x), {\mathbf{r}}(x) \rangle}\\), and
+\\(\mathbf{l}(x), \mathbf{r}(x)\\) are correct.
 
 
 Padding \\(\mathbf{l}(x)\\) and \\(\mathbf{r}(x)\\) for the inner product proof
