@@ -5,8 +5,8 @@ The `circuit_proof` module contains an API for producing a proof that a set of s
 
 For more background on the constraint system proofs, see these two sections in the `notes` module:
 
-* [Constrain system](../notes/index.html#constraint-system): description of the constraint system architecture.
-* [Constrain system proof](../notes/index.html#constraint-system-proof): the math behind the constraint system proofs.
+* [Constraint system](../notes/index.html#constraint-system): description of the constraint system architecture.
+* [Constraint system proof](../notes/index.html#constraint-system-proof): the math behind the constraint system proofs.
 
 Prover’s algorithm
 ------------------
