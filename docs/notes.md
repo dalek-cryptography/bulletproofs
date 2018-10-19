@@ -1316,7 +1316,7 @@ The statements of each slice of the vectors \\(\mathbf{l}(x), \mathbf{r}(x)\\) b
 \end{aligned}
 \\]
 
-We want to commit to the the first subvectors \\(\mathbf{a}'\_{L,R,O}\\) independently from the second subvectors \\(\mathbf{a}''\_{L,R,O}\\)
+We want to commit to the first subvectors \\(\mathbf{a}'\_{L,R,O}\\) independently from the second subvectors \\(\mathbf{a}''\_{L,R,O}\\)
 because second subvectors are computed with the use of challenges generated _after_ the first subvectors are determined and committed.
 At the same time, we need to work towards a commitment to the complete vectors \\(\mathbf{l}(x), \mathbf{r}(x)\\).
 To do that, we combine pairs statements about each subvector with a random challenge \\(e \in {\mathbb Z\_{p}^{\times}}\\):
