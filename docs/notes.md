@@ -1208,13 +1208,13 @@ To do this, notice that
 \end{aligned}
 \\]
 so that by changing generators to
-\\({\mathbf{H}}' = {\mathbf{y}}^{-n} \circ {\mathbf{H}}\\), the point which
+\\(\hat{\mathbf{H}} = {\mathbf{y}}^{-n} \circ {\mathbf{H}}\\), the point which
 is a commitment to
 \\(({\mathbf{a}}\_{L}, {\mathbf{a}}\_{R}, {\widetilde{a}})\\) with respect to
 \\(({\mathbf{G}}, {\mathbf{H}}, {\widetilde{a}})\\) is transmuted into a
 commitment to
 \\(({\mathbf{a}}\_{L}, {\mathbf{y}}^{n} \circ {\mathbf{a}}\_{R}, {\widetilde{a}})\\)
-with respect to \\(({\mathbf{G}}, {\mathbf{H}}', {\widetilde{a}})\\).
+with respect to \\(({\mathbf{G}}, \hat{\mathbf{H}}, {\widetilde{a}})\\).
 
 We define the following commitments over the components of \\({\mathbf{l}}(x)\\) and \\({\mathbf{r}}(x)\\):
 
@@ -1247,7 +1247,7 @@ To relate the prover’s commitments to
 \begin{aligned}
   {\langle {\mathbf{l}}(x), {\mathbf{G}} \rangle}      &\quad &= \quad & {\langle {\mathbf{a}}\_L \cdot x, {\mathbf{G}} \rangle}      & \quad &+ \quad & {\langle {\mathbf{a}}\_O \cdot x^2, {\mathbf{G}} \rangle}  & \quad &+ \quad& \langle \mathbf{y}^{-n} \circ \mathbf{w}\_R \cdot x , \mathbf{G} \rangle                     &\quad &+\quad & \langle \mathbf{s}\_L \cdot x^3 , \mathbf{G} \rangle \\\\
                                                 +      &\quad &  \quad &  +                                                           & \quad &  \quad &  +                                                         & \quad &  \quad& +                                                                                            &\quad & \quad & +   \\\\
-  {\langle {\mathbf{r}}(x), {\mathbf{H}}' \rangle}     &\quad &= \quad & \langle \mathbf{a}\_R \cdot x, {\mathbf{H}} \rangle          & \quad &+ \quad & - \langle \mathbf{1}, \mathbf{H} \rangle                   & \quad &+ \quad& \langle \mathbf{y}^{-n} \circ (\mathbf{w}\_L \cdot x + \mathbf{w}\_O), \mathbf{H} \rangle    &\quad &+\quad & \langle \mathbf{s}\_R \cdot x^3 , \mathbf{H} \rangle \\\\
+  {\langle {\mathbf{r}}(x), \hat{\mathbf{H}} \rangle}  &\quad &= \quad & \langle \mathbf{a}\_R \cdot x, {\mathbf{H}} \rangle          & \quad &+ \quad & - \langle \mathbf{1}, \mathbf{H} \rangle                   & \quad &+ \quad& \langle \mathbf{y}^{-n} \circ (\mathbf{w}\_L \cdot x + \mathbf{w}\_O), \mathbf{H} \rangle    &\quad &+\quad & \langle \mathbf{s}\_R \cdot x^3 , \mathbf{H} \rangle \\\\
                                                 +      &\quad &  \quad &  +                                                           & \quad &  \quad &  +                                                         & \quad &  \quad& +                                                                                            &\quad & \quad & +   \\\\
   \tilde{e} \cdot \widetilde{B}                        &\quad &= \quad & \tilde{a} \cdot x \cdot \widetilde{B}                        & \quad &+ \quad & \tilde{o} \cdot x^2 \cdot \widetilde{B}                    & \quad &+ \quad& 0                                                                                            &\quad &+\quad & \tilde{s} \cdot x^3 \cdot \widetilde{B} \\\\
                                     \shortparallel     &\quad &  \quad & \shortparallel                                               & \quad &  \quad & \shortparallel                                             & \quad &  \quad& \shortparallel                                                                               &\quad & \quad & \shortparallel   \\\\
@@ -1267,10 +1267,95 @@ the prover can send the evaluations \\(\mathbf{l}(x), \mathbf{r}(x)\\) along wit
 who uses the bottom row of the diagram to check the following statement:
 \\[
 \begin{aligned}
-   {\langle {\mathbf{l}}(x), {\mathbf{G}} \rangle} + {\langle {\mathbf{r}}(x), {\mathbf{H}}' \rangle} \stackrel{?}{=}
+   {\langle {\mathbf{l}}(x), {\mathbf{G}} \rangle} + {\langle {\mathbf{r}}(x), \hat{\mathbf{H}} \rangle} \stackrel{?}{=}
    -{\widetilde{e}} {\widetilde{B}} + x \cdot A_I + x^2 \cdot A_O - \langle \mathbf{1}, \mathbf{H} \rangle + W_L \cdot x + W_R \cdot x + W_O + x^3 \cdot S \\\\
 \end{aligned}
 \\]
+
+
+Verifying challenge-based constraints
+-------------------------------------
+
+Some [gadgets](#gadgets) can be made more efficient if they can [sample random challenges](#gadget-as-a-challenge) when building
+a constraint system, provided certain variables are committed. For instance, a shuffle gadget
+can use just \\(2(k-1)\\) multipliers for \\(k\\) inputs and \\(k\\) outputs to implement the check 
+that two polynomials are equal up to a permutation of their roots, but it is only sound as long
+as the roots of the polynomials (the inputs/outputs to the shuffle) are fixed before the evaluation point is chosen.
+
+To faciliate this, we split the vectors of multipliers and their blinding factors in two subvectors of lengths \\(n'\\) and \\(n"\\): 
+
+\\[
+\begin{aligned}
+    n                &= n' + n''                              \\\\
+    {\mathbf{a}}\_L  &= {\mathbf{a}}\_L' || {\mathbf{a}}\_L'' \\\\
+    {\mathbf{a}}\_R  &= {\mathbf{a}}\_R' || {\mathbf{a}}\_R'' \\\\
+    {\mathbf{a}}\_O  &= {\mathbf{a}}\_O' || {\mathbf{a}}\_O'' \\\\
+    {\mathbf{s}}\_L  &= {\mathbf{s}}\_L' || {\mathbf{s}}\_L'' \\\\
+    {\mathbf{s}}\_R  &= {\mathbf{s}}\_R' || {\mathbf{s}}\_R'' \\\\
+\end{aligned}
+\\]
+
+The vectors of flattened weights are split accordingly:
+
+\\[
+\begin{aligned}
+    \mathbf{w}\_L  &= {\mathbf{w}}\_L' || {\mathbf{a}}\_L'' \\\\
+    \mathbf{w}\_R  &= {\mathbf{w}}\_R' || {\mathbf{a}}\_R'' \\\\
+    \mathbf{w}\_O  &= {\mathbf{w}}\_O' || {\mathbf{a}}\_O'' \\\\
+\end{aligned}
+\\]
+
+The vectors become:
+
+\\[
+\begin{aligned}
+                        \mathbf{l}(x)  &= \mathbf{l}'(x) || \mathbf{l}''(x)                                   &{}={}&  &       &  \mathbf{a}'\_L \cdot x  + \mathbf{s}\_L' \cdot x^3  +        \mathbf{y}^{-n'}  \circ \mathbf{w}\_R'  \cdot x + \mathbf{a}\_O' \cdot x^2\\\\
+                                       &                                                                      &     &  &||\quad&  \mathbf{a}''\_L \cdot x + \mathbf{s}\_L'' \cdot x^3 + y^{-n'}\mathbf{y}^{-n''} \circ \mathbf{w}\_R'' \cdot x + \mathbf{a}\_O'' \cdot x^2\\\\
+  \mathbf{y}^{-n} \circ \mathbf{r}(x)  &= \mathbf{y}^{-n} \circ \big(\mathbf{r}'(x) || \mathbf{r}''(x)\big)   &{}={}&  &       &  \mathbf{a}'\_R \cdot x +  \mathbf{s}\_R' \cdot x^3  +        \mathbf{y}^{-n'}  \circ \mathbf{w}\_L' \cdot x  - \mathbf{1}^{n'}  +        \mathbf{y}^{-n'}  \circ \mathbf{w}\_O'\\\\
+                                       &                                                                      &     &  &||\quad&  \mathbf{a}''\_R \cdot x + \mathbf{s}\_R'' \cdot x^3 + y^{-n'}\mathbf{y}^{-n''} \circ \mathbf{w}\_L'' \cdot x - \mathbf{1}^{n''} + y^{-n'}\mathbf{y}^{-n''} \circ \mathbf{w}\_O''\\\\
+\end{aligned}
+\\]
+
+The low-level variables and their blinding factors are committed as follows:
+
+\\[
+\begin{aligned}
+G     &= G' || G'' \\\\
+H     &= H' || H'' \\\\
+A_I'  &= \widetilde{B} \cdot \tilde{a}'  + \langle \mathbf{G}'  , \mathbf{a}\_L'  \rangle + \langle \mathbf{H}', \mathbf{a}\_R' \rangle \\\\
+A_O'  &= \widetilde{B} \cdot \tilde{o}'  + \langle \mathbf{G}'  , \mathbf{a}\_O'  \rangle \\\\
+S'    &= \widetilde{B} \cdot \tilde{s}'  + \langle \mathbf{G}'  , \mathbf{s}\_L'  \rangle + \langle \mathbf{H}', \mathbf{s}\_R' \rangle \\\\
+A_I'' &= \widetilde{B} \cdot \tilde{a}'' + \langle \mathbf{G}'' , \mathbf{a}\_L'' \rangle + \langle \mathbf{H}'', \mathbf{a}\_R'' \rangle \\\\
+A_O'' &= \widetilde{B} \cdot \tilde{o}'' + \langle \mathbf{G}'' , \mathbf{a}\_O'' \rangle \\\\
+S''   &= \widetilde{B} \cdot \tilde{s}'' + \langle \mathbf{G}'' , \mathbf{s}\_L'' \rangle + \langle \mathbf{H}'', \mathbf{s}\_R'' \rangle \\\\
+\end{aligned}
+\\]
+
+Using the diagram from the previous section, we can build two statements, each in terms of the corresponding set of commitments:
+
+TBD:
+\\[
+\begin{aligned}
+   {\langle \mathbf{l}'(x), {\mathbf{G}'} \rangle} + {\langle \mathbf{r}'(x), \hat{\mathbf{H}}'' \rangle} &\stackrel{?}{=}
+   -\widetilde{e}' {\widetilde{B}} + x \cdot A_I' + x^2 \cdot A_O' - \langle \mathbf{1}, \mathbf{H}' \rangle + W_L' \cdot x + W_R' \cdot x + W_O' + x^3 \cdot S' \\\\
+   {\langle \mathbf{l}''(x), {\mathbf{G}''} \rangle} + {\langle \mathbf{r}''(x), \hat{\mathbf{H}}'' \rangle} &\stackrel{?}{=}
+   -\widetilde{e}'' {\widetilde{B}} + x \cdot A_I'' + x^2 \cdot A_O'' - \langle \mathbf{1}, \mathbf{H}'' \rangle + W_L'' \cdot x + W_R'' \cdot x + W_O' + x^3 \cdot S'' \\\\
+\end{aligned}
+\\]
+
+TBD: eliminate need for two synthetic blinding factors \\(\widetilde{e}', \widetilde{e}''\\).
+
+We can then combine two statements in one by using an additional random challenge \\(e \in {\mathbb Z\_{p}^{\times}}\\):
+
+\\[
+\begin{aligned}
+TBD\\\\
+\end{aligned}
+\\]
+
+
+TBD: transmuting commitments by moving around the challenge.
+
 
 
 Compressing vectors \\(\mathbf{l}(x)\\) and \\(\mathbf{r}(x)\\) with an inner product argument
@@ -1282,7 +1367,7 @@ This, however, would require transmitting \\(2n\\) 32-byte elements representing
 
 To make the proof smaller, the prover will use the [inner product argument](../notes/index.html#inner-product-proof)
 to indirectly prove the inner product relation using \\(t(x)\\) and the vectors represented
-by a commitment \\(P = {\langle {\mathbf{l}}(x), {\mathbf{G}} \rangle} + {\langle {\mathbf{r}}(x), {\mathbf{H}}' \rangle}\\).
+by a commitment \\(P = {\langle {\mathbf{l}}(x), {\mathbf{G}} \rangle} + {\langle {\mathbf{r}}(x), \hat{\mathbf{H}} \rangle}\\).
 
 The verifier checks the inner product proof with \\(P\\) computed using the bottom row of the diagram,
 which proves that the vectors \\(\mathbf{l}(x), \mathbf{r}(x)\\) are computed correctly:
