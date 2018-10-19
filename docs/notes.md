@@ -1260,7 +1260,7 @@ the sum of each column is a vector Pedersen commitment with left and right halve
 and blinding factor from the third row.
 The sum of all of the columns is a vector
 Pedersen commitment to \\({\mathbf{l}}(x)\\) and \\({\mathbf{r}}(x)\\) with
-synthetic blinding factor \\({\widetilde{e}}\\).
+synthetic blinding factor \\(\widetilde{e} = \tilde{a} \cdot x+ \tilde{o} \cdot x^2 + \tilde{s} \cdot x^3\\).
 
 To convince the verifier that \\(\mathbf{l}(x)\\) and \\(\mathbf{r}(x)\\) are computed correctly,
 the prover can send the evaluations \\(\mathbf{l}(x), \mathbf{r}(x)\\) along with \\(\tilde{e}\\) to the verifier,
@@ -1305,56 +1305,103 @@ The vectors of flattened weights are split accordingly:
 \end{aligned}
 \\]
 
-The vectors become:
+The statements of each slice of the vectors \\(\mathbf{l}(x), \mathbf{r}(x)\\) become:
 
 \\[
 \begin{aligned}
-                        \mathbf{l}(x)  &= \mathbf{l}'(x) || \mathbf{l}''(x)                                   &{}={}&  &       &  \mathbf{a}'\_L \cdot x  + \mathbf{s}\_L' \cdot x^3  +        \mathbf{y}^{-n'}  \circ \mathbf{w}\_R'  \cdot x + \mathbf{a}\_O' \cdot x^2\\\\
-                                       &                                                                      &     &  &||\quad&  \mathbf{a}''\_L \cdot x + \mathbf{s}\_L'' \cdot x^3 + y^{-n'}\mathbf{y}^{-n''} \circ \mathbf{w}\_R'' \cdot x + \mathbf{a}\_O'' \cdot x^2\\\\
-  \mathbf{y}^{-n} \circ \mathbf{r}(x)  &= \mathbf{y}^{-n} \circ \big(\mathbf{r}'(x) || \mathbf{r}''(x)\big)   &{}={}&  &       &  \mathbf{a}'\_R \cdot x +  \mathbf{s}\_R' \cdot x^3  +        \mathbf{y}^{-n'}  \circ \mathbf{w}\_L' \cdot x  - \mathbf{1}^{n'}  +        \mathbf{y}^{-n'}  \circ \mathbf{w}\_O'\\\\
-                                       &                                                                      &     &  &||\quad&  \mathbf{a}''\_R \cdot x + \mathbf{s}\_R'' \cdot x^3 + y^{-n'}\mathbf{y}^{-n''} \circ \mathbf{w}\_L'' \cdot x - \mathbf{1}^{n''} + y^{-n'}\mathbf{y}^{-n''} \circ \mathbf{w}\_O''\\\\
+                                   \mathbf{l}'(x) &= \mathbf{a}'\_L \cdot x  + \mathbf{s}\_L' \cdot x^3  +        \mathbf{y}^{-n'}  \circ \mathbf{w}\_R'  \cdot x + \mathbf{a}\_O' \cdot x^2\\\\
+                                  \mathbf{l}''(x) &= \mathbf{a}''\_L \cdot x + \mathbf{s}\_L'' \cdot x^3 + y^{-n'}\mathbf{y}^{-n''} \circ \mathbf{w}\_R'' \cdot x + \mathbf{a}\_O'' \cdot x^2\\\\
+            \mathbf{y}^{-n'} \circ \mathbf{r}'(x) &= \mathbf{a}'\_R \cdot x  + \mathbf{s}\_R' \cdot x^3  +        \mathbf{y}^{-n'}  \circ \mathbf{w}\_L' \cdot x  - \mathbf{1}^{n'}  +        \mathbf{y}^{-n'}  \circ \mathbf{w}\_O'\\\\
+  y^{-n'} \mathbf{y}^{-n''} \circ \mathbf{r}''(x) &= \mathbf{a}''\_R \cdot x + \mathbf{s}\_R'' \cdot x^3 + y^{-n'}\mathbf{y}^{-n''} \circ \mathbf{w}\_L'' \cdot x - \mathbf{1}^{n''} + y^{-n'}\mathbf{y}^{-n''} \circ \mathbf{w}\_O''\\\\
 \end{aligned}
 \\]
+
+We want to commit to the the first subvectors \\(\mathbf{a}'\_{L,R,O}\\) independently from the second subvectors \\(\mathbf{a}''\_{L,R,O}\\)
+because second subvectors are computed with the use of challenges generated _after_ the first subvectors are determined and committed.
+At the same time, we need to work towards a commitment to the complete vectors \\(\mathbf{l}(x), \mathbf{r}(x)\\).
+To do that, we combine pairs statements about each subvector with a random challenge \\(e \in {\mathbb Z\_{p}^{\times}}\\):
+
+\\[
+\begin{aligned}
+                               \mathbf{l}'(x) + e \cdot \mathbf{l}''(x)       &{}={}&                 &\mathbf{a}'\_L \cdot x  + \mathbf{s}\_L' \cdot x^3  +        \mathbf{y}^{-n'}  \circ \mathbf{w}\_R'  \cdot x + \mathbf{a}\_O' \cdot x^2 \\\\
+                                                                              &&       + e \cdot \Big(&\mathbf{a}''\_L \cdot x + \mathbf{s}\_L'' \cdot x^3 + y^{-n'}\mathbf{y}^{-n''} \circ \mathbf{w}\_R'' \cdot x + \mathbf{a}\_O'' \cdot x^2 \Big)\\\\
+    \mathbf{y}^{-n} \circ \big(\mathbf{r}'(x) + e \cdot \mathbf{r}''(x) \big) &{}={}&                 &\mathbf{a}'\_R \cdot x  + \mathbf{s}\_R' \cdot x^3  +        \mathbf{y}^{-n'}  \circ \mathbf{w}\_L' \cdot x  - \mathbf{1}^{n'}  +        \mathbf{y}^{-n'}  \circ \mathbf{w}\_O' \\\\
+                                                                              &&       + e \cdot \Big(&\mathbf{a}''\_R \cdot x + \mathbf{s}\_R'' \cdot x^3 + y^{-n'}\mathbf{y}^{-n''} \circ \mathbf{w}\_L'' \cdot x - \mathbf{1}^{n''} + y^{-n'}\mathbf{y}^{-n''} \circ \mathbf{w}\_O'' \Big)\\\\
+\end{aligned}
+\\]
+
+Applying challenge \\(e\\) to each term, we get:
+
+\\[
+\begin{aligned}
+                               \mathbf{l}'(x) + e \cdot \mathbf{l}''(x)       &= (\mathbf{a}'\_L + e \cdot \mathbf{a}''\_L) \cdot x  + (\mathbf{s}\_L' + e \cdot \mathbf{s}\_L'') \cdot x^3  +  \mathbf{y}^{-n} \circ (\mathbf{w}\_R' + e \cdot \mathbf{w}\_R'') \cdot x + (\mathbf{a}\_O' + e \cdot \mathbf{a}\_O'') \cdot x^2 \\\\
+    \mathbf{y}^{-n} \circ \big(\mathbf{r}'(x) + e \cdot \mathbf{r}''(x) \big) &= (\mathbf{a}'\_R + e \cdot \mathbf{a}''\_R) \cdot x  + (\mathbf{s}\_R' + e \cdot \mathbf{s}\_R'') \cdot x^3  +  \mathbf{y}^{-n} \circ (\mathbf{w}\_L' + e \cdot \mathbf{w}\_L'') \cdot x - \mathbf{1}^{n}  + \mathbf{y}^{-n} \circ (\mathbf{w}\_O' + e \cdot \mathbf{w}\_O'') \\\\
+\end{aligned}
+\\]
+
 
 The low-level variables and their blinding factors are committed as follows:
 
 \\[
 \begin{aligned}
-G     &= G' || G'' \\\\
-H     &= H' || H'' \\\\
-A_I'  &= \widetilde{B} \cdot \tilde{a}'  + \langle \mathbf{G}'  , \mathbf{a}\_L'  \rangle + \langle \mathbf{H}', \mathbf{a}\_R' \rangle \\\\
-A_O'  &= \widetilde{B} \cdot \tilde{o}'  + \langle \mathbf{G}'  , \mathbf{a}\_O'  \rangle \\\\
-S'    &= \widetilde{B} \cdot \tilde{s}'  + \langle \mathbf{G}'  , \mathbf{s}\_L'  \rangle + \langle \mathbf{H}', \mathbf{s}\_R' \rangle \\\\
-A_I'' &= \widetilde{B} \cdot \tilde{a}'' + \langle \mathbf{G}'' , \mathbf{a}\_L'' \rangle + \langle \mathbf{H}'', \mathbf{a}\_R'' \rangle \\\\
-A_O'' &= \widetilde{B} \cdot \tilde{o}'' + \langle \mathbf{G}'' , \mathbf{a}\_O'' \rangle \\\\
-S''   &= \widetilde{B} \cdot \tilde{s}'' + \langle \mathbf{G}'' , \mathbf{s}\_L'' \rangle + \langle \mathbf{H}'', \mathbf{s}\_R'' \rangle \\\\
+\mathbf{G} &= \mathbf{G}' || \mathbf{G}'' \\\\
+\mathbf{H} &= \mathbf{H}' || \mathbf{H}'' \\\\
+     A_I'  &= \langle \mathbf{G}'  , \mathbf{a}\_L'  \rangle + \langle \mathbf{H}', \mathbf{a}\_R' \rangle + \widetilde{B} \cdot \tilde{a}'  \\\\
+     A_I'' &= \langle \mathbf{G}'' , \mathbf{a}\_L'' \rangle + \langle \mathbf{H}'', \mathbf{a}\_R'' \rangle + \widetilde{B} \cdot \tilde{a}'' \\\\
+     A_O'  &= \langle \mathbf{G}'  , \mathbf{a}\_O'  \rangle + \widetilde{B} \cdot \tilde{o}'  \\\\
+     A_O'' &= \langle \mathbf{G}'' , \mathbf{a}\_O'' \rangle + \widetilde{B} \cdot \tilde{o}'' \\\\
+     S'    &= \langle \mathbf{G}'  , \mathbf{s}\_L'  \rangle + \langle \mathbf{H}', \mathbf{s}\_R' \rangle + \widetilde{B} \cdot \tilde{s}'  \\\\
+     S''   &= \langle \mathbf{G}'' , \mathbf{s}\_L'' \rangle + \langle \mathbf{H}'', \mathbf{s}\_R'' \rangle + \widetilde{B} \cdot \tilde{s}'' \\\\
 \end{aligned}
 \\]
 
-Using the diagram from the previous section, we can build two statements, each in terms of the corresponding set of commitments:
-
-TBD:
-\\[
-\begin{aligned}
-   {\langle \mathbf{l}'(x), {\mathbf{G}'} \rangle} + {\langle \mathbf{r}'(x), \hat{\mathbf{H}}'' \rangle} &\stackrel{?}{=}
-   -\widetilde{e}' {\widetilde{B}} + x \cdot A_I' + x^2 \cdot A_O' - \langle \mathbf{1}, \mathbf{H}' \rangle + W_L' \cdot x + W_R' \cdot x + W_O' + x^3 \cdot S' \\\\
-   {\langle \mathbf{l}''(x), {\mathbf{G}''} \rangle} + {\langle \mathbf{r}''(x), \hat{\mathbf{H}}'' \rangle} &\stackrel{?}{=}
-   -\widetilde{e}'' {\widetilde{B}} + x \cdot A_I'' + x^2 \cdot A_O'' - \langle \mathbf{1}, \mathbf{H}'' \rangle + W_L'' \cdot x + W_R'' \cdot x + W_O' + x^3 \cdot S'' \\\\
-\end{aligned}
-\\]
-
-TBD: eliminate need for two synthetic blinding factors \\(\widetilde{e}', \widetilde{e}''\\).
-
-We can then combine two statements in one by using an additional random challenge \\(e \in {\mathbb Z\_{p}^{\times}}\\):
+Low-level variables are committed before challenges \\(y\\) and \\(e\\) are known, so we need to change generators:
 
 \\[
 \begin{aligned}
-TBD\\\\
+    \hat{\mathbf{G}} &= \mathbf{G}' || (e \cdot \mathbf{G}'') \\\\
+    \hat{\mathbf{H}} &= \mathbf{y}^{-n} \circ \big( \mathbf{H}' || (e \cdot \mathbf{H}'') \big) \\\\
 \end{aligned}
 \\]
 
+To relate the prover’s commitments to \\({\mathbf{l}}(x)\\) and \\({\mathbf{r}}(x)\\), we use the new diagram:
 
-TBD: transmuting commitments by moving around the challenge.
+\\[
+\begin{aligned}
+  {\langle {\mathbf{l}}(x), \hat{\mathbf{G}} \rangle}      &\quad &= \quad & x \cdot \big( {\langle \mathbf{a}'\_L, \mathbf{G}' \rangle} + e \cdot {\langle \mathbf{a}''\_L, \mathbf{G}'' \rangle} \big)      & \quad &+ \quad x^2 \cdot \big( {\langle \mathbf{a}'\_O, \mathbf{G}' \rangle}  +  e \cdot {\langle \mathbf{a}''\_O, \mathbf{G}'' \rangle} \big)    & \quad &+ \quad \langle \mathbf{y}^{-n} \circ (\mathbf{w}\_R' || e \cdot \mathbf{w}\_R'') \cdot x , \mathbf{G} \rangle                                                   &\quad &+\quad  x^3 \cdot \big( \langle \mathbf{s}'\_L , \mathbf{G}' \rangle + e \cdot \langle \mathbf{s}''\_L , \mathbf{G}'' \rangle \big) \\\\
+                                                    +      &\quad &  \quad &  +                                                                                                                               & \quad &  \quad \quad  +                                                                                                                           & \quad &  \quad \quad +                                                                                                                                                  &\quad & \quad  \quad +   \\\\
+  {\langle {\mathbf{r}}(x), \hat{\mathbf{H}} \rangle}      &\quad &= \quad & x \cdot \big( {\langle \mathbf{a}'\_R, \mathbf{H}' \rangle} + e \cdot {\langle \mathbf{a}''\_R, \mathbf{H}'' \rangle} \big)      & \quad &- \quad \langle \mathbf{1}, \mathbf{H} \rangle                                                                                             & \quad &+ \quad \langle \mathbf{y}^{-n} \circ (\mathbf{w}\_L' || e \cdot \mathbf{w}\_L'') \cdot x + (\mathbf{w}\_O' || e \cdot \mathbf{w}\_O''), \mathbf{H} \rangle      &\quad &+\quad  x^3 \cdot \big( \langle \mathbf{s}'\_R , \mathbf{H}' \rangle + e \cdot \langle \mathbf{s}''\_R , \mathbf{H}'' \rangle \big) \\\\
+                                                    +      &\quad &  \quad &  +                                                                                                                               & \quad &  \quad \quad +                                                                                                                            & \quad &  \quad \quad +                                                                                                                                                  &\quad & \quad  \quad +   \\\\
+                        \tilde{e} \cdot \widetilde{B}      &\quad &= \quad & x \cdot \big( \tilde{a}' \cdot \widetilde{B} + e \tilde{a}'' \cdot \widetilde{B} \big)                                           & \quad &+ \quad x^2 \cdot \big( \tilde{o}' \cdot \widetilde{B} + e \cdot \tilde{o}'' \cdot \widetilde{B} \big)                                     & \quad &+ \quad 0                                                                                                                                                        &\quad &+\quad  x^3 \cdot \big( \tilde{s}' \cdot \widetilde{B} + e \tilde{s}'' \cdot \widetilde{B} \big) \\\\
+                                        \shortparallel     &\quad &  \quad & \shortparallel                                                                                                                   & \quad &  \quad \quad \shortparallel                                                                                                               & \quad &  \quad \quad \shortparallel                                                                                                                                           &\quad & \quad  \quad \shortparallel   \\\\
+                                                           &\quad &= \quad & x \cdot \big(A_I' + e \cdot A_I'')                                                                                               & \quad &+ \quad x^2 \cdot \big(A_O' + e \cdot A_O'' \big) - \langle \mathbf{1}, \mathbf{H} \rangle                                                 & \quad &+ \quad W_L \cdot x + W_R \cdot x + W_O                                                                                                                          &\quad &+\quad  x^3 \cdot (S' + e \cdot S'')
+\end{aligned}
+\\]
+where
+\\[
+\begin{aligned}
+W_L &= \langle \mathbf{y}^{-n} \circ (\mathbf{w}'\_L || e \cdot \mathbf{w}''\_L), \mathbf{H} \rangle, \\\\
+W_R &= \langle \mathbf{y}^{-n} \circ (\mathbf{w}'\_R || e \cdot \mathbf{w}''\_R), \mathbf{G} \rangle, \\\\
+W_O &= \langle \mathbf{y}^{-n} \circ (\mathbf{w}'\_O || e \cdot \mathbf{w}''\_O), \mathbf{H} \rangle. \\\\
+\end{aligned}
+\\]
+
+The sum of each column is a vector Pedersen commitment with left and right halves from the first and second rows respectively
+and blinding factor from the third row.
+The sum of all of the columns is a vector
+Pedersen commitment to \\({\mathbf{l}}(x)\\) and \\({\mathbf{r}}(x)\\) with
+synthetic blinding factor \\(\widetilde{e} = (\tilde{a}' + e \tilde{a}'') \cdot x + (\tilde{o}' + e \tilde{o}'') \cdot x^2 + (\tilde{s}' + e \tilde{s}'') \cdot x^3\\).
+
+To convince the verifier that \\(\mathbf{l}(x)\\) and \\(\mathbf{r}(x)\\) are computed correctly,
+the prover can send the evaluations \\(\mathbf{l}(x), \mathbf{r}(x)\\) along with \\(\tilde{e}\\) to the verifier,
+who uses the bottom row of the diagram to check the following statement:
+
+\\[
+\begin{aligned}
+   {\langle {\mathbf{l}}(x), \hat{\mathbf{G}} \rangle} + {\langle {\mathbf{r}}(x), \hat{\mathbf{H}} \rangle} \stackrel{?}{=}
+   -{\widetilde{e}} {\widetilde{B}} + x \cdot (A_I' + e \cdot A_I'') + x^2 \cdot (A_O' + e \cdot A_O'') - \langle \mathbf{1}, \mathbf{H} \rangle + W_L \cdot x + W_R \cdot x + W_O + x^3 \cdot (S' + e \cdot S'') \\\\
+\end{aligned}
+\\]
 
 
 
@@ -1367,19 +1414,20 @@ This, however, would require transmitting \\(2n\\) 32-byte elements representing
 
 To make the proof smaller, the prover will use the [inner product argument](../notes/index.html#inner-product-proof)
 to indirectly prove the inner product relation using \\(t(x)\\) and the vectors represented
-by a commitment \\(P = {\langle {\mathbf{l}}(x), {\mathbf{G}} \rangle} + {\langle {\mathbf{r}}(x), \hat{\mathbf{H}} \rangle}\\).
+by a commitment \\(P = {\langle {\mathbf{l}}(x), \hat{\mathbf{G}} \rangle} + {\langle {\mathbf{r}}(x), \hat{\mathbf{H}} \rangle}\\).
 
 The verifier checks the inner product proof with \\(P\\) computed using the bottom row of the diagram,
 which proves that the vectors \\(\mathbf{l}(x), \mathbf{r}(x)\\) are computed correctly:
 \\[
 \begin{aligned}
-  P &= -{\widetilde{e}} {\widetilde{B}} + x \cdot A_I + x^2 \cdot A_O - \langle \mathbf{1}, \mathbf{H} \rangle + W_L \cdot x + W_R \cdot x + W_O + x^3 \cdot S \\\\
+  P &= -{\widetilde{e}} {\widetilde{B}} + x \cdot (A_I' + e \cdot A_I'') + x^2 \cdot (A_O' + e \cdot A_O'') - \langle \mathbf{1}, \mathbf{H} \rangle + W_L \cdot x + W_R \cdot x + W_O + x^3 \cdot (S' + e \cdot S'') \\\\
 \end{aligned}
 \\]
 
 If the inner product proof with such \\(P\\) is correct, the verifier is convinced of two facts:
 that \\(t(x) = {\langle {\mathbf{l}}(x), {\mathbf{r}}(x) \rangle}\\), and
 \\(\mathbf{l}(x), \mathbf{r}(x)\\) are correct.
+
 
 
 Padding \\(\mathbf{l}(x)\\) and \\(\mathbf{r}(x)\\) for the inner product proof
