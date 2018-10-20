@@ -1245,13 +1245,13 @@ To relate the prover’s commitments to
 
 \\[
 \begin{aligned}
-  {\langle {\mathbf{l}}(x), {\mathbf{G}} \rangle}      &\quad &= \quad & {\langle {\mathbf{a}}\_L \cdot x, {\mathbf{G}} \rangle}      & \quad &+ \quad & {\langle {\mathbf{a}}\_O \cdot x^2, {\mathbf{G}} \rangle}  & \quad &+ \quad& \langle \mathbf{y}^{-n} \circ \mathbf{w}\_R \cdot x , \mathbf{G} \rangle                     &\quad &+\quad & \langle \mathbf{s}\_L \cdot x^3 , \mathbf{G} \rangle \\\\
+  {\langle {\mathbf{l}}(x), {\mathbf{G}} \rangle}      &\quad &= \quad & {\langle {\mathbf{a}}\_L \cdot x, {\mathbf{G}} \rangle}      & \quad &+ \quad & {\langle {\mathbf{a}}\_O \cdot x^2, {\mathbf{G}} \rangle}  & \quad &+ \quad& x \cdot \langle \mathbf{y}^{-n} \circ \mathbf{w}\_R, \mathbf{G} \rangle                      &\quad &+\quad & \langle \mathbf{s}\_L \cdot x^3 , \mathbf{G} \rangle \\\\
                                                 +      &\quad &  \quad &  +                                                           & \quad &  \quad &  +                                                         & \quad &  \quad& +                                                                                            &\quad & \quad & +   \\\\
-  {\langle {\mathbf{r}}(x), \hat{\mathbf{H}} \rangle}  &\quad &= \quad & \langle \mathbf{a}\_R \cdot x, {\mathbf{H}} \rangle          & \quad &+ \quad & - \langle \mathbf{1}, \mathbf{H} \rangle                   & \quad &+ \quad& \langle \mathbf{y}^{-n} \circ (\mathbf{w}\_L \cdot x + \mathbf{w}\_O), \mathbf{H} \rangle    &\quad &+\quad & \langle \mathbf{s}\_R \cdot x^3 , \mathbf{H} \rangle \\\\
+  {\langle {\mathbf{r}}(x), \hat{\mathbf{H}} \rangle}  &\quad &= \quad & \langle \mathbf{a}\_R \cdot x, {\mathbf{H}} \rangle          & \quad &+ \quad & - \langle \mathbf{1}, \mathbf{H} \rangle                   & \quad &+ \quad& \langle \mathbf{y}^{-n} \circ (x \cdot \mathbf{w}\_L + \mathbf{w}\_O), \mathbf{H} \rangle    &\quad &+\quad & \langle \mathbf{s}\_R \cdot x^3 , \mathbf{H} \rangle \\\\
                                                 +      &\quad &  \quad &  +                                                           & \quad &  \quad &  +                                                         & \quad &  \quad& +                                                                                            &\quad & \quad & +   \\\\
   \tilde{e} \cdot \widetilde{B}                        &\quad &= \quad & \tilde{a} \cdot x \cdot \widetilde{B}                        & \quad &+ \quad & \tilde{o} \cdot x^2 \cdot \widetilde{B}                    & \quad &+ \quad& 0                                                                                            &\quad &+\quad & \tilde{s} \cdot x^3 \cdot \widetilde{B} \\\\
                                     \shortparallel     &\quad &  \quad & \shortparallel                                               & \quad &  \quad & \shortparallel                                             & \quad &  \quad& \shortparallel                                                                               &\quad & \quad & \shortparallel   \\\\
-                                                       &\quad &= \quad & x \cdot A_I                                                  & \quad &+ \quad & x^2 \cdot A_O - \langle \mathbf{1}, \mathbf{H} \rangle     & \quad &+ \quad& W_L \cdot x + W_R \cdot x + W_O                                                              &\quad &+\quad & x^3 \cdot S
+                                                       &\quad &= \quad & x \cdot A_I                                                  & \quad &+ \quad & x^2 \cdot A_O - \langle \mathbf{1}, \mathbf{H} \rangle     & \quad &+ \quad& x \cdot W_L + x \cdot W_R + W_O                                                              &\quad &+\quad & x^3 \cdot S
 \end{aligned}
 \\]
 
@@ -1316,36 +1316,61 @@ The statements of each slice of the vectors \\(\mathbf{l}(x), \mathbf{r}(x)\\) b
 \end{aligned}
 \\]
 
-We want to commit to the first subvectors \\(\mathbf{a}'\_{L,R,O}\\) independently from the second subvectors \\(\mathbf{a}''\_{L,R,O}\\)
-because second subvectors are computed with the use of challenges generated _after_ the first subvectors are determined and committed.
-At the same time, we need to work towards a commitment to the complete vectors \\(\mathbf{l}(x), \mathbf{r}(x)\\).
-To do that, we combine pairs statements about each subvector with a random challenge \\(e \in {\mathbb Z\_{p}^{\times}}\\):
+Now we need to express the statements above using independent commitments to the subvectors \\(\mathbf{a}'\_{L,R,O}\\) and \\(\mathbf{a}''\_{L,R,O}\\).
+Commitments must be independent because second subvectors are computed with the use of challenges generated _after_ the first subvectors are determined and committed.
 
-\\[
-\begin{aligned}
-                               \mathbf{l}'(x) + e \cdot \mathbf{l}''(x)       &{}={}&                 &\mathbf{a}'\_L \cdot x  + \mathbf{s}\_L' \cdot x^3  +        \mathbf{y}^{-n'}  \circ \mathbf{w}\_R'  \cdot x + \mathbf{a}\_O' \cdot x^2 \\\\
-                                                                              &&       + e \cdot \Big(&\mathbf{a}''\_L \cdot x + \mathbf{s}\_L'' \cdot x^3 + y^{-n'}\mathbf{y}^{-n''} \circ \mathbf{w}\_R'' \cdot x + \mathbf{a}\_O'' \cdot x^2 \Big)\\\\
-    \mathbf{y}^{-n} \circ \big(\mathbf{r}'(x) + e \cdot \mathbf{r}''(x) \big) &{}={}&                 &\mathbf{a}'\_R \cdot x  + \mathbf{s}\_R' \cdot x^3  +        \mathbf{y}^{-n'}  \circ \mathbf{w}\_L' \cdot x  - \mathbf{1}^{n'}  +        \mathbf{y}^{-n'}  \circ \mathbf{w}\_O' \\\\
-                                                                              &&       + e \cdot \Big(&\mathbf{a}''\_R \cdot x + \mathbf{s}\_R'' \cdot x^3 + y^{-n'}\mathbf{y}^{-n''} \circ \mathbf{w}\_L'' \cdot x - \mathbf{1}^{n''} + y^{-n'}\mathbf{y}^{-n''} \circ \mathbf{w}\_O'' \Big)\\\\
-\end{aligned}
-\\]
-
-Applying challenge \\(e\\) to each term, we get:
-
-\\[
-\begin{aligned}
-                               \mathbf{l}'(x) + e \cdot \mathbf{l}''(x)       &= (\mathbf{a}'\_L + e \cdot \mathbf{a}''\_L) \cdot x  + (\mathbf{s}\_L' + e \cdot \mathbf{s}\_L'') \cdot x^3  +  \mathbf{y}^{-n} \circ (\mathbf{w}\_R' + e \cdot \mathbf{w}\_R'') \cdot x + (\mathbf{a}\_O' + e \cdot \mathbf{a}\_O'') \cdot x^2 \\\\
-    \mathbf{y}^{-n} \circ \big(\mathbf{r}'(x) + e \cdot \mathbf{r}''(x) \big) &= (\mathbf{a}'\_R + e \cdot \mathbf{a}''\_R) \cdot x  + (\mathbf{s}\_R' + e \cdot \mathbf{s}\_R'') \cdot x^3  +  \mathbf{y}^{-n} \circ (\mathbf{w}\_L' + e \cdot \mathbf{w}\_L'') \cdot x - \mathbf{1}^{n}  + \mathbf{y}^{-n} \circ (\mathbf{w}\_O' + e \cdot \mathbf{w}\_O'') \\\\
-\end{aligned}
-\\]
-
-
-The low-level variables and their blinding factors are committed as follows:
+To do that, we split vectors of generators and combine the statements in two:
+the first one in terms of the commitments to the first subvectors,
+and the second one in terms of the commitments to the second subvectors.
 
 \\[
 \begin{aligned}
 \mathbf{G} &= \mathbf{G}' || \mathbf{G}'' \\\\
 \mathbf{H} &= \mathbf{H}' || \mathbf{H}'' \\\\
+\end{aligned}
+\\]
+
+\\[
+\begin{aligned}
+  {\langle \mathbf{l}'(x), {\mathbf{G}'} \rangle}                                   &\quad &= \quad & x \cdot {\langle \mathbf{a}'\_L, \mathbf{G}' \rangle}       & \quad &+ \quad x^2 \cdot {\langle \mathbf{a}'\_O, \mathbf{G}' \rangle}    & \quad &+ \quad \langle x \cdot \mathbf{y}^{-n'} \circ \mathbf{w}\_R', \mathbf{G}' \rangle                                 &\quad &+\quad  x^3 \cdot \langle \mathbf{s}'\_L , \mathbf{G}' \rangle \\\\
+                                                                        +           &\quad &  \quad &  +                                                          & \quad &  \quad \quad  +                                                   & \quad &  \quad \quad +                                                                                                    &\quad & \quad  \quad +   \\\\
+  {\langle  \mathbf{y}^{-n'} \circ \mathbf{r}'(x), {\mathbf{H}'} \rangle}           &\quad &= \quad & x \cdot {\langle \mathbf{a}'\_R, \mathbf{H}' \rangle}       & \quad &- \quad \langle \mathbf{1}, \mathbf{H}' \rangle                    & \quad &+ \quad \langle \mathbf{y}^{-n'} \circ (x \cdot \mathbf{w}\_L'  + \mathbf{w}\_O'), \mathbf{H}' \rangle             &\quad &+\quad  x^3 \cdot \langle \mathbf{s}'\_R , \mathbf{H}' \rangle \\\\
+                                                                                    &\quad &  \quad &                                                             & \quad &  \quad \quad                                                      & \quad &  \quad \quad                                                                                                      &\quad & \quad  \quad     \\\\
+  {\langle \mathbf{l}''(x), {\mathbf{G}''} \rangle}                                 &\quad &= \quad & x \cdot {\langle \mathbf{a}''\_L, \mathbf{G}'' \rangle}     & \quad &+ \quad x^2 \cdot {\langle \mathbf{a}''\_O, \mathbf{G}'' \rangle}  & \quad &+ \quad \langle x \cdot y^{-n'} \mathbf{y}^{-n''} \circ \mathbf{w}\_R'', \mathbf{G}'' \rangle                      &\quad &+\quad  x^3 \cdot \langle \mathbf{s}''\_L , \mathbf{G}'' \rangle \\\\
+                                                                              +     &\quad &  \quad &  +                                                          & \quad &  \quad \quad  +                                                   & \quad &  \quad \quad +                                                                                                    &\quad & \quad  \quad +   \\\\
+  {\langle  y^{n'} \mathbf{y}^{-n''} \circ \mathbf{r}''(x), {\mathbf{H}''} \rangle} &\quad &= \quad & x \cdot {\langle \mathbf{a}''\_R, \mathbf{H}'' \rangle}     & \quad &- \quad \langle \mathbf{1}, \mathbf{H}'' \rangle                   & \quad &+ \quad \langle y^{-n'} \mathbf{y}^{-n''} \circ (x \cdot \mathbf{w}\_L''  + \mathbf{w}\_O''), \mathbf{H}'' \rangle &\quad &+\quad  x^3 \cdot \langle \mathbf{s}''\_R , \mathbf{H}'' \rangle \\\\
+\end{aligned}
+\\]
+
+We need to combine the above statements in one in order to have an expression for the complete vectors \\(\mathbf{l}(x), \mathbf{r}(x)\\).
+For that we will multiply the second statement by a random challenge \\(e \in {\mathbb Z\_{p}^{\times}}\\), and add it to the first statement.
+
+\\[
+\begin{aligned}
+  {\langle \mathbf{l}'(x), {\mathbf{G}'} \rangle}                                           &\quad &= \quad & x \cdot {\langle \mathbf{a}'\_L, \mathbf{G}' \rangle}               & \quad &+ \quad x^2 \cdot {\langle \mathbf{a}'\_O, \mathbf{G}' \rangle}            & \quad &+ \quad \langle x \cdot \mathbf{y}^{-n'} \circ \mathbf{w}\_R', \mathbf{G}' \rangle                                         &\quad &+\quad  x^3 \cdot \langle \mathbf{s}'\_L , \mathbf{G}' \rangle \\\\
+                                                                        +                   &\quad &  \quad &  +                                                                  & \quad &  \quad \quad  +                                                           & \quad &  \quad \quad +                                                                                                            &\quad & \quad  \quad +   \\\\
+  {\langle  \mathbf{y}^{-n'} \circ \mathbf{r}'(x), {\mathbf{H}'} \rangle}                   &\quad &= \quad & x \cdot {\langle \mathbf{a}'\_R, \mathbf{H}' \rangle}               & \quad &- \quad \langle \mathbf{1}, \mathbf{H}' \rangle                            & \quad &+ \quad \langle \mathbf{y}^{-n'} \circ (x \cdot \mathbf{w}\_L'  + \mathbf{w}\_O'), \mathbf{H}' \rangle                     &\quad &+\quad  x^3 \cdot \langle \mathbf{s}'\_R , \mathbf{H}' \rangle \\\\
+                                                                        +                   &\quad &  \quad &  +                                                                  & \quad &  \quad \quad  +                                                           & \quad &  \quad \quad +                                                                                                            &\quad & \quad  \quad     \\\\
+  {\langle e \cdot \mathbf{l}''(x), {\mathbf{G}''} \rangle}                                 &\quad &= \quad & e \cdot x \cdot {\langle \mathbf{a}''\_L, \mathbf{G}'' \rangle}     & \quad &+ \quad e \cdot x^2 \cdot {\langle \mathbf{a}''\_O, \mathbf{G}'' \rangle}  & \quad &+ \quad e \cdot \langle x \cdot y^{-n'} \mathbf{y}^{-n''} \circ \mathbf{w}\_R'', \mathbf{G}'' \rangle                      &\quad &+\quad  e \cdot x^3 \cdot \langle \mathbf{s}''\_L , \mathbf{G}'' \rangle \\\\
+                                                                        +                   &\quad &  \quad &  +                                                                  & \quad &  \quad \quad  +                                                           & \quad &  \quad \quad +                                                                                                            &\quad & \quad  \quad +   \\\\
+  {\langle e \cdot  y^{n'} \mathbf{y}^{-n''} \circ \mathbf{r}''(x), {\mathbf{H}''} \rangle} &\quad &= \quad & e \cdot x \cdot {\langle \mathbf{a}''\_R, \mathbf{H}'' \rangle}     & \quad &- \quad e \cdot \langle \mathbf{1}, \mathbf{H}'' \rangle                   & \quad &+ \quad e \cdot \langle y^{-n'} \mathbf{y}^{-n''} \circ (x \cdot \mathbf{w}\_L''  + \mathbf{w}\_O''), \mathbf{H}'' \rangle &\quad &+\quad  e \cdot x^3 \cdot \langle \mathbf{s}''\_R , \mathbf{H}'' \rangle \\\\
+\end{aligned}
+\\]
+
+
+Low-level variables are committed before challenges \\(y\\) and \\(e\\) are known, so we change the generators for the \\(\mathbf{l}(x), \mathbf{r}(x)\\):
+
+\\[
+\begin{aligned}
+    \hat{\mathbf{G}} &= \mathbf{G}' || (e \cdot \mathbf{G}'') \\\\
+    \hat{\mathbf{H}} &= \mathbf{y}^{-n} \circ \big( \mathbf{H}' || (e \cdot \mathbf{H}'') \big) \\\\
+\end{aligned}
+\\]
+
+Lets now define the commitments over the components of \\(\mathbf{l}(x)\\) and \\(\mathbf{r}(x)\\):
+
+\\[
+\begin{aligned}
      A_I'  &= \langle \mathbf{G}'  , \mathbf{a}\_L'  \rangle + \langle \mathbf{H}', \mathbf{a}\_R' \rangle + \widetilde{B} \cdot \tilde{a}'  \\\\
      A_I'' &= \langle \mathbf{G}'' , \mathbf{a}\_L'' \rangle + \langle \mathbf{H}'', \mathbf{a}\_R'' \rangle + \widetilde{B} \cdot \tilde{a}'' \\\\
      A_O'  &= \langle \mathbf{G}'  , \mathbf{a}\_O'  \rangle + \widetilde{B} \cdot \tilde{o}'  \\\\
@@ -1355,26 +1380,17 @@ The low-level variables and their blinding factors are committed as follows:
 \end{aligned}
 \\]
 
-Low-level variables are committed before challenges \\(y\\) and \\(e\\) are known, so we need to change generators:
+We can now relate the above commitments to \\({\mathbf{l}}(x)\\) and \\({\mathbf{r}}(x)\\) using the new diagram:
 
 \\[
 \begin{aligned}
-    \hat{\mathbf{G}} &= \mathbf{G}' || (e \cdot \mathbf{G}'') \\\\
-    \hat{\mathbf{H}} &= \mathbf{y}^{-n} \circ \big( \mathbf{H}' || (e \cdot \mathbf{H}'') \big) \\\\
-\end{aligned}
-\\]
-
-To relate the prover’s commitments to \\({\mathbf{l}}(x)\\) and \\({\mathbf{r}}(x)\\), we use the new diagram:
-
-\\[
-\begin{aligned}
-  {\langle {\mathbf{l}}(x), \hat{\mathbf{G}} \rangle}      &\quad &= \quad & x \cdot \big( {\langle \mathbf{a}'\_L, \mathbf{G}' \rangle} + e \cdot {\langle \mathbf{a}''\_L, \mathbf{G}'' \rangle} \big)      & \quad &+ \quad x^2 \cdot \big( {\langle \mathbf{a}'\_O, \mathbf{G}' \rangle}  +  e \cdot {\langle \mathbf{a}''\_O, \mathbf{G}'' \rangle} \big)    & \quad &+ \quad \langle \mathbf{y}^{-n} \circ (\mathbf{w}\_R' || e \cdot \mathbf{w}\_R'') \cdot x , \mathbf{G} \rangle                                                   &\quad &+\quad  x^3 \cdot \big( \langle \mathbf{s}'\_L , \mathbf{G}' \rangle + e \cdot \langle \mathbf{s}''\_L , \mathbf{G}'' \rangle \big) \\\\
-                                                    +      &\quad &  \quad &  +                                                                                                                               & \quad &  \quad \quad  +                                                                                                                           & \quad &  \quad \quad +                                                                                                                                                  &\quad & \quad  \quad +   \\\\
-  {\langle {\mathbf{r}}(x), \hat{\mathbf{H}} \rangle}      &\quad &= \quad & x \cdot \big( {\langle \mathbf{a}'\_R, \mathbf{H}' \rangle} + e \cdot {\langle \mathbf{a}''\_R, \mathbf{H}'' \rangle} \big)      & \quad &- \quad \langle \mathbf{1}, \mathbf{H} \rangle                                                                                             & \quad &+ \quad \langle \mathbf{y}^{-n} \circ (\mathbf{w}\_L' || e \cdot \mathbf{w}\_L'') \cdot x + (\mathbf{w}\_O' || e \cdot \mathbf{w}\_O''), \mathbf{H} \rangle      &\quad &+\quad  x^3 \cdot \big( \langle \mathbf{s}'\_R , \mathbf{H}' \rangle + e \cdot \langle \mathbf{s}''\_R , \mathbf{H}'' \rangle \big) \\\\
-                                                    +      &\quad &  \quad &  +                                                                                                                               & \quad &  \quad \quad +                                                                                                                            & \quad &  \quad \quad +                                                                                                                                                  &\quad & \quad  \quad +   \\\\
-                        \tilde{e} \cdot \widetilde{B}      &\quad &= \quad & x \cdot \big( \tilde{a}' \cdot \widetilde{B} + e \tilde{a}'' \cdot \widetilde{B} \big)                                           & \quad &+ \quad x^2 \cdot \big( \tilde{o}' \cdot \widetilde{B} + e \cdot \tilde{o}'' \cdot \widetilde{B} \big)                                     & \quad &+ \quad 0                                                                                                                                                        &\quad &+\quad  x^3 \cdot \big( \tilde{s}' \cdot \widetilde{B} + e \tilde{s}'' \cdot \widetilde{B} \big) \\\\
-                                        \shortparallel     &\quad &  \quad & \shortparallel                                                                                                                   & \quad &  \quad \quad \shortparallel                                                                                                               & \quad &  \quad \quad \shortparallel                                                                                                                                           &\quad & \quad  \quad \shortparallel   \\\\
-                                                           &\quad &= \quad & x \cdot \big(A_I' + e \cdot A_I'')                                                                                               & \quad &+ \quad x^2 \cdot \big(A_O' + e \cdot A_O'' \big) - \langle \mathbf{1}, \mathbf{H} \rangle                                                 & \quad &+ \quad W_L \cdot x + W_R \cdot x + W_O                                                                                                                          &\quad &+\quad  x^3 \cdot (S' + e \cdot S'')
+  {\langle {\mathbf{l}}(x), \hat{\mathbf{G}} \rangle}      &\quad &= \quad & x \cdot \big( {\langle \mathbf{a}'\_L, \mathbf{G}' \rangle} + e \cdot {\langle \mathbf{a}''\_L, \mathbf{G}'' \rangle} \big)      & \quad &+ \quad x^2 \cdot \big( {\langle \mathbf{a}'\_O, \mathbf{G}' \rangle}  +  e \cdot {\langle \mathbf{a}''\_O, \mathbf{G}'' \rangle} \big)         & \quad &+ \quad \langle \mathbf{y}^{-n} \circ (\mathbf{w}\_R' || e \cdot \mathbf{w}\_R'') \cdot x , \mathbf{G} \rangle                                                   &\quad &+\quad  x^3 \cdot \big( \langle \mathbf{s}'\_L , \mathbf{G}' \rangle + e \cdot \langle \mathbf{s}''\_L , \mathbf{G}'' \rangle \big) \\\\
+                                                    +      &\quad &  \quad &  +                                                                                                                               & \quad &  \quad \quad  +                                                                                                                                & \quad &  \quad \quad +                                                                                                                                                  &\quad & \quad  \quad +   \\\\
+  {\langle {\mathbf{r}}(x), \hat{\mathbf{H}} \rangle}      &\quad &= \quad & x \cdot \big( {\langle \mathbf{a}'\_R, \mathbf{H}' \rangle} + e \cdot {\langle \mathbf{a}''\_R, \mathbf{H}'' \rangle} \big)      & \quad &- \quad \langle \mathbf{1}, \mathbf{H}' \rangle -  e \cdot \langle \mathbf{1}, \mathbf{H}'' \rangle                                             & \quad &+ \quad \langle \mathbf{y}^{-n} \circ (\mathbf{w}\_L' || e \cdot \mathbf{w}\_L'') \cdot x + (\mathbf{w}\_O' || e \cdot \mathbf{w}\_O''), \mathbf{H} \rangle      &\quad &+\quad  x^3 \cdot \big( \langle \mathbf{s}'\_R , \mathbf{H}' \rangle + e \cdot \langle \mathbf{s}''\_R , \mathbf{H}'' \rangle \big) \\\\
+                                                    +      &\quad &  \quad &  +                                                                                                                               & \quad &  \quad \quad +                                                                                                                                 & \quad &  \quad \quad +                                                                                                                                                  &\quad & \quad  \quad +   \\\\
+                        \tilde{e} \cdot \widetilde{B}      &\quad &= \quad & x \cdot \big( \tilde{a}' \cdot \widetilde{B} + e \tilde{a}'' \cdot \widetilde{B} \big)                                           & \quad &+ \quad x^2 \cdot \big( \tilde{o}' \cdot \widetilde{B} + e \cdot \tilde{o}'' \cdot \widetilde{B} \big)                                          & \quad &+ \quad 0                                                                                                                                                        &\quad &+\quad  x^3 \cdot \big( \tilde{s}' \cdot \widetilde{B} + e \tilde{s}'' \cdot \widetilde{B} \big) \\\\
+                                        \shortparallel     &\quad &  \quad & \shortparallel                                                                                                                   & \quad &  \quad \quad \shortparallel                                                                                                                    & \quad &  \quad \quad \shortparallel                                                                                                                                           &\quad & \quad  \quad \shortparallel   \\\\
+                                                           &\quad &= \quad & x \cdot \big(A_I' + e \cdot A_I'')                                                                                               & \quad &+ \quad x^2 \cdot \big(A_O' + e \cdot A_O'' \big) - \langle \mathbf{1}, \mathbf{H}' \rangle - e \cdot \langle \mathbf{1}, \mathbf{H}'' \rangle  & \quad &+ \quad W_L \cdot x + W_R \cdot x + W_O                                                                                                                          &\quad &+\quad  x^3 \cdot (S' + e \cdot S'')
 \end{aligned}
 \\]
 where
@@ -1399,7 +1415,7 @@ who uses the bottom row of the diagram to check the following statement:
 \\[
 \begin{aligned}
    {\langle {\mathbf{l}}(x), \hat{\mathbf{G}} \rangle} + {\langle {\mathbf{r}}(x), \hat{\mathbf{H}} \rangle} \stackrel{?}{=}
-   -{\widetilde{e}} {\widetilde{B}} + x \cdot (A_I' + e \cdot A_I'') + x^2 \cdot (A_O' + e \cdot A_O'') - \langle \mathbf{1}, \mathbf{H} \rangle + W_L \cdot x + W_R \cdot x + W_O + x^3 \cdot (S' + e \cdot S'') \\\\
+   -{\widetilde{e}} {\widetilde{B}} + x \cdot (A_I' + e \cdot A_I'') + x^2 \cdot (A_O' + e \cdot A_O'') - \langle \mathbf{1}, \mathbf{H}' \rangle - e \cdot \langle \mathbf{1}, \mathbf{H}'' \rangle + W_L \cdot x + W_R \cdot x + W_O + x^3 \cdot (S' + e \cdot S'') \\\\
 \end{aligned}
 \\]
 
