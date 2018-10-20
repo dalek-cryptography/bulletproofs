@@ -1282,7 +1282,7 @@ can use just \\(2(k-1)\\) multipliers for \\(k\\) inputs and \\(k\\) outputs to 
 that two polynomials are equal up to a permutation of their roots, but it is only sound as long
 as the roots of the polynomials (the inputs/outputs to the shuffle) are fixed before the evaluation point is chosen.
 
-To faciliate this, we split the vectors of multipliers and their blinding factors in two subvectors of lengths \\(n'\\) and \\(n"\\): 
+To faciliate this, we split the vectors of multipliers and their blinding factors in two subvectors of lengths \\(n'\\) and \\(n''\\): 
 
 \\[
 \begin{aligned}
