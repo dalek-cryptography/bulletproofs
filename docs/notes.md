@@ -1436,7 +1436,7 @@ The verifier checks the inner product proof with \\(P\\) computed using the bott
 which proves that the vectors \\(\mathbf{l}(x), \mathbf{r}(x)\\) are computed correctly:
 \\[
 \begin{aligned}
-  P &= -{\widetilde{e}} {\widetilde{B}} + x \cdot (A_I' + e \cdot A_I'') + x^2 \cdot (A_O' + e \cdot A_O'') - \langle \mathbf{1}, \mathbf{H} \rangle + W_L \cdot x + W_R \cdot x + W_O + x^3 \cdot (S' + e \cdot S'') \\\\
+  P &= -{\widetilde{e}} {\widetilde{B}} + x \cdot (A_I' + e \cdot A_I'') + x^2 \cdot (A_O' + e \cdot A_O'') - \langle \mathbf{1}, \mathbf{H}' \rangle - e \cdot \langle \mathbf{1}, \mathbf{H}'' \rangle + W_L \cdot x + W_R \cdot x + W_O + x^3 \cdot (S' + e \cdot S'') \\\\
 \end{aligned}
 \\]
 
