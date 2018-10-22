@@ -3,6 +3,7 @@
 pub mod assignment;
 pub mod prover;
 pub mod verifier;
+pub mod cs;
 
 #[cfg(test)]
 mod tests;
