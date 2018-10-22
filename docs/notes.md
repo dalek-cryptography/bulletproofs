@@ -1299,9 +1299,9 @@ The vectors of flattened weights are split accordingly:
 
 \\[
 \begin{aligned}
-    \mathbf{w}\_L  &= {\mathbf{w}}\_L' || {\mathbf{a}}\_L'' \\\\
-    \mathbf{w}\_R  &= {\mathbf{w}}\_R' || {\mathbf{a}}\_R'' \\\\
-    \mathbf{w}\_O  &= {\mathbf{w}}\_O' || {\mathbf{a}}\_O'' \\\\
+    \mathbf{w}\_L  &= {\mathbf{w}}\_L' || {\mathbf{w}}\_L'' \\\\
+    \mathbf{w}\_R  &= {\mathbf{w}}\_R' || {\mathbf{w}}\_R'' \\\\
+    \mathbf{w}\_O  &= {\mathbf{w}}\_O' || {\mathbf{w}}\_O'' \\\\
 \end{aligned}
 \\]
 
