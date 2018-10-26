@@ -1,4 +1,5 @@
 use super::assignment::Assignment;
+use super::opaque_scalar::OpaqueScalar;
 use super::prover::ProverCS;
 use super::verifier::VerifierCS;
 use super::*;
@@ -16,23 +17,23 @@ use rand::thread_rng;
 #[allow(non_snake_case)]
 fn example_gadget<CS: ConstraintSystem>(
     cs: &mut CS,
-    a1: (Variable, Assignment),
-    a2: (Variable, Assignment),
-    b1: (Variable, Assignment),
-    b2: (Variable, Assignment),
-    c1: (Variable, Assignment),
+    a1: (VariableIndex, Assignment<Scalar>),
+    a2: (VariableIndex, Assignment<Scalar>),
+    b1: (VariableIndex, Assignment<Scalar>),
+    b2: (VariableIndex, Assignment<Scalar>),
+    c1: (VariableIndex, Assignment<Scalar>),
     c2: Scalar,
 ) -> Result<(), R1CSError> {
-    // Make low-level variables (aL = v_a1 + v_a2, aR = v_b1 + v_b2, aO = v_c1 + v_c2)
+    // Make low-level VariableIndexs (aL = v_a1 + v_a2, aR = v_b1 + v_b2, aO = v_c1 + v_c2)
     let (aL, aR, aO) =
         cs.assign_multiplier(a1.1 + a2.1, b1.1 + b2.1, c1.1 + Assignment::from(c2))?;
 
-    // Tie high-level and low-level variables together
+    // Tie high-level and low-level VariableIndexs together
     let one = Scalar::one();
     cs.add_constraint([(aL, -one), (a1.0, one), (a2.0, one)].iter().collect());
     cs.add_constraint([(aR, -one), (b1.0, one), (b2.0, one)].iter().collect());
     cs.add_constraint(
-        [(aO, -one), (c1.0, one), (Variable::One(), c2)]
+        [(aO, -one), (c1.0, one), (VariableIndex::One(), c2)]
             .iter()
             .collect(),
     );
@@ -129,7 +130,7 @@ K-SHUFFLE GADGET SPECIFICATION:
 
 Represents a permutation of a list of `k` scalars `{x_i}` into a list of `k` scalars `{y_i}`.
 
-Algebraically it can be expressed as a statement that for a free variable `z`, 
+Algebraically it can be expressed as a statement that for a free VariableIndex `z`, 
 the roots of the two polynomials in terms of `z` are the same up to a permutation:
 
     ∏(x_i - z) == ∏(y_i - z)
@@ -160,7 +161,7 @@ For K > 1:
     muly_left[i]  = y_i - z
     muly_right[i] = muly_out[i+1]
 
-    // last multipliers connect two last variables (on each side)
+    // last multipliers connect two last VariableIndexs (on each side)
     mulx_left[k-2]  = x_{k-2} - z
     mulx_right[k-2] = x_{k-1} - z
     muly_left[k-2]  = y_{k-2} - z
@@ -205,8 +206,8 @@ impl From<R1CSError> for KShuffleError {
 impl KShuffleGadget {
     fn fill_cs<CS: ConstraintSystem>(
         cs: &mut CS,
-        x: Vec<(Variable, Assignment)>,
-        y: Vec<(Variable, Assignment)>,
+        x: Vec<(VariableIndex, Assignment<OpaqueScalar>)>,
+        y: Vec<(VariableIndex, Assignment<OpaqueScalar>)>,
     ) -> Result<(), KShuffleError> {
         let one = Scalar::one();
         let z = cs.challenge_scalar(b"k-shuffle challenge");
@@ -294,12 +295,12 @@ impl KShuffleGadget {
         left: Assignment,
         right: Assignment,
         out: Assignment,
-        left_var: Variable,
-        right_var: Variable,
+        left_var: VariableIndex,
+        right_var: VariableIndex,
         is_last_mul: bool,
-    ) -> Result<Variable, KShuffleError> {
+    ) -> Result<VariableIndex, KShuffleError> {
         let one = Scalar::one();
-        let var_one = Variable::One();
+        let var_one = VariableIndex::One();
         // Make multiplier gate variables
         let (left_mul_var, right_mul_var, out_mul_var) = cs.assign_multiplier(left, right, out)?;
         if is_last_mul {

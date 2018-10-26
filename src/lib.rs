@@ -55,7 +55,7 @@ pub mod range_proof_mpc {
 ///
 /// ```
 /// extern crate bulletproofs;
-/// use bulletproofs::r1cs::{Assignment, ConstraintSystem, Variable, ProverCS, VerifierCS, R1CSError};
+/// use bulletproofs::r1cs::{Assignment, ConstraintSystem, VariableIndex, ProverCS, VerifierCS, R1CSError};
 /// use bulletproofs::{BulletproofGens, PedersenGens};
 ///
 /// extern crate curve25519_dalek;
@@ -126,8 +126,8 @@ pub mod range_proof_mpc {
 /// impl KShuffleGadget {
 ///     fn fill_cs<CS: ConstraintSystem>(
 ///         cs: &mut CS,
-///         x: Vec<(Variable, Assignment)>,
-///         y: Vec<(Variable, Assignment)>,
+///         x: Vec<(VariableIndex, Assignment)>,
+///         y: Vec<(VariableIndex, Assignment)>,
 ///     ) -> Result<(), KShuffleError> {
 ///         let one = Scalar::one();
 ///         let z = cs.challenge_scalar(b"k-shuffle challenge");
@@ -226,12 +226,12 @@ pub mod range_proof_mpc {
 ///         left: Assignment,
 ///         right: Assignment,
 ///         out: Assignment,
-///         left_var: Variable,
-///         right_var: Variable,
+///         left_var: VariableIndex,
+///         right_var: VariableIndex,
 ///         is_last_mul: bool,
-///     ) -> Result<Variable, KShuffleError> {
+///     ) -> Result<VariableIndex, KShuffleError> {
 ///         let one = Scalar::one();
-///         let var_one = Variable::One();
+///         let var_one = VariableIndex::One();
 ///
 ///         // Make multiplier gate variables
 ///         let (left_mul_var, right_mul_var, out_mul_var) = cs.assign_multiplier(left, right, out)?;
@@ -405,6 +405,6 @@ pub mod r1cs {
     pub use circuit_proof::ConstraintSystem;
     pub use circuit_proof::LinearCombination;
     pub use circuit_proof::R1CSProof;
-    pub use circuit_proof::Variable;
+    pub use circuit_proof::VariableIndex;
     pub use errors::R1CSError;
 }

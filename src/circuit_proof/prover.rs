@@ -6,8 +6,7 @@ use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::MultiscalarMul;
 use merlin::Transcript;
 
-use super::assignment::Assignment;
-use super::{ConstraintSystem, LinearCombination, R1CSProof, Variable};
+use super::{R1CSProof, Constraint, ConstraintSystem, CommittedConstraintSystem, Variable, VariableIndex, Assignment, AssignmentValue, OpaqueScalar};
 
 use errors::R1CSError;
 use generators::{BulletproofGens, PedersenGens};
@@ -31,12 +30,18 @@ pub struct ProverCS<'a, 'b> {
     transcript: &'a mut Transcript,
     bp_gens: &'b BulletproofGens,
     pc_gens: &'b PedersenGens,
-    constraints: Vec<LinearCombination>,
+    constraints: Vec<Constraint>,
     a_L: Vec<Scalar>,
     a_R: Vec<Scalar>,
     a_O: Vec<Scalar>,
     v: Vec<Scalar>,
     v_blinding: Vec<Scalar>,
+    callbacks: Vec<Box<Fn(&mut CommittedProverCS)->Result<(), R1CSError>>>,
+}
+
+pub struct CommittedProverCS<'a, 'b> {
+    cs: ProverCS<'a,'b>,
+    committed_variables_count: usize,
 }
 
 /// Overwrite secrets with null bytes when they go out of scope.
@@ -63,46 +68,66 @@ impl<'a, 'b> Drop for ProverCS<'a, 'b> {
 }
 
 impl<'a, 'b> ConstraintSystem for ProverCS<'a, 'b> {
-    fn assign_multiplier(
+    type CommittedCS = CommittedProverCS<'a,'b>;
+
+    fn assign_multiplier<S: AssignmentValue>(
         &mut self,
-        left: Assignment,
-        right: Assignment,
-        out: Assignment,
-    ) -> Result<(Variable, Variable, Variable), R1CSError> {
+        left: Assignment<S>,
+        right: Assignment<S>,
+        out: Assignment<S>,
+    ) -> Result<(Variable<S>, Variable<S>, Variable<S>), R1CSError> {
         // Unwrap all of l,r,o up front to ensure we leave the CS in a
         // consistent state if any are missing assignments
         let l = left?;
         let r = right?;
         let o = out?;
         // Now commit to the assignment
-        self.a_L.push(l);
-        self.a_R.push(r);
-        self.a_O.push(o);
+        self.a_L.push(l.into::<OpaqueScalar>().internal_scalar);
+        self.a_R.push(r.into::<OpaqueScalar>().internal_scalar);
+        self.a_O.push(o.into::<OpaqueScalar>().internal_scalar);
         Ok((
-            Variable::MultiplierLeft(self.a_L.len() - 1),
-            Variable::MultiplierRight(self.a_R.len() - 1),
-            Variable::MultiplierOutput(self.a_O.len() - 1),
+            VariableIndex::MultiplierLeft(self.a_L.len() - 1),
+            VariableIndex::MultiplierRight(self.a_R.len() - 1),
+            VariableIndex::MultiplierOutput(self.a_O.len() - 1),
         ))
     }
 
-    fn assign_uncommitted(
-        &mut self,
-        val_1: Assignment,
-        val_2: Assignment,
-    ) -> Result<(Variable, Variable), R1CSError> {
-        let val_3 = val_1 * val_2;
-
-        let (left, right, _) = self.assign_multiplier(val_1, val_2, val_3)?;
-        Ok((left, right))
-    }
-
-    fn add_constraint(&mut self, lc: LinearCombination) {
+    fn add_constraint(&mut self, constraint: Constraint) {
         // TODO: check that the linear combinations are valid
         // (e.g. that variables are valid, that the linear combination evals to 0 for prover, etc).
-        self.constraints.push(lc);
+        self.constraints.push(constraint);
     }
 
-    fn challenge_scalar(&mut self, label: &'static [u8]) -> Scalar {
+    /// Adds a callback for when the constraint system’s free variables are committed.
+    fn after_commitment<F>(&mut self, callback: F) where F: Fn(&mut Self::CommittedCS)->Result<(), R1CSError> {
+        self.callbacks.push(Box::new(callback));
+    }
+}
+
+impl<'a, 'b> ConstraintSystem for CommittedProverCS<'a, 'b> {
+    type CommittedCS = CommittedProverCS<'a,'b>;
+    
+    fn assign_multiplier<S: AssignmentValue>(
+        &mut self,
+        left: Assignment<S>,
+        right: Assignment<S>,
+        out: Assignment<S>,
+    ) -> Result<(Variable<S>, Variable<S>, Variable<S>), R1CSError> {
+        self.cs.assign_multiplier(left,right,out)
+    }
+
+    fn add_constraint(&mut self, constraint: Constraint) {
+        self.cs.add_constraint(constraint)
+    }
+
+    /// Adds a callback for when the constraint system’s free variables are committed.
+    fn after_commitment<F>(&mut self, callback: F) where F: Fn(&mut Self::CommittedCS)->Result<(), R1CSError> {
+        self.cs.after_commitment(callback)
+    }
+}
+
+impl<'a, 'b> CommittedConstraintSystem for CommittedProverCS<'a, 'b> {
+    fn challenge_scalar(&mut self, label: &'static [u8]) -> OpaqueScalar {
         self.transcript.challenge_scalar(label)
     }
 }
@@ -151,7 +176,7 @@ impl<'a, 'b> ProverCS<'a, 'b> {
         transcript: &'a mut Transcript,
         v: Vec<Scalar>,
         v_blinding: Vec<Scalar>,
-    ) -> (Self, Vec<Variable>, Vec<CompressedRistretto>) {
+    ) -> (Self, Vec<VariableIndex>, Vec<CompressedRistretto>) {
         // Check that the input lengths are consistent
         assert_eq!(v.len(), v_blinding.len());
         let m = v.len();
@@ -167,7 +192,7 @@ impl<'a, 'b> ProverCS<'a, 'b> {
             commitments.push(V);
 
             // Allocate and return a variable for v_i
-            variables.push(Variable::Committed(i));
+            variables.push(VariableIndex::Committed(i));
         }
 
         let cs = ProverCS {
@@ -212,19 +237,19 @@ impl<'a, 'b> ProverCS<'a, 'b> {
         for lc in self.constraints.iter() {
             for (var, coeff) in &lc.terms {
                 match var {
-                    Variable::MultiplierLeft(i) => {
+                    VariableIndex::MultiplierLeft(i) => {
                         wL[*i] += exp_z * coeff;
                     }
-                    Variable::MultiplierRight(i) => {
+                    VariableIndex::MultiplierRight(i) => {
                         wR[*i] += exp_z * coeff;
                     }
-                    Variable::MultiplierOutput(i) => {
+                    VariableIndex::MultiplierOutput(i) => {
                         wO[*i] += exp_z * coeff;
                     }
-                    Variable::Committed(i) => {
+                    VariableIndex::Committed(i) => {
                         wV[*i] -= exp_z * coeff;
                     }
-                    Variable::One() => {
+                    VariableIndex::One() => {
                         // The prover doesn't need to handle constant terms
                     }
                 }

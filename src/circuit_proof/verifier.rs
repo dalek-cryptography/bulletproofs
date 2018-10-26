@@ -5,8 +5,7 @@ use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::VartimeMultiscalarMul;
 use merlin::Transcript;
 
-use super::assignment::Assignment;
-use super::{ConstraintSystem, LinearCombination, R1CSProof, Variable};
+use super::{R1CSProof, Constraint, ConstraintSystem, CommittedConstraintSystem, Variable, VariableIndex, Assignment, AssignmentValue, OpaqueScalar};
 
 use errors::R1CSError;
 use generators::{BulletproofGens, PedersenGens};
@@ -31,48 +30,74 @@ pub struct VerifierCS<'a, 'b> {
     bp_gens: &'b BulletproofGens,
     pc_gens: &'b PedersenGens,
     transcript: &'a mut Transcript,
-    constraints: Vec<LinearCombination>,
+    constraints: Vec<Constraint>,
     num_vars: usize,
     V: Vec<CompressedRistretto>,
+    callbacks: Vec<Box<Fn(&mut CommittedVerifierCS)->Result<(), R1CSError>>>,
+}
+
+pub struct CommittedVerifierCS<'a, 'b> {
+    cs: VerifierCS<'a,'b>,
+    committed_variables_count: usize,
 }
 
 impl<'a, 'b> ConstraintSystem for VerifierCS<'a, 'b> {
-    fn assign_multiplier(
+    type CommittedCS = CommittedVerifierCS<'a,'b>;
+
+    fn assign_multiplier<S: AssignmentValue>(
         &mut self,
-        _left: Assignment,
-        _right: Assignment,
-        _out: Assignment,
-    ) -> Result<(Variable, Variable, Variable), R1CSError> {
+        _left: Assignment<S>,
+        _right: Assignment<S>,
+        _out: Assignment<S>,
+    ) -> Result<(Variable<S>, Variable<S>, Variable<S>), R1CSError> {
         let var = self.num_vars;
         self.num_vars += 1;
 
         Ok((
-            Variable::MultiplierLeft(var),
-            Variable::MultiplierRight(var),
-            Variable::MultiplierOutput(var),
+            VariableIndex::MultiplierLeft(var),
+            VariableIndex::MultiplierRight(var),
+            VariableIndex::MultiplierOutput(var),
         ))
     }
 
-    fn assign_uncommitted(
+    fn add_constraint(&mut self, constraint: Constraint) {
+        self.constraints.push(constraint);
+    }
+
+    /// Adds a callback for when the constraint system’s free variables are committed.
+    fn after_commitment<F>(&mut self, callback: F) where F: Fn(&mut Self::CommittedCS)->Result<(), R1CSError> {
+        self.callbacks.push(Box::new(callback));
+    }
+}
+
+impl<'a, 'b> ConstraintSystem for CommittedVerifierCS<'a, 'b> {
+    type CommittedCS = CommittedVerifierCS<'a,'b>;
+
+    fn assign_multiplier<S: AssignmentValue>(
         &mut self,
-        val_1: Assignment,
-        val_2: Assignment,
-    ) -> Result<(Variable, Variable), R1CSError> {
-        let (left, right, _) = self.assign_multiplier(val_1, val_2, Assignment::Missing())?;
-        Ok((left, right))
+        left: Assignment<S>,
+        right: Assignment<S>,
+        out: Assignment<S>,
+    ) -> Result<(Variable<S>, Variable<S>, Variable<S>), R1CSError> {
+        self.cs.assign_multiplier(left,right,out)
     }
 
-    fn add_constraint(&mut self, lc: LinearCombination) {
-        // TODO: check that the linear combinations are valid
-        // (e.g. that variables are valid, that the linear combination
-        // evals to 0 for prover, etc).
-        self.constraints.push(lc);
+    fn add_constraint(&mut self, constraint: Constraint) {
+        self.cs.add_constraint(constraint)
     }
 
-    fn challenge_scalar(&mut self, label: &'static [u8]) -> Scalar {
+    /// Adds a callback for when the constraint system’s free variables are committed.
+    fn after_commitment<F>(&mut self, callback: F) where F: Fn(&mut Self::CommittedCS)->Result<(), R1CSError> {
+        self.cs.after_commitment(callback)
+    }
+}
+
+impl<'a, 'b> CommittedConstraintSystem for CommittedVerifierCS<'a, 'b> {
+    fn challenge_scalar(&mut self, label: &'static [u8]) -> OpaqueScalar {
         self.transcript.challenge_scalar(label)
     }
 }
+
 
 impl<'a, 'b> VerifierCS<'a, 'b> {
     /// Construct an empty constraint system with specified external
@@ -104,14 +129,14 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
     ///
     /// The first element is the newly constructed constraint system.
     ///
-    /// The second element is a list of [`Variable`]s corresponding to
+    /// The second element is a list of [`VariableIndex`]s corresponding to
     /// the external inputs, which can be used to form constraints.
     pub fn new(
         bp_gens: &'b BulletproofGens,
         pc_gens: &'b PedersenGens,
         transcript: &'a mut Transcript,
         commitments: Vec<CompressedRistretto>,
-    ) -> (Self, Vec<Variable>) {
+    ) -> (Self, Vec<VariableIndex>) {
         let m = commitments.len();
         transcript.r1cs_domain_sep(m as u64);
 
@@ -121,7 +146,7 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
             transcript.commit_point(b"V", &commitment);
 
             // Allocate and return a variable for the commitment
-            variables.push(Variable::Committed(i));
+            variables.push(VariableIndex::Committed(i));
         }
 
         let cs = VerifierCS {
@@ -164,19 +189,19 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
         for lc in self.constraints.iter() {
             for (var, coeff) in &lc.terms {
                 match var {
-                    Variable::MultiplierLeft(i) => {
+                    VariableIndex::MultiplierLeft(i) => {
                         wL[*i] += exp_z * coeff;
                     }
-                    Variable::MultiplierRight(i) => {
+                    VariableIndex::MultiplierRight(i) => {
                         wR[*i] += exp_z * coeff;
                     }
-                    Variable::MultiplierOutput(i) => {
+                    VariableIndex::MultiplierOutput(i) => {
                         wO[*i] += exp_z * coeff;
                     }
-                    Variable::Committed(i) => {
+                    VariableIndex::Committed(i) => {
                         wV[*i] -= exp_z * coeff;
                     }
-                    Variable::One() => {
+                    VariableIndex::One() => {
                         wc -= exp_z * coeff;
                     }
                 }

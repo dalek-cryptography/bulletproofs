@@ -1,7 +1,22 @@
 use curve25519_dalek::scalar::Scalar;
 use errors::R1CSError;
-use std::ops::{Add, Div, Mul, Sub, Try};
+use std::ops::{Neg, Add, AddAssign, Sub, SubAssign, Mul, Div, Try};
 use subtle::{Choice, ConditionallyAssignable, ConditionallySelectable, ConstantTimeEq};
+
+pub trait AssignmentValue:
+    Copy +
+    From<Scalar> + 
+    From<u64> + 
+    Neg<Output=Self> +
+    Add<Output=Self> +
+    AddAssign +
+    Sub<Output=Self> + 
+    SubAssign +
+    Mul<Output=Self> {
+
+    /// Returns `x` such that `self*x mod l == 1`.
+    fn invert(&self) -> Self;
+}
 
 /// Represents an optional assignment to a [`Variable`](::r1cs::Variable).
 ///
@@ -10,23 +25,33 @@ use subtle::{Choice, ConditionallyAssignable, ConditionallySelectable, ConstantT
 ///
 /// Proving code creates `Value` assignments, while verification code
 /// creates `Missing` assignments.
-#[derive(Copy, Clone, Debug)]
-pub enum Assignment {
+#[derive(Debug)]
+pub enum Assignment<S> where S: AssignmentValue {
     /// A known assignment to a variable in a [`ConstraintSystem`](::r1cs::ConstraintSystem).
-    Value(Scalar),
+    Value(S),
     /// An unknown assignment to a variable in a [`ConstraintSystem`](::r1cs::ConstraintSystem).
     Missing(),
 }
 
+impl<S> Copy for Assignment<S> where S: AssignmentValue {}
+impl<S> Clone for Assignment<S> where S: AssignmentValue {
+    fn clone(&self) -> Self {
+        match self {
+            Assignment::Value(v) => Assignment::Value(v.clone()),
+            Assignment::Missing() => Assignment::Missing(),
+        }
+    }
+}
+
 // Default implementation is used for zeroing secrets from allocated memory via `clear_on_drop`.
-impl Default for Assignment {
-    fn default() -> Assignment {
+impl<S> Default for Assignment<S> where S: AssignmentValue {
+    fn default() -> Assignment<S> {
         Assignment::Missing()
     }
 }
 
-impl From<Option<Scalar>> for Assignment {
-    fn from(o: Option<Scalar>) -> Self {
+impl<S> From<Option<S>> for Assignment<S> where S: AssignmentValue {
+    fn from(o: Option<S>) -> Self {
         match o {
             Some(v) => Assignment::Value(v),
             None => Assignment::Missing(),
@@ -34,110 +59,106 @@ impl From<Option<Scalar>> for Assignment {
     }
 }
 
-impl From<Scalar> for Assignment {
-    fn from(scalar: Scalar) -> Self {
+impl<S> From<S> for Assignment<S> where S: AssignmentValue {
+    fn from(scalar: S) -> Self {
         Assignment::Value(scalar)
     }
 }
 
-impl From<u64> for Assignment {
+impl<S> From<u64> for Assignment<S> where S: AssignmentValue {
     fn from(int: u64) -> Self {
-        Assignment::Value(Scalar::from(int))
+        Assignment::Value(S::from(int))
     }
 }
 
-impl Add for Assignment {
+impl<A,B> Add<B> for Assignment<A>
+where
+A: AssignmentValue,
+B: Into<Assignment<A>>
+{
     type Output = Self;
 
-    fn add(self, rhs: Self) -> Self {
-        match (self, rhs) {
+    fn add(self, rhs: B) -> Self {
+        match (self, rhs.into()) {
             (Assignment::Value(left), Assignment::Value(right)) => Assignment::Value(left + right),
-            (_, _) => Assignment::Missing(),
+            (_,_) => Assignment::Missing(),
         }
     }
 }
 
-impl Add<Scalar> for Assignment {
-    type Output = Self;
-
-    fn add(self, rhs: Scalar) -> Self {
-        match self {
-            Assignment::Value(lhs) => Assignment::Value(lhs + rhs),
-            _ => Assignment::Missing(),
+impl<A,B> AddAssign<B> for Assignment<A>
+where
+A: AssignmentValue,
+B: Into<Assignment<A>>
+{
+    fn add_assign(&mut self, rhs: B) {
+        match (self, rhs.into()) {
+            (Assignment::Value(ref mut left), Assignment::Value(right)) => *left = *left + right,
+            (_,_) => (),
         }
     }
 }
 
-impl Sub for Assignment {
+impl<A,B> Sub<B> for Assignment<A>
+where
+A: AssignmentValue,
+B: Into<Assignment<A>>
+{
     type Output = Self;
 
-    fn sub(self, rhs: Self) -> Self {
-        match (self, rhs) {
+    fn sub(self, rhs: B) -> Self {
+        match (self, rhs.into()) {
             (Assignment::Value(left), Assignment::Value(right)) => Assignment::Value(left - right),
+            (_,_) => Assignment::Missing(),
+        }
+    }
+}
+
+impl<A,B> SubAssign<B> for Assignment<A>
+where
+A: AssignmentValue,
+B: Into<Assignment<A>>
+{
+    fn sub_assign(&mut self, rhs: B) {
+        match (self, rhs.into()) {
+            (Assignment::Value(ref mut left), Assignment::Value(right)) => *left = *left - right,
+            (_,_) => (),
+        }
+    }
+}
+
+impl<A,B> Mul<B> for Assignment<A>
+where
+A: AssignmentValue,
+B: Into<A>
+{
+    type Output = Self;
+
+    fn mul(self, rhs: B) -> Self::Output {
+        match (self, rhs.into()) {
+            (Assignment::Value(left), right) => Assignment::Value(left * right),
             (_, _) => Assignment::Missing(),
         }
     }
 }
 
-impl Sub<Scalar> for Assignment {
+impl<A,B> Div<B> for Assignment<A>
+where
+A: AssignmentValue,
+B: Into<A>
+{
     type Output = Self;
 
-    fn sub(self, rhs: Scalar) -> Self {
-        match self {
-            Assignment::Value(lhs) => Assignment::Value(lhs - rhs),
-            _ => Assignment::Missing(),
-        }
-    }
-}
-
-impl Mul for Assignment {
-    type Output = Self;
-
-    fn mul(self, rhs: Self) -> Self {
-        match (self, rhs) {
-            (Assignment::Value(left), Assignment::Value(right)) => Assignment::Value(left * right),
+    fn div(self, rhs: B) -> Self {
+        match (self, rhs.into()) {
+            (Assignment::Value(left), right) => Assignment::Value(left * right.invert()),
             (_, _) => Assignment::Missing(),
         }
     }
 }
 
-impl Mul<Scalar> for Assignment {
-    type Output = Self;
-
-    fn mul(self, rhs: Scalar) -> Self {
-        match self {
-            Assignment::Value(lhs) => Assignment::Value(lhs * rhs),
-            _ => Assignment::Missing(),
-        }
-    }
-}
-
-impl Div for Assignment {
-    type Output = Self;
-
-    fn div(self, rhs: Self) -> Self {
-        match (self, rhs) {
-            (Assignment::Value(left), Assignment::Value(right)) => {
-                Assignment::Value(left * right.invert())
-            }
-            (_, _) => Assignment::Missing(),
-        }
-    }
-}
-
-impl Div<Scalar> for Assignment {
-    type Output = Self;
-
-    fn div(self, rhs: Scalar) -> Self {
-        match self {
-            Assignment::Value(lhs) => Assignment::Value(lhs * rhs.invert()),
-            _ => Assignment::Missing(),
-        }
-    }
-}
-
-impl Try for Assignment {
-    type Ok = Scalar;
+impl<S> Try for Assignment<S> where S: AssignmentValue {
+    type Ok = S;
     type Error = R1CSError;
 
     fn into_result(self) -> Result<Self::Ok, Self::Error> {
@@ -156,7 +177,10 @@ impl Try for Assignment {
     }
 }
 
-impl ConditionallySelectable for Assignment {
+impl<S> ConditionallySelectable for Assignment<S>
+where
+S: AssignmentValue + ConditionallyAssignable
+{
     // This function should execute in constant time for a and b of the same type.
     // So, if a and b are both of type Assignment::Value(), then the comparison will
     // execute in constant time regardless of their value assignments.
@@ -175,7 +199,7 @@ impl ConditionallySelectable for Assignment {
     }
 }
 
-impl ConstantTimeEq for Assignment {
+impl<S> ConstantTimeEq for Assignment<S> where S: AssignmentValue+ConstantTimeEq {
     // This function should execute in constant time for self and other of the same type.
     fn ct_eq(&self, other: &Self) -> Choice {
         match (self, other) {
