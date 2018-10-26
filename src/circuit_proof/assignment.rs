@@ -2,7 +2,6 @@ use curve25519_dalek::scalar::Scalar;
 use std::ops::{Add, AddAssign, Div, Mul, Neg, Sub, SubAssign, Try};
 use subtle::{Choice, ConditionallyAssignable, ConditionallySelectable, ConstantTimeEq};
 
-use super::opaque_scalar::OpaqueScalar;
 use errors::R1CSError;
 
 pub trait AssignmentValue:
@@ -38,19 +37,6 @@ where
     /// An unknown assignment to a variable in a [`ConstraintSystem`](::r1cs::ConstraintSystem).
     Missing(),
 }
-
-// impl<S> Copy for Assignment<S> where S: AssignmentValue {}
-// impl<S> Clone for Assignment<S>
-// where
-//     S: AssignmentValue,
-// {
-//     fn clone(&self) -> Self {
-//         match self {
-//             Assignment::Value(v) => Assignment::Value(v.clone()),
-//             Assignment::Missing() => Assignment::Missing(),
-//         }
-//     }
-// }
 
 // Default implementation is used for zeroing secrets from allocated memory via `clear_on_drop`.
 impl<S> Default for Assignment<S>
