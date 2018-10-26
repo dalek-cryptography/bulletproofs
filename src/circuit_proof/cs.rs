@@ -2,11 +2,10 @@ use curve25519_dalek::scalar::Scalar;
 
 use errors::R1CSError;
 
-use super::assignment::{Assignment,AssignmentValue};
-use super::linear_combination::{LinearCombination};
+use super::assignment::{Assignment, AssignmentValue};
 use super::linear_combination as lc;
-use super::opaque_scalar::{OpaqueScalar};
-
+use super::linear_combination::LinearCombination;
+use super::opaque_scalar::OpaqueScalar;
 
 /// Represents a variable in a constraint system.
 #[derive(Copy, Clone, Debug)]
@@ -24,9 +23,9 @@ pub enum VariableIndex {
 }
 
 /// Represents a variable in the constraint system.
-/// Each variable is identified by its index (`VariableIndex`) and 
+/// Each variable is identified by its index (`VariableIndex`) and
 /// has an assignment which can be present of missing.
-#[derive(Clone,Debug)]
+#[derive(Clone, Debug)]
 pub struct Variable<S: AssignmentValue> {
     pub index: VariableIndex,
     pub assignment: Assignment<S>,
@@ -42,7 +41,7 @@ pub trait ConstraintSystem {
     /// Allocate variables for left, right, and output wires of multiplication,
     /// and assign them the Assignments that are passed in.
     /// Prover will pass in `Value(Scalar)`s, and Verifier will pass in `Missing`s.
-    fn assign_multiplier<S: AssignmentValue>(
+    fn assign_multiplier<S: AssignmentValue + Into<OpaqueScalar>>(
         &mut self,
         left: Assignment<S>,
         right: Assignment<S>,
@@ -51,7 +50,7 @@ pub trait ConstraintSystem {
 
     /// Allocate two uncommitted variables, and assign them the Assignments passed in.
     /// Prover will pass in `Value(Scalar)`s, and Verifier will pass in `Missing`s.
-    fn assign_uncommitted<S: AssignmentValue>(
+    fn assign_uncommitted<S: AssignmentValue + Into<OpaqueScalar>>(
         &mut self,
         a: Assignment<S>,
         b: Assignment<S>,
@@ -64,11 +63,12 @@ pub trait ConstraintSystem {
     fn add_constraint(&mut self, constraint: Constraint);
 
     /// Adds a callback for when the constraint system’s free variables are committed.
-    fn after_commitment<F>(&mut self, callback: F) where F: Fn(&mut Self::CommittedCS)->Result<(), R1CSError>;
+    fn after_commitment<F>(&mut self, callback: F)
+    where
+        for<'t> F: Fn(&'t mut Self::CommittedCS) -> Result<(), R1CSError>;
 }
 
 pub trait CommittedConstraintSystem: ConstraintSystem {
-
     /// Obtain a challenge scalar bound to the assignments of all of
     /// the externally committed wires.
     ///
@@ -76,7 +76,6 @@ pub trait CommittedConstraintSystem: ConstraintSystem {
     /// family of circuits parameterized by challenge scalars.
     fn challenge_scalar(&mut self, label: &'static [u8]) -> OpaqueScalar;
 }
-
 
 impl AssignmentValue for OpaqueScalar {
     fn invert(&self) -> Self {
@@ -95,7 +94,7 @@ impl From<Variable<Scalar>> for Variable<OpaqueScalar> {
     fn from(v: Variable<Scalar>) -> Self {
         Variable {
             index: v.index,
-            assignment: v.assignment.into()
+            assignment: v.assignment.into(),
         }
     }
 }
@@ -105,7 +104,7 @@ impl From<Assignment<Scalar>> for Assignment<OpaqueScalar> {
     fn from(a: Assignment<Scalar>) -> Self {
         match a {
             Assignment::Value(a) => Assignment::Value(a.into()),
-            Assignment::Missing() => Assignment::Missing()
+            Assignment::Missing() => Assignment::Missing(),
         }
     }
 }
@@ -113,16 +112,20 @@ impl From<Assignment<Scalar>> for Assignment<OpaqueScalar> {
 // Any linear combination of variables with opaque or non-opaque scalars can be converted to a Constraint
 // (which does not hold the assignments and contains only the opaque scalars for uniform representation inside CS)
 impl<T> From<LinearCombination<Variable<T>>> for Constraint
-where 
-T: lc::Value + Into<OpaqueScalar>,
+where
+    T: lc::Value + Into<OpaqueScalar>,
 {
     fn from(lc: LinearCombination<Variable<T>>) -> Constraint {
         Constraint {
-            terms: lc.terms.into_iter().map(|(v,s)| (v.index, s.into()) ).collect(),
+            terms: lc
+                .terms
+                .into_iter()
+                .map(|(v, s)| (v.index, s.into()))
+                .collect(),
             precomputed: match lc.eval() {
                 Assignment::Value(v) => Assignment::Value(v.into()),
-                Assignment::Missing() => Assignment::Missing()
-            }
+                Assignment::Missing() => Assignment::Missing(),
+            },
         }
     }
 }
@@ -137,7 +140,6 @@ impl lc::Value for OpaqueScalar {
         Scalar::zero().into()
     }
 }
-
 
 impl lc::Value for Scalar {
     fn one() -> Self {
@@ -187,7 +189,6 @@ impl<S: lc::Value> lc::Variable for Variable<S> {
         }
     }
 }
-
 
 // pub(crate) trait ConstraintSystemDelegate {
 //     /// This is called when the assignments are made.

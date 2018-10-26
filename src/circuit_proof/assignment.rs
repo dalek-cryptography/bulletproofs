@@ -1,19 +1,21 @@
 use curve25519_dalek::scalar::Scalar;
-use errors::R1CSError;
-use std::ops::{Neg, Add, AddAssign, Sub, SubAssign, Mul, Div, Try};
+use std::ops::{Add, AddAssign, Div, Mul, Neg, Sub, SubAssign, Try};
 use subtle::{Choice, ConditionallyAssignable, ConditionallySelectable, ConstantTimeEq};
 
-pub trait AssignmentValue:
-    Copy +
-    From<Scalar> + 
-    From<u64> + 
-    Neg<Output=Self> +
-    Add<Output=Self> +
-    AddAssign +
-    Sub<Output=Self> + 
-    SubAssign +
-    Mul<Output=Self> {
+use super::opaque_scalar::OpaqueScalar;
+use errors::R1CSError;
 
+pub trait AssignmentValue:
+    Copy
+    + From<Scalar>
+    + From<u64>
+    + Neg<Output = Self>
+    + Add<Output = Self>
+    + AddAssign
+    + Sub<Output = Self>
+    + SubAssign
+    + Mul<Output = Self>
+{
     /// Returns `x` such that `self*x mod l == 1`.
     fn invert(&self) -> Self;
 }
@@ -26,7 +28,10 @@ pub trait AssignmentValue:
 /// Proving code creates `Value` assignments, while verification code
 /// creates `Missing` assignments.
 #[derive(Debug)]
-pub enum Assignment<S> where S: AssignmentValue {
+pub enum Assignment<S>
+where
+    S: AssignmentValue,
+{
     /// A known assignment to a variable in a [`ConstraintSystem`](::r1cs::ConstraintSystem).
     Value(S),
     /// An unknown assignment to a variable in a [`ConstraintSystem`](::r1cs::ConstraintSystem).
@@ -34,7 +39,10 @@ pub enum Assignment<S> where S: AssignmentValue {
 }
 
 impl<S> Copy for Assignment<S> where S: AssignmentValue {}
-impl<S> Clone for Assignment<S> where S: AssignmentValue {
+impl<S> Clone for Assignment<S>
+where
+    S: AssignmentValue,
+{
     fn clone(&self) -> Self {
         match self {
             Assignment::Value(v) => Assignment::Value(v.clone()),
@@ -44,13 +52,19 @@ impl<S> Clone for Assignment<S> where S: AssignmentValue {
 }
 
 // Default implementation is used for zeroing secrets from allocated memory via `clear_on_drop`.
-impl<S> Default for Assignment<S> where S: AssignmentValue {
+impl<S> Default for Assignment<S>
+where
+    S: AssignmentValue,
+{
     fn default() -> Assignment<S> {
         Assignment::Missing()
     }
 }
 
-impl<S> From<Option<S>> for Assignment<S> where S: AssignmentValue {
+impl<S> From<Option<S>> for Assignment<S>
+where
+    S: AssignmentValue,
+{
     fn from(o: Option<S>) -> Self {
         match o {
             Some(v) => Assignment::Value(v),
@@ -59,78 +73,84 @@ impl<S> From<Option<S>> for Assignment<S> where S: AssignmentValue {
     }
 }
 
-impl<S> From<S> for Assignment<S> where S: AssignmentValue {
+impl<S> From<S> for Assignment<S>
+where
+    S: AssignmentValue,
+{
     fn from(scalar: S) -> Self {
         Assignment::Value(scalar)
     }
 }
 
-impl<S> From<u64> for Assignment<S> where S: AssignmentValue {
+impl<S> From<u64> for Assignment<S>
+where
+    S: AssignmentValue,
+{
     fn from(int: u64) -> Self {
         Assignment::Value(S::from(int))
     }
 }
 
-impl<A,B> Add<B> for Assignment<A>
+impl<A, B> Add<B> for Assignment<A>
 where
-A: AssignmentValue,
-B: Into<Assignment<A>>
+    A: AssignmentValue,
+    B: Into<Assignment<A>>,
 {
     type Output = Self;
 
     fn add(self, rhs: B) -> Self {
         match (self, rhs.into()) {
             (Assignment::Value(left), Assignment::Value(right)) => Assignment::Value(left + right),
-            (_,_) => Assignment::Missing(),
+            (_, _) => Assignment::Missing(),
         }
     }
 }
 
-impl<A,B> AddAssign<B> for Assignment<A>
+impl<A, B> AddAssign<B> for Assignment<A>
 where
-A: AssignmentValue,
-B: Into<Assignment<A>>
+    A: AssignmentValue,
+    B: Into<Assignment<A>>,
 {
     fn add_assign(&mut self, rhs: B) {
         match (self, rhs.into()) {
             (Assignment::Value(ref mut left), Assignment::Value(right)) => *left = *left + right,
-            (_,_) => (),
+            (_, _) => (),
         }
     }
 }
 
-impl<A,B> Sub<B> for Assignment<A>
+impl<A, B> Sub<B> for Assignment<A>
 where
-A: AssignmentValue,
-B: Into<Assignment<A>>
+    A: AssignmentValue,
+    B: Into<Assignment<A>>,
 {
     type Output = Self;
 
     fn sub(self, rhs: B) -> Self {
         match (self, rhs.into()) {
             (Assignment::Value(left), Assignment::Value(right)) => Assignment::Value(left - right),
-            (_,_) => Assignment::Missing(),
+            (_, _) => Assignment::Missing(),
         }
     }
 }
 
-impl<A,B> SubAssign<B> for Assignment<A>
+impl<A, B> SubAssign<B> for Assignment<A>
 where
-A: AssignmentValue,
-B: Into<Assignment<A>>
+    A: AssignmentValue,
+    B: Into<Assignment<A>>,
 {
     fn sub_assign(&mut self, rhs: B) {
         match (self, rhs.into()) {
             (Assignment::Value(ref mut left), Assignment::Value(right)) => *left = *left - right,
-            (_,_) => (),
+            (_, _) => (),
         }
     }
 }
 
-impl<A,B> Mul<B> for Assignment<A>
+impl<A, B> Mul<B> for Assignment<A>
 where
-A: AssignmentValue,
-B: Into<Assignment<A>>
+    A: AssignmentValue,
+    B: Into<Assignment<A>>,
 {
     type Output = Self;
 
@@ -142,22 +162,27 @@ B: Into<Assignment<A>>
     }
 }
 
-impl<A,B> Div<B> for Assignment<A>
+impl<A, B> Div<B> for Assignment<A>
 where
-A: AssignmentValue,
-B: Into<Assignment<A>>
+    A: AssignmentValue,
+    B: Into<Assignment<A>>,
 {
     type Output = Self;
 
     fn div(self, rhs: B) -> Self {
         match (self, rhs.into()) {
-            (Assignment::Value(left), Assignment::Value(right)) => Assignment::Value(left * right.invert()),
+            (Assignment::Value(left), Assignment::Value(right)) => {
+                Assignment::Value(left * right.invert())
+            }
             (_, _) => Assignment::Missing(),
         }
     }
 }
 
-impl<S> Try for Assignment<S> where S: AssignmentValue {
+impl<S> Try for Assignment<S>
+where
+    S: AssignmentValue,
+{
     type Ok = S;
     type Error = R1CSError;
 
@@ -179,7 +204,7 @@ impl<S> Try for Assignment<S> where S: AssignmentValue {
 
 impl<S> ConditionallySelectable for Assignment<S>
 where
-S: AssignmentValue + ConditionallyAssignable
+    S: AssignmentValue + ConditionallyAssignable,
 {
     // This function should execute in constant time for a and b of the same type.
     // So, if a and b are both of type Assignment::Value(), then the comparison will
@@ -199,7 +224,10 @@ S: AssignmentValue + ConditionallyAssignable
     }
 }
 
-impl<S> ConstantTimeEq for Assignment<S> where S: AssignmentValue+ConstantTimeEq {
+impl<S> ConstantTimeEq for Assignment<S>
+where
+    S: AssignmentValue + ConstantTimeEq,
+{
     // This function should execute in constant time for self and other of the same type.
     fn ct_eq(&self, other: &Self) -> Choice {
         match (self, other) {

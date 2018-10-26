@@ -5,7 +5,10 @@ use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::VartimeMultiscalarMul;
 use merlin::Transcript;
 
-use super::{R1CSProof, Constraint, ConstraintSystem, CommittedConstraintSystem, Variable, VariableIndex, Assignment, AssignmentValue, OpaqueScalar};
+use super::{
+    Assignment, AssignmentValue, CommittedConstraintSystem, Constraint, ConstraintSystem,
+    OpaqueScalar, R1CSProof, Variable, VariableIndex,
+};
 
 use errors::R1CSError;
 use generators::{BulletproofGens, PedersenGens};
@@ -33,30 +36,39 @@ pub struct VerifierCS<'a, 'b> {
     constraints: Vec<Constraint>,
     num_vars: usize,
     V: Vec<CompressedRistretto>,
-    callbacks: Vec<Box<Fn(&mut CommittedVerifierCS)->Result<(), R1CSError>>>,
+    callbacks: Vec<Box<Fn(&mut CommittedVerifierCS) -> Result<(), R1CSError>>>,
 }
 
 pub struct CommittedVerifierCS<'a, 'b> {
-    cs: VerifierCS<'a,'b>,
+    cs: VerifierCS<'a, 'b>,
     committed_variables_count: usize,
 }
 
 impl<'a, 'b> ConstraintSystem for VerifierCS<'a, 'b> {
-    type CommittedCS = CommittedVerifierCS<'a,'b>;
+    type CommittedCS = CommittedVerifierCS<'a, 'b>;
 
-    fn assign_multiplier<S: AssignmentValue>(
+    fn assign_multiplier<S: AssignmentValue + Into<OpaqueScalar>>(
         &mut self,
-        _left: Assignment<S>,
-        _right: Assignment<S>,
-        _out: Assignment<S>,
+        left: Assignment<S>,
+        right: Assignment<S>,
+        out: Assignment<S>,
     ) -> Result<(Variable<S>, Variable<S>, Variable<S>), R1CSError> {
         let var = self.num_vars;
         self.num_vars += 1;
 
         Ok((
-            VariableIndex::MultiplierLeft(var),
-            VariableIndex::MultiplierRight(var),
-            VariableIndex::MultiplierOutput(var),
+            Variable {
+                index: VariableIndex::MultiplierLeft(var),
+                assignment: left,
+            },
+            Variable {
+                index: VariableIndex::MultiplierRight(var),
+                assignment: right,
+            },
+            Variable {
+                index: VariableIndex::MultiplierOutput(var),
+                assignment: out,
+            },
         ))
     }
 
@@ -65,21 +77,24 @@ impl<'a, 'b> ConstraintSystem for VerifierCS<'a, 'b> {
     }
 
     /// Adds a callback for when the constraint system’s free variables are committed.
-    fn after_commitment<F>(&mut self, callback: F) where F: Fn(&mut Self::CommittedCS)->Result<(), R1CSError> {
+    fn after_commitment<F>(&mut self, callback: F)
+    where
+        for<'t> F: Fn(&'t mut Self::CommittedCS) -> Result<(), R1CSError>,
+    {
         self.callbacks.push(Box::new(callback));
     }
 }
 
 impl<'a, 'b> ConstraintSystem for CommittedVerifierCS<'a, 'b> {
-    type CommittedCS = CommittedVerifierCS<'a,'b>;
+    type CommittedCS = CommittedVerifierCS<'a, 'b>;
 
-    fn assign_multiplier<S: AssignmentValue>(
+    fn assign_multiplier<S: AssignmentValue + Into<OpaqueScalar>>(
         &mut self,
         left: Assignment<S>,
         right: Assignment<S>,
         out: Assignment<S>,
     ) -> Result<(Variable<S>, Variable<S>, Variable<S>), R1CSError> {
-        self.cs.assign_multiplier(left,right,out)
+        self.cs.assign_multiplier(left, right, out)
     }
 
     fn add_constraint(&mut self, constraint: Constraint) {
@@ -87,17 +102,19 @@ impl<'a, 'b> ConstraintSystem for CommittedVerifierCS<'a, 'b> {
     }
 
     /// Adds a callback for when the constraint system’s free variables are committed.
-    fn after_commitment<F>(&mut self, callback: F) where F: Fn(&mut Self::CommittedCS)->Result<(), R1CSError> {
+    fn after_commitment<F>(&mut self, callback: F)
+    where
+        for<'t> F: Fn(&'t mut Self::CommittedCS) -> Result<(), R1CSError>,
+    {
         self.cs.after_commitment(callback)
     }
 }
 
 impl<'a, 'b> CommittedConstraintSystem for CommittedVerifierCS<'a, 'b> {
     fn challenge_scalar(&mut self, label: &'static [u8]) -> OpaqueScalar {
-        self.transcript.challenge_scalar(label)
+        self.cs.transcript.challenge_scalar(label).into()
     }
 }
-
 
 impl<'a, 'b> VerifierCS<'a, 'b> {
     /// Construct an empty constraint system with specified external
@@ -156,6 +173,7 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
             num_vars: 0,
             V: commitments,
             constraints: Vec::new(),
+            callbacks: Vec::new(),
         };
 
         (cs, variables)
@@ -190,19 +208,19 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
             for (var, coeff) in &lc.terms {
                 match var {
                     VariableIndex::MultiplierLeft(i) => {
-                        wL[*i] += exp_z * coeff;
+                        wL[*i] += exp_z * coeff.internal_scalar;
                     }
                     VariableIndex::MultiplierRight(i) => {
-                        wR[*i] += exp_z * coeff;
+                        wR[*i] += exp_z * coeff.internal_scalar;
                     }
                     VariableIndex::MultiplierOutput(i) => {
-                        wO[*i] += exp_z * coeff;
+                        wO[*i] += exp_z * coeff.internal_scalar;
                     }
                     VariableIndex::Committed(i) => {
-                        wV[*i] -= exp_z * coeff;
+                        wV[*i] -= exp_z * coeff.internal_scalar;
                     }
                     VariableIndex::One() => {
-                        wc -= exp_z * coeff;
+                        wc -= exp_z * coeff.internal_scalar;
                     }
                 }
             }

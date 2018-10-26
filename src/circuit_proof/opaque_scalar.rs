@@ -1,5 +1,5 @@
 use curve25519_dalek::scalar::Scalar;
-use std::ops::{Neg, Add, AddAssign, Sub, SubAssign, Mul};
+use std::ops::{Add, AddAssign, Mul, Neg, Sub, SubAssign};
 use subtle::{Choice, ConditionallyAssignable, ConstantTimeEq};
 
 /// A scalar that does not expose its value to the constraint system.
@@ -8,8 +8,8 @@ use subtle::{Choice, ConditionallyAssignable, ConstantTimeEq};
 /// As a consequence, all the derived assignments are opaque as well.
 #[derive(Copy, Clone, Debug)]
 pub struct OpaqueScalar {
-	/// The actual scalar value is only available to the constraint system implementation.
-    pub(crate) internal_scalar: Scalar
+    /// The actual scalar value is only available to the constraint system implementation.
+    pub(crate) internal_scalar: Scalar,
 }
 
 impl OpaqueScalar {
@@ -23,13 +23,17 @@ impl OpaqueScalar {
 
 impl From<Scalar> for OpaqueScalar {
     fn from(scalar: Scalar) -> Self {
-        OpaqueScalar{ internal_scalar: scalar }
+        OpaqueScalar {
+            internal_scalar: scalar,
+        }
     }
 }
 
 impl From<u64> for OpaqueScalar {
     fn from(scalar: u64) -> Self {
-        OpaqueScalar{ internal_scalar: Scalar::from(scalar) }
+        OpaqueScalar {
+            internal_scalar: Scalar::from(scalar),
+        }
     }
 }
 
@@ -51,19 +55,18 @@ impl Neg for OpaqueScalar {
 impl Add for OpaqueScalar {
     type Output = Self;
     fn add(mut self, rhs: OpaqueScalar) -> Self {
-    	self.internal_scalar += rhs.internal_scalar;
-    	self
+        self.internal_scalar += rhs.internal_scalar;
+        self
     }
 }
 
 impl Add<Scalar> for OpaqueScalar {
     type Output = Self;
     fn add(mut self, rhs: Scalar) -> Self {
-    	self.internal_scalar += rhs;
-    	self
+        self.internal_scalar += rhs;
+        self
     }
 }
-
 
 impl AddAssign for OpaqueScalar {
     fn add_assign(&mut self, rhs: OpaqueScalar) {
@@ -74,16 +77,16 @@ impl AddAssign for OpaqueScalar {
 impl Sub for OpaqueScalar {
     type Output = Self;
     fn sub(mut self, rhs: OpaqueScalar) -> Self {
-    	self.internal_scalar -= rhs.internal_scalar;
-    	self
+        self.internal_scalar -= rhs.internal_scalar;
+        self
     }
 }
 
 impl Sub<Scalar> for OpaqueScalar {
     type Output = Self;
     fn sub(mut self, rhs: Scalar) -> Self {
-    	self.internal_scalar -= rhs;
-    	self
+        self.internal_scalar -= rhs;
+        self
     }
 }
 
@@ -96,27 +99,28 @@ impl SubAssign for OpaqueScalar {
 impl Mul for OpaqueScalar {
     type Output = Self;
     fn mul(mut self, rhs: OpaqueScalar) -> Self {
-    	self.internal_scalar *= rhs.internal_scalar;
-    	self
+        self.internal_scalar *= rhs.internal_scalar;
+        self
     }
 }
 
 impl Mul<Scalar> for OpaqueScalar {
     type Output = Self;
     fn mul(mut self, rhs: Scalar) -> Self {
-    	self.internal_scalar *= rhs;
-    	self
+        self.internal_scalar *= rhs;
+        self
     }
 }
 
-impl  ConditionallyAssignable for OpaqueScalar {
+impl ConditionallyAssignable for OpaqueScalar {
     fn conditional_assign(&mut self, other: &Self, choice: Choice) {
-    	self.internal_scalar.conditional_assign(&other.internal_scalar, choice)
+        self.internal_scalar
+            .conditional_assign(&other.internal_scalar, choice)
     }
 }
 
 impl ConstantTimeEq for OpaqueScalar {
     fn ct_eq(&self, other: &Self) -> Choice {
-    	self.internal_scalar.ct_eq(&other.internal_scalar)
+        self.internal_scalar.ct_eq(&other.internal_scalar)
     }
 }
