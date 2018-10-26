@@ -80,7 +80,7 @@ pub trait CommittedConstraintSystem: ConstraintSystem {
 
 impl AssignmentValue for OpaqueScalar {
     fn invert(&self) -> Self {
-        Scalar::invert(&self).into()
+        Scalar::invert(&self.internal_scalar).into()
     }
 }
 
@@ -119,7 +119,10 @@ T: lc::Value + Into<OpaqueScalar>,
     fn from(lc: LinearCombination<Variable<T>>) -> Constraint {
         Constraint {
             terms: lc.terms.into_iter().map(|(v,s)| (v.index, s.into()) ).collect(),
-            precomputed: lc.precomputed.into()
+            precomputed: match lc.eval() {
+                Assignment::Value(v) => Assignment::Value(v.into()),
+                Assignment::Missing() => Assignment::Missing()
+            }
         }
     }
 }

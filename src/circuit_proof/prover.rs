@@ -82,9 +82,9 @@ impl<'a, 'b> ConstraintSystem for ProverCS<'a, 'b> {
         let r = right?;
         let o = out?;
         // Now commit to the assignment
-        self.a_L.push(l.into::<OpaqueScalar>().internal_scalar);
-        self.a_R.push(r.into::<OpaqueScalar>().internal_scalar);
-        self.a_O.push(o.into::<OpaqueScalar>().internal_scalar);
+        self.a_L.push(l.into().internal_scalar);
+        self.a_R.push(r.into().internal_scalar);
+        self.a_O.push(o.into().internal_scalar);
         Ok((
             VariableIndex::MultiplierLeft(self.a_L.len() - 1),
             VariableIndex::MultiplierRight(self.a_R.len() - 1),
@@ -106,7 +106,7 @@ impl<'a, 'b> ConstraintSystem for ProverCS<'a, 'b> {
 
 impl<'a, 'b> ConstraintSystem for CommittedProverCS<'a, 'b> {
     type CommittedCS = CommittedProverCS<'a,'b>;
-    
+
     fn assign_multiplier<S: AssignmentValue>(
         &mut self,
         left: Assignment<S>,

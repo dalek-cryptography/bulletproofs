@@ -29,7 +29,14 @@ pub trait Variable {
 /// the variable needs to be converted to opaque assignment first.
 pub struct LinearCombination<V: Variable> {
 	pub terms: Vec<(V, V::ValueType)>,
-	pub precomputed: Assignment<V::ValueType>
+	precomputed: Assignment<V::ValueType>
+}
+
+impl<V: Variable> LinearCombination<V> {
+    /// Evaluates the linear combination
+    pub fn eval(&self) -> Assignment<V::ValueType> {
+        self.precomputed
+    }
 }
 
 /// Empty linear combination

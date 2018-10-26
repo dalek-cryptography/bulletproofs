@@ -130,13 +130,13 @@ B: Into<Assignment<A>>
 impl<A,B> Mul<B> for Assignment<A>
 where
 A: AssignmentValue,
-B: Into<A>
+B: Into<Assignment<A>>
 {
     type Output = Self;
 
     fn mul(self, rhs: B) -> Self::Output {
         match (self, rhs.into()) {
-            (Assignment::Value(left), right) => Assignment::Value(left * right),
+            (Assignment::Value(left), Assignment::Value(right)) => Assignment::Value(left * right),
             (_, _) => Assignment::Missing(),
         }
     }
@@ -145,13 +145,13 @@ B: Into<A>
 impl<A,B> Div<B> for Assignment<A>
 where
 A: AssignmentValue,
-B: Into<A>
+B: Into<Assignment<A>>
 {
     type Output = Self;
 
     fn div(self, rhs: B) -> Self {
         match (self, rhs.into()) {
-            (Assignment::Value(left), right) => Assignment::Value(left * right.invert()),
+            (Assignment::Value(left), Assignment::Value(right)) => Assignment::Value(left * right.invert()),
             (_, _) => Assignment::Missing(),
         }
     }
