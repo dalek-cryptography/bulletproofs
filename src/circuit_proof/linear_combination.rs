@@ -102,9 +102,9 @@ impl<V: Variable, T: Value+Into<V::ValueType>> Mul<T> for LinearCombination<V> {
 
     fn mul(mut self, rhs: T) -> Self {
     	for (_, ref mut s) in self.terms.iter_mut() {
-    		*s *= rhs.into();
+    		*s = *s * rhs.into();
     	}
-    	self.precomputed *= rhs.into();
+    	self.precomputed = self.precomputed * rhs.into();
     	self
     }
 }
@@ -114,9 +114,7 @@ impl<V: Variable, T: Value+Into<V::ValueType>> FromIterator<(V, T)> for LinearCo
     where
         I: IntoIterator<Item = (V, T)>,
     {
-        LinearCombination {
-            terms: iter.into_iter().map(|(v,s)| (v, s.into())).collect(),
-        }
+        iter.into_iter().fold(LinearCombination::default(), |t, (v,s)| t + (v,s) )
     }
 }
 
@@ -125,8 +123,6 @@ impl<'a,V: Variable, T: Value+Into<V::ValueType>> FromIterator<&'a (V, T)> for L
     where
         I: IntoIterator<Item = &'a (V, T)>,
     {
-        LinearCombination {
-            terms: iter.into_iter().map(|(v,s)| (v.clone(), s.clone().into())).collect(),
-        }
+        iter.into_iter().fold(LinearCombination::default(), |t, (v,s)| t + (*v.clone(), s.clone()) )
     }
 }
