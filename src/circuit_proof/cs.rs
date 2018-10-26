@@ -84,6 +84,12 @@ pub trait CommittedConstraintSystem: ConstraintSystem {
     fn challenge_scalar(&mut self, label: &'static [u8]) -> OpaqueScalar;
 }
 
+
+
+// Trait implementations for concrete types used in the constraint system
+// ----------------------------------------------------------------------
+
+
 impl AssignmentValue for OpaqueScalar {
     fn invert(&self) -> Self {
         Scalar::invert(&self.internal_scalar).into()

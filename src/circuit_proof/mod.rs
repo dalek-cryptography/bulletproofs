@@ -24,9 +24,11 @@ use generators::{BulletproofGens, PedersenGens};
 use inner_product_proof::InnerProductProof;
 
 use self::prover::ProverCS;
+use self::verifier::VerifierCS;
 
 /// A proof of some statement specified by a [`ConstraintSystem`].
 ///
+/// XXX OBSOLETE:
 /// Statements are specified by writing gadget functions which add
 /// constraints to a `ConstraintSystem` implementation.  To construct
 /// an `R1CSProof`, a prover constructs a
@@ -70,7 +72,8 @@ pub struct R1CSProof {
 }
 
 impl R1CSProof {
-	/// Creates a proof. The constraint system is built using the `builder` closure.
+	/// Creates and returns a proof, along with the Pedersen commitments for all provided secrets.
+	/// The constraint system is specified using the `builder` closure.
     pub fn prove<'a, 'b, F>(
         bp_gens: &'b BulletproofGens,
         pc_gens: &'b PedersenGens,
@@ -78,14 +81,65 @@ impl R1CSProof {
         v: Vec<Scalar>,
         v_blinding: Vec<Scalar>,
         builder: F,
-    ) where
-        F: FnOnce(&mut ProverCS) -> Result<(), R1CSError>,
+    ) -> Result<(Self, Vec<CompressedRistretto>), R1CSError>
+    where
+        F: FnOnce(&mut ProverCS, Vec<Variable<Scalar>>) -> Result<(), R1CSError>,
     {
-        // TBD: set up a prover
+    	// 1. Prepare a proving CS
+    	let (mut prover, variables, commitments) = ProverCS::new(
+        	bp_gens,
+        	pc_gens,
+        	transcript,
+        	v,
+        	v_blinding
+        );
+    	
+    	// 2. Delegate to the caller to build a constraint system.
+    	builder(&mut prover, variables)?;
 
-        // TBD: build constraint system
+    	// 3. Commit internal variables
+    	let mut committed_prover = prover.commit();
 
-        // TBD:
-        unimplemented!()
+    	// 4. Process callbacks to finish building the constraint system.
+    	committed_prover.process_callbacks()?;
+
+    	// 5. Create the proof
+        let proof = committed_prover.prove()?;
+
+        Ok((proof, commitments))
+    }
+
+	/// Verifies the proof for the given commitments.
+	/// The constraint system is specified using the `builder` closure.
+    pub fn verify<'a, 'b, F>(
+    	&self,
+    	bp_gens: &'b BulletproofGens,
+        pc_gens: &'b PedersenGens,
+        transcript: &'a mut Transcript,
+        commitments: Vec<CompressedRistretto>,
+        builder: F,
+    ) -> Result<(), R1CSError> 
+    where
+        F: FnOnce(&mut VerifierCS, Vec<Variable<OpaqueScalar>>) -> Result<(), R1CSError>,
+    {
+    	// 1. Prepare a verifying CS
+    	let (mut verifier, variables) = VerifierCS::new(
+        	bp_gens,
+        	pc_gens,
+        	transcript,
+        	commitments,
+    	);
+
+		// 2. Delegate to the caller to build a constraint system.
+    	builder(&mut verifier, variables)?;
+
+    	// 3. commit internal variables
+    	// TBD.
+
+    	// 4. Process callbacks to finish building the constraint system.
+    	// TBD.
+
+    	// 5. Verify the proof
+        verifier.verify(&self)
     }
 }

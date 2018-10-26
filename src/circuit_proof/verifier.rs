@@ -154,7 +154,7 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
         pc_gens: &'b PedersenGens,
         transcript: &'a mut Transcript,
         commitments: Vec<CompressedRistretto>,
-    ) -> (Self, Vec<VariableIndex>) {
+    ) -> (Self, Vec<Variable<OpaqueScalar>>) {
         let m = commitments.len();
         transcript.r1cs_domain_sep(m as u64);
 
@@ -164,7 +164,10 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
             transcript.commit_point(b"V", &commitment);
 
             // Allocate and return a variable for the commitment
-            variables.push(VariableIndex::Committed(i));
+            variables.push(Variable {
+                index: VariableIndex::Committed(i),
+                assignment: Assignment::Missing()
+            });
         }
 
         let cs = VerifierCS {
