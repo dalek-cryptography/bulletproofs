@@ -70,6 +70,7 @@ pub struct R1CSProof {
 }
 
 impl R1CSProof {
+	/// Creates a proof. The constraint system is built using the `builder` closure.
     pub fn prove<'a, 'b, F>(
         bp_gens: &'b BulletproofGens,
         pc_gens: &'b PedersenGens,

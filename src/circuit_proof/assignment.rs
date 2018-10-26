@@ -7,6 +7,7 @@ use errors::R1CSError;
 
 pub trait AssignmentValue:
     Copy
+    + Clone
     + From<Scalar>
     + From<u64>
     + Neg<Output = Self>
@@ -27,7 +28,7 @@ pub trait AssignmentValue:
 ///
 /// Proving code creates `Value` assignments, while verification code
 /// creates `Missing` assignments.
-#[derive(Debug)]
+#[derive(Copy,Clone,Debug)]
 pub enum Assignment<S>
 where
     S: AssignmentValue,
@@ -38,18 +39,18 @@ where
     Missing(),
 }
 
-impl<S> Copy for Assignment<S> where S: AssignmentValue {}
-impl<S> Clone for Assignment<S>
-where
-    S: AssignmentValue,
-{
-    fn clone(&self) -> Self {
-        match self {
-            Assignment::Value(v) => Assignment::Value(v.clone()),
-            Assignment::Missing() => Assignment::Missing(),
-        }
-    }
-}
+// impl<S> Copy for Assignment<S> where S: AssignmentValue {}
+// impl<S> Clone for Assignment<S>
+// where
+//     S: AssignmentValue,
+// {
+//     fn clone(&self) -> Self {
+//         match self {
+//             Assignment::Value(v) => Assignment::Value(v.clone()),
+//             Assignment::Missing() => Assignment::Missing(),
+//         }
+//     }
+// }
 
 // Default implementation is used for zeroing secrets from allocated memory via `clear_on_drop`.
 impl<S> Default for Assignment<S>

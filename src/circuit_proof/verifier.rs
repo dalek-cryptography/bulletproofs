@@ -36,7 +36,7 @@ pub struct VerifierCS<'a, 'b> {
     constraints: Vec<Constraint>,
     num_vars: usize,
     V: Vec<CompressedRistretto>,
-    callbacks: Vec<Box<Fn(&mut CommittedVerifierCS) -> Result<(), R1CSError>>>,
+    callbacks: Vec<Box<Fn(&mut CommittedVerifierCS<'a, 'b>) -> Result<(), R1CSError>>>,
 }
 
 pub struct CommittedVerifierCS<'a, 'b> {
@@ -77,11 +77,12 @@ impl<'a, 'b> ConstraintSystem for VerifierCS<'a, 'b> {
     }
 
     /// Adds a callback for when the constraint system’s free variables are committed.
-    fn after_commitment<F>(&mut self, callback: F)
+    fn after_commitment<F>(&mut self, callback: F) -> Result<(), R1CSError>
     where
-        for<'t> F: Fn(&'t mut Self::CommittedCS) -> Result<(), R1CSError>,
+        for<'t> F: 'static + Fn(&'t mut Self::CommittedCS) -> Result<(), R1CSError>,
     {
         self.callbacks.push(Box::new(callback));
+        Ok(())
     }
 }
 
@@ -102,11 +103,11 @@ impl<'a, 'b> ConstraintSystem for CommittedVerifierCS<'a, 'b> {
     }
 
     /// Adds a callback for when the constraint system’s free variables are committed.
-    fn after_commitment<F>(&mut self, callback: F)
+    fn after_commitment<F>(&mut self, callback: F) -> Result<(), R1CSError>
     where
-        for<'t> F: Fn(&'t mut Self::CommittedCS) -> Result<(), R1CSError>,
+        for<'t> F: 'static + Fn(&'t mut Self::CommittedCS) -> Result<(), R1CSError>,
     {
-        self.cs.after_commitment(callback)
+        callback(self)
     }
 }
 

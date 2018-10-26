@@ -11,7 +11,7 @@ pub trait Value: AssignmentValue {
     fn zero() -> Self;
 }
 
-pub trait Variable {
+pub trait Variable: Clone {
     type ValueType: Value;
 
     /// Returns the assignment
@@ -27,12 +27,15 @@ pub trait Variable {
 /// If one needs to make an LC of a clear assignment with opaque weight,
 /// the variable needs to be converted to opaque assignment first.
 pub struct LinearCombination<V: Variable> {
-    pub terms: Vec<(V, V::ValueType)>,
-    precomputed: Assignment<V::ValueType>,
+    /// Terms of the linear combination.
+    pub(crate) terms: Vec<(V, V::ValueType)>,
+
+    /// Precomputed evaluation of the linear combination.
+    pub(crate) precomputed: Assignment<V::ValueType>,
 }
 
 impl<V: Variable> LinearCombination<V> {
-    /// Evaluates the linear combination
+    /// Evaluates the linear combination expression.
     pub fn eval(&self) -> Assignment<V::ValueType> {
         self.precomputed
     }
@@ -52,8 +55,8 @@ impl<V: Variable> Default for LinearCombination<V> {
 impl<V: Variable> From<(V, V::ValueType)> for LinearCombination<V> {
     fn from(pair: (V, V::ValueType)) -> Self {
         LinearCombination {
-            terms: vec![(pair.0, pair.1)],
             precomputed: pair.0.assignment() * pair.1,
+            terms: vec![(pair.0, pair.1)],
         }
     }
 }
@@ -63,8 +66,8 @@ impl<V: Variable, T: Value + Into<V::ValueType>> Add<(V, T)> for LinearCombinati
     type Output = Self;
 
     fn add(mut self, rhs: (V, T)) -> Self {
-        self.terms.push((rhs.0, rhs.1.into()));
         self.precomputed += rhs.0.assignment() * rhs.1.into();
+        self.terms.push((rhs.0, rhs.1.into()));
         self
     }
 }
@@ -74,8 +77,8 @@ impl<V: Variable, T: Value + Into<V::ValueType>> Sub<(V, T)> for LinearCombinati
     type Output = Self;
 
     fn sub(mut self, rhs: (V, T)) -> Self {
-        self.terms.push((rhs.0, -rhs.1.into()));
         self.precomputed -= rhs.0.assignment() * rhs.1.into();
+        self.terms.push((rhs.0, -rhs.1.into()));
         self
     }
 }
@@ -85,8 +88,8 @@ impl<V: Variable, T: Value + Into<V::ValueType>> Add<T> for LinearCombination<V>
     type Output = Self;
 
     fn add(mut self, rhs: T) -> Self {
-        self.terms.push((V::constant_one(), rhs.into()));
         self.precomputed += rhs.into();
+        self.terms.push((V::constant_one(), rhs.into()));
         self
     }
 }
@@ -96,8 +99,8 @@ impl<V: Variable, T: Value + Into<V::ValueType>> Sub<T> for LinearCombination<V>
     type Output = Self;
 
     fn sub(mut self, rhs: T) -> Self {
-        self.terms.push((V::constant_one(), -rhs.into()));
         self.precomputed -= rhs.into();
+        self.terms.push((V::constant_one(), -rhs.into()));
         self
     }
 }
@@ -107,10 +110,10 @@ impl<V: Variable, T: Value + Into<V::ValueType>> Mul<T> for LinearCombination<V>
     type Output = Self;
 
     fn mul(mut self, rhs: T) -> Self {
+        self.precomputed = self.precomputed * rhs.into();
         for (_, ref mut s) in self.terms.iter_mut() {
             *s = *s * rhs.into();
         }
-        self.precomputed = self.precomputed * rhs.into();
         self
     }
 }
@@ -134,7 +137,7 @@ impl<'a, V: Variable, T: Value + Into<V::ValueType>> FromIterator<&'a (V, T)>
     {
         iter.into_iter()
             .fold(LinearCombination::default(), |t, (v, s)| {
-                t + (*v.clone(), s.clone())
+                t + (v.clone(), s.clone().into())
             })
     }
 }

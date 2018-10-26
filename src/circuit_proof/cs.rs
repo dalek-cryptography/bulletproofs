@@ -25,7 +25,7 @@ pub enum VariableIndex {
 /// Represents a variable in the constraint system.
 /// Each variable is identified by its index (`VariableIndex`) and
 /// has an assignment which can be present of missing.
-#[derive(Clone, Debug)]
+#[derive(Copy,Clone,Debug)]
 pub struct Variable<S: AssignmentValue> {
     pub index: VariableIndex,
     pub assignment: Assignment<S>,
@@ -35,7 +35,11 @@ pub struct Variable<S: AssignmentValue> {
 /// both opaque and non-opaque combinations
 pub type Constraint = LinearCombination<VariableIndex>;
 
+/// `ConstraintSystem` trait represents the API for the gadgets.
+/// Gadgets receive a mutable instance of the constraint system and use it
+/// to allocate variables and create constraints between them.
 pub trait ConstraintSystem {
+    /// Type of the constraint system in the committed state.
     type CommittedCS: CommittedConstraintSystem;
 
     /// Allocate variables for left, right, and output wires of multiplication,
@@ -63,9 +67,12 @@ pub trait ConstraintSystem {
     fn add_constraint(&mut self, constraint: Constraint);
 
     /// Adds a callback for when the constraint system’s free variables are committed.
-    fn after_commitment<F>(&mut self, callback: F)
+    /// If the CS is not yet committed, the call returns `Ok()`. 
+    /// If the CS is already committed, the callback is invoked immediately
+    /// with the result forwarded to the caller.
+    fn after_commitment<F>(&mut self, callback: F) -> Result<(), R1CSError>
     where
-        for<'t> F: Fn(&'t mut Self::CommittedCS) -> Result<(), R1CSError>;
+        for<'t> F: 'static + Fn(&'t mut Self::CommittedCS) -> Result<(), R1CSError>;
 }
 
 pub trait CommittedConstraintSystem: ConstraintSystem {
@@ -117,15 +124,15 @@ where
 {
     fn from(lc: LinearCombination<Variable<T>>) -> Constraint {
         Constraint {
+            precomputed: match lc.eval() {
+                Assignment::Value(v) => Assignment::Value(v.into()),
+                Assignment::Missing() => Assignment::Missing(),
+            },
             terms: lc
                 .terms
                 .into_iter()
                 .map(|(v, s)| (v.index, s.into()))
                 .collect(),
-            precomputed: match lc.eval() {
-                Assignment::Value(v) => Assignment::Value(v.into()),
-                Assignment::Missing() => Assignment::Missing(),
-            },
         }
     }
 }
