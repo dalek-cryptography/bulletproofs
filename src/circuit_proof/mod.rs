@@ -98,12 +98,9 @@ impl R1CSProof {
     	builder(&mut prover, variables)?;
 
     	// 3. Commit internal variables
-    	let mut committed_prover = prover.commit();
+    	let committed_prover = prover.commit()?;
 
-    	// 4. Process callbacks to finish building the constraint system.
-    	committed_prover.process_callbacks()?;
-
-    	// 5. Create the proof
+    	// 4. Create the proof
         let proof = committed_prover.prove()?;
 
         Ok((proof, commitments))

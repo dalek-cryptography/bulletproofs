@@ -16,6 +16,8 @@ use generators::{BulletproofGens, PedersenGens};
 use inner_product_proof::InnerProductProof;
 use transcript::TranscriptProtocol;
 
+use core::mem;
+
 /// A [`ConstraintSystem`] implementation for use by the prover.
 ///
 /// The lifecycle of a `ProverCS` is as follows.  The proving code
@@ -221,39 +223,40 @@ impl<'a, 'b> ProverCS<'a, 'b> {
             pc_gens,
             bp_gens,
             transcript,
+            constraints: vec![],
+            callbacks: vec![],
             v,
             v_blinding,
-            constraints: vec![],
             a_L: vec![],
             a_R: vec![],
             a_O: vec![],
-            callbacks: vec![],
         };
 
         (cs, variables, commitments)
     }
 
-    pub(crate) fn commit(self) -> CommittedProverCS<'a,'b> {
+    pub(crate) fn commit(self) -> Result<CommittedProverCS<'a,'b>, R1CSError> {
 
         // TBD: create intermediate commitments,
-        // send them to the transcript, continue.
+        // TBD: send them to the transcript.
 
-        CommittedProverCS {
+        let mut committed_cs = CommittedProverCS {
             committed_variables_count: self.a_L.len(),
             cs: self,
             // TBD: add commitment points here
+        };
+
+        let mut closures = mem::replace(&mut committed_cs.cs.callbacks, Vec::new());
+
+        for closure in closures.drain(..) {
+             closure(&mut committed_cs)?
         }
+
+        Ok(committed_cs)
     }
 }
 
 impl<'a, 'b> CommittedProverCS<'a, 'b> {
-
-    pub(crate) fn process_callbacks(&mut self) -> Result<(), R1CSError> {
-         for closure in self.cs.callbacks.drain(..) {
-             closure(&mut self)?
-         }
-         Ok(())
-    }
 
     /// Use a challenge, `z`, to flatten the constraints in the
     /// constraint system into vectors used for proving and
