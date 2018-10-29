@@ -7,7 +7,7 @@ use curve25519_dalek::traits::VartimeMultiscalarMul;
 use merlin::Transcript;
 
 use super::{
-    Assignment, AssignmentValue, CommittedConstraintSystem, Constraint, ConstraintSystem,
+    Assignment, ScalarValue, CommittedConstraintSystem, Constraint, ConstraintSystem,
     OpaqueScalar, R1CSProof, Variable, VariableIndex,
 };
 
@@ -48,7 +48,7 @@ pub struct CommittedVerifierCS<'a, 'b> {
 impl<'a, 'b> ConstraintSystem for VerifierCS<'a, 'b> {
     type CommittedCS = CommittedVerifierCS<'a, 'b>;
 
-    fn assign_multiplier<S: AssignmentValue + Into<OpaqueScalar>>(
+    fn assign_multiplier<S: ScalarValue>(
         &mut self,
         left: Assignment<S>,
         right: Assignment<S>,
@@ -90,7 +90,7 @@ impl<'a, 'b> ConstraintSystem for VerifierCS<'a, 'b> {
 impl<'a, 'b> ConstraintSystem for CommittedVerifierCS<'a, 'b> {
     type CommittedCS = CommittedVerifierCS<'a, 'b>;
 
-    fn assign_multiplier<S: AssignmentValue + Into<OpaqueScalar>>(
+    fn assign_multiplier<S: ScalarValue>(
         &mut self,
         left: Assignment<S>,
         right: Assignment<S>,

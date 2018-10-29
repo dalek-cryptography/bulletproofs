@@ -1,18 +1,11 @@
-use super::assignment::{Assignment, AssignmentValue};
 use core::iter::FromIterator;
 use core::ops::{Add, Mul, Sub};
 
-/// Trait for the weights and variable assignments
-pub trait Value: AssignmentValue {
-    /// Value of 1, neutral element in multiplication
-    fn one() -> Self;
-
-    /// Value of 0, neutral element in addition
-    fn zero() -> Self;
-}
+use super::assignment::{Assignment};
+use super::scalar_value::{ScalarValue};
 
 pub trait Variable: Clone {
-    type ValueType: Value;
+    type ValueType: ScalarValue;
 
     /// Returns the assignment
     fn assignment(&self) -> Assignment<Self::ValueType>;
@@ -62,7 +55,7 @@ impl<V: Variable> From<(V, V::ValueType)> for LinearCombination<V> {
 }
 
 // Adding a pair to a linear combination
-impl<V: Variable, T: Value + Into<V::ValueType>> Add<(V, T)> for LinearCombination<V> {
+impl<V: Variable, T: ScalarValue + Into<V::ValueType>> Add<(V, T)> for LinearCombination<V> {
     type Output = Self;
 
     fn add(mut self, rhs: (V, T)) -> Self {
@@ -73,7 +66,7 @@ impl<V: Variable, T: Value + Into<V::ValueType>> Add<(V, T)> for LinearCombinati
 }
 
 // Subtracting a pair from a linear combination
-impl<V: Variable, T: Value + Into<V::ValueType>> Sub<(V, T)> for LinearCombination<V> {
+impl<V: Variable, T: ScalarValue + Into<V::ValueType>> Sub<(V, T)> for LinearCombination<V> {
     type Output = Self;
 
     fn sub(mut self, rhs: (V, T)) -> Self {
@@ -84,7 +77,7 @@ impl<V: Variable, T: Value + Into<V::ValueType>> Sub<(V, T)> for LinearCombinati
 }
 
 // Adding a constant to a linear combination
-impl<V: Variable, T: Value + Into<V::ValueType>> Add<T> for LinearCombination<V> {
+impl<V: Variable, T: ScalarValue + Into<V::ValueType>> Add<T> for LinearCombination<V> {
     type Output = Self;
 
     fn add(mut self, rhs: T) -> Self {
@@ -95,7 +88,7 @@ impl<V: Variable, T: Value + Into<V::ValueType>> Add<T> for LinearCombination<V>
 }
 
 // Subtracting a constant from a linear combination
-impl<V: Variable, T: Value + Into<V::ValueType>> Sub<T> for LinearCombination<V> {
+impl<V: Variable, T: ScalarValue + Into<V::ValueType>> Sub<T> for LinearCombination<V> {
     type Output = Self;
 
     fn sub(mut self, rhs: T) -> Self {
@@ -106,7 +99,7 @@ impl<V: Variable, T: Value + Into<V::ValueType>> Sub<T> for LinearCombination<V>
 }
 
 // Multiplying a linear combination by a constant
-impl<V: Variable, T: Value + Into<V::ValueType>> Mul<T> for LinearCombination<V> {
+impl<V: Variable, T: ScalarValue + Into<V::ValueType>> Mul<T> for LinearCombination<V> {
     type Output = Self;
 
     fn mul(mut self, rhs: T) -> Self {
@@ -118,7 +111,7 @@ impl<V: Variable, T: Value + Into<V::ValueType>> Mul<T> for LinearCombination<V>
     }
 }
 
-impl<V: Variable, T: Value + Into<V::ValueType>> FromIterator<(V, T)> for LinearCombination<V> {
+impl<V: Variable, T: ScalarValue + Into<V::ValueType>> FromIterator<(V, T)> for LinearCombination<V> {
     fn from_iter<I>(iter: I) -> Self
     where
         I: IntoIterator<Item = (V, T)>,
@@ -128,7 +121,7 @@ impl<V: Variable, T: Value + Into<V::ValueType>> FromIterator<(V, T)> for Linear
     }
 }
 
-impl<'a, V: Variable, T: Value + Into<V::ValueType>> FromIterator<&'a (V, T)>
+impl<'a, V: Variable, T: ScalarValue + Into<V::ValueType>> FromIterator<&'a (V, T)>
     for LinearCombination<V>
 {
     fn from_iter<I>(iter: I) -> Self

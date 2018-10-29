@@ -2,7 +2,8 @@ use curve25519_dalek::scalar::Scalar;
 
 use errors::R1CSError;
 
-use super::assignment::{Assignment, AssignmentValue};
+use super::scalar_value::ScalarValue;
+use super::assignment::Assignment;
 use super::linear_combination as lc;
 use super::linear_combination::LinearCombination;
 use super::opaque_scalar::OpaqueScalar;
@@ -26,7 +27,7 @@ pub enum VariableIndex {
 /// Each variable is identified by its index (`VariableIndex`) and
 /// has an assignment which can be present of missing.
 #[derive(Copy,Clone,Debug)]
-pub struct Variable<S: AssignmentValue> {
+pub struct Variable<S: ScalarValue> {
     pub index: VariableIndex,
     pub assignment: Assignment<S>,
 }
@@ -45,7 +46,7 @@ pub trait ConstraintSystem {
     /// Allocate variables for left, right, and output wires of multiplication,
     /// and assign them the Assignments that are passed in.
     /// Prover will pass in `Value(Scalar)`s, and Verifier will pass in `Missing`s.
-    fn assign_multiplier<S: AssignmentValue + Into<OpaqueScalar>>(
+    fn assign_multiplier<S: ScalarValue>(
         &mut self,
         left: Assignment<S>,
         right: Assignment<S>,
@@ -54,7 +55,7 @@ pub trait ConstraintSystem {
 
     /// Allocate two uncommitted variables, and assign them the Assignments passed in.
     /// Prover will pass in `Value(Scalar)`s, and Verifier will pass in `Missing`s.
-    fn assign_uncommitted<S: AssignmentValue + Into<OpaqueScalar>>(
+    fn assign_uncommitted<S: ScalarValue>(
         &mut self,
         a: Assignment<S>,
         b: Assignment<S>,
@@ -89,19 +90,6 @@ pub trait CommittedConstraintSystem: ConstraintSystem {
 // Trait implementations for concrete types used in the constraint system
 // ----------------------------------------------------------------------
 
-
-impl AssignmentValue for OpaqueScalar {
-    fn invert(&self) -> Self {
-        Scalar::invert(&self.internal_scalar).into()
-    }
-}
-
-impl AssignmentValue for Scalar {
-    fn invert(&self) -> Self {
-        Scalar::invert(self)
-    }
-}
-
 /// Variable can be made opaque.
 impl From<Variable<Scalar>> for Variable<OpaqueScalar> {
     fn from(v: Variable<Scalar>) -> Self {
@@ -124,10 +112,7 @@ impl From<Assignment<Scalar>> for Assignment<OpaqueScalar> {
 
 // Any linear combination of variables with opaque or non-opaque scalars can be converted to a Constraint
 // (which does not hold the assignments and contains only the opaque scalars for uniform representation inside CS)
-impl<T> From<LinearCombination<Variable<T>>> for Constraint
-where
-    T: lc::Value + Into<OpaqueScalar>,
-{
+impl<T: ScalarValue> From<LinearCombination<Variable<T>>> for Constraint {
     fn from(lc: LinearCombination<Variable<T>>) -> Constraint {
         Constraint {
             precomputed: match lc.eval() {
@@ -140,26 +125,6 @@ where
                 .map(|(v, s)| (v.index, s.into()))
                 .collect(),
         }
-    }
-}
-
-// Linear combinations can be made over `(VariableIndex | Assignment | Variable)`
-// with `Scalar` or `OpaqueScalar` as valid weights.
-impl lc::Value for OpaqueScalar {
-    fn one() -> Self {
-        Scalar::one().into()
-    }
-    fn zero() -> Self {
-        Scalar::zero().into()
-    }
-}
-
-impl lc::Value for Scalar {
-    fn one() -> Self {
-        Scalar::one()
-    }
-    fn zero() -> Self {
-        Scalar::zero()
     }
 }
 
@@ -176,7 +141,7 @@ impl lc::Variable for VariableIndex {
     }
 }
 
-impl<S: lc::Value> lc::Variable for Assignment<S> {
+impl<S: ScalarValue> lc::Variable for Assignment<S> {
     type ValueType = S;
 
     fn assignment(&self) -> Assignment<Self::ValueType> {
@@ -188,7 +153,7 @@ impl<S: lc::Value> lc::Variable for Assignment<S> {
     }
 }
 
-impl<S: lc::Value> lc::Variable for Variable<S> {
+impl<S: ScalarValue> lc::Variable for Variable<S> {
     type ValueType = S;
 
     fn assignment(&self) -> Assignment<Self::ValueType> {

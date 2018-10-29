@@ -8,7 +8,7 @@ use curve25519_dalek::traits::MultiscalarMul;
 use merlin::Transcript;
 
 use super::{
-    Assignment, AssignmentValue, CommittedConstraintSystem, Constraint, ConstraintSystem,
+    Assignment, ScalarValue, CommittedConstraintSystem, Constraint, ConstraintSystem,
     OpaqueScalar, R1CSProof, Variable, VariableIndex,
 };
 
@@ -74,7 +74,7 @@ impl<'a, 'b> Drop for ProverCS<'a, 'b> {
 impl<'a, 'b> ConstraintSystem for ProverCS<'a, 'b> {
     type CommittedCS = CommittedProverCS<'a, 'b>;
 
-    fn assign_multiplier<S: AssignmentValue + Into<OpaqueScalar>>(
+    fn assign_multiplier<S: ScalarValue>(
         &mut self,
         left: Assignment<S>,
         right: Assignment<S>,
@@ -124,7 +124,7 @@ impl<'a, 'b> ConstraintSystem for ProverCS<'a, 'b> {
 impl<'a, 'b> ConstraintSystem for CommittedProverCS<'a, 'b> {
     type CommittedCS = CommittedProverCS<'a, 'b>;
 
-    fn assign_multiplier<S: AssignmentValue + Into<OpaqueScalar>>(
+    fn assign_multiplier<S: ScalarValue>(
         &mut self,
         left: Assignment<S>,
         right: Assignment<S>,

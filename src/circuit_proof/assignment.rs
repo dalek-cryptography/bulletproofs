@@ -1,24 +1,9 @@
-use curve25519_dalek::scalar::Scalar;
-use std::ops::{Add, AddAssign, Div, Mul, Neg, Sub, SubAssign, Try};
+use std::ops::{Add, AddAssign, Div, Mul, Sub, SubAssign, Try};
 use subtle::{Choice, ConditionallyAssignable, ConditionallySelectable, ConstantTimeEq};
 
 use errors::R1CSError;
 
-pub trait AssignmentValue:
-    Copy
-    + Clone
-    + From<Scalar>
-    + From<u64>
-    + Neg<Output = Self>
-    + Add<Output = Self>
-    + AddAssign
-    + Sub<Output = Self>
-    + SubAssign
-    + Mul<Output = Self>
-{
-    /// Returns `x` such that `self*x mod l == 1`.
-    fn invert(&self) -> Self;
-}
+use super::scalar_value::ScalarValue;
 
 /// Represents an optional assignment to a [`Variable`](::r1cs::Variable).
 ///
@@ -30,7 +15,7 @@ pub trait AssignmentValue:
 #[derive(Copy,Clone,Debug)]
 pub enum Assignment<S>
 where
-    S: AssignmentValue,
+    S: ScalarValue,
 {
     /// A known assignment to a variable in a [`ConstraintSystem`](::r1cs::ConstraintSystem).
     Value(S),
@@ -41,7 +26,7 @@ where
 // Default implementation is used for zeroing secrets from allocated memory via `clear_on_drop`.
 impl<S> Default for Assignment<S>
 where
-    S: AssignmentValue,
+    S: ScalarValue,
 {
     fn default() -> Assignment<S> {
         Assignment::Missing()
@@ -50,7 +35,7 @@ where
 
 impl<S> From<Option<S>> for Assignment<S>
 where
-    S: AssignmentValue,
+    S: ScalarValue,
 {
     fn from(o: Option<S>) -> Self {
         match o {
@@ -62,7 +47,7 @@ where
 
 impl<S> From<S> for Assignment<S>
 where
-    S: AssignmentValue,
+    S: ScalarValue,
 {
     fn from(scalar: S) -> Self {
         Assignment::Value(scalar)
@@ -71,7 +56,7 @@ where
 
 impl<S> From<u64> for Assignment<S>
 where
-    S: AssignmentValue,
+    S: ScalarValue,
 {
     fn from(int: u64) -> Self {
         Assignment::Value(S::from(int))
@@ -80,7 +65,7 @@ where
 
 impl<A, B> Add<B> for Assignment<A>
 where
-    A: AssignmentValue,
+    A: ScalarValue,
     B: Into<Assignment<A>>,
 {
     type Output = Self;
@@ -95,7 +80,7 @@ where
 
 impl<A, B> AddAssign<B> for Assignment<A>
 where
-    A: AssignmentValue,
+    A: ScalarValue,
     B: Into<Assignment<A>>,
 {
     fn add_assign(&mut self, rhs: B) {
@@ -108,7 +93,7 @@ where
 
 impl<A, B> Sub<B> for Assignment<A>
 where
-    A: AssignmentValue,
+    A: ScalarValue,
     B: Into<Assignment<A>>,
 {
     type Output = Self;
@@ -123,7 +108,7 @@ where
 
 impl<A, B> SubAssign<B> for Assignment<A>
 where
-    A: AssignmentValue,
+    A: ScalarValue,
     B: Into<Assignment<A>>,
 {
     fn sub_assign(&mut self, rhs: B) {
@@ -136,7 +121,7 @@ where
 
 impl<A, B> Mul<B> for Assignment<A>
 where
-    A: AssignmentValue,
+    A: ScalarValue,
     B: Into<Assignment<A>>,
 {
     type Output = Self;
@@ -151,7 +136,7 @@ where
 
 impl<A, B> Div<B> for Assignment<A>
 where
-    A: AssignmentValue,
+    A: ScalarValue,
     B: Into<Assignment<A>>,
 {
     type Output = Self;
@@ -168,7 +153,7 @@ where
 
 impl<S> Try for Assignment<S>
 where
-    S: AssignmentValue,
+    S: ScalarValue,
 {
     type Ok = S;
     type Error = R1CSError;
@@ -191,7 +176,7 @@ where
 
 impl<S> ConditionallySelectable for Assignment<S>
 where
-    S: AssignmentValue + ConditionallyAssignable,
+    S: ScalarValue + ConditionallyAssignable,
 {
     // This function should execute in constant time for a and b of the same type.
     // So, if a and b are both of type Assignment::Value(), then the comparison will
@@ -213,7 +198,7 @@ where
 
 impl<S> ConstantTimeEq for Assignment<S>
 where
-    S: AssignmentValue + ConstantTimeEq,
+    S: ScalarValue + ConstantTimeEq,
 {
     // This function should execute in constant time for self and other of the same type.
     fn ct_eq(&self, other: &Self) -> Choice {

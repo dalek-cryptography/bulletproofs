@@ -1,8 +1,5 @@
-use super::assignment::{Assignment,AssignmentValue};
-use super::linear_combination;
+use super::scalar_value::ScalarValue;
 use super::opaque_scalar::OpaqueScalar;
-use super::prover::ProverCS;
-use super::verifier::VerifierCS;
 use super::*;
 
 use errors::R1CSError;
@@ -16,7 +13,7 @@ use rand::thread_rng;
 /// Constrains (a1 + a2) * (b1 + b2) = (c1 + c2),
 /// where c2 is a constant.
 #[allow(non_snake_case)]
-fn example_gadget<S: linear_combination::Value+Into<OpaqueScalar>, CS: ConstraintSystem>(
+fn example_gadget<S: ScalarValue, CS: ConstraintSystem>(
     cs: &mut CS,
     a1: Variable<S>,
     a2: Variable<S>,
@@ -180,7 +177,7 @@ struct KShuffleGadget {}
 
 impl KShuffleGadget {
 
-    fn fill_cs<S: linear_combination::Value+Into<OpaqueScalar>, CS: ConstraintSystem>(
+    fn fill_cs<S: ScalarValue, CS: ConstraintSystem>(
         cs: &mut CS,
         x: &[Variable<S>],
         y: &[Variable<S>],
@@ -229,7 +226,7 @@ impl KShuffleGadget {
         Ok(())
     }
 
-    fn last_multiplier<S: linear_combination::Value+Into<OpaqueScalar>, CS: ConstraintSystem>(
+    fn last_multiplier<S: ScalarValue, CS: ConstraintSystem>(
         cs: &mut CS,
         neg_z: OpaqueScalar,
         left: Variable<S>,
@@ -249,7 +246,7 @@ impl KShuffleGadget {
         Ok(ao)
     }
 
-    fn intermediate_multiplier<S: linear_combination::Value+Into<OpaqueScalar>, CS: ConstraintSystem>(
+    fn intermediate_multiplier<S: ScalarValue, CS: ConstraintSystem>(
         cs: &mut CS,
         neg_z: OpaqueScalar,
         left: Variable<S>,
@@ -269,83 +266,6 @@ impl KShuffleGadget {
         Ok(ao)
     }
 }
-
-// // Helper functions for proof creation
-// fn kshuffle_prover_cs<'a, 'b>(
-//     pc_gens: &'b PedersenGens,
-//     bp_gens: &'b BulletproofGens,
-//     transcript: &'a mut Transcript,
-//     input: &Vec<u64>,
-//     output: &Vec<u64>,
-// ) -> Result<(ProverCS<'a, 'b>, Vec<CompressedRistretto>), R1CSError> {
-//     let k = input.len();
-
-//     // Prover makes a `ConstraintSystem` instance representing a shuffle gadget
-//     // Make v vector
-//     let mut v = Vec::with_capacity(2 * k);
-//     for i in 0..k {
-//         v.push(Scalar::from(input[i]));
-//     }
-//     for i in 0..k {
-//         v.push(Scalar::from(output[i]));
-//     }
-
-//     // Make v_blinding vector using RNG from transcript
-//     let mut rng = {
-//         let mut builder = transcript.build_rng();
-//         // commit the secret values
-//         for &v_i in &v {
-//             builder = builder.commit_witness_bytes(b"v_i", v_i.as_bytes());
-//         }
-//         use rand::thread_rng;
-//         builder.finalize(&mut thread_rng())
-//     };
-//     let v_blinding: Vec<Scalar> = (0..2 * k).map(|_| Scalar::random(&mut rng)).collect();
-//     let (mut prover_cs, variables, commitments) =
-//         ProverCS::new(&bp_gens, &pc_gens, transcript, v, v_blinding.clone());
-
-//     // Prover allocates variables and adds constraints to the constraint system
-//     let in_pairs = variables[0..k]
-//         .iter()
-//         .zip(input.iter())
-//         .map(|(var_i, in_i)| (*var_i, Assignment::from(in_i.clone())))
-//         .collect();
-//     let out_pairs = variables[k..2 * k]
-//         .iter()
-//         .zip(output.iter())
-//         .map(|(var_i, out_i)| (*var_i, Assignment::from(out_i.clone())))
-//         .collect();
-//     KShuffleGadget::fill_cs(&mut prover_cs, in_pairs, out_pairs).unwrap();
-
-//     Ok((prover_cs, commitments))
-// }
-
-// // Helper functions for proof verification
-// fn kshuffle_verifier_cs<'a, 'b>(
-//     pc_gens: &'b PedersenGens,
-//     bp_gens: &'b BulletproofGens,
-//     transcript: &'a mut Transcript,
-//     commitments: &Vec<CompressedRistretto>,
-// ) -> Result<VerifierCS<'a, 'b>, R1CSError> {
-//     let k = commitments.len() / 2;
-
-//     // Verifier makes a `ConstraintSystem` instance representing a shuffle gadget
-//     let (mut verifier_cs, variables) =
-//         VerifierCS::new(&bp_gens, &pc_gens, transcript, commitments.to_vec());
-
-//     // Verifier allocates variables and adds constraints to the constraint system
-//     let in_pairs = variables[0..k]
-//         .iter()
-//         .map(|var_i| (*var_i, Assignment::Missing()))
-//         .collect();
-//     let out_pairs = variables[k..2 * k]
-//         .iter()
-//         .map(|var_i| (*var_i, Assignment::Missing()))
-//         .collect();
-//     KShuffleGadget::fill_cs(&mut verifier_cs, in_pairs, out_pairs)?;
-
-//     Ok(verifier_cs)
-// }
 
 fn shuffle_gadget_test_helper(k: usize) {
     use merlin::Transcript;
@@ -384,14 +304,17 @@ fn shuffle_gadget_test_helper(k: usize) {
         ).unwrap()
     };
 
-    {
-        let mut verifier_transcript = transcript.clone();
+    // Verifier's scope
 
-        let verifier_cs =
-            kshuffle_verifier_cs(&pc_gens, &bp_gens, &mut verifier_transcript, &commitments)
-                .unwrap();
-        verifier_cs.verify(&proof).unwrap();
-    }
+    proof.verify(
+        &bp_gens,
+        &pc_gens,
+        &mut base_transcript.clone(),
+        commitments,
+        |cs, vars| {
+            KShuffleGadget::fill_cs(cs, &vars[0..k], &vars[k..2*k])
+        }
+    ).unwrap()
 }
 
 #[test]
