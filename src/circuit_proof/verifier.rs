@@ -1,5 +1,6 @@
 #![allow(non_snake_case)]
 
+use core::mem;
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::VartimeMultiscalarMul;
@@ -183,6 +184,30 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
         (cs, variables)
     }
 
+    /// Commits the intermediate variables and processes deferred allocations and constraints.
+    pub(crate) fn commit(self) -> Result<CommittedVerifierCS<'a,'b>, R1CSError> {
+
+        // TBD: create intermediate commitments,
+        // TBD: send them to the transcript.
+
+        let mut committed_cs = CommittedVerifierCS {
+            committed_variables_count: self.num_vars,
+            cs: self,
+            // TBD: add commitment points here
+        };
+
+        let mut closures = mem::replace(&mut committed_cs.cs.callbacks, Vec::new());
+
+        for closure in closures.drain(..) {
+             closure(&mut committed_cs)?
+        }
+
+        Ok(committed_cs)
+    }
+}
+
+impl<'a, 'b> CommittedVerifierCS<'a, 'b>  {
+
     /// Use a challenge, `z`, to flatten the constraints in the
     /// constraint system into vectors used for proving and
     /// verification.
@@ -198,8 +223,8 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
         &mut self,
         z: &Scalar,
     ) -> (Vec<Scalar>, Vec<Scalar>, Vec<Scalar>, Vec<Scalar>, Scalar) {
-        let n = self.num_vars;
-        let m = self.V.len();
+        let n = self.cs.num_vars;
+        let m = self.cs.V.len();
 
         let mut wL = vec![Scalar::zero(); n];
         let mut wR = vec![Scalar::zero(); n];
@@ -208,7 +233,7 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
         let mut wc = Scalar::zero();
 
         let mut exp_z = *z;
-        for lc in self.constraints.iter() {
+        for lc in self.cs.constraints.iter() {
             for (var, coeff) in &lc.terms {
                 match var {
                     VariableIndex::MultiplierLeft(i) => {
@@ -237,47 +262,47 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
     /// Consume this `VerifierCS` and attempt to verify the supplied `proof`.
     pub fn verify(mut self, proof: &R1CSProof) -> Result<(), R1CSError> {
         // If the number of multiplications is not 0 or a power of 2, then pad the circuit.
-        let n = self.num_vars;
-        let padded_n = self.num_vars.next_power_of_two();
+        let n = self.cs.num_vars;
+        let padded_n = self.cs.num_vars.next_power_of_two();
         let pad = padded_n - n;
 
         use inner_product_proof::inner_product;
         use std::iter;
         use util;
 
-        if self.bp_gens.gens_capacity < padded_n {
+        if self.cs.bp_gens.gens_capacity < padded_n {
             return Err(R1CSError::InvalidGeneratorsLength);
         }
         // We are performing a single-party circuit proof, so party index is 0.
-        let gens = self.bp_gens.share(0);
+        let gens = self.cs.bp_gens.share(0);
 
-        self.transcript.commit_point(b"A_I", &proof.A_I);
-        self.transcript.commit_point(b"A_O", &proof.A_O);
-        self.transcript.commit_point(b"S", &proof.S);
+        self.cs.transcript.commit_point(b"A_I", &proof.A_I);
+        self.cs.transcript.commit_point(b"A_O", &proof.A_O);
+        self.cs.transcript.commit_point(b"S", &proof.S);
 
-        let y = self.transcript.challenge_scalar(b"y");
-        let z = self.transcript.challenge_scalar(b"z");
+        let y = self.cs.transcript.challenge_scalar(b"y");
+        let z = self.cs.transcript.challenge_scalar(b"z");
 
-        self.transcript.commit_point(b"T_1", &proof.T_1);
-        self.transcript.commit_point(b"T_3", &proof.T_3);
-        self.transcript.commit_point(b"T_4", &proof.T_4);
-        self.transcript.commit_point(b"T_5", &proof.T_5);
-        self.transcript.commit_point(b"T_6", &proof.T_6);
+        self.cs.transcript.commit_point(b"T_1", &proof.T_1);
+        self.cs.transcript.commit_point(b"T_3", &proof.T_3);
+        self.cs.transcript.commit_point(b"T_4", &proof.T_4);
+        self.cs.transcript.commit_point(b"T_5", &proof.T_5);
+        self.cs.transcript.commit_point(b"T_6", &proof.T_6);
 
-        let x = self.transcript.challenge_scalar(b"x");
+        let x = self.cs.transcript.challenge_scalar(b"x");
 
-        self.transcript.commit_scalar(b"t_x", &proof.t_x);
-        self.transcript
+        self.cs.transcript.commit_scalar(b"t_x", &proof.t_x);
+        self.cs.transcript
             .commit_scalar(b"t_x_blinding", &proof.t_x_blinding);
-        self.transcript
+        self.cs.transcript
             .commit_scalar(b"e_blinding", &proof.e_blinding);
 
-        let w = self.transcript.challenge_scalar(b"w");
+        let w = self.cs.transcript.challenge_scalar(b"w");
 
         let (wL, wR, wO, wV, wc) = self.flattened_constraints(&z);
 
         // Get IPP variables
-        let (u_sq, u_inv_sq, s) = proof.ipp_proof.verification_scalars(self.transcript);
+        let (u_sq, u_inv_sq, s) = proof.ipp_proof.verification_scalars(self.cs.transcript);
 
         let a = proof.ipp_proof.a;
         let b = proof.ipp_proof.b;
@@ -312,7 +337,7 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
 
         // Create a `TranscriptRng` from the transcript
         use rand::thread_rng;
-        let mut rng = self.transcript.build_rng().finalize(&mut thread_rng());
+        let mut rng = self.cs.transcript.build_rng().finalize(&mut thread_rng());
         let r = Scalar::random(&mut rng);
 
         let xx = x * x;
@@ -340,10 +365,10 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
             iter::once(proof.A_I.decompress())
                 .chain(iter::once(proof.A_O.decompress()))
                 .chain(iter::once(proof.S.decompress()))
-                .chain(self.V.iter().map(|V_i| V_i.decompress()))
+                .chain(self.cs.V.iter().map(|V_i| V_i.decompress()))
                 .chain(T_points.iter().map(|T_i| T_i.decompress()))
-                .chain(iter::once(Some(self.pc_gens.B)))
-                .chain(iter::once(Some(self.pc_gens.B_blinding)))
+                .chain(iter::once(Some(self.cs.pc_gens.B)))
+                .chain(iter::once(Some(self.cs.pc_gens.B_blinding)))
                 .chain(gens.G(padded_n).map(|&G_i| Some(G_i)))
                 .chain(gens.H(padded_n).map(|&H_i| Some(H_i)))
                 .chain(proof.ipp_proof.L_vec.iter().map(|L_i| L_i.decompress()))

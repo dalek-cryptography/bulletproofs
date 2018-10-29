@@ -85,7 +85,7 @@ impl R1CSProof {
     where
         F: FnOnce(&mut ProverCS, Vec<Variable<Scalar>>) -> Result<(), R1CSError>,
     {
-    	// 1. Prepare a proving CS
+    	// 1. Prepare a proving CS.
     	let (mut prover, variables, commitments) = ProverCS::new(
         	bp_gens,
         	pc_gens,
@@ -97,10 +97,10 @@ impl R1CSProof {
     	// 2. Delegate to the caller to build a constraint system.
     	builder(&mut prover, variables)?;
 
-    	// 3. Commit internal variables
+    	// 3. Commit internal variables.
     	let committed_prover = prover.commit()?;
 
-    	// 4. Create the proof
+    	// 4. Create the proof.
         let proof = committed_prover.prove()?;
 
         Ok((proof, commitments))
@@ -119,7 +119,7 @@ impl R1CSProof {
     where
         F: FnOnce(&mut VerifierCS, Vec<Variable<OpaqueScalar>>) -> Result<(), R1CSError>,
     {
-    	// 1. Prepare a verifying CS
+    	// 1. Prepare a verifying CS.
     	let (mut verifier, variables) = VerifierCS::new(
         	bp_gens,
         	pc_gens,
@@ -130,13 +130,10 @@ impl R1CSProof {
 		// 2. Delegate to the caller to build a constraint system.
     	builder(&mut verifier, variables)?;
 
-    	// 3. commit internal variables
-    	// TBD.
+    	// 3. Commit internal variables.
+    	let committed_verifier = verifier.commit()?;
 
-    	// 4. Process callbacks to finish building the constraint system.
-    	// TBD.
-
-    	// 5. Verify the proof
-        verifier.verify(&self)
+    	// 4. Verify the proof.
+        committed_verifier.verify(&self)
     }
 }

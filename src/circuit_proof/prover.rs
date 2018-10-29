@@ -1,5 +1,6 @@
 #![allow(non_snake_case)]
 
+use core::mem;
 use clear_on_drop::clear::Clear;
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
@@ -15,8 +16,6 @@ use errors::R1CSError;
 use generators::{BulletproofGens, PedersenGens};
 use inner_product_proof::InnerProductProof;
 use transcript::TranscriptProtocol;
-
-use core::mem;
 
 /// A [`ConstraintSystem`] implementation for use by the prover.
 ///
@@ -235,6 +234,7 @@ impl<'a, 'b> ProverCS<'a, 'b> {
         (cs, variables, commitments)
     }
 
+    /// Commits the intermediate variables and processes deferred allocations and constraints.
     pub(crate) fn commit(self) -> Result<CommittedProverCS<'a,'b>, R1CSError> {
 
         // TBD: create intermediate commitments,
