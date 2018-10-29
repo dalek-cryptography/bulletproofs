@@ -109,4 +109,13 @@ pub enum R1CSError {
     /// [`R1CSProof`](::r1cs::R1CSProof) fails.
     #[fail(display = "R1CSProof did not verify correctly.")]
     VerificationError,
+
+    /// Occurs when the constraint system cannot be built.
+    #[fail(
+        display = "Constraint system is not well-formed. {:?}",
+        cause
+    )]
+    LayoutError {
+        cause: &'static str
+    },
 }

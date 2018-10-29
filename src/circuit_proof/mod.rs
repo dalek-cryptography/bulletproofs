@@ -12,8 +12,8 @@ pub use self::cs::*;
 pub use self::linear_combination::LinearCombination;
 pub use self::opaque_scalar::OpaqueScalar;
 
-// #[cfg(test)]
-// mod tests;
+#[cfg(test)]
+mod tests;
 
 use curve25519_dalek::ristretto::CompressedRistretto;
 use curve25519_dalek::scalar::Scalar;
