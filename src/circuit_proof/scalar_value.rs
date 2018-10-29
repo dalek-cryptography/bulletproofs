@@ -9,8 +9,8 @@ pub trait ScalarValue:
     Copy
     + Clone
     + From<Scalar>
-    + Into<OpaqueScalar>
     + From<u64>
+    + Into<OpaqueScalar>
     + Neg<Output = Self>
     + Add<Output = Self>
     + AddAssign
@@ -30,7 +30,6 @@ pub trait ScalarValue:
     /// Converts the value into `OpaqueScalar`.
     fn into_opaque(self) -> OpaqueScalar;
 }
-
 
 impl ScalarValue for OpaqueScalar {
 	fn one() -> Self {

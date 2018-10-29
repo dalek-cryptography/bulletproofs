@@ -4,6 +4,7 @@ use subtle::{Choice, ConditionallyAssignable, ConditionallySelectable, ConstantT
 use errors::R1CSError;
 
 use super::scalar_value::ScalarValue;
+use super::opaque_scalar::OpaqueScalar;
 
 /// Represents an optional assignment to a [`Variable`](::r1cs::Variable).
 ///
@@ -21,6 +22,16 @@ where
     Value(S),
     /// An unknown assignment to a variable in a [`ConstraintSystem`](::r1cs::ConstraintSystem).
     Missing(),
+}
+
+impl<S: ScalarValue> Assignment<S> {
+    /// Converts the assignment to an opaque scalar.
+    pub fn into_opaque(self) -> Assignment<OpaqueScalar> {
+        match self {
+            Assignment::Value(x) => Assignment::Value(x.into()),
+            Assignment::Missing() => Assignment::Missing(),
+        }
+    }
 }
 
 // Default implementation is used for zeroing secrets from allocated memory via `clear_on_drop`.

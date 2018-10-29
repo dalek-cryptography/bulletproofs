@@ -90,26 +90,6 @@ pub trait CommittedConstraintSystem: ConstraintSystem {
 // Trait implementations for concrete types used in the constraint system
 // ----------------------------------------------------------------------
 
-/// Variable can be made opaque.
-impl From<Variable<Scalar>> for Variable<OpaqueScalar> {
-    fn from(v: Variable<Scalar>) -> Self {
-        Variable {
-            index: v.index,
-            assignment: v.assignment.into(),
-        }
-    }
-}
-
-/// Assignment can be made opaque.
-impl From<Assignment<Scalar>> for Assignment<OpaqueScalar> {
-    fn from(a: Assignment<Scalar>) -> Self {
-        match a {
-            Assignment::Value(a) => Assignment::Value(a.into()),
-            Assignment::Missing() => Assignment::Missing(),
-        }
-    }
-}
-
 // Any linear combination of variables with opaque or non-opaque scalars can be converted to a Constraint
 // (which does not hold the assignments and contains only the opaque scalars for uniform representation inside CS)
 impl<T: ScalarValue> From<LinearCombination<Variable<T>>> for Constraint {
@@ -131,6 +111,7 @@ impl<T: ScalarValue> From<LinearCombination<Variable<T>>> for Constraint {
 impl lc::Variable for VariableIndex {
     // Using OpaqueScalar for the Constraint to have opaque weights
     type ValueType = OpaqueScalar;
+    type OpaqueType = VariableIndex;
 
     fn assignment(&self) -> Assignment<Self::ValueType> {
         Assignment::Missing()
@@ -139,10 +120,15 @@ impl lc::Variable for VariableIndex {
     fn constant_one() -> Self {
         VariableIndex::One()
     }
+
+    fn into_opaque(self) -> Self::OpaqueType {
+        self
+    }
 }
 
 impl<S: ScalarValue> lc::Variable for Assignment<S> {
     type ValueType = S;
+    type OpaqueType = Assignment<OpaqueScalar>;
 
     fn assignment(&self) -> Assignment<Self::ValueType> {
         self.clone()
@@ -151,10 +137,15 @@ impl<S: ScalarValue> lc::Variable for Assignment<S> {
     fn constant_one() -> Self {
         Assignment::Value(S::one())
     }
+
+    fn into_opaque(self) -> Self::OpaqueType {
+        self.into_opaque()
+    }
 }
 
 impl<S: ScalarValue> lc::Variable for Variable<S> {
     type ValueType = S;
+    type OpaqueType = Variable<OpaqueScalar>;
 
     fn assignment(&self) -> Assignment<Self::ValueType> {
         self.assignment
@@ -164,6 +155,13 @@ impl<S: ScalarValue> lc::Variable for Variable<S> {
         Variable {
             index: VariableIndex::One(),
             assignment: Assignment::Value(S::one()),
+        }
+    }
+
+    fn into_opaque(self) -> Self::OpaqueType {
+        Variable {
+            index: self.index,
+            assignment: self.assignment.into_opaque()
         }
     }
 }
