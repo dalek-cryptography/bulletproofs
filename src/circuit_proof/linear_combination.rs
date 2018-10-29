@@ -70,6 +70,15 @@ impl<V> IntoLC<V> for OpaqueScalar where V: Variable<ValueType=OpaqueScalar> {
     }
 }
 
+impl<V> IntoLC<V> for V where V: Variable {
+    fn into_linear_combination(self) -> LinearCombination<V> {
+        LinearCombination {
+            terms: vec![(self, V::ValueType::one())],
+            precomputed: self.assignment()
+        }
+    }
+}
+
 impl<V> IntoLC<V> for (V, Scalar) where V: Variable, Assignment<V::ValueType>: From<Scalar> {
     fn into_linear_combination(self) -> LinearCombination<V> {
         LinearCombination {
