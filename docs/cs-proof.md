@@ -17,54 +17,74 @@ The protocol begins with the prover computing commitments to the secret values \
 V_i \gets \operatorname{Com}(v_i, {\widetilde{v}\_i}) = v\_i \cdot B + {\widetilde{v}\_i} \cdot {\widetilde{B}}
 \\] where each \\(\widetilde{v}\_i\\) is sampled randomly.
 
-The prover then [builds constraints](#building-constraints), allocating necessary multiplication gates on the fly,
-generating challenge values bound to the commitments \\(V_i\\), filling in weights \\(\mathbf{W}\_L,\mathbf{W}\_R,\mathbf{W}\_O,\mathbf{W}\_V\\), and assigning values to the left, right and output wires
-of the multiplication gates (\\(\mathbf{a}\_{L}, \mathbf{a}\_{R}, \mathbf{a}\_{O}\\)).
+The prover then [builds constraints](#building-constraints) in two phases.
 
-Once all multiplication wires are assigned, the prover commits to them via vector Pedersen commitments:
+In the first phase, the prover allocates necessary multiplication gates on the fly, fills in weights \\(\mathbf{W}\_L',\mathbf{W}\_R',\mathbf{W}\_O',\mathbf{W}\_V'\\), and assigns values to the left, right and output wires
+of the multiplication gates (\\(\mathbf{a}\_L', \mathbf{a}\_R', \mathbf{a}\_O'\\)) without using the challenge values.
+
+Once \\(n'\\) multiplication gates are assigned, the prover commits to them via vector Pedersen commitments:
 
 \\[
 \begin{aligned}
-\tilde{a} \\;&{\xleftarrow{\\$}}\\; \mathbb Z\_p \\\\
-\tilde{o} \\;&{\xleftarrow{\\$}}\\; \mathbb Z\_p \\\\
-A_I          &\gets \widetilde{B} \cdot \tilde{a} + \langle \mathbf{G} , \mathbf{a}\_L \rangle + \langle \mathbf{H}, \mathbf{a}\_R \rangle \\\\
-A_O          &\gets \widetilde{B} \cdot \tilde{o} + \langle \mathbf{G} , \mathbf{a}\_O \rangle \\\\
+\tilde{a}' \\;&{\xleftarrow{\\$}}\\; \mathbb Z\_p \\\\
+\tilde{o}' \\;&{\xleftarrow{\\$}}\\; \mathbb Z\_p \\\\
+A_I'          &\gets \widetilde{B} \cdot \tilde{a}' + \langle \mathbf{G}' , \mathbf{a}\_L' \rangle + \langle \mathbf{H}', \mathbf{a}\_R' \rangle \\\\
+A_O'          &\gets \widetilde{B} \cdot \tilde{o}' + \langle \mathbf{G}' , \mathbf{a}\_O' \rangle \\\\
 \end{aligned}
 \\]
 
-The prover also computes blinding factors \\(\mathbf{s}\_L, \mathbf{s}\_R\\)
+The prover also computes blinding factors \\(\mathbf{s}\_L', \mathbf{s}\_R'\\)
 for the left and right multiplication values and commits to them:
 
 \\[
 \begin{aligned}
-\mathbf{s}\_{L} \\; &{\xleftarrow{\\$}}\\; {\mathbb Z\_p}^{n} \\\\
-\mathbf{s}\_{R} \\; &{\xleftarrow{\\$}}\\; {\mathbb Z\_p}^{n} \\\\
-\tilde{s} \\;       &{\xleftarrow{\\$}}\\; \mathbb Z\_p \\\\
-S                   &\gets \widetilde{B} \cdot \tilde{s} + \langle \mathbf{G} , \mathbf{s}\_L \rangle + \langle \mathbf{H}, \mathbf{s}\_R \rangle
+\mathbf{s}\_L' \\; &{\xleftarrow{\\$}}\\; {\mathbb Z\_p}^{n'} \\\\
+\mathbf{s}\_R' \\; &{\xleftarrow{\\$}}\\; {\mathbb Z\_p}^{n'} \\\\
+\tilde{s}' \\;     &{\xleftarrow{\\$}}\\; \mathbb Z\_p \\\\
+S'                 &\gets \widetilde{B} \cdot \tilde{s}' + \langle \mathbf{G}', \mathbf{s}\_L' \rangle + \langle \mathbf{H}', \mathbf{s}\_R' \rangle
 \end{aligned}
 \\]
 
-The prover adds \\(A_I\\), \\(A_O\\) and \\(S\\) to the protocol transcript
+The prover adds \\(A_I'\\), \\(A_O'\\) and \\(S'\\) to the protocol transcript.
+
+In the second phase, the prover is allowed to use challenge values when allocating multiplication gates (\\(\mathbf{a}\_{L}'', \mathbf{a}\_{R}'', \mathbf{a}\_{O}''\\)) and computing weights \\(\mathbf{W}\_L'',\mathbf{W}\_R'',\mathbf{W}\_O'',\mathbf{W}\_V''\\).
+
+When additional \\(n''\\) multiplication gates are assigned, the prover commits to them via vector Pedersen commitments, along with corresponding blinding factors \\(\mathbf{s}\_L'', \mathbf{s}\_R''\\):
+
+\\[
+\begin{aligned}
+\tilde{a}''        \\;&{\xleftarrow{\\$}}\\; \mathbb Z\_p \\\\
+\tilde{o}''        \\;&{\xleftarrow{\\$}}\\; \mathbb Z\_p \\\\
+A_I''                 &\gets \widetilde{B} \cdot \tilde{a}'' + \langle \mathbf{G}'' , \mathbf{a}\_L'' \rangle + \langle \mathbf{H}'', \mathbf{a}\_R'' \rangle \\\\
+A_O''                 &\gets \widetilde{B} \cdot \tilde{o}'' + \langle \mathbf{G}'' , \mathbf{a}\_O'' \rangle \\\\
+\mathbf{s}\_L''   \\; &{\xleftarrow{\\$}}\\; {\mathbb Z\_p}^{n''} \\\\
+\mathbf{s}\_R''   \\; &{\xleftarrow{\\$}}\\; {\mathbb Z\_p}^{n''} \\\\
+\tilde{s}'' \\;       &{\xleftarrow{\\$}}\\; \mathbb Z\_p \\\\
+S''                   &\gets \widetilde{B} \cdot \tilde{s}'' + \langle \mathbf{G}'' , \mathbf{s}\_L'' \rangle + \langle \mathbf{H}'', \mathbf{s}\_R'' \rangle
+\end{aligned}
+\\]
+
+The prover adds \\(A_I''\\), \\(A_O''\\) and \\(S''\\) to the protocol transcript
 and obtains challenge scalars \\(y,z \in {\mathbb Z\_p}\\) from the transcript.
 
 The prover then flattens the constraints using \\(q\\) powers of challenge \\(z\\):
 
 \\[
 \begin{aligned}
-\mathbf{w}\_L &\gets z \mathbf{z}^q \cdot \mathbf{W}\_L, \\\\
-\mathbf{w}\_R &\gets z \mathbf{z}^q \cdot \mathbf{W}\_R, \\\\
-\mathbf{w}\_O &\gets z \mathbf{z}^q \cdot \mathbf{W}\_O, \\\\
-\mathbf{w}\_V &\gets z \mathbf{z}^q \cdot \mathbf{W}\_V,
+\mathbf{w}\_L &\gets z \mathbf{z}^q \cdot (\mathbf{W}\_L' || \mathbf{W}\_L''), \\\\
+\mathbf{w}\_R &\gets z \mathbf{z}^q \cdot (\mathbf{W}\_R' || \mathbf{W}\_R''), \\\\
+\mathbf{w}\_O &\gets z \mathbf{z}^q \cdot (\mathbf{W}\_O' || \mathbf{W}\_O''), \\\\
+\mathbf{w}\_V &\gets z \mathbf{z}^q \cdot (\mathbf{W}\_V' || \mathbf{W}\_V''),
 \end{aligned}
 \\]
-where each of \\(\mathbf{w}\_L, \mathbf{w}\_R, \mathbf{w}\_O\\) has length \\(n\\) and \\(\mathbf{w}\_V\\) has length \\(m\\).
+where each of \\(\mathbf{w}\_L, \mathbf{w}\_R, \mathbf{w}\_O\\) has length \\(n = n' + n''\\) and \\(\mathbf{w}\_V\\) has length \\(m\\).
 
 The prover then constructs the blinded polynomials and their inner product:
 
 \\[
 \begin{aligned}
-  {\mathbf{l}}(x)  &\gets \mathbf{a}\_L \cdot x + \mathbf{s}\_L \cdot x^3 + \mathbf{y}^{-n} \circ \mathbf{w}\_R \cdot x + \mathbf{a}\_O \cdot x^2 \\\\
-  {\mathbf{r}}(x)  &\gets \mathbf{y}^n \circ \mathbf{a}\_R \cdot x + \mathbf{y}^n \circ \mathbf{s}\_R \cdot x^3 + \mathbf{w}\_L \cdot x - \mathbf{y}^n + \mathbf{w}\_O \\\\
+  {\mathbf{l}}(x)  &\gets (\mathbf{a}\_L' || \mathbf{a}\_L'') \cdot x + (\mathbf{s}\_L' || \mathbf{s}\_L'') \cdot x^3 + \mathbf{y}^{-n} \circ \mathbf{w}\_R \cdot x + (\mathbf{a}\_O' || \mathbf{a}\_O'') \cdot x^2 \\\\
+  {\mathbf{r}}(x)  &\gets \mathbf{y}^n \circ (\mathbf{a}\_R' || \mathbf{a}\_R'') \cdot x + \mathbf{y}^n \circ (\mathbf{s}\_R' || \mathbf{s}\_R'') \cdot x^3 + \mathbf{w}\_L \cdot x - \mathbf{y}^n + \mathbf{w}\_O \\\\
   t(x)             &\gets {\langle {\mathbf{l}}(x), {\mathbf{r}}(x) \rangle}
 \end{aligned}
 \\]
@@ -80,16 +100,16 @@ The prover generates blinding factors for terms \\(t\_1, t\_3, t\_4, t\_5, t\_6\
 \\]
 
 The prover adds \\(T_1, T_3, T_4, T_5, T_6\\) to the protocol transcript
-and obtains a challenge scalar \\(x \in {\mathbb Z\_p}\\) from the transcript.
+and obtains the challenge scalars \\(e,x \in {\mathbb Z\_p}\\) from the transcript.
 
-Using the concrete value \\(x\\), the prover computes
+Using the concrete values \\(e, x\\), the prover computes
 the synthetic blinding factors \\({\tilde{t}}(x)\\) and \\(\tilde{e}\\):
 
 \\[
 \begin{aligned}
   \tilde{t}\_2    &\gets \langle \mathbf{w}\_V, \tilde{\mathbf{v}} \rangle \\\\
   {\tilde{t}}(x)  &\gets \sum\_{i = 1}^{6} x^i \tilde{t}\_{i} \\\\
-  {\tilde{e}}     &\gets \tilde{a} \cdot x + \tilde{o} \cdot x^2 + \tilde{s} \cdot x^3 \\\\
+  {\tilde{e}}     &\gets (\tilde{a}' + e \tilde{a}'') \cdot x + (\tilde{o}' + e \tilde{o}'') \cdot x^2 + (\tilde{s}' + e \tilde{s}'') \cdot x^3 \\\\
 \end{aligned}
 \\]
 
@@ -104,9 +124,18 @@ The prover evaluates polynomials \\(\mathbf{l}(x), \mathbf{r}(x)\\) and
 
 \\[
 \begin{aligned}
-             n^{+} &= 2^{\lceil \log_2 n \rceil} \\\\
-\mathbf{l}^{+}     &= \mathbf{l}(x) \hspace{0.1cm} || \hspace{0.1cm} \mathbf{0} \\\\
-\mathbf{r}^{+}     &= \mathbf{r}(x) \hspace{0.1cm} || \hspace{0.1cm} [-y^n,...,-y^{n^{+}-1}]
+             n^{+} &\gets 2^{\lceil \log_2 n \rceil} \\\\
+\mathbf{l}^{+}     &\gets \mathbf{l}(x) \hspace{0.1cm} || \hspace{0.1cm} \mathbf{0} \\\\
+\mathbf{r}^{+}     &\gets \mathbf{r}(x) \hspace{0.1cm} || \hspace{0.1cm} [-y^n,...,-y^{n^{+}-1}]
+\end{aligned}
+\\]
+
+The prover transmutes generators using challenges \\(y, e\\):
+
+\\[
+\begin{aligned}
+    \hat{\mathbf{G}} &\gets \mathbf{G}' || (e \cdot \mathbf{G}'') \\\\
+    \hat{\mathbf{H}} &\gets \mathbf{y}^{-n} \circ \big( \mathbf{H}' || (e \cdot \mathbf{H}'') \big) \\\\
 \end{aligned}
 \\]
 
@@ -114,24 +143,24 @@ The prover also takes a larger slice of the generators \\(\mathbf{G}, \mathbf{H}
 
 \\[
 \begin{aligned}
-\mathbf{G}^{+}     &= \mathbf{G}    \hspace{0.1cm} || \hspace{0.1cm} [G_n,...,G_{n^{+}-1}] \\\\
-{\mathbf{H}'}^{+}  &= \mathbf{H}'   \hspace{0.1cm} || \hspace{0.1cm} \Big( [y^n,...,y^{n^{+}-1}] \circ [H_n,...,H_{n^{+}-1}] \Big) \\\\
+\hat{\mathbf{G}}^{+}  &\gets \hat{\mathbf{G}}   \hspace{0.1cm} || \hspace{0.1cm} e \cdot [G_n,...,G_{n^{+}-1}] \\\\
+\hat{\mathbf{H}}^{+}  &\gets \hat{\mathbf{H}}   \hspace{0.1cm} || \hspace{0.1cm} e \cdot [H_n,...,H_{n^{+}-1}] \\\\
 \end{aligned}
 \\]
 
 Finally, the prover performs the [inner product argument](../inner_product_proof/index.html) to prove the relation:
 \\[
 \operatorname{PK}\left\\{
-  (\mathbf{G}^{+}, {\mathbf{H}'}^{+} \in {\mathbb G}^{n^{+}}, P', Q \in {\mathbb G}; \mathbf{l}^{+}, \mathbf{r}^{+} \in {\mathbb Z\_p}^{n^{+}})
-  : P' = {\langle \mathbf{l}^{+}, \mathbf{G}^{+} \rangle} + {\langle \mathbf{r}^{+}, {\mathbf{H}'}^{+} \rangle} + {\langle \mathbf{l}^{+}, \mathbf{r}^{+} \rangle} Q
+  (\hat{\mathbf{G}}^{+}, \hat{\mathbf{H}}^{+} \in {\mathbb G}^{n^{+}}, P', Q \in {\mathbb G}; \mathbf{l}^{+}, \mathbf{r}^{+} \in {\mathbb Z\_p}^{n^{+}})
+  : P' = {\langle \mathbf{l}^{+}, \hat{\mathbf{G}}^{+} \rangle} + {\langle \mathbf{r}^{+}, \hat{\mathbf{H}}^{+} \rangle} + {\langle \mathbf{l}^{+}, \mathbf{r}^{+} \rangle} Q
 \right\\}
-\\] where \\({\mathbf{H}'}^{+} = {\mathbf{y}}^{-n^{+}} \circ \mathbf{H}^{+}\\).
+\\]
 
 The result of the inner product proof is a list of \\(2k\\) points and \\(2\\) scalars, where \\(k = \lceil \log_2(n) \rceil\\): \\(\\{L\_k, R\_k, \\dots, L\_1, R\_1, a, b\\}\\).
 
-The complete proof consists of \\(13+2k\\) 32-byte elements:
+The complete proof consists of \\(16+2k\\) 32-byte elements:
 \\[
-  \\{A\_I, A\_O, S, T\_1, T\_3, T\_4, T\_5, T\_6, t(x), {\tilde{t}}(x), \tilde{e}, L\_k, R\_k, \\dots, L\_1, R\_1, a, b\\}
+  \\{A\_I', A\_O', S', A\_I'', A\_O'', S'', T\_1, T\_3, T\_4, T\_5, T\_6, t(x), {\tilde{t}}(x), \tilde{e}, L\_k, R\_k, \\dots, L\_1, R\_1, a, b\\}
 \\]
 
 
