@@ -39,7 +39,7 @@ pub struct Variable<S: ScalarValue> {
 
 /// `Constraint` is a `LinearCombination` over variable indices with opaque scalars
 /// that is required to equal zero.
-/// Create constraints using `eq` method on `LinearCombination`s and `Variable`s.
+/// Create constraints using `equals` method on `LinearCombination`s and `Variable`s.
 pub struct Constraint(pub LinearCombination<VariableIndex>);
 
 /// `ConstraintSystem` trait represents the API for the gadgets.
@@ -144,7 +144,7 @@ impl<T,S> Mul<T> for Variable<S> where T: Into<S>, S: ScalarValue {
 impl<S> Variable<S> where S: ScalarValue {
 
     /// Creates a `Constraint` that this variable equals the given linear combination.
-    pub fn eq<T>(self, lc: T) -> Constraint where T: IntoLC<Variable<S>> {
+    pub fn equals<T>(self, lc: T) -> Constraint where T: IntoLC<Variable<S>> {
         (self - lc).into_constraint()
     }
 
@@ -160,7 +160,7 @@ impl<S> Variable<S> where S: ScalarValue {
 impl<S> LinearCombination<Variable<S>> where S: ScalarValue {
 
     /// Creates a `Constraint` that this linear combination equals the other linear combination.
-    pub fn eq<T>(self, lc: T) -> Constraint where T: IntoLC<Variable<S>> {
+    pub fn equals<T>(self, lc: T) -> Constraint where T: IntoLC<Variable<S>> {
         (self - lc.into_lc()).into_constraint()
     }
 

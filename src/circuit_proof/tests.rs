@@ -32,9 +32,9 @@ fn example_gadget<S: ScalarValue, CS: ConstraintSystem>(
         cs.assign_multiplier(l.eval(), r.eval(), o.eval())?;
 
     // Tie high-level and low-level variables together
-    cs.add_constraint(aL.eq(l));
-    cs.add_constraint(aR.eq(r));
-    cs.add_constraint(aO.eq(o));
+    cs.add_constraint(aL.equals(l));
+    cs.add_constraint(aR.equals(r));
+    cs.add_constraint(aO.equals(o));
 
     Ok(())
 }
@@ -188,7 +188,7 @@ impl KShuffleGadget {
         let k = x.len();
 
         if k == 1 {
-            cs.add_constraint(x[0].eq(y[0]));
+            cs.add_constraint(x[0].equals(y[0]));
             return Ok(());
         }
         
@@ -213,7 +213,7 @@ impl KShuffleGadget {
             })?;
 
             // Check equality between last x mul output and last y mul output
-            cs.add_constraint(first_mulx_out.eq(first_muly_out));
+            cs.add_constraint(first_mulx_out.equals(first_muly_out));
 
             Ok(())
         })?;
@@ -233,8 +233,8 @@ impl KShuffleGadget {
         let (al, ar, ao) =
             cs.assign_multiplier(l.eval(), r.eval(), l.eval()*r.eval())?;
 
-        cs.add_constraint(al.eq(l));
-        cs.add_constraint(ar.eq(r));
+        cs.add_constraint(al.equals(l));
+        cs.add_constraint(ar.equals(r));
 
         Ok(ao)
     }
@@ -250,8 +250,8 @@ impl KShuffleGadget {
         let (al, ar, ao) =
             cs.assign_multiplier(left.assignment, r.eval(), left.assignment*r.eval())?;
 
-        cs.add_constraint(al.eq(left));
-        cs.add_constraint(ar.eq(r));
+        cs.add_constraint(al.equals(left));
+        cs.add_constraint(ar.equals(r));
 
         Ok(ao)
     }
