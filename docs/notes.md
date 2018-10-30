@@ -730,21 +730,14 @@ Examples:
 * a **range proof gadget** checks that a given value is composed of a specific number of bits.
 
 
-## Uncommitted variables
+## Low-level variables
 
 Often a [gadget](#gadgets) needs a variable to connect with another gadget,
 or to implement its internal logic, without requiring a distinct [high-level variable](#variables) commitment \\(V\_i\\) for it.
-Such **uncommitted variables** are created from left and right variables \\(a\_L, a\_R\\) of additional multiplication gates.
+Such **low-level variables** are created from left and right variables \\(a\_L, a\_R\\) of additional multiplication gates.
 Output variables \\(a\_O\\) are not used for this purpose because
 they are implicitly constrained by a [multiplication gate](#multiplication-gates)
 and cannot be used as independent uncommitted variables.
-
-**Important:** uncommitted variables have their name due to lack of the individual commitments \\(V\_i\\),
-but they are still committed collectively with all [low-level variables](#variables)
-using a single vector Pedersen commitment \\(A\_I\\) as required by the underlying proof protocol.
-The distinction is important when [building constraints](#building-constraints) using [challenges](#gadget-as-a-challenge),
-which are bound only to the high-level variables, but not to the low-level variables (hence, “uncommitted”).
-
 
 ## Gadget as a challenge
 
@@ -761,11 +754,13 @@ represent secret values of the corresponding side of a permutation:
 Making a proof of permutation using a static gadget (without challenge values) may require
 building a [sorting network][sorting_network] that would use significantly more multiplication gates.
 
-**Important:** since challenges in the linear constraints are bound only to [high-level variables](#variables),
-using them to implement high-level protocols requires proving the soundness of the system as a _whole_.
-Individual gadgets can be proven to be sound only when they do not use such challenges.
-This caveat does not apply to the challenges used to implement the underlying proof system (\\(y, z, x, w\\)),
-as these are produced after all variables (including low-level ones) are committed.
+**Important:** challenges are bound to the [high-level variables](#variables) and the
+committed portion of [low-level variables](#low-level-variables).
+The remaining [low-level variables](#low-level-variables) are uncommitted and must be uniquely determined
+by the committed variables and the challenge scalars in order for gadgets to be _locally sound_.
+To facilitate this, the [constraint system API](../r1cs/index.html) prevents use of challenges
+before all freely chosen variables are committed, and the raw challenge scalars are never exposed to the user.
+
 
 [sorting_network]: https://en.wikipedia.org/wiki/Sorting_network
 
