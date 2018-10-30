@@ -147,19 +147,19 @@ pub mod range_proof_mpc {
 ///             let z = cs.challenge_scalar(b"k-scalar shuffle challenge");
 /// 
 ///             // Make last x multiplier for i = k-1 and k-2
-///             let last_mulx_out = KShuffleGadget::last_multiplier(cs, z, x[k - 1].into_opaque(), x[k - 2].into_opaque());
+///             let last_mulx_out = KShuffleGadget::last_multiplier(cs, z, x[k - 1], x[k - 2]);
 /// 
 ///             // Make multipliers for x from i == [0, k-3]
 ///             let first_mulx_out = (0..k - 2).rev().fold(last_mulx_out, |prev_out, i| {
-///                 KShuffleGadget::intermediate_multiplier(cs, z, prev_out?, x[i].into_opaque())
+///                 KShuffleGadget::intermediate_multiplier(cs, z, prev_out?, x[i])
 ///             })?;
 /// 
 ///             // Make last y multiplier for i = k-1 and k-2
-///             let last_muly_out = KShuffleGadget::last_multiplier(cs, z, y[k - 1].into_opaque(), y[k - 2].into_opaque());
+///             let last_muly_out = KShuffleGadget::last_multiplier(cs, z, y[k - 1], y[k - 2]);
 /// 
 ///             // Make multipliers for y from i == [0, k-3]
 ///             let first_muly_out = (0..k - 2).rev().fold(last_muly_out, |prev_out, i| {
-///                 KShuffleGadget::intermediate_multiplier(cs, z, prev_out?, y[i].into_opaque())
+///                 KShuffleGadget::intermediate_multiplier(cs, z, prev_out?, y[i])
 ///             })?;
 /// 
 ///             // Check equality between last x mul output and last y mul output
@@ -177,8 +177,8 @@ pub mod range_proof_mpc {
 ///         left: Variable<OpaqueScalar>,
 ///         right: Variable<OpaqueScalar>,
 ///     ) -> Result<Variable<OpaqueScalar>, R1CSError> {
-///         let l = left.into_opaque() - z;
-///         let r = right.into_opaque() - z;
+///         let l = left - z;
+///         let r = right - z;
 /// 
 ///         let (al, ar, ao) =
 ///             cs.assign_multiplier(l.eval(), r.eval(), l.eval()*r.eval())?;
