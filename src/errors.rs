@@ -116,6 +116,7 @@ pub enum R1CSError {
         cause
     )]
     LayoutError {
+        /// Underlying cause of the error.
         cause: &'static str
     },
 }

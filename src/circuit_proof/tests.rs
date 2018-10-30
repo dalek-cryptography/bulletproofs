@@ -1,5 +1,6 @@
 use super::scalar_value::ScalarValue;
 use super::opaque_scalar::OpaqueScalar;
+use super::linear_combination::{IntoLC,Variable as LCVariable};
 use super::*;
 
 use errors::R1CSError;
@@ -23,20 +24,18 @@ fn example_gadget<S: ScalarValue, CS: ConstraintSystem>(
     c2: Scalar,
 ) -> Result<(), R1CSError> {
 
-    let one: S = Scalar::one().into();
-
-    let l = LinearCombination::from((a1, one)) + (a2, one);
-    let r = LinearCombination::from((b1, one)) + (b2, one);
-    let o = LinearCombination::from((c1, one)) + c2;
+    let l = a1 + a2;
+    let r = b1 + b2;
+    let o = c1 + c2;
 
     // Make low-level VariableIndexs (aL = v_a1 + v_a2, aR = v_b1 + v_b2, aO = v_c1 + v_c2)
     let (aL, aR, aO) =
         cs.assign_multiplier(l.eval(), r.eval(), o.eval())?;
 
     // Tie high-level and low-level variables together
-    cs.add_constraint((l - (aL, one)).into());
-    cs.add_constraint((r - (aR, one)).into());
-    cs.add_constraint((o - (aO, one)).into());
+    cs.add_constraint(aL.eq(l));
+    cs.add_constraint(aR.eq(r));
+    cs.add_constraint(aO.eq(o));
 
     Ok(())
 }
@@ -177,13 +176,11 @@ struct KShuffleGadget {}
 
 impl KShuffleGadget {
 
-    fn fill_cs<S: ScalarValue, CS: ConstraintSystem>(
+    fn fill_cs<CS: ConstraintSystem>(
         cs: &mut CS,
-        x: &[Variable<S>],
-        y: &[Variable<S>],
+        x: Vec<Variable<OpaqueScalar>>,
+        y: Vec<Variable<OpaqueScalar>>,
     ) -> Result<(), R1CSError> {
-
-        let one = S::one();
 
         if x.len() != y.len() {
             return Err(R1CSError::LayoutError{cause: "KShuffleGadget: inputs have different lengths"});
@@ -192,33 +189,32 @@ impl KShuffleGadget {
         let k = x.len();
 
         if k == 1 {
-            cs.add_constraint((LinearCombination::from((x[0], one)) - (y[0], one)).into());
+            cs.add_constraint(x[0].eq(y[0]));
             return Ok(());
         }
         
-        cs.after_commitment(|cs| {
+        cs.after_commitment(move |cs| {
 
             let z = cs.challenge_scalar(b"k-scalar shuffle challenge");
-            let neg_z = -z;
 
             // Make last x multiplier for i = k-1 and k-2
-            let last_mulx_out = KShuffleGadget::last_multiplier(cs, neg_z, x[k - 1], x[k - 2]);
+            let last_mulx_out = KShuffleGadget::last_multiplier(cs, z, x[k - 1].into_opaque(), x[k - 2].into_opaque());
 
             // Make multipliers for x from i == [0, k-3]
             let first_mulx_out = (0..k - 2).rev().fold(last_mulx_out, |prev_out, i| {
-                KShuffleGadget::intermediate_multiplier(cs, neg_z, prev_out?, x[i])
+                KShuffleGadget::intermediate_multiplier(cs, z, prev_out?, x[i].into_opaque())
             })?;
 
             // Make last y multiplier for i = k-1 and k-2
-            let last_muly_out = KShuffleGadget::last_multiplier(cs, z, y[k - 1], y[k - 2]);
+            let last_muly_out = KShuffleGadget::last_multiplier(cs, z, y[k - 1].into_opaque(), y[k - 2].into_opaque());
 
             // Make multipliers for y from i == [0, k-3]
             let first_muly_out = (0..k - 2).rev().fold(last_muly_out, |prev_out, i| {
-                KShuffleGadget::intermediate_multiplier(cs, neg_z, prev_out?, y[i])
+                KShuffleGadget::intermediate_multiplier(cs, z, prev_out?, y[i].into_opaque())
             })?;
 
             // Check equality between last x mul output and last y mul output
-            cs.add_constraint((LinearCombination::from((first_mulx_out, one)) - (first_muly_out, one)).into());
+            cs.add_constraint(first_mulx_out.eq(first_muly_out));
 
             Ok(())
         })?;
@@ -226,42 +222,38 @@ impl KShuffleGadget {
         Ok(())
     }
 
-    fn last_multiplier<S: ScalarValue, CS: ConstraintSystem>(
+    fn last_multiplier<CS: ConstraintSystem>(
         cs: &mut CS,
-        neg_z: OpaqueScalar,
-        left: Variable<S>,
-        right: Variable<S>,
-    ) -> Result<Variable<S>, R1CSError> {
-        let one = S::one();
-
-        let l = LinearCombination::from((left, one)) + neg_z;
-        let r = LinearCombination::from((right, one)) + neg_z;
+        z: OpaqueScalar,
+        left: Variable<OpaqueScalar>,
+        right: Variable<OpaqueScalar>,
+    ) -> Result<Variable<OpaqueScalar>, R1CSError> {
+        let l = left.into_opaque() - z;
+        let r = right.into_opaque() - z;
 
         let (al, ar, ao) =
             cs.assign_multiplier(l.eval(), r.eval(), l.eval()*r.eval())?;
 
-        cs.add_constraint((l - (al, one)).into());
-        cs.add_constraint((r - (ar, one)).into());
+        cs.add_constraint(al.eq(l));
+        cs.add_constraint(ar.eq(r));
 
         Ok(ao)
     }
 
-    fn intermediate_multiplier<S: ScalarValue, CS: ConstraintSystem>(
+    fn intermediate_multiplier<CS: ConstraintSystem>(
         cs: &mut CS,
-        neg_z: OpaqueScalar,
-        left: Variable<S>,
-        right: Variable<S>,
-    ) -> Result<Variable<S>, R1CSError> {
-        let one = S::one();
-
-        let l = LinearCombination::from((left, one));
-        let r = LinearCombination::from((right, one)) + neg_z;
+        z: OpaqueScalar,
+        left: Variable<OpaqueScalar>,
+        right: Variable<OpaqueScalar>,
+    ) -> Result<Variable<OpaqueScalar>, R1CSError> {
+        let l = left.into_lc();
+        let r = right - z;
 
         let (al, ar, ao) =
             cs.assign_multiplier(l.eval(), r.eval(), l.eval()*r.eval())?;
 
-        cs.add_constraint((l - (al, one)).into());
-        cs.add_constraint((r - (ar, one)).into());
+        cs.add_constraint(al.eq(l));
+        cs.add_constraint(ar.eq(r));
 
         Ok(ao)
     }
@@ -299,7 +291,11 @@ fn shuffle_gadget_test_helper(k: usize) {
             v.into_iter().map(Scalar::from).collect(),
             v_blinding,
             |cs, vars| {
-                KShuffleGadget::fill_cs(cs, &vars[0..k], &vars[k..2*k])
+                KShuffleGadget::fill_cs(
+                    cs, 
+                    (&vars[0..k]).into_iter().map(|v| v.into_opaque()).collect(),
+                    (&vars[k..2*k]).into_iter().map(|v| v.into_opaque()).collect()
+                )
             },
         ).unwrap()
     };
@@ -312,7 +308,11 @@ fn shuffle_gadget_test_helper(k: usize) {
         &mut base_transcript.clone(),
         commitments,
         |cs, vars| {
-            KShuffleGadget::fill_cs(cs, &vars[0..k], &vars[k..2*k])
+            KShuffleGadget::fill_cs(
+                cs, 
+                (&vars[0..k]).into_iter().map(|v| v.into_opaque()).collect(),
+                (&vars[k..2*k]).into_iter().map(|v| v.into_opaque()).collect()
+            )
         }
     ).unwrap()
 }

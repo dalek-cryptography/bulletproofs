@@ -233,8 +233,8 @@ impl<'a, 'b> CommittedVerifierCS<'a, 'b>  {
         let mut wc = Scalar::zero();
 
         let mut exp_z = *z;
-        for lc in self.cs.constraints.iter() {
-            for (var, coeff) in &lc.terms {
+        for c in self.cs.constraints.iter() {
+            for (var, coeff) in &c.0.terms {
                 match var {
                     VariableIndex::MultiplierLeft(i) => {
                         wL[*i] += exp_z * coeff.internal_scalar;

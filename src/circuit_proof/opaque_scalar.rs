@@ -12,15 +12,6 @@ pub struct OpaqueScalar {
     pub(crate) internal_scalar: Scalar,
 }
 
-impl OpaqueScalar {
-    fn one() -> Self {
-        Scalar::one().into()
-    }
-    fn zero() -> Self {
-        Scalar::zero().into()
-    }
-}
-
 impl From<Scalar> for OpaqueScalar {
     fn from(scalar: Scalar) -> Self {
         OpaqueScalar {
@@ -39,7 +30,7 @@ impl From<u64> for OpaqueScalar {
 
 impl Default for OpaqueScalar {
     fn default() -> Self {
-        OpaqueScalar::zero()
+        Scalar::zero().into()
     }
 }
 

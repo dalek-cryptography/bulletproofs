@@ -1,11 +1,11 @@
-use curve25519_dalek::scalar::Scalar;
+use core::ops::{Add, Sub, Mul};
 
 use errors::R1CSError;
 
 use super::scalar_value::ScalarValue;
 use super::assignment::Assignment;
 use super::linear_combination as lc;
-use super::linear_combination::LinearCombination;
+use super::linear_combination::{LinearCombination,IntoLC};
 use super::opaque_scalar::OpaqueScalar;
 
 /// Represents a variable in a constraint system.
@@ -28,13 +28,19 @@ pub enum VariableIndex {
 /// has an assignment which can be present of missing.
 #[derive(Copy,Clone,Debug)]
 pub struct Variable<S: ScalarValue> {
+    /// Index of the variable within the constraint system
     pub index: VariableIndex,
+
+    /// Assignment of the variable within the constraint system.
+    /// Assignment is present as a plain or opaque scalar for the prover,
+    /// but missing for the verifier.
     pub assignment: Assignment<S>,
 }
 
-/// Constraint is a linear combination over variable indices with opaque scalars to accomodate
-/// both opaque and non-opaque combinations
-pub type Constraint = LinearCombination<VariableIndex>;
+/// `Constraint` is a `LinearCombination` over variable indices with opaque scalars
+/// that is required to equal zero.
+/// Create constraints using `eq` method on `LinearCombination`s and `Variable`s.
+pub struct Constraint(pub LinearCombination<VariableIndex>);
 
 /// `ConstraintSystem` trait represents the API for the gadgets.
 /// Gadgets receive a mutable instance of the constraint system and use it
@@ -76,6 +82,9 @@ pub trait ConstraintSystem {
         for<'t> F: 'static + Fn(&'t mut Self::CommittedCS) -> Result<(), R1CSError>;
 }
 
+/// `CommittedConstraintSystem` trait represents the `ConstraintSystem` in the state
+/// after low-level variables have been committed. Gadgets can sample random challenge
+/// from the constraint system to create additional variables and constraints.
 pub trait CommittedConstraintSystem: ConstraintSystem {
     /// Obtain a challenge scalar bound to the assignments of all of
     /// the externally committed wires.
@@ -86,25 +95,81 @@ pub trait CommittedConstraintSystem: ConstraintSystem {
 }
 
 
+// Creating linear combinations from variables
+
+/// Adding a linear combination `lc` to a variable `v` creates combination `v*1 + lc`. 
+impl<S,T> Add<T> for Variable<S> where S: ScalarValue, T: IntoLC<Variable<S>> {
+    type Output = LinearCombination<Self>;
+
+    fn add(self, lc: T) -> Self::Output {
+        let mut lc = lc.into_lc();
+        lc.precomputed += self.assignment;
+        lc.terms.push((self, S::one()));
+        lc
+    }
+}
+
+/// Subtracting a linear combination `lc` from a variable `v` creates combination `v*1 - lc`. 
+impl<S,T> Sub<T> for Variable<S> where S: ScalarValue, T: IntoLC<Variable<S>> {
+    type Output = LinearCombination<Self>;
+
+    fn sub(self, lc: T) -> Self::Output {
+        let mut lc = lc.into_lc();
+        lc.precomputed = self.assignment - lc.precomputed;
+        for (_, ref mut s) in lc.terms.iter_mut() {
+            *s = -*s;
+        }
+        lc.terms.push((self, S::one()));
+        lc
+    }
+}
+
+/// Multiplying a variable `v` by a scalar `a` creates combination `v*a`.
+impl<T,S> Mul<T> for Variable<S> where T: Into<S>, S: ScalarValue {
+    type Output = LinearCombination<Self>;
+
+    fn mul(self, scalar: T) -> Self::Output {
+        let scalar = scalar.into();
+        LinearCombination {
+            precomputed: self.assignment * Assignment::Value(scalar),
+            terms: vec![(self, scalar)]
+        }
+    }
+}
+
 
 // Trait implementations for concrete types used in the constraint system
 // ----------------------------------------------------------------------
 
-// Any linear combination of variables with opaque or non-opaque scalars can be converted to a Constraint
-// (which does not hold the assignments and contains only the opaque scalars for uniform representation inside CS)
-impl<T: ScalarValue> From<LinearCombination<Variable<T>>> for Constraint {
-    fn from(lc: LinearCombination<Variable<T>>) -> Constraint {
-        Constraint {
-            precomputed: match lc.eval() {
-                Assignment::Value(v) => Assignment::Value(v.into()),
+impl<S> Variable<S> where S: ScalarValue {
+
+    /// Creates a `Constraint` that this variable equals the given linear combination.
+    pub fn eq<T>(self, lc: T) -> Constraint where T: IntoLC<Variable<S>> {
+        (self - lc).into_constraint()
+    }
+}
+
+impl<S> LinearCombination<Variable<S>> where S: ScalarValue {
+
+    /// Creates a `Constraint` that this linear combination equals the other linear combination.
+    pub fn eq<T>(self, lc: T) -> Constraint where T: IntoLC<Variable<S>> {
+        (self - lc.into_lc()).into_constraint()
+    }
+
+    // Any linear combination of variables with opaque or non-opaque scalars can be converted to a Constraint
+    // (which does not hold the assignments and contains only the opaque scalars for uniform representation inside CS)
+    fn into_constraint(self) -> Constraint {
+        Constraint(LinearCombination{
+            precomputed: match self.eval() {
+                Assignment::Value(v) => Assignment::Value(v.into_opaque()),
                 Assignment::Missing() => Assignment::Missing(),
             },
-            terms: lc
+            terms: self
                 .terms
                 .into_iter()
-                .map(|(v, s)| (v.index, s.into()))
+                .map(|(v, s)| (v.index, s.into_opaque()))
                 .collect(),
-        }
+        })
     }
 }
 
@@ -123,23 +188,6 @@ impl lc::Variable for VariableIndex {
 
     fn into_opaque(self) -> Self::OpaqueType {
         self
-    }
-}
-
-impl<S: ScalarValue> lc::Variable for Assignment<S> {
-    type ValueType = S;
-    type OpaqueType = Assignment<OpaqueScalar>;
-
-    fn assignment(&self) -> Assignment<Self::ValueType> {
-        self.clone()
-    }
-
-    fn constant_one() -> Self {
-        Assignment::Value(S::one())
-    }
-
-    fn into_opaque(self) -> Self::OpaqueType {
-        self.into_opaque()
     }
 }
 
@@ -165,3 +213,5 @@ impl<S: ScalarValue> lc::Variable for Variable<S> {
         }
     }
 }
+
+

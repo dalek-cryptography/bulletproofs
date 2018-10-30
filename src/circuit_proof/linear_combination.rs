@@ -1,5 +1,4 @@
-use core::iter::FromIterator;
-use core::ops::{Add, Mul, Sub};
+use core::ops::{Add, Sub, Mul};
 
 use curve25519_dalek::scalar::Scalar;
 
@@ -9,7 +8,10 @@ use super::opaque_scalar::OpaqueScalar;
 
 /// Trait representing a variable in the linear combination
 pub trait Variable: Clone {
+    /// Type of the scalar used in the assignment for this variable.
     type ValueType: ScalarValue;
+
+    /// Type of the variable with an opaque assignment.
     type OpaqueType: Variable<ValueType=OpaqueScalar>;
 
     /// Returns the assignment
@@ -27,7 +29,7 @@ pub trait Variable: Clone {
 /// tuple `(v,w)` is converted to a single term.
 pub trait IntoLC<V> where V: Variable {
     /// Converts the type into a linear combination
-    fn into_linear_combination(self) -> LinearCombination<V>;
+    fn into_lc(self) -> LinearCombination<V>;
 }
 
 /// Linear combination of variables `V` and scalars `S` allows
@@ -47,13 +49,13 @@ pub struct LinearCombination<V: Variable> {
 // Implementation of IntoLC trait for various types
 
 impl<V: Variable> IntoLC<V> for LinearCombination<V> {
-    fn into_linear_combination(self) -> LinearCombination<V> {
+    fn into_lc(self) -> LinearCombination<V> {
         self
     }
 }
 
 impl<V: Variable> IntoLC<V> for Scalar {
-    fn into_linear_combination(self) -> LinearCombination<V> {
+    fn into_lc(self) -> LinearCombination<V> {
         LinearCombination {
             terms: vec![(V::constant_one(), self.into())],
             precomputed: Assignment::Value(self.into())
@@ -62,7 +64,7 @@ impl<V: Variable> IntoLC<V> for Scalar {
 }
 
 impl<V> IntoLC<V> for OpaqueScalar where V: Variable<ValueType=OpaqueScalar> {
-    fn into_linear_combination(self) -> LinearCombination<V> {
+    fn into_lc(self) -> LinearCombination<V> {
         LinearCombination {
             terms: vec![(V::constant_one(), self)],
             precomputed: Assignment::Value(self)
@@ -71,28 +73,28 @@ impl<V> IntoLC<V> for OpaqueScalar where V: Variable<ValueType=OpaqueScalar> {
 }
 
 impl<V> IntoLC<V> for V where V: Variable {
-    fn into_linear_combination(self) -> LinearCombination<V> {
+    fn into_lc(self) -> LinearCombination<V> {
         LinearCombination {
+            precomputed: self.assignment(),
             terms: vec![(self, V::ValueType::one())],
-            precomputed: self.assignment()
         }
     }
 }
 
 impl<V> IntoLC<V> for (V, Scalar) where V: Variable, Assignment<V::ValueType>: From<Scalar> {
-    fn into_linear_combination(self) -> LinearCombination<V> {
+    fn into_lc(self) -> LinearCombination<V> {
         LinearCombination {
+            precomputed: self.0.assignment() * self.1,
             terms: vec![(self.0, self.1.into())],
-            precomputed: self.0.assignment() * self.1
         }
     }
 }
 
 impl<V> IntoLC<V> for (V, OpaqueScalar) where V: Variable<ValueType=OpaqueScalar> {
-    fn into_linear_combination(self) -> LinearCombination<V> {
+    fn into_lc(self) -> LinearCombination<V> {
         LinearCombination {
+            precomputed: self.0.assignment() * self.1,
             terms: vec![(self.0, self.1)],
-            precomputed: self.0.assignment() * self.1
         }
     }
 }
@@ -103,7 +105,8 @@ impl<V: Variable> LinearCombination<V> {
         self.precomputed
     }
 
-    pub fn into_opaque(&self) -> LinearCombination<V::OpaqueType> {
+    /// Converts variables in the linear combination into opaque variables
+    pub fn into_opaque(self) -> LinearCombination<V::OpaqueType> {
         LinearCombination {
             precomputed: self.precomputed.into_opaque(),
             // XXX: use mem::forget + mem::transmute + Vec::from_raw_parts + packed repr for OpaqueScalar
@@ -127,94 +130,37 @@ impl<V: Variable> Default for LinearCombination<V> {
 
 /// Arithmetic on linear combinations
 
-impl<V: Variable, T: ScalarValue + Into<V::ValueType>> Add<(V, T)> for LinearCombination<V> {
+impl<T, V> Add<T> for LinearCombination<V> where T: IntoLC<V>, V: Variable {
     type Output = Self;
 
-    fn add(mut self, rhs: (V, T)) -> Self {
-        self.precomputed += rhs.0.assignment() * rhs.1.into();
-        self.terms.push((rhs.0, rhs.1.into()));
+    fn add(mut self, other: T) -> Self {
+        let other = other.into_lc();
+        self.precomputed += other.precomputed;
+        self.terms.extend(other.terms.into_iter());
         self
     }
 }
 
-
-// Adding a pair to a linear combination
-impl<V: Variable, T: ScalarValue + Into<V::ValueType>> Add<(V, T)> for LinearCombination<V> {
+impl<T, V> Sub<T> for LinearCombination<V> where T: IntoLC<V>, V: Variable {
     type Output = Self;
 
-    fn add(mut self, rhs: (V, T)) -> Self {
-        self.precomputed += rhs.0.assignment() * rhs.1.into();
-        self.terms.push((rhs.0, rhs.1.into()));
-        self
-    }
-}
-
-// Subtracting a pair from a linear combination
-impl<V: Variable, T: ScalarValue + Into<V::ValueType>> Sub<(V, T)> for LinearCombination<V> {
-    type Output = Self;
-
-    fn sub(mut self, rhs: (V, T)) -> Self {
-        self.precomputed -= rhs.0.assignment() * rhs.1.into();
-        self.terms.push((rhs.0, -rhs.1.into()));
-        self
-    }
-}
-
-// Adding a constant to a linear combination
-impl<V: Variable, T: ScalarValue + Into<V::ValueType>> Add<T> for LinearCombination<V> {
-    type Output = Self;
-
-    fn add(mut self, rhs: T) -> Self {
-        self.precomputed += rhs.into();
-        self.terms.push((V::constant_one(), rhs.into()));
-        self
-    }
-}
-
-// Subtracting a constant from a linear combination
-impl<V: Variable, T: ScalarValue + Into<V::ValueType>> Sub<T> for LinearCombination<V> {
-    type Output = Self;
-
-    fn sub(mut self, rhs: T) -> Self {
-        self.precomputed -= rhs.into();
-        self.terms.push((V::constant_one(), -rhs.into()));
+    fn sub(mut self, other: T) -> Self {
+        let other = other.into_lc();
+        self.precomputed -= other.precomputed;
+        self.terms.extend(other.terms.into_iter().map(|(v,w)| (v,-w)));
         self
     }
 }
 
 // Multiplying a linear combination by a constant
-impl<V: Variable, T: ScalarValue + Into<V::ValueType>> Mul<T> for LinearCombination<V> {
+impl<V> Mul<V::ValueType> for LinearCombination<V> where V: Variable {
     type Output = Self;
 
-    fn mul(mut self, rhs: T) -> Self {
-        self.precomputed = self.precomputed * rhs.into();
+    fn mul(mut self, scalar: V::ValueType) -> Self {
+        self.precomputed = self.precomputed * Assignment::Value(scalar);
         for (_, ref mut s) in self.terms.iter_mut() {
-            *s = *s * rhs.into();
+            *s = *s * scalar;
         }
         self
-    }
-}
-
-impl<V: Variable, T: ScalarValue + Into<V::ValueType>> FromIterator<(V, T)> for LinearCombination<V> {
-    fn from_iter<I>(iter: I) -> Self
-    where
-        I: IntoIterator<Item = (V, T)>,
-    {
-        iter.into_iter()
-            .fold(LinearCombination::default(), |t, (v, s)| t + (v, s))
-    }
-}
-
-impl<'a, V: Variable, T: ScalarValue + Into<V::ValueType>> FromIterator<&'a (V, T)>
-    for LinearCombination<V>
-{
-    fn from_iter<I>(iter: I) -> Self
-    where
-        I: IntoIterator<Item = &'a (V, T)>,
-    {
-        iter.into_iter()
-            .fold(LinearCombination::default(), |t, (v, s)| {
-                t + (v.clone(), s.clone().into())
-            })
     }
 }
