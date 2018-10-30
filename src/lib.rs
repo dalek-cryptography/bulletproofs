@@ -195,13 +195,12 @@ pub mod range_proof_mpc {
 ///         left: Variable<OpaqueScalar>,
 ///         right: Variable<OpaqueScalar>,
 ///     ) -> Result<Variable<OpaqueScalar>, R1CSError> {
-///         let l = left.into_lc();
 ///         let r = right - z;
 /// 
 ///         let (al, ar, ao) =
-///             cs.assign_multiplier(l.eval(), r.eval(), l.eval()*r.eval())?;
+///             cs.assign_multiplier(left.assignment, r.eval(), left.assignment*r.eval())?;
 /// 
-///         cs.add_constraint(al.eq(l));
+///         cs.add_constraint(al.eq(left));
 ///         cs.add_constraint(ar.eq(r));
 /// 
 ///         Ok(ao)

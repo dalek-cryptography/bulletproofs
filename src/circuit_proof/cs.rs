@@ -147,6 +147,14 @@ impl<S> Variable<S> where S: ScalarValue {
     pub fn eq<T>(self, lc: T) -> Constraint where T: IntoLC<Variable<S>> {
         (self - lc).into_constraint()
     }
+
+    /// Converts the variable into an opaque one.
+    pub fn into_opaque(self) -> Variable<OpaqueScalar> {
+        Variable {
+            index: self.index,
+            assignment: self.assignment.into_opaque()
+        }
+    }
 }
 
 impl<S> LinearCombination<Variable<S>> where S: ScalarValue {
@@ -207,10 +215,7 @@ impl<S: ScalarValue> lc::Variable for Variable<S> {
     }
 
     fn into_opaque(self) -> Self::OpaqueType {
-        Variable {
-            index: self.index,
-            assignment: self.assignment.into_opaque()
-        }
+        Variable::into_opaque(self)
     }
 }
 
