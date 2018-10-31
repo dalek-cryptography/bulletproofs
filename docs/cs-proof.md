@@ -294,8 +294,10 @@ Finally, verifier groups all scalars by each point and performs a single multisc
                       + & \quad (-{\widetilde{e}} - r{\tilde{t}}(x)) \cdot \widetilde{B} \\\\
                       + & \quad {\langle \big( x \mathbf{y}^{-n'} \circ \mathbf{w}\_R' \big) - a\mathbf{s}\_{[0:n']}, \mathbf{G}' \rangle}\\\\
                       + & \quad {\langle e \Big( \big( x y^{-n'} \mathbf{y}^{-n''} \circ \mathbf{w}\_R'' \big) - a\mathbf{s}\_{[n':n]} \Big), \mathbf{G}'' \rangle}\\\\
-                      + & \quad {\langle -e a\mathbf{s}\_{[n:n^{+}]}, [G_n,...,G_{n^{+}-1}] \rangle}\\\\
-                      + & \quad {\langle -\mathbf{1} + \mathbf{y}^{-n^{+}} \circ \big( (x \mathbf{w}\_L + \mathbf{w}\_O) || \mathbf{0} - (b /{\mathbf{s}}) \big), \mathbf{H}^{+} \rangle}\\\\
+                      + & \quad {\langle -e a\mathbf{s}\_{[n:n^{+}]}, \mathbf{G}^{+}\_{[n:n^{+}]} \rangle}\\\\
+                      + & \quad {\langle -\mathbf{1} + \mathbf{y}^{-n'} \circ (x \mathbf{w}\_L' + \mathbf{w}\_O' - b /\mathbf{s}\_{[0:n']} ), \mathbf{H}' \rangle}\\\\
+                      + & \quad {\langle e \big(-\mathbf{1} + y^{n'} \mathbf{y}^{-n''} \circ (x \mathbf{w}\_L'' + \mathbf{w}\_O'' - b /\mathbf{s}\_{[n':n]} ) \big), \mathbf{H}'' \rangle}\\\\
+                      + & \quad {\langle e \big(-\mathbf{1} + y^{n} \mathbf{y}^{-(n^{+}-n)} \circ ( -b /\mathbf{s}\_{[n:n^{+}]} ) \big), \mathbf{H}^{+}\_{[n:n^{+}]} \rangle}\\\\
                       + & \quad {\langle [u_{1}^2,    \dots, u_{k}^2    ], [L_1, \dots, L_{k}] \rangle}\\\\
                       + & \quad {\langle [u_{1}^{-2}, \dots, u_{k}^{-2} ], [R_1, \dots, R_{k}] \rangle}
 \end{aligned}
