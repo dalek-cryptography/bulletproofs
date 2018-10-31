@@ -288,16 +288,16 @@ Finally, verifier groups all scalars by each point and performs a single multisc
                       + & \quad e \cdot x     \cdot A\_I'' \\\\
                       + & \quad e \cdot x^2   \cdot A\_O'' \\\\
                       + & \quad e \cdot x^3   \cdot S'' \\\\
-                      + & \quad \langle r x^2 \mathbf{w}\_V, \mathbf{V} \rangle \\\\
-                      + & \quad \sum\_{i = 1,3,4,5,6} r x^i T\_{i} \\\\
-                      + & \quad \Big(w \big(t(x) - ab\big) + r \big(x^2 (w\_c + \delta(y,z)) - t(x)\big) \Big) \cdot B \\\\
-                      + & \quad (-{\widetilde{e}} - r{\tilde{t}}(x)) \cdot \widetilde{B} \\\\
-                      + & \quad {\langle \big( x \mathbf{y}^{-n'} \circ \mathbf{w}\_R' \big) - a\mathbf{s}\_{[0:n']}, \mathbf{G}' \rangle}\\\\
-                      + & \quad {\langle e \Big( \big( x y^{-n'} \mathbf{y}^{-n''} \circ \mathbf{w}\_R'' \big) - a\mathbf{s}\_{[n':n]} \Big), \mathbf{G}'' \rangle}\\\\
-                      + & \quad {\langle -e a\mathbf{s}\_{[n:n^{+}]}, \mathbf{G}^{+}\_{[n:n^{+}]} \rangle}\\\\
-                      + & \quad {\langle -\mathbf{1} + \mathbf{y}^{-n'} \circ (x \mathbf{w}\_L' + \mathbf{w}\_O' - b /\mathbf{s}\_{[0:n']} ), \mathbf{H}' \rangle}\\\\
-                      + & \quad {\langle e \big(-\mathbf{1} + y^{n'} \mathbf{y}^{-n''} \circ (x \mathbf{w}\_L'' + \mathbf{w}\_O'' - b /\mathbf{s}\_{[n':n]} ) \big), \mathbf{H}'' \rangle}\\\\
-                      + & \quad {\langle e \big(-\mathbf{1} + y^{n} \mathbf{y}^{-(n^{+}-n)} \circ ( -b /\mathbf{s}\_{[n:n^{+}]} ) \big), \mathbf{H}^{+}\_{[n:n^{+}]} \rangle}\\\\
+                      + & \quad \langle r \cdot x^2 \cdot \mathbf{w}\_V, \mathbf{V} \rangle \\\\
+                      + & \quad \sum\_{i = 1,3,4,5,6} r \cdot x^i \cdot T\_{i} \\\\
+                      + & \quad \Big(w \cdot \big(t(x) - a \cdot b\big) + r \cdot \big(x^2 \cdot (w\_c + \delta(y,z)) - t(x)\big) \Big) \cdot B \\\\
+                      + & \quad (-{\widetilde{e}} - r \cdot {\tilde{t}}(x)) \cdot \widetilde{B} \\\\
+                      + & \quad {\langle x \cdot \mathbf{y}^{-n^{+}}\_{[0:n']} \circ \mathbf{w}\_R' - a \cdot \mathbf{s}\_{[0:n']}, \mathbf{G}^{+}\_{[0:n']} \rangle}\\\\
+                      + & \quad {\langle e \cdot \big( x \cdot \mathbf{y}^{-n^{+}}\_{[n':n]} \circ \mathbf{w}\_R'' - a \cdot \mathbf{s}\_{[n':n]} \big), \mathbf{G}^{+}\_{[n':n]} \rangle}\\\\
+                      + & \quad {\langle -e \cdot a \cdot \mathbf{s}\_{[n:n^{+}]}, \mathbf{G}^{+}\_{[n:n^{+}]} \rangle}\\\\
+                      + & \quad {\langle -\mathbf{1} + \mathbf{y}^{-n^{+}}\_{[0:n']} \circ (x \mathbf{w}\_L' + \mathbf{w}\_O' - b /\mathbf{s}\_{[0:n']} ), \mathbf{H}^{+}\_{[0:n']} \rangle}\\\\
+                      + & \quad {\langle e \cdot \big(-\mathbf{1} + \mathbf{y}^{-n^{+}}\_{[n':n]} \circ (x \mathbf{w}\_L'' + \mathbf{w}\_O'' - b /\mathbf{s}\_{[n':n]} ) \big), \mathbf{H}^{+}\_{[n':n]} \rangle}\\\\
+                      + & \quad {\langle e \cdot \big(-\mathbf{1} + \mathbf{y}^{-n^{+}}\_{[n:n^{+}]} \circ ( -b /\mathbf{s}\_{[n:n^{+}]} ) \big), \mathbf{H}^{+}\_{[n:n^{+}]} \rangle}\\\\
                       + & \quad {\langle [u_{1}^2,    \dots, u_{k}^2    ], [L_1, \dots, L_{k}] \rangle}\\\\
                       + & \quad {\langle [u_{1}^{-2}, \dots, u_{k}^{-2} ], [R_1, \dots, R_{k}] \rangle}
 \end{aligned}
