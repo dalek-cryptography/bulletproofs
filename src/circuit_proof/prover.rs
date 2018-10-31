@@ -8,9 +8,11 @@ use curve25519_dalek::traits::MultiscalarMul;
 use merlin::Transcript;
 
 use super::{
-    Assignment, ScalarValue, CommittedConstraintSystem, Constraint, ConstraintSystem,
+    Assignment, ScalarValue, Constraint, ConstraintSystem,
     OpaqueScalar, R1CSProof, Variable, VariableIndex,
 };
+
+use super::cs::{InternalState,ConstraintSystemInternal};
 
 use errors::R1CSError;
 use generators::{BulletproofGens, PedersenGens};
@@ -41,6 +43,7 @@ pub struct ProverCS<'a, 'b> {
     v: Vec<Scalar>,
     v_blinding: Vec<Scalar>,
     callbacks: Vec<Box<Fn(&mut CommittedProverCS<'a, 'b>) -> Result<(), R1CSError>>>,
+    committed_variables_count: Option<usize>,
 }
 
 pub struct CommittedProverCS<'a, 'b> {

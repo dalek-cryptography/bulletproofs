@@ -1,6 +1,13 @@
 use core::ops::{Add, Sub, Mul};
+use core::mem;
+
+use curve25519_dalek::scalar::Scalar;
+use curve25519_dalek::ristretto::CompressedRistretto;
+use merlin::Transcript;
 
 use errors::R1CSError;
+use generators::{BulletproofGens, PedersenGens};
+use transcript::TranscriptProtocol;
 
 use super::scalar_value::ScalarValue;
 use super::assignment::Assignment;
@@ -46,8 +53,6 @@ pub struct Constraint(pub LinearCombination<VariableIndex>);
 /// Gadgets receive a mutable instance of the constraint system and use it
 /// to allocate variables and create constraints between them.
 pub trait ConstraintSystem {
-    /// Type of the constraint system in the committed state.
-    type CommittedCS: CommittedConstraintSystem;
 
     /// Allocate variables for left, right, and output wires of multiplication,
     /// and assign them the Assignments that are passed in.
@@ -61,6 +66,8 @@ pub trait ConstraintSystem {
 
     /// Allocate two uncommitted variables, and assign them the Assignments passed in.
     /// Prover will pass in `Value(Scalar)`s, and Verifier will pass in `Missing`s.
+    /// TODO: replace this with a method that allocates a single variable and keeps another one
+    /// in a pair in a stash for the next call.
     fn assign_uncommitted<S: ScalarValue>(
         &mut self,
         a: Assignment<S>,
@@ -73,31 +80,180 @@ pub trait ConstraintSystem {
     /// Enforce that the given linear combination in the constraint is zero.
     fn add_constraint(&mut self, constraint: Constraint);
 
-    /// Adds a callback for when the constraint system’s free variables are committed.
-    /// If the CS is not yet committed, the call returns `Ok()`. 
-    /// If the CS is already committed, the callback is invoked immediately
-    /// with the result forwarded to the caller.
-    fn after_commitment<F>(&mut self, callback: F) -> Result<(), R1CSError>
-    where
-        for<'t> F: 'static + Fn(&'t mut Self::CommittedCS) -> Result<(), R1CSError>;
-}
-
-/// `CommittedConstraintSystem` trait represents the `ConstraintSystem` in the state
-/// after low-level variables have been committed. Gadgets can sample random challenge
-/// from the constraint system to create additional variables and constraints.
-pub trait CommittedConstraintSystem: ConstraintSystem {
     /// Obtain a challenge scalar bound to the assignments of all of
     /// the externally committed wires.
+    /// 
+    /// If the CS is not yet committed, the call returns `Ok()` and saves a callback
+    /// for later, when the constraint system’s free variables are committed.
+    /// If the CS is already committed, the callback is invoked immediately
     ///
     /// This allows the prover to select a challenge circuit from a
     /// family of circuits parameterized by challenge scalars.
-    fn challenge_scalar(&mut self, label: &'static [u8]) -> OpaqueScalar;
+    fn challenge_scalar<F>(&mut self, label: &'static [u8], callback: F) -> Result<(), R1CSError>
+    where
+        F: 'static + Fn(OpaqueScalar)-> Result<(), R1CSError>;
 }
+
+/// State of the constraint system
+pub(crate) struct InternalState<'a, 'b> {
+    transcript: &'a mut Transcript,
+    bp_gens: &'b BulletproofGens,
+    pc_gens: &'b PedersenGens,
+    constraints: Vec<Constraint>,
+    variables_count: usize,
+    phase: Phase,
+}
+
+/// Represents the current phase of a constraint system
+enum Phase {
+    /// First phase collects the callbacks that produce challenges
+    First {
+        callbacks: Vec<(&'static [u8], Box<Fn(OpaqueScalar) -> Result<(), R1CSError>>)>
+    },
+
+    /// Second phase contains the number of variables committed after the first phase
+    Second {
+        /// Number of committed variables
+        committed_variables: usize
+    }
+}
+
+impl<'a,'b> InternalState<'a, 'b> {
+    /// Creates an internal state for the constraint system.
+    pub(crate) fn new(
+        transcript: &'a mut Transcript,
+        bp_gens: &'b BulletproofGens,
+        pc_gens: &'b PedersenGens,
+    ) -> InternalState<'a, 'b> {
+        InternalState {
+            transcript, 
+            bp_gens,
+            pc_gens,
+            constraints: Vec::new(),
+            phase: Phase::First{callbacks: Vec::new()}
+        }
+    }
+}
+
+pub(crate) trait ConstraintSystemInternal {
+    /// Returns the mutable reference to the internal state of the constraint system.
+    fn internal_state(&mut self) -> &mut InternalState;
+
+    /// Processes the transparent assignments to the variables.
+    /// Prover forms commitments, verifier does nothing.
+    fn handle_assignments(
+        &mut self,
+        left: Assignment<Scalar>,
+        right: Assignment<Scalar>,
+        out: Assignment<Scalar>
+    )-> Result<(), R1CSError>;
+
+    /// Returns Pedersen commitments `A_I`, `A_O`, `S`.
+    fn intermediate_commitments(&mut self) -> (&CompressedRistretto, &CompressedRistretto, &CompressedRistretto);
+
+    /// Commits the constraint system and generates deferred challenges.
+    /// If the constraint system is already committed, this call has no effect.
+    fn commit(&mut self) -> Result<(), R1CSError> {
+
+        let phase2 = Phase::Second { committed_variables: self.internal_state().variables_count };
+        let current_phase = mem::replace(self.internal_state().phase, phase2);
+
+        let callbacks = match current_phase {
+            Phase::First{callbacks: callbacks} => callbacks,
+            second => {
+                // Repeated commit calls should have no effect, so we need to put this phase back in.
+                let _ = mem::replace(self.internal_state().phase, second);
+                return Ok(());
+            }
+        };
+
+        let (A_I, A_O, S) = self.intermediate_commitments();
+        self.internal_state().transcript.commit_point(b"A_I'", A_I);
+        self.internal_state().transcript.commit_point(b"A_O'", A_O);
+        self.internal_state().transcript.commit_point(b"S'", S);
+
+        for (label, callback) in callbacks.drain(..) {
+            let challenge = self.internal_state().transcript.challenge_scalar(label).into();
+             callback(challenge)?;
+        }
+
+        Ok(())
+    }
+}
+
+impl<C> ConstraintSystem for C where C: ConstraintSystemInternal {
+     /// Allocate variables for left, right, and output wires of multiplication,
+    /// and assign them the Assignments that are passed in.
+    /// Prover will pass in `Value(Scalar)`s, and Verifier will pass in `Missing`s.
+    fn assign_multiplier<S: ScalarValue>(
+        &mut self,
+        left: Assignment<S>,
+        right: Assignment<S>,
+        out: Assignment<S>,
+    ) -> Result<(Variable<S>, Variable<S>, Variable<S>), R1CSError> {
+
+        // Pass the transparent assignments to the implementation of the CS
+        self.handle_assignments(
+            left.into_transparent(),
+            right.into_transparent(),
+            out.into_transparent()
+        )?;
+
+        let i = self.internal_state().variables_count;
+        self.internal_state().variables_count += 1;
+
+        Ok((
+            Variable {
+                index: VariableIndex::MultiplierLeft(i),
+                assignment: left,
+            },
+            Variable {
+                index: VariableIndex::MultiplierRight(i),
+                assignment: right,
+            },
+            Variable {
+                index: VariableIndex::MultiplierOutput(i),
+                assignment: out,
+            },
+        ))
+    }
+
+    /// Enforce that the given linear combination in the constraint is zero.
+    fn add_constraint(&mut self, constraint: Constraint) {
+        self.internal_state().constraints.push(constraint)
+    }
+
+    /// Obtain a challenge scalar bound to the assignments of all of
+    /// the externally committed wires.
+    /// 
+    /// If the CS is not yet committed, the call returns `Ok()` and saves a callback
+    /// for later, when the constraint system’s free variables are committed.
+    /// If the CS is already committed, the callback is invoked immediately
+    ///
+    /// This allows the prover to select a challenge circuit from a
+    /// family of circuits parameterized by challenge scalars.
+    fn challenge_scalar<F>(&mut self, label: &'static [u8], callback: F) -> Result<(), R1CSError>
+    where
+        F: 'static + Fn(OpaqueScalar) -> Result<(), R1CSError>
+    {
+        match &mut self.internal_state().phase {
+            Phase::First{ callbacks: ref mut callbacks } => {
+                callbacks.push((label, Box::new(callback)));
+                Ok(())
+            },
+            Phase::Second{ committed_variables: _ } => {
+                let challenge = self.internal_state().transcript.challenge_scalar(label).into();
+                callback(challenge)
+            }
+        }
+    }
+}
+
 
 
 // Creating linear combinations from variables
 
-/// Adding a linear combination `lc` to a variable `v` creates combination `v*1 + lc`. 
+/// Adding a linear combination `lc` to a variable `v` creates a combination `v*1 + lc`. 
 impl<S,T> Add<T> for Variable<S> where S: ScalarValue, T: IntoLC<Variable<S>> {
     type Output = LinearCombination<Self>;
 
@@ -109,7 +265,7 @@ impl<S,T> Add<T> for Variable<S> where S: ScalarValue, T: IntoLC<Variable<S>> {
     }
 }
 
-/// Subtracting a linear combination `lc` from a variable `v` creates combination `v*1 - lc`. 
+/// Subtracting a linear combination `lc` from a variable `v` creates a combination `v*1 - lc`. 
 impl<S,T> Sub<T> for Variable<S> where S: ScalarValue, T: IntoLC<Variable<S>> {
     type Output = LinearCombination<Self>;
 
@@ -124,7 +280,7 @@ impl<S,T> Sub<T> for Variable<S> where S: ScalarValue, T: IntoLC<Variable<S>> {
     }
 }
 
-/// Multiplying a variable `v` by a scalar `a` creates combination `v*a`.
+/// Multiplying a variable `v` by a scalar `a` creates a combination `v*a`.
 impl<T,S> Mul<T> for Variable<S> where T: Into<S>, S: ScalarValue {
     type Output = LinearCombination<Self>;
 

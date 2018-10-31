@@ -32,6 +32,15 @@ impl<S: ScalarValue> Assignment<S> {
             Assignment::Missing() => Assignment::Missing(),
         }
     }
+
+    /// Converts the assignment to a transparent scalar.
+    /// This method is for internal use by ConstraintSystem only.
+    pub(crate) fn into_transparent(self) -> Assignment<Scalar> {
+        match self {
+            Assignment::Value(x) => Assignment::Value(x.into_opaque().internal_scalar),
+            Assignment::Missing() => Assignment::Missing(),
+        }
+    }
 }
 
 // Default implementation is used for zeroing secrets from allocated memory via `clear_on_drop`.
