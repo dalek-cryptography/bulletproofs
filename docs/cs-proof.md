@@ -144,7 +144,7 @@ The prover also takes a larger slice of the generators \\(\mathbf{G}, \mathbf{H}
 \\[
 \begin{aligned}
 \hat{\mathbf{G}}^{+}  &\gets \hat{\mathbf{G}}   \hspace{0.1cm} || \hspace{0.1cm} e \cdot [G_n,...,G_{n^{+}-1}] \\\\
-\hat{\mathbf{H}}^{+}  &\gets \hat{\mathbf{H}}   \hspace{0.1cm} || \hspace{0.1cm} e \cdot [H_n,...,H_{n^{+}-1}] \\\\
+\hat{\mathbf{H}}^{+}  &\gets \hat{\mathbf{H}}   \hspace{0.1cm} || \hspace{0.1cm} e \cdot [y^{-n} H_n,..., y^{-(n^{+}-1)} H_{n^{+}-1}] \\\\
 \end{aligned}
 \\]
 
@@ -169,21 +169,28 @@ Verifier’s algorithm
 --------------------
 
 The input to the verifier is the aggregated proof, which contains the \\(m\\) value commitments \\(V_{(j)}\\),
-and \\(32 \cdot (13 + 2 k)\\) bytes of the proof data where \\(k = \lceil \log_2(n) \rceil\\) and \\(n\\) is a number of [multiplication gates](#multiplication-gates):
+and \\(32 \cdot (16 + 2 k)\\) bytes of the proof data where \\(k = \lceil \log_2(n) \rceil\\) and \\(n\\) is a number of [multiplication gates](#multiplication-gates):
 
 \\[
-  \\{A\_I, A\_O, S, T\_1, T\_3, T\_4, T\_5, T\_6, t(x), {\tilde{t}}(x), \tilde{e}, L\_k, R\_k, \\dots, L\_1, R\_1, a, b\\}
+  \\{A\_I', A\_O', S', A\_I'', A\_O'', S'', T\_1, T\_3, T\_4, T\_5, T\_6, t(x), {\tilde{t}}(x), \tilde{e}, L\_k, R\_k, \\dots, L\_1, R\_1, a, b\\}
 \\]
 
 The verifier starts by adding all value commitments \\(V_i\\) to the protocol transcript.
 
-The verifier then [builds constraints](#building-constraints), allocating necessary multiplication gates on the fly and
-generating challenge values bound to the commitments \\(V_i\\).
+The verifier then [builds constraints](#building-constraints) in two phases.
 
-The verifier uses the Fiat-Shamir transform to obtain challenges by adding the appropriate data sequentially to the protocol transcript:
+In the first phase, the verifier allocates \\(n'\\) multiplication gates and the first set of constraints without using challenges.
 
-1. \\(A_I, A_O, S\\) are added to obtain challenge scalars \\(y,z \in {\mathbb Z\_p}\\),
-2. \\(T_1, T_3, T_4, T_5, T_6\\) are added to obtain a challenge \\(x \in {\mathbb Z\_p}\\),
+Then, the verifier uses the Fiat-Shamir transform to generate challenges required by the gadgets
+by adding the intermediate commitments \\(A_I', A_O', S'\\) to the protocol transcript.
+
+In the second phase, the verifier allocates additional \\(n''\\) multiplication gates and the second set of constraints,
+providing necessary challenges to the gadgets that form the constraint system.
+
+The verifier obtains more challenges by adding the appropriate data sequentially to the protocol transcript:
+
+1. \\(A_I'', A_O'', S''\\) are added to obtain challenge scalars \\(y,z \in {\mathbb Z\_p}\\),
+2. \\(T_1, T_3, T_4, T_5, T_6\\) are added to obtain a challenge scalars \\(e,x \in {\mathbb Z\_p}\\),
 3. \\(t(x), {\tilde{t}}(x), \tilde{e}\\) are added to obtain a challenge \\(w \in {\mathbb Z\_p}\\).
 
 The verifier flattens constraints:
@@ -204,10 +211,10 @@ by taking a larger slice of the generators \\(\mathbf{G},\mathbf{H}\\) and more 
 
 \\[
 \begin{aligned}
-             n^{+} &= 2^{\lceil \log_2 n \rceil} \\\\
-\mathbf{G}^{+}     &= \mathbf{G}   \hspace{0.1cm} || \hspace{0.1cm} [G_n,...,G_{n^{+}-1}] \\\\
-\mathbf{H}^{+}     &= \mathbf{H}   \hspace{0.1cm} || \hspace{0.1cm} [H_n,...,H_{n^{+}-1}] \\\\
-\mathbf{y}^{n^{+}} &= \mathbf{y}^n \hspace{0.1cm} || \hspace{0.1cm} [y^n,...,y^{n^{+}-1}] \\\\
+              n^{+} &\gets 2^{\lceil \log_2 n \rceil} \\\\
+\mathbf{G}^{+}      &\gets \mathbf{G}   \hspace{0.1cm} || \hspace{0.1cm} [G_n,...,G_{n^{+}-1}] \\\\
+\mathbf{H}^{+}      &\gets \mathbf{H}   \hspace{0.1cm} || \hspace{0.1cm} [H_n,...,H_{n^{+}-1}] \\\\
+\mathbf{y}^{n^{+}}  &\gets \mathbf{y}^n \hspace{0.1cm} || \hspace{0.1cm} [y^n,...,y^{n^{+}-1}] \\\\
 \end{aligned}
 \\]
 
@@ -238,26 +245,33 @@ If we rewrite the check as a comparison with the identity point, we get:
 **Second**, verify the inner product argument for the vectors \\(\mathbf{l}(x), \mathbf{r}(x)\\) that form the \\(t(x)\\) (see [inner-product protocol](../inner_product_proof/index.html#verification-equation))
   
 \\[
-P' \overset ? = {\langle a \cdot \mathbf{s}, \mathbf{G}^{+} \rangle} + {\langle {\mathbf{y}^{-n^{+}}} \circ (b /{\mathbf{s}}), \mathbf{H}^{+} \rangle} + abQ - \sum\_{j=1}^{k} \left( L\_{j} u\_{j}^{2} + u\_{j}^{-2} R\_{j} \right).
+P' \overset ? = {\langle a \cdot \mathbf{s}, \hat{\mathbf{G}}^{+} \rangle} + {\langle b/\mathbf{s}, \hat{\mathbf{H}}^{+} \rangle} + abQ - \sum\_{j=1}^{k} \left( L\_{j} u\_{j}^{2} + u\_{j}^{-2} R\_{j} \right),
+\\]
+where
+\\[
+\begin{aligned}
+    \hat{\mathbf{G}}^{+}  &= \mathbf{G}' \hspace{0.1cm} || \hspace{0.1cm} e \cdot \mathbf{G}'' \hspace{0.1cm} || \hspace{0.1cm} e \cdot [G_n,...,G_{n^{+}-1}] \\\\
+    \hat{\mathbf{H}}^{+}  &= \mathbf{y}^{-n^{+}} \circ \big( \mathbf{H}' \hspace{0.1cm} || \hspace{0.1cm} e \cdot \mathbf{H}'' \hspace{0.1cm} || \hspace{0.1cm} e \cdot [H_n,...,H_{n^{+}-1}]\big) \\\\
+\end{aligned}
 \\]
 
 Rewriting as a comparison with the identity point and expanding \\(Q = wB\\) and \\(P' = P^{+} + t(x) wB\\) as [needed for transition to the inner-product protocol](../notes/index.html#inner-product-proof):
 
 \\[
-0 \overset ? = P^{+} + t(x) wB - {\langle a \cdot \mathbf{s}, \mathbf{G}^{+} \rangle} - {\langle \mathbf{y}^{-n^{+}} \circ (b /\mathbf{s}), \mathbf{H}^{+} \rangle} - abwB + \sum\_{j=1}^{k} \left( L\_{j} u\_{j}^{2} + u\_{j}^{-2} R\_{j} \right),
+0 \overset ? = P^{+} + t(x) wB - {\langle a \cdot \mathbf{s}, \hat{\mathbf{G}}^{+} \rangle} - {\langle b/\mathbf{s}, \hat{\mathbf{H}}^{+} \rangle} - abwB + \sum\_{j=1}^{k} \left( L\_{j} u\_{j}^{2} + u\_{j}^{-2} R\_{j} \right),
 \\]
 where the [definition](#proving-that-mathbflx-mathbfrx-are-correct) of \\(P^{+}\\) is:
 
 \\[
 \begin{aligned}
-  P^{+}   = -{\widetilde{e}} {\widetilde{B}} + x \cdot A_I + x^2 \cdot A_O - \langle \mathbf{1}, \mathbf{H}^{+} \rangle + W_L \cdot x + W_R \cdot x + W_O + x^3 \cdot S
+  P^{+}   = -{\widetilde{e}} {\widetilde{B}} + x \cdot (A_I' + e \cdot A_I'') + x^2 \cdot (A_O' + e \cdot A_O'') - \langle \mathbf{1}, \hat{\mathbf{H}}^{+} \rangle + W_L \cdot x + W_R \cdot x + W_O + x^3 \cdot (S' + e \cdot S'')
 \end{aligned}
 \\]
 \\[
 \begin{aligned}
-  W_L &= \langle \mathbf{y}^{-n} \circ \mathbf{w}\_L, \mathbf{H} \rangle \\\\
-  W_R &= \langle \mathbf{y}^{-n} \circ \mathbf{w}\_R, \mathbf{G} \rangle \\\\
-  W_O &= \langle \mathbf{y}^{-n} \circ \mathbf{w}\_O, \mathbf{H} \rangle \\\\
+W_L &= \langle \mathbf{y}^{-n} \circ (\mathbf{w}'\_L || e \cdot \mathbf{w}''\_L), \mathbf{H} \rangle, \\\\
+W_R &= \langle \mathbf{y}^{-n} \circ (\mathbf{w}'\_R || e \cdot \mathbf{w}''\_R), \mathbf{G} \rangle, \\\\
+W_O &= \langle \mathbf{y}^{-n} \circ (\mathbf{w}'\_O || e \cdot \mathbf{w}''\_O), \mathbf{H} \rangle. \\\\
 \end{aligned}
 \\]
 
@@ -268,14 +282,19 @@ Finally, verifier groups all scalars by each point and performs a single multisc
 
 \\[
 \begin{aligned}
-0 \quad \stackrel{?}{=} & \quad x       \cdot A\_I \\\\
-                      + & \quad x^2     \cdot A\_O \\\\
-                      + & \quad x^3     \cdot S \\\\
+0 \quad \stackrel{?}{=} & \quad x       \cdot A\_I' \\\\
+                      + & \quad x^2     \cdot A\_O' \\\\
+                      + & \quad x^3     \cdot S' \\\\
+                      + & \quad e \cdot x     \cdot A\_I'' \\\\
+                      + & \quad e \cdot x^2   \cdot A\_O'' \\\\
+                      + & \quad e \cdot x^3   \cdot S'' \\\\
                       + & \quad \langle r x^2 \mathbf{w}\_V, \mathbf{V} \rangle \\\\
                       + & \quad \sum\_{i = 1,3,4,5,6} r x^i T\_{i} \\\\
                       + & \quad \Big(w \big(t(x) - ab\big) + r \big(x^2 (w\_c + \delta(y,z)) - t(x)\big) \Big) \cdot B \\\\
                       + & \quad (-{\widetilde{e}} - r{\tilde{t}}(x)) \cdot \widetilde{B} \\\\
-                      + & \quad {\langle \big( x \mathbf{y}^{-n} \circ \mathbf{w}\_R \big) || \mathbf{0} - a\mathbf{s}, \mathbf{G}^{+} \rangle}\\\\
+                      + & \quad {\langle \big( x \mathbf{y}^{-n'} \circ \mathbf{w}\_R' \big) - a\mathbf{s}\_{[0:n']}, \mathbf{G}' \rangle}\\\\
+                      + & \quad {\langle e \Big( \big( x y^{-n'} \mathbf{y}^{-n''} \circ \mathbf{w}\_R'' \big) - a\mathbf{s}\_{[n':n]} \Big), \mathbf{G}'' \rangle}\\\\
+                      + & \quad {\langle -e a\mathbf{s}\_{[n:n^{+}]}, [G_n,...,G_{n^{+}-1}] \rangle}\\\\
                       + & \quad {\langle -\mathbf{1} + \mathbf{y}^{-n^{+}} \circ \big( (x \mathbf{w}\_L + \mathbf{w}\_O) || \mathbf{0} - (b /{\mathbf{s}}) \big), \mathbf{H}^{+} \rangle}\\\\
                       + & \quad {\langle [u_{1}^2,    \dots, u_{k}^2    ], [L_1, \dots, L_{k}] \rangle}\\\\
                       + & \quad {\langle [u_{1}^{-2}, \dots, u_{k}^{-2} ], [R_1, \dots, R_{k}] \rangle}
