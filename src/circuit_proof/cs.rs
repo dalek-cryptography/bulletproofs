@@ -60,8 +60,7 @@ pub trait ConstraintSystem {
 }
 
 /// Internal state of the constraint system
-pub(crate) struct ConstraintSystemState<'a, CS: ConstraintSystem> {
-    pub(crate) transcript: &'a mut Transcript,
+pub(crate) struct ConstraintSystemState<CS: ConstraintSystem> {
     constraints: Vec<Constraint>,
     external_variables_count: usize,
     variables_count: usize,
@@ -80,13 +79,13 @@ enum Phase<CS: ConstraintSystem> {
     CommittedCS,
 }
 
-impl<'a, CS> ConstraintSystemState<'a, CS>
+impl<CS> ConstraintSystemState<CS>
 where
     CS: ConstraintSystem,
 {
     /// Creates an internal state for the constraint system.
     pub(crate) fn new(
-        transcript: &'a mut Transcript,
+        transcript: &mut Transcript,
         external_commitments: &[CompressedRistretto],
     ) -> Self {
         transcript.r1cs_domain_sep(external_commitments.len() as u64);
@@ -96,7 +95,6 @@ where
         }
 
         Self {
-            transcript,
             constraints: Vec::new(),
             external_variables_count: external_commitments.len(),
             variables_count: 0,

@@ -31,7 +31,8 @@ use transcript::TranscriptProtocol;
 /// [`ProverCS::prove`], which consumes the `ProverCS`, synthesizes
 /// the witness, and constructs the proof.
 pub struct ProverCS<'a, 'b> {
-    cs_state: ConstraintSystemState<'a, ProverCS<'a, 'b>>,
+    cs_state: ConstraintSystemState<ProverCS<'a, 'b>>,
+    transcript: &'a mut Transcript,
     bp_gens: &'b BulletproofGens,
     pc_gens: &'b PedersenGens,
     a_L: Vec<Scalar>,
@@ -95,7 +96,7 @@ impl<'a, 'b> ConstraintSystem for ProverCS<'a, 'b> {
     {
         match self.cs_state.store_challenge_callback(label, callback) {
             Some(callback) => {
-                let challenge = self.cs_state.transcript.challenge_scalar(label);
+                let challenge = self.transcript.challenge_scalar(label);
                 callback(self, challenge.into())
             }
             None => Ok(()),
@@ -161,6 +162,7 @@ impl<'a, 'b> ProverCS<'a, 'b> {
 
         let cs = Self {
             cs_state,
+            transcript,
             pc_gens,
             bp_gens,
             v,
@@ -176,7 +178,7 @@ impl<'a, 'b> ProverCS<'a, 'b> {
     /// Creates an RNG out of the current state of the transcript
     /// and the blinding factors for the external variables.
     fn rng(&mut self) -> TranscriptRng {
-        let mut builder = self.cs_state.transcript.build_rng();
+        let mut builder = self.transcript.build_rng();
 
         // Commit the blinding factors for the input wires
         for v_b in &self.v_blinding {
@@ -254,14 +256,14 @@ impl<'a, 'b> ProverCS<'a, 'b> {
         )
         .compress();
 
-        self.cs_state.transcript.commit_point(b"A_I1", &A_I1);
-        self.cs_state.transcript.commit_point(b"A_O1", &A_O1);
-        self.cs_state.transcript.commit_point(b"S1", &S1);
+        self.transcript.commit_point(b"A_I1", &A_I1);
+        self.transcript.commit_point(b"A_O1", &A_O1);
+        self.transcript.commit_point(b"S1", &S1);
 
         // 3. Process the second phase of the CS, allocating more variables
         //    and adding more constraints.
         for (label, callback) in self.cs_state.complete_constraints().into_iter() {
-            let challenge = self.cs_state.transcript.challenge_scalar(label);
+            let challenge = self.transcript.challenge_scalar(label);
             callback(&mut self, challenge.into())?;
         }
 
@@ -313,14 +315,14 @@ impl<'a, 'b> ProverCS<'a, 'b> {
         )
         .compress();
 
-        self.cs_state.transcript.commit_point(b"A_I2", &A_I2);
-        self.cs_state.transcript.commit_point(b"A_O2", &A_O2);
-        self.cs_state.transcript.commit_point(b"S2", &S2);
+        self.transcript.commit_point(b"A_I2", &A_I2);
+        self.transcript.commit_point(b"A_O2", &A_O2);
+        self.transcript.commit_point(b"S2", &S2);
 
         // 4. Compute blinded vector polynomials l(x) and r(x)
 
-        let y = self.cs_state.transcript.challenge_scalar(b"y");
-        let z = self.cs_state.transcript.challenge_scalar(b"z");
+        let y = self.transcript.challenge_scalar(b"y");
+        let z = self.transcript.challenge_scalar(b"z");
 
         let (wL, wR, wO, wV, _) = self.cs_state.flattened_constraints::<NoScalar>(&z);
 
@@ -372,15 +374,15 @@ impl<'a, 'b> ProverCS<'a, 'b> {
         let T_5 = self.pc_gens.commit(t_poly.t5, t_5_blinding).compress();
         let T_6 = self.pc_gens.commit(t_poly.t6, t_6_blinding).compress();
 
-        self.cs_state.transcript.commit_point(b"T_1", &T_1);
-        self.cs_state.transcript.commit_point(b"T_3", &T_3);
-        self.cs_state.transcript.commit_point(b"T_4", &T_4);
-        self.cs_state.transcript.commit_point(b"T_5", &T_5);
-        self.cs_state.transcript.commit_point(b"T_6", &T_6);
+        self.transcript.commit_point(b"T_1", &T_1);
+        self.transcript.commit_point(b"T_3", &T_3);
+        self.transcript.commit_point(b"T_4", &T_4);
+        self.transcript.commit_point(b"T_5", &T_5);
+        self.transcript.commit_point(b"T_6", &T_6);
 
         // Challenges for evaluating the polynomial and combining two phases of the protocol.
-        let e = self.cs_state.transcript.challenge_scalar(b"e");
-        let x = self.cs_state.transcript.challenge_scalar(b"x");
+        let e = self.transcript.challenge_scalar(b"e");
+        let x = self.transcript.challenge_scalar(b"x");
 
         // t_2_blinding = <z*z^Q, W_V * v_blinding>
         // in the t_x_blinding calculations, line 76.
@@ -418,16 +420,13 @@ impl<'a, 'b> ProverCS<'a, 'b> {
 
         let e_blinding = x * (i_blinding + x * (o_blinding + x * s_blinding));
 
-        self.cs_state.transcript.commit_scalar(b"t_x", &t_x);
-        self.cs_state
-            .transcript
+        self.transcript.commit_scalar(b"t_x", &t_x);
+        self.transcript
             .commit_scalar(b"t_x_blinding", &t_x_blinding);
-        self.cs_state
-            .transcript
-            .commit_scalar(b"e_blinding", &e_blinding);
+        self.transcript.commit_scalar(b"e_blinding", &e_blinding);
 
         // Get a challenge value to combine statements for the IPP
-        let w = self.cs_state.transcript.challenge_scalar(b"w");
+        let w = self.transcript.challenge_scalar(b"w");
         let Q = w * self.pc_gens.B;
 
         let G_factors = iter::repeat(Scalar::one())
@@ -441,7 +440,7 @@ impl<'a, 'b> ProverCS<'a, 'b> {
             .collect::<Vec<_>>();
 
         let ipp_proof = InnerProductProof::create(
-            self.cs_state.transcript,
+            self.transcript,
             &Q,
             &G_factors,
             &H_factors,

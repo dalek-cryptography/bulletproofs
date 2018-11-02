@@ -31,7 +31,8 @@ use transcript::TranscriptProtocol;
 /// consumes the `VerifierCS` and verifies the proof.
 pub struct VerifierCS<'a, 'b> {
     V: Vec<CompressedRistretto>,
-    cs_state: ConstraintSystemState<'a, VerifierCS<'a, 'b>>,
+    cs_state: ConstraintSystemState<VerifierCS<'a, 'b>>,
+    transcript: &'a mut Transcript,
     bp_gens: &'b BulletproofGens,
     pc_gens: &'b PedersenGens,
     variables_count: usize,
@@ -58,7 +59,7 @@ impl<'a, 'b> ConstraintSystem for VerifierCS<'a, 'b> {
     {
         match self.cs_state.store_challenge_callback(label, callback) {
             Some(callback) => {
-                let challenge = self.cs_state.transcript.challenge_scalar(label);
+                let challenge = self.transcript.challenge_scalar(label);
                 callback(self, challenge.into())
             }
             None => Ok(()),
@@ -109,6 +110,7 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
         VerifierCS {
             V: commitments,
             cs_state,
+            transcript,
             bp_gens,
             pc_gens,
             variables_count: 0,
@@ -139,20 +141,20 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
         builder(&mut self, variables)?;
 
         let n1 = self.variables_count;
-        self.cs_state.transcript.commit_point(b"A_I1", &proof.A_I1);
-        self.cs_state.transcript.commit_point(b"A_O1", &proof.A_O1);
-        self.cs_state.transcript.commit_point(b"S1", &proof.S1);
+        self.transcript.commit_point(b"A_I1", &proof.A_I1);
+        self.transcript.commit_point(b"A_O1", &proof.A_O1);
+        self.transcript.commit_point(b"S1", &proof.S1);
 
         // 3. Process the second phase of the CS, allocating more variables
         //    and adding more constraints.
         for (label, callback) in self.cs_state.complete_constraints().into_iter() {
-            let challenge = self.cs_state.transcript.challenge_scalar(label);
+            let challenge = self.transcript.challenge_scalar(label);
             callback(&mut self, challenge.into())?;
         }
 
-        self.cs_state.transcript.commit_point(b"A_I2", &proof.A_I2);
-        self.cs_state.transcript.commit_point(b"A_O2", &proof.A_O2);
-        self.cs_state.transcript.commit_point(b"S2", &proof.S2);
+        self.transcript.commit_point(b"A_I2", &proof.A_I2);
+        self.transcript.commit_point(b"A_O2", &proof.A_O2);
+        self.transcript.commit_point(b"S2", &proof.S2);
 
         // If the number of multiplications is not 0 or a power of 2, then pad the circuit.
         let n = self.variables_count;
@@ -166,35 +168,31 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
         // We are performing a single-party circuit proof, so party index is 0.
         let gens = self.bp_gens.share(0);
 
-        let y = self.cs_state.transcript.challenge_scalar(b"y");
-        let z = self.cs_state.transcript.challenge_scalar(b"z");
+        let y = self.transcript.challenge_scalar(b"y");
+        let z = self.transcript.challenge_scalar(b"z");
 
-        self.cs_state.transcript.commit_point(b"T_1", &proof.T_1);
-        self.cs_state.transcript.commit_point(b"T_3", &proof.T_3);
-        self.cs_state.transcript.commit_point(b"T_4", &proof.T_4);
-        self.cs_state.transcript.commit_point(b"T_5", &proof.T_5);
-        self.cs_state.transcript.commit_point(b"T_6", &proof.T_6);
+        self.transcript.commit_point(b"T_1", &proof.T_1);
+        self.transcript.commit_point(b"T_3", &proof.T_3);
+        self.transcript.commit_point(b"T_4", &proof.T_4);
+        self.transcript.commit_point(b"T_5", &proof.T_5);
+        self.transcript.commit_point(b"T_6", &proof.T_6);
 
         // Challenges for evaluating the polynomial and combining two phases of the protocol.
-        let e = self.cs_state.transcript.challenge_scalar(b"e");
-        let x = self.cs_state.transcript.challenge_scalar(b"x");
+        let e = self.transcript.challenge_scalar(b"e");
+        let x = self.transcript.challenge_scalar(b"x");
 
-        self.cs_state.transcript.commit_scalar(b"t_x", &proof.t_x);
-        self.cs_state
-            .transcript
+        self.transcript.commit_scalar(b"t_x", &proof.t_x);
+        self.transcript
             .commit_scalar(b"t_x_blinding", &proof.t_x_blinding);
-        self.cs_state
-            .transcript
+        self.transcript
             .commit_scalar(b"e_blinding", &proof.e_blinding);
 
-        let w = self.cs_state.transcript.challenge_scalar(b"w");
+        let w = self.transcript.challenge_scalar(b"w");
 
         let (wL, wR, wO, wV, wc) = self.cs_state.flattened_constraints::<Scalar>(&z);
 
         // Get IPP variables
-        let (u_sq, u_inv_sq, s) = proof
-            .ipp_proof
-            .verification_scalars(self.cs_state.transcript);
+        let (u_sq, u_inv_sq, s) = proof.ipp_proof.verification_scalars(self.transcript);
 
         let a = proof.ipp_proof.a;
         let b = proof.ipp_proof.b;
@@ -238,11 +236,7 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
 
         // Create a `TranscriptRng` from the transcript
         use rand::thread_rng;
-        let mut rng = self
-            .cs_state
-            .transcript
-            .build_rng()
-            .finalize(&mut thread_rng());
+        let mut rng = self.transcript.build_rng().finalize(&mut thread_rng());
         let r = Scalar::random(&mut rng);
 
         let xx = x * x;
