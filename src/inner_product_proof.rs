@@ -66,6 +66,8 @@ impl InnerProductProof {
         assert_eq!(H.len(), n);
         assert_eq!(a.len(), n);
         assert_eq!(b.len(), n);
+        assert_eq!(G_factors.len(), n);
+        assert_eq!(H_factors.len(), n);
 
         // All of the input vectors must have a length that is a power of two.
         assert!(n.is_power_of_two());

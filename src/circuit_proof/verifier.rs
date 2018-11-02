@@ -212,19 +212,24 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
 
         let delta = inner_product(&yneg_wR[0..n], &wL);
 
+        let e_for_g = iter::repeat(Scalar::one()).take(n1).chain(iter::repeat(e).take(n2 + pad));
+        let e_for_h = iter::repeat(Scalar::one()).take(n1).chain(iter::repeat(e).take(n2 + pad));
+
         // define parameters for P check
         let g_scalars = yneg_wR
             .iter()
+            .zip(e_for_g)
             .zip(s.iter().take(padded_n))
-            .map(|(yneg_wRi, s_i)| x * yneg_wRi - a * s_i);
+            .map(|((yneg_wRi, e_or_1), s_i)| e_or_1*(x * yneg_wRi - a * s_i));
 
         let h_scalars = y_inv_vec
             .iter()
+            .zip(e_for_h)
             .zip(s.iter().rev().take(padded_n))
             .zip(wL.into_iter().chain(iter::repeat(Scalar::zero()).take(pad)))
             .zip(wO.into_iter().chain(iter::repeat(Scalar::zero()).take(pad)))
-            .map(|(((y_inv_i, s_i_inv), wLi), wOi)| {
-                y_inv_i * (x * wLi + wOi - b * s_i_inv) - Scalar::one()
+            .map(|((((y_inv_i, e_or_1), s_i_inv), wLi), wOi)| {
+                e_or_1 * (y_inv_i * (x * wLi + wOi - b * s_i_inv) - Scalar::one())
             });
 
         // Create a `TranscriptRng` from the transcript
@@ -245,9 +250,12 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
         let T_points = [proof.T_1, proof.T_3, proof.T_4, proof.T_5, proof.T_6];
 
         let mega_check = RistrettoPoint::optional_multiscalar_mul(
-            iter::once(x) // A_I
-                .chain(iter::once(xx)) // A_O
-                .chain(iter::once(xxx)) // S
+            iter::once(x) // A_I1
+                .chain(iter::once(xx)) // A_O1
+                .chain(iter::once(xxx)) // S1
+                .chain(iter::once(e*x)) // A_I2
+                .chain(iter::once(e*xx)) // A_O2
+                .chain(iter::once(e*xxx)) // S2
                 .chain(wV.iter().map(|wVi| wVi * rxx)) // V
                 .chain(T_scalars.iter().cloned()) // T_points
                 .chain(iter::once(
@@ -258,13 +266,12 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
                 .chain(h_scalars) // H
                 .chain(u_sq.iter().cloned()) // ipp_proof.L_vec
                 .chain(u_inv_sq.iter().cloned()), // ipp_proof.R_vec
-            iter::once(Some(proof.A_I1.decompress()? + proof.A_I2.decompress()?))
-                .chain(iter::once(Some(
-                    proof.A_O1.decompress()? + proof.A_O2.decompress()?,
-                )))
-                .chain(iter::once(Some(
-                    proof.S1.decompress()? + proof.S2.decompress()?,
-                )))
+            iter::once(proof.A_I1.decompress())
+                .chain(iter::once(proof.A_O1.decompress()))
+                .chain(iter::once(proof.S1.decompress()))
+                .chain(iter::once(proof.A_I2.decompress()))
+                .chain(iter::once(proof.A_O2.decompress()))
+                .chain(iter::once(proof.S2.decompress()))
                 .chain(self.V.iter().map(|V_i| V_i.decompress()))
                 .chain(T_points.iter().map(|T_i| T_i.decompress()))
                 .chain(iter::once(Some(self.pc_gens.B)))

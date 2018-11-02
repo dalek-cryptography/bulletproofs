@@ -124,7 +124,7 @@ pub enum R1CSError {
 }
 
 impl From<NoneError> for R1CSError {
-    fn from(e: NoneError) -> R1CSError {
+    fn from(_: NoneError) -> R1CSError {
         R1CSError::VerificationError
     }
 }

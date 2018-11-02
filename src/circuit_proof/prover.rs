@@ -329,6 +329,10 @@ impl<'a, 'b> ProverCS<'a, 'b> {
 
         let mut exp_y = Scalar::one(); // y^n starting at n=0
         let y_inv = y.invert();
+
+        // Note: the sequence of `y^{-i}` is computed up to `padded_n`
+        // for use in the IPP via `H_factors`, even though only `n` items
+        // are used for `l` and `r` calculation.
         let exp_y_inv = util::exp_iter(y_inv).take(padded_n).collect::<Vec<_>>();
 
         let sLsR = s_L1
@@ -408,10 +412,9 @@ impl<'a, 'b> ProverCS<'a, 'b> {
             exp_y = exp_y * y; // y^i -> y^(i+1)
         }
 
-        // TODO: apply `e` factor
-        let i_blinding = i_blinding1 + /* e* */i_blinding2;
-        let o_blinding = o_blinding1 + /* e* */o_blinding2;
-        let s_blinding = s_blinding1 + /* e* */s_blinding2;
+        let i_blinding = i_blinding1 + e * i_blinding2;
+        let o_blinding = o_blinding1 + e * o_blinding2;
+        let s_blinding = s_blinding1 + e * s_blinding2;
 
         let e_blinding = x * (i_blinding + x * (o_blinding + x * s_blinding));
 
@@ -427,8 +430,13 @@ impl<'a, 'b> ProverCS<'a, 'b> {
         let w = self.cs_state.transcript.challenge_scalar(b"w");
         let Q = w * self.pc_gens.B;
 
-        let G_factors = iter::repeat(Scalar::one()).take(padded_n).collect::<Vec<_>>();
-        let H_factors = exp_y_inv;
+        let G_factors = iter::repeat(Scalar::one()).take(n1)
+            .chain(
+                iter::repeat(e).take(n2 + pad)
+            ).collect::<Vec<_>>();
+        let H_factors = exp_y_inv.into_iter().zip(G_factors.iter())
+            .map(|(y,e_or_1)| y*e_or_1 )
+            .collect::<Vec<_>>();
 
         let ipp_proof = InnerProductProof::create(
             self.cs_state.transcript,

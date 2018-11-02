@@ -29,19 +29,15 @@ use inner_product_proof::InnerProductProof;
 
 /// A proof of some statement specified by a [`ConstraintSystem`].
 ///
-/// XXX OBSOLETE:
 /// Statements are specified by writing gadget functions which add
 /// constraints to a `ConstraintSystem` implementation.  To construct
-/// an `R1CSProof`, a prover constructs a
-/// [`Prover`](::r1cs::Prover), then passes it to gadget functions
-/// to build the constraint system, then consumes the constraint
-/// system using [`Prover::prove`](::r1cs::Prover::prove) to
-/// produce an `R1CSProof`.  To verify an `R1CSProof`, a verifier
-/// constructs a [`VerifierCS`](::r1cs::VerifierCS), then passes it to
-/// the same gadget functions to (re)build the constraint system, then
-/// consumes the constraint system using
-/// [`VerifierCS::verify`](::r1cs::VerifierCS::verify) to verify the
-/// proof.
+/// an `R1CSProof`, a prover calls [`R1CSProof::prove`](::r1cs::R1CSProof::prove),
+/// with a closure combines gadgets to build the constraint system.
+/// The method prepares a constraint system, calls that closure and returns a complete `R1CSProof`.
+/// To verify an `R1CSProof`, a verifier
+/// constructs calls [`R1CSProof::verify`](::r1cs::R1CSProof::verify) with a closure
+/// where the same gadget functions (re)build the constraint system. The call verifies the proof
+/// against that constraint system and returns with a success or failure.
 #[derive(Clone, Debug)]
 #[allow(non_snake_case)]
 pub struct R1CSProof {
