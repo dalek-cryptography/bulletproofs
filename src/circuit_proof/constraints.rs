@@ -205,11 +205,13 @@ impl<T: ScalarValue> LinearCombination<T> {
     }
 
     /// Creates a `Constraint` that this linear combination equals the other linear combination.
+    /// The left hand side linear combination is negated, as it is typically just one term
+    /// (e.g. "variable X equals LC(A,B,C)"). This allows minimizing negations.
     pub fn equals<L>(self, lc: L) -> Constraint
     where
         L: IntoLinearCombination<T>,
     {
-        (self - lc.into_lc()).into_constraint()
+        (lc.into_lc() - self).into_constraint()
     }
 
     // Any linear combination of variables with opaque or non-opaque scalars can be converted to a Constraint
