@@ -427,11 +427,14 @@ impl<'a, 'b> ProverCS<'a, 'b> {
         let w = self.cs_state.transcript.challenge_scalar(b"w");
         let Q = w * self.pc_gens.B;
 
+        let G_factors = iter::repeat(Scalar::one()).take(padded_n).collect::<Vec<_>>();
+        let H_factors = exp_y_inv;
+
         let ipp_proof = InnerProductProof::create(
             self.cs_state.transcript,
             &Q,
-            // XXX: provide {e} for G and {e*y^-i} for H
-            &exp_y_inv,
+            &G_factors,
+            &H_factors,
             gens.G(padded_n).cloned().collect(),
             gens.H(padded_n).cloned().collect(),
             l_vec,

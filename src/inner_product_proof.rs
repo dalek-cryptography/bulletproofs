@@ -35,7 +35,8 @@ impl InnerProductProof {
     pub fn create(
         transcript: &mut Transcript,
         Q: &RistrettoPoint,
-        Hprime_factors: &[Scalar],
+        G_factors: &[Scalar],
+        H_factors: &[Scalar],
         mut G_vec: Vec<RistrettoPoint>,
         mut H_vec: Vec<RistrettoPoint>,
         mut a_vec: Vec<Scalar>,
@@ -89,11 +90,12 @@ impl InnerProductProof {
 
             let L = RistrettoPoint::vartime_multiscalar_mul(
                 a_L.iter()
-                    .cloned()
+                    .zip(G_factors[0..n].into_iter())
+                    .map(|(a_L_i, g)| a_L_i * g)
                     .chain(
                         b_R.iter()
-                            .zip(Hprime_factors[0..n].into_iter())
-                            .map(|(b_R_i, y_i)| b_R_i * y_i),
+                            .zip(H_factors[0..n].into_iter())
+                            .map(|(b_R_i, h)| b_R_i * h),
                     )
                     .chain(iter::once(c_L)),
                 G_R.iter().chain(H_L.iter()).chain(iter::once(Q)),
@@ -102,11 +104,12 @@ impl InnerProductProof {
 
             let R = RistrettoPoint::vartime_multiscalar_mul(
                 a_R.iter()
-                    .cloned()
+                    .zip(G_factors[n..2 * n].into_iter())
+                    .map(|(a_R_i, g)| a_R_i * g)
                     .chain(
                         b_L.iter()
-                            .zip(Hprime_factors[n..2 * n].into_iter())
-                            .map(|(b_L_i, y_i)| b_L_i * y_i),
+                            .zip(H_factors[n..2 * n].into_iter())
+                            .map(|(b_L_i, h)| b_L_i * h),
                     )
                     .chain(iter::once(c_R)),
                 G_L.iter().chain(H_R.iter()).chain(iter::once(Q)),
@@ -125,9 +128,12 @@ impl InnerProductProof {
             for i in 0..n {
                 a_L[i] = a_L[i] * u + u_inv * a_R[i];
                 b_L[i] = b_L[i] * u_inv + u * b_R[i];
-                G_L[i] = RistrettoPoint::vartime_multiscalar_mul(&[u_inv, u], &[G_L[i], G_R[i]]);
+                G_L[i] = RistrettoPoint::vartime_multiscalar_mul(
+                    &[u_inv * G_factors[i], u * G_factors[n + i]],
+                    &[G_L[i], G_R[i]]
+                );
                 H_L[i] = RistrettoPoint::vartime_multiscalar_mul(
-                    &[u * Hprime_factors[i], u_inv * Hprime_factors[n + i]],
+                    &[u * H_factors[i], u_inv * H_factors[n + i]],
                     &[H_L[i], H_R[i]],
                 )
             }
@@ -246,27 +252,33 @@ impl InnerProductProof {
     /// method to combine inner product verification with other checks
     /// in a single multiscalar multiplication.
     #[allow(dead_code)]
-    pub fn verify<I>(
+    pub fn verify<IG,IH>(
         &self,
         transcript: &mut Transcript,
-        Hprime_factors: I,
+        G_factors: IG,
+        H_factors: IH,
         P: &RistrettoPoint,
         Q: &RistrettoPoint,
         G: &[RistrettoPoint],
         H: &[RistrettoPoint],
     ) -> Result<(), ProofError>
     where
-        I: IntoIterator,
-        I::Item: Borrow<Scalar>,
+        IG: IntoIterator,
+        IG::Item: Borrow<Scalar>,
+        IH: IntoIterator,
+        IH::Item: Borrow<Scalar>,
     {
         let (u_sq, u_inv_sq, s) = self.verification_scalars(transcript);
 
-        let a_times_s = s.iter().map(|s_i| self.a * s_i).take(G.len());
+        let g_times_a_times_s = G_factors
+            .into_iter()
+            .zip(s.iter())
+            .map(|(g_i, s_i)| (self.a * s_i) * g_i.borrow()).take(G.len());
 
         // 1/s[i] is s[!i], and !i runs from n-1 to 0 as i runs from 0 to n-1
         let inv_s = s.iter().rev();
 
-        let h_times_b_div_s = Hprime_factors
+        let h_times_b_div_s = H_factors
             .into_iter()
             .zip(inv_s)
             .map(|(h_i, s_i_inv)| (self.b * s_i_inv) * h_i.borrow());
@@ -288,7 +300,7 @@ impl InnerProductProof {
 
         let expect_P = RistrettoPoint::vartime_multiscalar_mul(
             iter::once(self.a * self.b)
-                .chain(a_times_s)
+                .chain(g_times_a_times_s)
                 .chain(h_times_b_div_s)
                 .chain(neg_u_sq)
                 .chain(neg_u_inv_sq),
@@ -413,9 +425,11 @@ mod tests {
         let b: Vec<_> = (0..n).map(|_| Scalar::random(&mut rng)).collect();
         let c = inner_product(&a, &b);
 
+        let G_factors: Vec<Scalar> = iter::repeat(Scalar::one()).take(n).collect();
+
         // y_inv is (the inverse of) a random challenge
         let y_inv = Scalar::random(&mut rng);
-        let Hprime_factors: Vec<Scalar> = util::exp_iter(y_inv).take(n).collect();
+        let H_factors: Vec<Scalar> = util::exp_iter(y_inv).take(n).collect();
 
         // P would be determined upstream, but we need a correct P to check the proof.
         //
@@ -435,7 +449,8 @@ mod tests {
         let proof = InnerProductProof::create(
             &mut verifier,
             &Q,
-            &Hprime_factors,
+            &G_factors,
+            &H_factors,
             G.clone(),
             H.clone(),
             a.clone(),
@@ -445,7 +460,12 @@ mod tests {
         let mut verifier = Transcript::new(b"innerproducttest");
         assert!(
             proof
-                .verify(&mut verifier, util::exp_iter(y_inv).take(n), &P, &Q, &G, &H)
+                .verify(
+                    &mut verifier,
+                    iter::repeat(Scalar::one()).take(n),
+                    util::exp_iter(y_inv).take(n),
+                    &P, &Q, &G, &H
+                )
                 .is_ok()
         );
 
@@ -453,7 +473,11 @@ mod tests {
         let mut verifier = Transcript::new(b"innerproducttest");
         assert!(
             proof
-                .verify(&mut verifier, util::exp_iter(y_inv).take(n), &P, &Q, &G, &H)
+                .verify(
+                    &mut verifier,
+                    iter::repeat(Scalar::one()).take(n),
+                    util::exp_iter(y_inv).take(n),
+                    &P, &Q, &G, &H)
                 .is_ok()
         );
     }

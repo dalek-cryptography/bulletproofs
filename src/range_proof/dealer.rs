@@ -4,6 +4,7 @@
 //! For more explanation of how the `dealer`, `party`, and `messages` modules orchestrate the protocol execution, see
 //! [the API for the aggregated multiparty computation protocol](../aggregation/index.html#api-for-the-aggregated-multiparty-computation-protocol).
 
+use core::iter;
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
 use merlin::Transcript;
@@ -230,7 +231,10 @@ impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
         let w = self.transcript.challenge_scalar(b"w");
         let Q = w * self.pc_gens.B;
 
-        let Hprime_factors: Vec<Scalar> = util::exp_iter(self.bit_challenge.y.invert())
+        let G_factors: Vec<Scalar> = iter::repeat(Scalar::one())
+            .take(self.n * self.m)
+            .collect();
+        let H_factors: Vec<Scalar> = util::exp_iter(self.bit_challenge.y.invert())
             .take(self.n * self.m)
             .collect();
 
@@ -246,7 +250,8 @@ impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
         let ipp_proof = inner_product_proof::InnerProductProof::create(
             self.transcript,
             &Q,
-            &Hprime_factors,
+            &G_factors,
+            &H_factors,
             self.bp_gens.G(self.n, self.m).cloned().collect(),
             self.bp_gens.H(self.n, self.m).cloned().collect(),
             l_vec,
