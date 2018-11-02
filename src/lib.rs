@@ -289,13 +289,10 @@ pub mod range_proof_mpc {
 /// # }
 ///
 /// ```
-
 pub mod r1cs {
-    pub use circuit_proof::assignment::Assignment;
-    pub use circuit_proof::linear_combination::{IntoLC, Variable as LCVariable, LinearCombination};
-    pub use circuit_proof::cs::{ConstraintSystem, CommittedConstraintSystem, Constraint, Variable, VariableIndex};
-    pub use circuit_proof::prover::ProverCS;
-    pub use circuit_proof::verifier::VerifierCS;
-    pub use circuit_proof::{R1CSProof, OpaqueScalar};
+    pub use circuit_proof::{ScalarValue,OpaqueScalar,Assignment,Variable,VariableIndex};
+    pub use circuit_proof::{Constraint, LinearCombination, IntoLC, LCVariable};
+    pub use circuit_proof::{ConstraintSystem,ProverCS, VerifierCS};
+    pub use circuit_proof::R1CSProof;
     pub use errors::R1CSError;
 }

@@ -1,4 +1,5 @@
-use core::ops::{Add, Sub, Mul};
+#![allow(non_snake_case)]
+
 use core::mem;
 
 use curve25519_dalek::scalar::Scalar;
@@ -6,48 +7,13 @@ use curve25519_dalek::ristretto::CompressedRistretto;
 use merlin::Transcript;
 
 use errors::R1CSError;
-use generators::{BulletproofGens, PedersenGens};
 use transcript::TranscriptProtocol;
 
 use super::scalar_value::ScalarValue;
 use super::assignment::Assignment;
-use super::linear_combination as lc;
-use super::linear_combination::{LinearCombination,IntoLC};
 use super::opaque_scalar::OpaqueScalar;
+use super::constraints::{Variable,VariableIndex,Constraint};
 
-/// Represents a variable in a constraint system.
-#[derive(Copy, Clone, Debug)]
-pub enum VariableIndex {
-    /// Represents an external input specified by a commitment.
-    Committed(usize),
-    /// Represents the left input of a multiplication gate.
-    MultiplierLeft(usize),
-    /// Represents the right input of a multiplication gate.
-    MultiplierRight(usize),
-    /// Represents the output of a multiplication gate.
-    MultiplierOutput(usize),
-    /// Represents the constant 1.
-    One(),
-}
-
-/// Represents a variable in the constraint system.
-/// Each variable is identified by its index (`VariableIndex`) and
-/// has an assignment which can be present of missing.
-#[derive(Copy,Clone,Debug)]
-pub struct Variable<S: ScalarValue> {
-    /// Index of the variable within the constraint system
-    pub index: VariableIndex,
-
-    /// Assignment of the variable within the constraint system.
-    /// Assignment is present as a plain or opaque scalar for the prover,
-    /// but missing for the verifier.
-    pub assignment: Assignment<S>,
-}
-
-/// `Constraint` is a `LinearCombination` over variable indices with opaque scalars
-/// that is required to equal zero.
-/// Create constraints using `equals` method on `LinearCombination`s and `Variable`s.
-pub struct Constraint(pub LinearCombination<VariableIndex>);
 
 /// `ConstraintSystem` trait represents the API for the gadgets.
 /// Gadgets receive a mutable instance of the constraint system and use it
@@ -66,7 +32,8 @@ pub trait ConstraintSystem {
 
     /// Allocate two uncommitted variables, and assign them the Assignments passed in.
     /// Prover will pass in `Value(Scalar)`s, and Verifier will pass in `Missing`s.
-    /// TODO: replace this with a method that allocates a single variable and keeps another one
+    ///
+    /// XXX: replace this with a method that allocates a single variable and keeps another one
     /// in a pair in a stash for the next call.
     fn assign_uncommitted<S: ScalarValue>(
         &mut self,
@@ -94,12 +61,12 @@ pub trait ConstraintSystem {
         F: 'static + Fn(OpaqueScalar)-> Result<(), R1CSError>;
 }
 
-/// State of the constraint system
-pub(crate) struct InternalState<'a, 'b> {
-    transcript: &'a mut Transcript,
-    bp_gens: &'b BulletproofGens,
-    pc_gens: &'b PedersenGens,
+
+/// Internal state of the constraint system
+pub(crate) struct ConstraintSystemState<'a> {
+    pub(crate) transcript: &'a mut Transcript,
     constraints: Vec<Constraint>,
+    external_variables_count: usize,
     variables_count: usize,
     phase: Phase,
 }
@@ -107,81 +74,110 @@ pub(crate) struct InternalState<'a, 'b> {
 /// Represents the current phase of a constraint system
 enum Phase {
     /// First phase collects the callbacks that produce challenges
-    First {
-        callbacks: Vec<(&'static [u8], Box<Fn(OpaqueScalar) -> Result<(), R1CSError>>)>
-    },
-
-    /// Second phase contains the number of variables committed after the first phase
-    Second {
-        /// Number of committed variables
-        committed_variables: usize
-    }
+    DeferredCS(Vec<(&'static [u8], Box<Fn(OpaqueScalar) -> Result<(), R1CSError>>)>),
+    CommittedCS
 }
 
-impl<'a,'b> InternalState<'a, 'b> {
+impl<'a> ConstraintSystemState<'a> {
     /// Creates an internal state for the constraint system.
     pub(crate) fn new(
         transcript: &'a mut Transcript,
-        bp_gens: &'b BulletproofGens,
-        pc_gens: &'b PedersenGens,
-    ) -> InternalState<'a, 'b> {
-        InternalState {
+        external_commitments: &[CompressedRistretto],
+    ) -> Self {
+
+        transcript.r1cs_domain_sep(external_commitments.len() as u64);
+
+        for V in external_commitments.iter() {
+            transcript.commit_point(b"V", V);
+        }
+
+        Self {
             transcript, 
-            bp_gens,
-            pc_gens,
             constraints: Vec::new(),
-            phase: Phase::First{callbacks: Vec::new()}
+            external_variables_count: external_commitments.len(),
+            variables_count: 0,
+            phase: Phase::DeferredCS(Vec::new())
         }
     }
-}
 
-pub(crate) trait ConstraintSystemInternal {
-    /// Returns the mutable reference to the internal state of the constraint system.
-    fn internal_state(&mut self) -> &mut InternalState;
-
-    /// Processes the transparent assignments to the variables.
-    /// Prover forms commitments, verifier does nothing.
-    fn handle_assignments(
-        &mut self,
-        left: Assignment<Scalar>,
-        right: Assignment<Scalar>,
-        out: Assignment<Scalar>
-    )-> Result<(), R1CSError>;
-
-    /// Returns Pedersen commitments `A_I`, `A_O`, `S`.
-    fn intermediate_commitments(&mut self) -> (&CompressedRistretto, &CompressedRistretto, &CompressedRistretto);
-
-    /// Commits the constraint system and generates deferred challenges.
+    /// Builds the second phase of the constraint system and generates deferred challenges.
     /// If the constraint system is already committed, this call has no effect.
-    fn commit(&mut self) -> Result<(), R1CSError> {
-
-        let phase2 = Phase::Second { committed_variables: self.internal_state().variables_count };
-        let current_phase = mem::replace(self.internal_state().phase, phase2);
-
-        let callbacks = match current_phase {
-            Phase::First{callbacks: callbacks} => callbacks,
-            second => {
-                // Repeated commit calls should have no effect, so we need to put this phase back in.
-                let _ = mem::replace(self.internal_state().phase, second);
+    pub(crate) fn complete_constraints(&mut self) -> Result<(), R1CSError> {
+        let mut callbacks = match &mut self.phase {
+            Phase::DeferredCS(ref mut callbacks) => mem::replace(callbacks, Vec::new()),
+            _ => {
                 return Ok(());
             }
         };
 
-        let (A_I, A_O, S) = self.intermediate_commitments();
-        self.internal_state().transcript.commit_point(b"A_I'", A_I);
-        self.internal_state().transcript.commit_point(b"A_O'", A_O);
-        self.internal_state().transcript.commit_point(b"S'", S);
+        // Switch the phase before we call any callbacks as those can trigger additional queries
+        self.phase = Phase::CommittedCS;
 
         for (label, callback) in callbacks.drain(..) {
-            let challenge = self.internal_state().transcript.challenge_scalar(label).into();
-             callback(challenge)?;
+            let challenge = self.transcript.challenge_scalar(label).into();
+            // Note: nested calls for challenges are going to yield immediately as we switched
+            // to the second phase already. This means, the order of challenge generation is
+            // depth-first: `A(B(C), D(E)), F(G)` -> `[A, B, C, D, E, F, G]`.
+            callback(challenge)?;
         }
 
         Ok(())
     }
+
+    /// Use a challenge, `z`, to flatten the constraints in the
+    /// constraint system into vectors used for proving and
+    /// verification.
+    ///
+    /// # Output
+    ///
+    /// Returns a tuple of
+    /// ```text
+    /// (wL, wR, wO, wV, wc)
+    /// ```
+    /// where `w{L,R,O}` is \\( z \cdot z^Q \cdot W_{L,R,O} \\).
+    pub(crate) fn flattened_constraints<T: ZeroCostOptionalScalar>(
+        &mut self,
+        z: &Scalar,
+    ) -> (Vec<Scalar>, Vec<Scalar>, Vec<Scalar>, Vec<Scalar>, T) {
+        let n = self.variables_count;
+        let m = self.external_variables_count;
+
+        let mut wL = vec![Scalar::zero(); n];
+        let mut wR = vec![Scalar::zero(); n];
+        let mut wO = vec![Scalar::zero(); n];
+        let mut wV = vec![Scalar::zero(); m];
+        let mut wc:T = Scalar::zero().into();
+
+        let mut exp_z = *z;
+        for c in self.constraints.iter() {
+            for (var, coeff) in &c.0.terms {
+                match var {
+                    VariableIndex::MultiplierLeft(i) => {
+                        wL[*i] += exp_z * coeff.internal_scalar;
+                    }
+                    VariableIndex::MultiplierRight(i) => {
+                        wR[*i] += exp_z * coeff.internal_scalar;
+                    }
+                    VariableIndex::MultiplierOutput(i) => {
+                        wO[*i] += exp_z * coeff.internal_scalar;
+                    }
+                    VariableIndex::Committed(i) => {
+                        wV[*i] -= exp_z * coeff.internal_scalar;
+                    }
+                    VariableIndex::One() => {
+                        // Note: this is no-op for the prover because it'll use T=NoScalar.
+                        wc -= T::from(exp_z) * coeff.internal_scalar;
+                    }
+                }
+            }
+            exp_z *= z;
+        }
+
+        (wL, wR, wO, wV, wc)
+    }
 }
 
-impl<C> ConstraintSystem for C where C: ConstraintSystemInternal {
+impl<'a> ConstraintSystem for ConstraintSystemState<'a> {
      /// Allocate variables for left, right, and output wires of multiplication,
     /// and assign them the Assignments that are passed in.
     /// Prover will pass in `Value(Scalar)`s, and Verifier will pass in `Missing`s.
@@ -192,15 +188,8 @@ impl<C> ConstraintSystem for C where C: ConstraintSystemInternal {
         out: Assignment<S>,
     ) -> Result<(Variable<S>, Variable<S>, Variable<S>), R1CSError> {
 
-        // Pass the transparent assignments to the implementation of the CS
-        self.handle_assignments(
-            left.into_transparent(),
-            right.into_transparent(),
-            out.into_transparent()
-        )?;
-
-        let i = self.internal_state().variables_count;
-        self.internal_state().variables_count += 1;
+        let i = self.variables_count;
+        self.variables_count += 1;
 
         Ok((
             Variable {
@@ -220,7 +209,7 @@ impl<C> ConstraintSystem for C where C: ConstraintSystemInternal {
 
     /// Enforce that the given linear combination in the constraint is zero.
     fn add_constraint(&mut self, constraint: Constraint) {
-        self.internal_state().constraints.push(constraint)
+        self.constraints.push(constraint)
     }
 
     /// Obtain a challenge scalar bound to the assignments of all of
@@ -236,143 +225,47 @@ impl<C> ConstraintSystem for C where C: ConstraintSystemInternal {
     where
         F: 'static + Fn(OpaqueScalar) -> Result<(), R1CSError>
     {
-        match &mut self.internal_state().phase {
-            Phase::First{ callbacks: ref mut callbacks } => {
+        match &mut self.phase {
+            Phase::DeferredCS(ref mut callbacks) => {
                 callbacks.push((label, Box::new(callback)));
                 Ok(())
             },
-            Phase::Second{ committed_variables: _ } => {
-                let challenge = self.internal_state().transcript.challenge_scalar(label).into();
+            Phase::CommittedCS => {
+                let challenge = self.transcript.challenge_scalar(label).into();
                 callback(challenge)
             }
         }
     }
 }
 
+use std::ops::{Mul, SubAssign};
+/// Trait representing either a `Scalar` or `NoScalar` (for which arithmetic is no-op).
+pub(crate) trait ZeroCostOptionalScalar: Mul<Scalar, Output=Self>
+                                       + SubAssign
+                                       + Sized
+                                       + From<Scalar>
+{}
 
+impl ZeroCostOptionalScalar for Scalar {}
+impl ZeroCostOptionalScalar for NoScalar {}
 
-// Creating linear combinations from variables
+/// Replacement for a scalar with zero-cost arithmetic operations
+pub(crate) struct NoScalar {}
 
-/// Adding a linear combination `lc` to a variable `v` creates a combination `v*1 + lc`. 
-impl<S,T> Add<T> for Variable<S> where S: ScalarValue, T: IntoLC<Variable<S>> {
-    type Output = LinearCombination<Self>;
-
-    fn add(self, lc: T) -> Self::Output {
-        let mut lc = lc.into_lc();
-        lc.precomputed += self.assignment;
-        lc.terms.push((self, S::one()));
-        lc
+impl From<Scalar> for NoScalar {
+    fn from(_: Scalar) -> Self {
+        NoScalar{}
     }
 }
 
-/// Subtracting a linear combination `lc` from a variable `v` creates a combination `v*1 - lc`. 
-impl<S,T> Sub<T> for Variable<S> where S: ScalarValue, T: IntoLC<Variable<S>> {
-    type Output = LinearCombination<Self>;
-
-    fn sub(self, lc: T) -> Self::Output {
-        let mut lc = lc.into_lc();
-        lc.precomputed = self.assignment - lc.precomputed;
-        for (_, ref mut s) in lc.terms.iter_mut() {
-            *s = -*s;
-        }
-        lc.terms.push((self, S::one()));
-        lc
-    }
+impl SubAssign for NoScalar {
+    fn sub_assign(&mut self, _rhs: NoScalar) {}
 }
 
-/// Multiplying a variable `v` by a scalar `a` creates a combination `v*a`.
-impl<T,S> Mul<T> for Variable<S> where T: Into<S>, S: ScalarValue {
-    type Output = LinearCombination<Self>;
-
-    fn mul(self, scalar: T) -> Self::Output {
-        let scalar = scalar.into();
-        LinearCombination {
-            precomputed: self.assignment * Assignment::Value(scalar),
-            terms: vec![(self, scalar)]
-        }
-    }
-}
-
-
-// Trait implementations for concrete types used in the constraint system
-// ----------------------------------------------------------------------
-
-impl<S> Variable<S> where S: ScalarValue {
-
-    /// Creates a `Constraint` that this variable equals the given linear combination.
-    pub fn equals<T>(self, lc: T) -> Constraint where T: IntoLC<Variable<S>> {
-        (self - lc).into_constraint()
-    }
-
-    /// Converts the variable into an opaque one.
-    pub fn into_opaque(self) -> Variable<OpaqueScalar> {
-        Variable {
-            index: self.index,
-            assignment: self.assignment.into_opaque()
-        }
-    }
-}
-
-impl<S> LinearCombination<Variable<S>> where S: ScalarValue {
-
-    /// Creates a `Constraint` that this linear combination equals the other linear combination.
-    pub fn equals<T>(self, lc: T) -> Constraint where T: IntoLC<Variable<S>> {
-        (self - lc.into_lc()).into_constraint()
-    }
-
-    // Any linear combination of variables with opaque or non-opaque scalars can be converted to a Constraint
-    // (which does not hold the assignments and contains only the opaque scalars for uniform representation inside CS)
-    fn into_constraint(self) -> Constraint {
-        Constraint(LinearCombination{
-            precomputed: match self.eval() {
-                Assignment::Value(v) => Assignment::Value(v.into_opaque()),
-                Assignment::Missing() => Assignment::Missing(),
-            },
-            terms: self
-                .terms
-                .into_iter()
-                .map(|(v, s)| (v.index, s.into_opaque()))
-                .collect(),
-        })
-    }
-}
-
-impl lc::Variable for VariableIndex {
-    // Using OpaqueScalar for the Constraint to have opaque weights
-    type ValueType = OpaqueScalar;
-    type OpaqueType = VariableIndex;
-
-    fn assignment(&self) -> Assignment<Self::ValueType> {
-        Assignment::Missing()
-    }
-
-    fn constant_one() -> Self {
-        VariableIndex::One()
-    }
-
-    fn into_opaque(self) -> Self::OpaqueType {
+impl Mul<Scalar> for NoScalar {
+    type Output = Self;
+    fn mul(self, _rhs: Scalar) -> Self {
         self
     }
 }
-
-impl<S: ScalarValue> lc::Variable for Variable<S> {
-    type ValueType = S;
-    type OpaqueType = Variable<OpaqueScalar>;
-
-    fn assignment(&self) -> Assignment<Self::ValueType> {
-        self.assignment
-    }
-
-    fn constant_one() -> Self {
-        Variable {
-            index: VariableIndex::One(),
-            assignment: Assignment::Value(S::one()),
-        }
-    }
-
-    fn into_opaque(self) -> Self::OpaqueType {
-        Variable::into_opaque(self)
-    }
-}
-
 

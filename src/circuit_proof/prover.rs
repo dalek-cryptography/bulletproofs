@@ -1,18 +1,23 @@
 #![allow(non_snake_case)]
 
-use core::mem;
+use circuit_proof::constraints::Constraint;
+use circuit_proof::opaque_scalar::OpaqueScalar;
 use clear_on_drop::clear::Clear;
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::MultiscalarMul;
-use merlin::Transcript;
+use merlin::{Transcript,TranscriptRng};
 
 use super::{
-    Assignment, ScalarValue, Constraint, ConstraintSystem,
-    OpaqueScalar, R1CSProof, Variable, VariableIndex,
+    Assignment, 
+    ScalarValue, 
+    Variable, 
+    VariableIndex,
+    ConstraintSystem,
+    R1CSProof
 };
 
-use super::cs::{InternalState,ConstraintSystemInternal};
+use super::cs::{ConstraintSystemState, NoScalar};
 
 use errors::R1CSError;
 use generators::{BulletproofGens, PedersenGens};
@@ -33,22 +38,14 @@ use transcript::TranscriptProtocol;
 /// [`ProverCS::prove`], which consumes the `ProverCS`, synthesizes
 /// the witness, and constructs the proof.
 pub struct ProverCS<'a, 'b> {
-    transcript: &'a mut Transcript,
+    cs_state: ConstraintSystemState<'a>,
     bp_gens: &'b BulletproofGens,
     pc_gens: &'b PedersenGens,
-    constraints: Vec<Constraint>,
     a_L: Vec<Scalar>,
     a_R: Vec<Scalar>,
     a_O: Vec<Scalar>,
     v: Vec<Scalar>,
     v_blinding: Vec<Scalar>,
-    callbacks: Vec<Box<Fn(&mut CommittedProverCS<'a, 'b>) -> Result<(), R1CSError>>>,
-    committed_variables_count: Option<usize>,
-}
-
-pub struct CommittedProverCS<'a, 'b> {
-    cs: ProverCS<'a, 'b>,
-    committed_variables_count: usize,
 }
 
 /// Overwrite secrets with null bytes when they go out of scope.
@@ -75,7 +72,6 @@ impl<'a, 'b> Drop for ProverCS<'a, 'b> {
 }
 
 impl<'a, 'b> ConstraintSystem for ProverCS<'a, 'b> {
-    type CommittedCS = CommittedProverCS<'a, 'b>;
 
     fn assign_multiplier<S: ScalarValue>(
         &mut self,
@@ -83,75 +79,29 @@ impl<'a, 'b> ConstraintSystem for ProverCS<'a, 'b> {
         right: Assignment<S>,
         out: Assignment<S>,
     ) -> Result<(Variable<S>, Variable<S>, Variable<S>), R1CSError> {
+
         // Unwrap all of l,r,o up front to ensure we leave the CS in a
         // consistent state if any are missing assignments
-        let l = left?;
-        let r = right?;
-        let o = out?;
+        let l = left.into_transparent()?;
+        let r = right.into_transparent()?;
+        let o = out.into_transparent()?;
+
         // Now commit to the assignment
-        self.a_L.push(l.into().internal_scalar);
-        self.a_R.push(r.into().internal_scalar);
-        self.a_O.push(o.into().internal_scalar);
-        Ok((
-            Variable {
-                index: VariableIndex::MultiplierLeft(self.a_L.len() - 1),
-                assignment: left,
-            },
-            Variable {
-                index: VariableIndex::MultiplierRight(self.a_R.len() - 1),
-                assignment: right,
-            },
-            Variable {
-                index: VariableIndex::MultiplierOutput(self.a_O.len() - 1),
-                assignment: out,
-            },
-        ))
+        self.a_L.push(l);
+        self.a_R.push(r);
+        self.a_O.push(o);
+
+        self.cs_state.assign_multiplier(left,right,out)
     }
 
     fn add_constraint(&mut self, constraint: Constraint) {
-        // TODO: check that the linear combinations are valid
-        // (e.g. that variables are valid, that the linear combination evals to 0 for prover, etc).
-        self.constraints.push(constraint);
+        self.cs_state.add_constraint(constraint);
     }
 
-    /// Adds a callback for when the constraint system’s free variables are committed.
-    fn after_commitment<F>(&mut self, callback: F) -> Result<(), R1CSError>
+    fn challenge_scalar<F>(&mut self, label: &'static [u8], callback: F) -> Result<(), R1CSError>
     where
-        for<'t> F: 'static + Fn(&'t mut Self::CommittedCS) -> Result<(), R1CSError>,
-    {
-        self.callbacks.push(Box::new(callback));
-        Ok(())
-    }
-}
-
-impl<'a, 'b> ConstraintSystem for CommittedProverCS<'a, 'b> {
-    type CommittedCS = CommittedProverCS<'a, 'b>;
-
-    fn assign_multiplier<S: ScalarValue>(
-        &mut self,
-        left: Assignment<S>,
-        right: Assignment<S>,
-        out: Assignment<S>,
-    ) -> Result<(Variable<S>, Variable<S>, Variable<S>), R1CSError> {
-        self.cs.assign_multiplier(left, right, out)
-    }
-
-    fn add_constraint(&mut self, constraint: Constraint) {
-        self.cs.add_constraint(constraint)
-    }
-
-    /// Adds a callback for when the constraint system’s free variables are committed.
-    fn after_commitment<F>(&mut self, callback: F) -> Result<(), R1CSError>
-    where
-        for<'t> F: 'static + Fn(&'t mut Self::CommittedCS) -> Result<(), R1CSError>,
-    {
-        callback(self)
-    }
-}
-
-impl<'a, 'b> CommittedConstraintSystem for CommittedProverCS<'a, 'b> {
-    fn challenge_scalar(&mut self, label: &'static [u8]) -> OpaqueScalar {
-        self.cs.transcript.challenge_scalar(label).into()
+        F: 'static + Fn(OpaqueScalar)-> Result<(), R1CSError> {
+        self.cs_state.challenge_scalar(label, callback)
     }
 }
 
@@ -199,34 +149,22 @@ impl<'a, 'b> ProverCS<'a, 'b> {
         transcript: &'a mut Transcript,
         v: Vec<Scalar>,
         v_blinding: Vec<Scalar>,
-    ) -> (Self, Vec<Variable<Scalar>>, Vec<CompressedRistretto>) {
+    ) -> (Self, Vec<CompressedRistretto>) {
         // Check that the input lengths are consistent
         assert_eq!(v.len(), v_blinding.len());
-        let m = v.len();
-        transcript.r1cs_domain_sep(m as u64);
 
-        let mut variables = Vec::with_capacity(m);
-        let mut commitments = Vec::with_capacity(m);
+        let commitments = v.iter().zip(v_blinding.iter())
+            .map(|(v,v_b)| {
+                pc_gens.commit(*v, *v_b).compress()
+            })
+            .collect::<Vec<_>>();
 
-        for i in 0..m {
-            // Generate pedersen commitment and commit it to the transcript
-            let V = pc_gens.commit(v[i], v_blinding[i]).compress();
-            transcript.commit_point(b"V", &V);
-            commitments.push(V);
+        let cs_state = ConstraintSystemState::new(transcript, &commitments[..]);
 
-            // Allocate and return a variable for v_i
-            variables.push(Variable {
-                index: VariableIndex::Committed(i),
-                assignment: v[i].into()
-            });
-        }
-
-        let cs = ProverCS {
+        let cs = Self {
+            cs_state,
             pc_gens,
             bp_gens,
-            transcript,
-            constraints: vec![],
-            callbacks: vec![],
             v,
             v_blinding,
             a_L: vec![],
@@ -234,162 +172,137 @@ impl<'a, 'b> ProverCS<'a, 'b> {
             a_O: vec![],
         };
 
-        (cs, variables, commitments)
+        (cs, commitments)
     }
 
-    /// Commits the intermediate variables and processes deferred allocations and constraints.
-    pub(crate) fn commit(self) -> Result<CommittedProverCS<'a,'b>, R1CSError> {
+    /// Creates an RNG out of the current state of the transcript
+    /// and the blinding factors for the external variables.
+    fn rng(&mut self) -> TranscriptRng {
+        let mut builder = self.cs_state.transcript.build_rng();
 
-        // TBD: create intermediate commitments,
-        // TBD: send them to the transcript.
-
-        let mut committed_cs = CommittedProverCS {
-            committed_variables_count: self.a_L.len(),
-            cs: self,
-            // TBD: add commitment points here
-        };
-
-        let mut closures = mem::replace(&mut committed_cs.cs.callbacks, Vec::new());
-
-        for closure in closures.drain(..) {
-             closure(&mut committed_cs)?
+        // Commit the blinding factors for the input wires
+        for v_b in &self.v_blinding {
+            builder = builder.commit_witness_bytes(b"v_blinding", v_b.as_bytes());
         }
 
-        Ok(committed_cs)
-    }
-}
-
-impl<'a, 'b> CommittedProverCS<'a, 'b> {
-
-    /// Use a challenge, `z`, to flatten the constraints in the
-    /// constraint system into vectors used for proving and
-    /// verification.
-    ///
-    /// # Output
-    ///
-    /// Returns a tuple of
-    /// ```text
-    /// (wL, wR, wO, wV)
-    /// ```
-    /// where `w{L,R,O}` is \\( z \cdot z^Q \cdot W_{L,R,O} \\).
-    fn flattened_constraints(
-        &mut self,
-        z: &Scalar,
-    ) -> (Vec<Scalar>, Vec<Scalar>, Vec<Scalar>, Vec<Scalar>) {
-        let n = self.cs.a_L.len();
-        let m = self.cs.v.len();
-
-        let mut wL = vec![Scalar::zero(); n];
-        let mut wR = vec![Scalar::zero(); n];
-        let mut wO = vec![Scalar::zero(); n];
-        let mut wV = vec![Scalar::zero(); m];
-
-        let mut exp_z = *z;
-        for c in self.cs.constraints.iter() {
-            for (var, coeff) in &c.0.terms {
-                match var {
-                    VariableIndex::MultiplierLeft(i) => {
-                        wL[*i] += exp_z * coeff.internal_scalar;
-                    }
-                    VariableIndex::MultiplierRight(i) => {
-                        wR[*i] += exp_z * coeff.internal_scalar;
-                    }
-                    VariableIndex::MultiplierOutput(i) => {
-                        wO[*i] += exp_z * coeff.internal_scalar;
-                    }
-                    VariableIndex::Committed(i) => {
-                        wV[*i] -= exp_z * coeff.internal_scalar;
-                    }
-                    VariableIndex::One() => {
-                        // The prover doesn't need to handle constant terms
-                    }
-                }
-            }
-            exp_z *= z;
-        }
-
-        (wL, wR, wO, wV)
+        use rand::thread_rng;
+        builder.finalize(&mut thread_rng())
     }
 
     /// Consume this `ConstraintSystem` to produce a proof.
-    pub fn prove(mut self) -> Result<R1CSProof, R1CSError> {
-        use std::iter;
+    pub fn prove<F>(mut self, builder: F) -> Result<R1CSProof, R1CSError> 
+    where
+        F: FnOnce(&mut Self, Vec<Variable<Scalar>>) -> Result<(), R1CSError>
+    {
         use util;
+        use std::iter;
 
-        // 0. Pad zeros to the next power of two (or do that implicitly when creating vectors)
+        // 0. Convert the external secrets into the variables
+        let variables = self.v.iter().enumerate().map(|(i,v)| {
+            Variable {
+                index: VariableIndex::Committed(i),
+                assignment: (*v).into()
+            }
+        }).collect::<Vec<_>>();
 
-        // If the number of multiplications is not 0 or a power of 2, then pad the circuit.
-        let n = self.cs.a_L.len();
-        let padded_n = self.cs.a_L.len().next_power_of_two();
-        let pad = padded_n - n;
-
-        if self.cs.bp_gens.gens_capacity < padded_n {
-            return Err(R1CSError::InvalidGeneratorsLength);
-        }
+        // 1. Build the constraint system.
+        builder(&mut self, variables)?;
 
         // We are performing a single-party circuit proof, so party index is 0.
-        let gens = self.cs.bp_gens.share(0);
+        let gens = self.bp_gens.share(0);
 
-        // 1. Create a `TranscriptRng` from the high-level witness data
+        // Create RNG from the transcript and the external secrets.
+        let mut rng = self.rng();
 
-        let mut rng = {
-            let mut builder = self.cs.transcript.build_rng();
+        // 2. Commit to the first-phase low-level witness data
+        let n1 = self.a_L.len();
 
-            // Commit the blinding factors for the input wires
-            for v_b in &self.cs.v_blinding {
-                builder = builder.commit_witness_bytes(b"v_blinding", v_b.as_bytes());
-            }
+        let i_blinding1 = Scalar::random(&mut rng);
+        let o_blinding1 = Scalar::random(&mut rng);
+        let s_blinding1 = Scalar::random(&mut rng);
 
-            use rand::thread_rng;
-            builder.finalize(&mut thread_rng())
-        };
-
-        // 3. Choose blinding factors and form commitments to low-level witness data
-
-        let i_blinding = Scalar::random(&mut rng);
-        let o_blinding = Scalar::random(&mut rng);
-        let s_blinding = Scalar::random(&mut rng);
-
-        let mut s_L: Vec<Scalar> = (0..n).map(|_| Scalar::random(&mut rng)).collect();
-        let mut s_R: Vec<Scalar> = (0..n).map(|_| Scalar::random(&mut rng)).collect();
+        let mut s_L1: Vec<Scalar> = (0..n1).map(|_| Scalar::random(&mut rng)).collect();
+        let mut s_R1: Vec<Scalar> = (0..n1).map(|_| Scalar::random(&mut rng)).collect();
 
         // A_I = <a_L, G> + <a_R, H> + i_blinding * B_blinding
-        let A_I = RistrettoPoint::multiscalar_mul(
-            iter::once(&i_blinding)
-                .chain(self.cs.a_L.iter())
-                .chain(self.cs.a_R.iter()),
-            iter::once(&self.cs.pc_gens.B_blinding)
-                .chain(gens.G(n))
-                .chain(gens.H(n)),
+        let A_I1 = RistrettoPoint::multiscalar_mul(
+            iter::once(&i_blinding1).chain(self.a_L.iter()).chain(self.a_R.iter()),
+            iter::once(&self.pc_gens.B_blinding).chain(gens.G(n1)).chain(gens.H(n1)),
         )
         .compress();
 
         // A_O = <a_O, G> + o_blinding * B_blinding
-        let A_O = RistrettoPoint::multiscalar_mul(
-            iter::once(&o_blinding).chain(self.cs.a_O.iter()),
-            iter::once(&self.cs.pc_gens.B_blinding).chain(gens.G(n)),
+        let A_O1 = RistrettoPoint::multiscalar_mul(
+            iter::once(&o_blinding1).chain(self.a_O.iter()),
+            iter::once(&self.pc_gens.B_blinding).chain(gens.G(n1)),
         )
         .compress();
 
         // S = <s_L, G> + <s_R, H> + s_blinding * B_blinding
-        let S = RistrettoPoint::multiscalar_mul(
-            iter::once(&s_blinding).chain(s_L.iter()).chain(s_R.iter()),
-            iter::once(&self.cs.pc_gens.B_blinding)
-                .chain(gens.G(n))
-                .chain(gens.H(n)),
+        let S1 = RistrettoPoint::multiscalar_mul(
+            iter::once(&s_blinding1).chain(s_L1.iter()).chain(s_R1.iter()),
+            iter::once(&self.pc_gens.B_blinding).chain(gens.G(n1)).chain(gens.H(n1)),
         )
         .compress();
 
-        self.cs.transcript.commit_point(b"A_I", &A_I);
-        self.cs.transcript.commit_point(b"A_O", &A_O);
-        self.cs.transcript.commit_point(b"S", &S);
+        self.cs_state.transcript.commit_point(b"A_I1", &A_I1);
+        self.cs_state.transcript.commit_point(b"A_O1", &A_O1);
+        self.cs_state.transcript.commit_point(b"S1", &S1);
+
+        // 3. Process the second phase of the CS, allocating more variables
+        //    and adding more constraints.
+        self.cs_state.complete_constraints()?;
+
+        // 4. Pad the CS to the power-of-two number of multipliers.
+        let n = self.a_L.len();
+        let padded_n = n.next_power_of_two();
+        let pad = padded_n - n;
+
+        if self.bp_gens.gens_capacity < padded_n {
+            return Err(R1CSError::InvalidGeneratorsLength);
+        }
+
+        // 5. Commit to the second-phase low-level witness data
+        let n2 = n - n1;
+
+        let i_blinding2 = Scalar::random(&mut rng);
+        let o_blinding2 = Scalar::random(&mut rng);
+        let s_blinding2 = Scalar::random(&mut rng);
+
+        let mut s_L2: Vec<Scalar> = (0..n2).map(|_| Scalar::random(&mut rng)).collect();
+        let mut s_R2: Vec<Scalar> = (0..n2).map(|_| Scalar::random(&mut rng)).collect();
+
+        // A_I = <a_L, G> + <a_R, H> + i_blinding * B_blinding
+        let A_I2 = RistrettoPoint::multiscalar_mul(
+            iter::once(&i_blinding2).chain(self.a_L.iter().skip(n1)).chain(self.a_R.iter().skip(n1)),
+            iter::once(&self.pc_gens.B_blinding).chain(gens.G(n).skip(n1)).chain(gens.H(n).skip(n1)),
+        )
+        .compress();
+
+        // A_O = <a_O, G> + o_blinding * B_blinding
+        let A_O2 = RistrettoPoint::multiscalar_mul(
+            iter::once(&o_blinding2).chain(self.a_O.iter().skip(n1)),
+            iter::once(&self.pc_gens.B_blinding).chain(gens.G(n).skip(n1)),
+        )
+        .compress();
+
+        // S = <s_L, G> + <s_R, H> + s_blinding * B_blinding
+        let S2 = RistrettoPoint::multiscalar_mul(
+            iter::once(&s_blinding2).chain(s_L2.iter()).chain(s_R2.iter()),
+            iter::once(&self.pc_gens.B_blinding).chain(gens.G(n).skip(n1)).chain(gens.H(n).skip(n1)),
+        )
+        .compress();
+
+        self.cs_state.transcript.commit_point(b"A_I2", &A_I2);
+        self.cs_state.transcript.commit_point(b"A_O2", &A_O2);
+        self.cs_state.transcript.commit_point(b"S2", &S2);
 
         // 4. Compute blinded vector polynomials l(x) and r(x)
 
-        let y = self.cs.transcript.challenge_scalar(b"y");
-        let z = self.cs.transcript.challenge_scalar(b"z");
+        let y = self.cs_state.transcript.challenge_scalar(b"y");
+        let z = self.cs_state.transcript.challenge_scalar(b"z");
 
-        let (wL, wR, wO, wV) = self.flattened_constraints(&z);
+        let (wL, wR, wO, wV, _) = self.cs_state.flattened_constraints::<NoScalar>(&z);
 
         let mut l_poly = util::VecPoly3::zero(n);
         let mut r_poly = util::VecPoly3::zero(n);
@@ -398,21 +311,24 @@ impl<'a, 'b> CommittedProverCS<'a, 'b> {
         let y_inv = y.invert();
         let exp_y_inv = util::exp_iter(y_inv).take(padded_n).collect::<Vec<_>>();
 
-        for i in 0..n {
+        let sLsR = s_L1.iter().chain(s_L2.iter()).zip(
+            s_R1.iter().chain(s_R2.iter())
+        );
+        for (i, (sl,sr)) in sLsR.enumerate() {
             // l_poly.0 = 0
             // l_poly.1 = a_L + y^-n * (z * z^Q * W_R)
-            l_poly.1[i] = self.cs.a_L[i] + exp_y_inv[i] * wR[i];
+            l_poly.1[i] = self.a_L[i] + exp_y_inv[i] * wR[i];
             // l_poly.2 = a_O
-            l_poly.2[i] = self.cs.a_O[i];
+            l_poly.2[i] = self.a_O[i];
             // l_poly.3 = s_L
-            l_poly.3[i] = s_L[i];
+            l_poly.3[i] = *sl;
             // r_poly.0 = (z * z^Q * W_O) - y^n
             r_poly.0[i] = wO[i] - exp_y;
             // r_poly.1 = y^n * a_R + (z * z^Q * W_L)
-            r_poly.1[i] = exp_y * self.cs.a_R[i] + wL[i];
+            r_poly.1[i] = exp_y * self.a_R[i] + wL[i];
             // r_poly.2 = 0
             // r_poly.3 = y^n * s_R
-            r_poly.3[i] = exp_y * s_R[i];
+            r_poly.3[i] = exp_y * sr;
 
             exp_y = exp_y * y; // y^i -> y^(i+1)
         }
@@ -425,25 +341,27 @@ impl<'a, 'b> CommittedProverCS<'a, 'b> {
         let t_5_blinding = Scalar::random(&mut rng);
         let t_6_blinding = Scalar::random(&mut rng);
 
-        let T_1 = self.cs.pc_gens.commit(t_poly.t1, t_1_blinding).compress();
-        let T_3 = self.cs.pc_gens.commit(t_poly.t3, t_3_blinding).compress();
-        let T_4 = self.cs.pc_gens.commit(t_poly.t4, t_4_blinding).compress();
-        let T_5 = self.cs.pc_gens.commit(t_poly.t5, t_5_blinding).compress();
-        let T_6 = self.cs.pc_gens.commit(t_poly.t6, t_6_blinding).compress();
+        let T_1 = self.pc_gens.commit(t_poly.t1, t_1_blinding).compress();
+        let T_3 = self.pc_gens.commit(t_poly.t3, t_3_blinding).compress();
+        let T_4 = self.pc_gens.commit(t_poly.t4, t_4_blinding).compress();
+        let T_5 = self.pc_gens.commit(t_poly.t5, t_5_blinding).compress();
+        let T_6 = self.pc_gens.commit(t_poly.t6, t_6_blinding).compress();
 
-        self.cs.transcript.commit_point(b"T_1", &T_1);
-        self.cs.transcript.commit_point(b"T_3", &T_3);
-        self.cs.transcript.commit_point(b"T_4", &T_4);
-        self.cs.transcript.commit_point(b"T_5", &T_5);
-        self.cs.transcript.commit_point(b"T_6", &T_6);
+        self.cs_state.transcript.commit_point(b"T_1", &T_1);
+        self.cs_state.transcript.commit_point(b"T_3", &T_3);
+        self.cs_state.transcript.commit_point(b"T_4", &T_4);
+        self.cs_state.transcript.commit_point(b"T_5", &T_5);
+        self.cs_state.transcript.commit_point(b"T_6", &T_6);
 
-        let x = self.cs.transcript.challenge_scalar(b"x");
+        // Challenges for evaluating the polynomial and combining two phases of the protocol.
+        let e = self.cs_state.transcript.challenge_scalar(b"e");
+        let x = self.cs_state.transcript.challenge_scalar(b"x");
 
         // t_2_blinding = <z*z^Q, W_V * v_blinding>
         // in the t_x_blinding calculations, line 76.
         let t_2_blinding = wV
             .iter()
-            .zip(self.cs.v_blinding.iter())
+            .zip(self.v_blinding.iter())
             .map(|(c, v_blinding)| c * v_blinding)
             .sum();
 
@@ -469,20 +387,25 @@ impl<'a, 'b> CommittedProverCS<'a, 'b> {
             exp_y = exp_y * y; // y^i -> y^(i+1)
         }
 
+        let i_blinding = i_blinding1 + /* e* */i_blinding2;
+        let o_blinding = o_blinding1 + /* e* */o_blinding2;
+        let s_blinding = s_blinding1 + /* e* */s_blinding2;
+
         let e_blinding = x * (i_blinding + x * (o_blinding + x * s_blinding));
 
-        self.cs.transcript.commit_scalar(b"t_x", &t_x);
-        self.cs.transcript
+        self.cs_state.transcript.commit_scalar(b"t_x", &t_x);
+        self.cs_state.transcript
             .commit_scalar(b"t_x_blinding", &t_x_blinding);
-        self.cs.transcript.commit_scalar(b"e_blinding", &e_blinding);
+        self.cs_state.transcript.commit_scalar(b"e_blinding", &e_blinding);
 
         // Get a challenge value to combine statements for the IPP
-        let w = self.cs.transcript.challenge_scalar(b"w");
-        let Q = w * self.cs.pc_gens.B;
+        let w = self.cs_state.transcript.challenge_scalar(b"w");
+        let Q = w * self.pc_gens.B;
 
         let ipp_proof = InnerProductProof::create(
-            self.cs.transcript,
+            self.cs_state.transcript,
             &Q,
+            // XXX: provide {e} for G and {e*y^-i} for H
             &exp_y_inv,
             gens.G(padded_n).cloned().collect(),
             gens.H(padded_n).cloned().collect(),
@@ -493,17 +416,20 @@ impl<'a, 'b> CommittedProverCS<'a, 'b> {
         // We do not yet have a ClearOnDrop wrapper for Vec<Scalar>.
         // When PR 202 [1] is merged, we can simply wrap s_L and s_R at the point of creation.
         // [1] https://github.com/dalek-cryptography/curve25519-dalek/pull/202
-        for e in s_L.iter_mut() {
+        for e in s_L1.iter_mut()
+                .chain(s_L2.iter_mut())
+                .chain(s_R1.iter_mut())
+                .chain(s_R2.iter_mut()) {
             e.clear();
         }
-        for e in s_R.iter_mut() {
-            e.clear();
-        }
-
+        
         Ok(R1CSProof {
-            A_I,
-            A_O,
-            S,
+            A_I1,
+            A_O1,
+            S1,
+            A_I2,
+            A_O2,
+            S2,
             T_1,
             T_3,
             T_4,

@@ -1,18 +1,22 @@
 #![doc(include = "../docs/cs-proof.md")]
 
-pub mod opaque_scalar;
-pub mod scalar_value;
-pub mod assignment;
-pub mod linear_combination;
-pub mod cs;
-pub mod prover;
-pub mod verifier;
+mod opaque_scalar;
+mod scalar_value;
+mod assignment;
+mod constraints;
+mod linear_combination;
+mod cs;
+mod prover;
+mod verifier;
 
 pub use self::scalar_value::ScalarValue;
-pub use self::assignment::Assignment;
-pub use self::cs::*;
-pub use self::linear_combination::LinearCombination;
 pub use self::opaque_scalar::OpaqueScalar;
+pub use self::assignment::Assignment;
+pub use self::constraints::{Variable,VariableIndex,Constraint};
+pub use self::linear_combination::{IntoLC, Variable as LCVariable, LinearCombination};
+pub use self::cs::ConstraintSystem;
+pub use self::prover::ProverCS;
+pub use self::verifier::VerifierCS;
 
 #[cfg(test)]
 mod tests;
@@ -24,9 +28,6 @@ use merlin::Transcript;
 use errors::R1CSError;
 use generators::{BulletproofGens, PedersenGens};
 use inner_product_proof::InnerProductProof;
-
-use self::prover::ProverCS;
-use self::verifier::VerifierCS;
 
 /// A proof of some statement specified by a [`ConstraintSystem`].
 ///
@@ -46,12 +47,18 @@ use self::verifier::VerifierCS;
 #[derive(Clone, Debug)]
 #[allow(non_snake_case)]
 pub struct R1CSProof {
-    /// Commitment to the values of input wires
-    A_I: CompressedRistretto,
-    /// Commitment to the values of output wires
-    A_O: CompressedRistretto,
-    /// Commitment to the blinding factors
-    S: CompressedRistretto,
+    /// Commitment to the values of the first-phase input wires
+    A_I1: CompressedRistretto,
+    /// Commitment to the values of the first-phase output wires
+    A_O1: CompressedRistretto,
+    /// Commitment to the first-phase blinding factors
+    S1: CompressedRistretto,
+    /// Commitment to the values of the second-phase input wires
+    A_I2: CompressedRistretto,
+    /// Commitment to the values of the second-phase output wires
+    A_O2: CompressedRistretto,
+    /// Commitment to the second-phase blinding factors
+    S2: CompressedRistretto,
     /// Commitment to the \\(t_1\\) coefficient of \\( t(x) \\)
     T_1: CompressedRistretto,
     /// Commitment to the \\(t_3\\) coefficient of \\( t(x) \\)
@@ -88,7 +95,7 @@ impl R1CSProof {
         F: FnOnce(&mut ProverCS, Vec<Variable<Scalar>>) -> Result<(), R1CSError>,
     {
     	// 1. Prepare a proving CS.
-    	let (mut prover, variables, commitments) = ProverCS::new(
+    	let (prover, commitments) = ProverCS::new(
         	bp_gens,
         	pc_gens,
         	transcript,
@@ -96,14 +103,8 @@ impl R1CSProof {
         	v_blinding
         );
     	
-    	// 2. Delegate to the caller to build a constraint system.
-    	builder(&mut prover, variables)?;
-
-    	// 3. Commit internal variables.
-    	let committed_prover = prover.commit()?;
-
-    	// 4. Create the proof.
-        let proof = committed_prover.prove()?;
+    	// 2. Create a proof.
+        let proof = prover.prove(builder)?;
 
         Ok((proof, commitments))
     }
@@ -119,23 +120,17 @@ impl R1CSProof {
         builder: F,
     ) -> Result<(), R1CSError> 
     where
-        F: FnOnce(&mut VerifierCS, Vec<Variable<OpaqueScalar>>) -> Result<(), R1CSError>,
+        F: FnOnce(&mut VerifierCS, Vec<Variable<Scalar>>) -> Result<(), R1CSError>,
     {
     	// 1. Prepare a verifying CS.
-    	let (mut verifier, variables) = VerifierCS::new(
+    	let verifier = VerifierCS::new(
         	bp_gens,
         	pc_gens,
         	transcript,
         	commitments,
     	);
 
-		// 2. Delegate to the caller to build a constraint system.
-    	builder(&mut verifier, variables)?;
-
-    	// 3. Commit internal variables.
-    	let committed_verifier = verifier.commit()?;
-
-    	// 4. Verify the proof.
-        committed_verifier.verify(&self)
+    	// 2. Verify the proof.
+        verifier.verify(&self, builder)
     }
 }

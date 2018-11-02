@@ -1,5 +1,7 @@
 //! Errors related to proving and verifying proofs.
 
+use std::option::NoneError;
+
 /// Represents an error in proof creation, verification, or parsing.
 #[derive(Fail, Clone, Debug, Eq, PartialEq)]
 pub enum ProofError {
@@ -119,4 +121,10 @@ pub enum R1CSError {
         /// Underlying cause of the error.
         cause: &'static str
     },
+}
+
+impl From<NoneError> for R1CSError {
+    fn from(e: NoneError) -> R1CSError {
+        R1CSError::VerificationError
+    }
 }

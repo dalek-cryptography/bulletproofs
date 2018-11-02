@@ -1,3 +1,4 @@
+use curve25519_dalek::scalar::Scalar;
 use std::ops::{Add, AddAssign, Div, Mul, Sub, SubAssign, Try};
 use subtle::{Choice, ConditionallyAssignable, ConditionallySelectable, ConstantTimeEq};
 
