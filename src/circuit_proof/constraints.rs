@@ -1,4 +1,7 @@
-use core::ops::{Add, Mul, Neg, Sub};
+#![allow(non_snake_case)]
+
+use core::borrow::Borrow;
+use core::ops::{Add, Mul, Neg, Sub, SubAssign};
 
 use curve25519_dalek::scalar::Scalar;
 
@@ -84,6 +87,97 @@ impl<T: ScalarValue> Variable<T> {
             index: self.index,
             assignment: self.assignment.into_opaque(),
         }
+    }
+
+    /// Creates a variable representing a committed
+    pub(crate) fn committed(index: usize, assignment: Assignment<T>) -> Variable<T> {
+        Self {
+            index: VariableIndex::Committed(index),
+            assignment,
+        }
+    }
+
+    pub(crate) fn from_multiplier(
+        index: usize,
+        left: Assignment<T>,
+        right: Assignment<T>,
+        out: Assignment<T>,
+    ) -> (Variable<T>, Variable<T>, Variable<T>) {
+        (
+            Variable {
+                index: VariableIndex::MultiplierLeft(index),
+                assignment: left,
+            },
+            Variable {
+                index: VariableIndex::MultiplierRight(index),
+                assignment: right,
+            },
+            Variable {
+                index: VariableIndex::MultiplierOutput(index),
+                assignment: out,
+            },
+        )
+    }
+}
+
+impl Constraint {
+    /// Use a challenge, `z`, to flatten the constraints in the
+    /// constraint system into vectors used for proving and
+    /// verification.
+    ///
+    /// # Output
+    ///
+    /// Returns a tuple of
+    /// ```text
+    /// (wL, wR, wO, wV, wc)
+    /// ```
+    /// where `w{L,R,O}` is \\( z \cdot z^Q \cdot W_{L,R,O} \\).
+    pub(crate) fn flatten<T, I>(
+        constraints: I,
+        z: &Scalar,
+        external_variables_count: usize,
+        internal_variables_count: usize,
+    ) -> (Vec<Scalar>, Vec<Scalar>, Vec<Scalar>, Vec<Scalar>, T)
+    where
+        T: ZeroCostOptionalScalar,
+        I: Iterator,
+        I::Item: Borrow<Constraint>,
+    {
+        let m = external_variables_count;
+        let n = internal_variables_count;
+
+        let mut wL = vec![Scalar::zero(); n];
+        let mut wR = vec![Scalar::zero(); n];
+        let mut wO = vec![Scalar::zero(); n];
+        let mut wV = vec![Scalar::zero(); m];
+        let mut wc: T = Scalar::zero().into();
+
+        let mut exp_z = *z;
+        for c in constraints {
+            for (var, coeff) in c.borrow().0.iter() {
+                match var {
+                    VariableIndex::MultiplierLeft(i) => {
+                        wL[*i] += exp_z * coeff.internal_scalar;
+                    }
+                    VariableIndex::MultiplierRight(i) => {
+                        wR[*i] += exp_z * coeff.internal_scalar;
+                    }
+                    VariableIndex::MultiplierOutput(i) => {
+                        wO[*i] += exp_z * coeff.internal_scalar;
+                    }
+                    VariableIndex::Committed(i) => {
+                        wV[*i] -= exp_z * coeff.internal_scalar;
+                    }
+                    VariableIndex::One() => {
+                        // Note: this is no-op for the prover because it'll use T = NoScalar.
+                        wc -= T::from(exp_z) * coeff.internal_scalar;
+                    }
+                }
+            }
+            exp_z *= z;
+        }
+
+        (wL, wR, wO, wV, wc)
     }
 }
 
@@ -295,5 +389,34 @@ where
         LinearCombination {
             terms: vec![(self, scalar)],
         }
+    }
+}
+
+/// Trait representing either a `Scalar` or `NoScalar` (for which arithmetic is no-op).
+pub(crate) trait ZeroCostOptionalScalar:
+    Mul<Scalar, Output = Self> + SubAssign + Sized + From<Scalar>
+{
+}
+
+impl ZeroCostOptionalScalar for Scalar {}
+impl ZeroCostOptionalScalar for NoScalar {}
+
+/// Replacement for a scalar with zero-cost arithmetic operations
+pub(crate) struct NoScalar {}
+
+impl From<Scalar> for NoScalar {
+    fn from(_: Scalar) -> Self {
+        NoScalar {}
+    }
+}
+
+impl SubAssign for NoScalar {
+    fn sub_assign(&mut self, _rhs: NoScalar) {}
+}
+
+impl Mul<Scalar> for NoScalar {
+    type Output = Self;
+    fn mul(self, _rhs: Scalar) -> Self {
+        self
     }
 }

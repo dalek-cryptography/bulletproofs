@@ -6,8 +6,8 @@ use curve25519_dalek::traits::VartimeMultiscalarMul;
 use merlin::Transcript;
 
 use super::{
-    cs::ConstraintSystemState, Assignment, Constraint, ConstraintSystem, OpaqueScalar, R1CSProof,
-    ScalarValue, Variable, VariableIndex,
+    cs::ConstraintSystemInternal, cs::DeferredChallenges, Assignment, Constraint, ConstraintSystem,
+    OpaqueScalar, R1CSProof, ScalarValue, Variable,
 };
 
 use errors::R1CSError;
@@ -31,11 +31,12 @@ use transcript::TranscriptProtocol;
 /// consumes the `VerifierCS` and verifies the proof.
 pub struct VerifierCS<'a, 'b> {
     V: Vec<CompressedRistretto>,
-    cs_state: ConstraintSystemState<VerifierCS<'a, 'b>>,
     transcript: &'a mut Transcript,
     bp_gens: &'b BulletproofGens,
     pc_gens: &'b PedersenGens,
+    constraints: Vec<Constraint>,
     variables_count: usize,
+    deferred_challenges: DeferredChallenges<VerifierCS<'a, 'b>>,
 }
 
 impl<'a, 'b> ConstraintSystem for VerifierCS<'a, 'b> {
@@ -46,24 +47,33 @@ impl<'a, 'b> ConstraintSystem for VerifierCS<'a, 'b> {
         out: Assignment<S>,
     ) -> Result<(Variable<S>, Variable<S>, Variable<S>), R1CSError> {
         self.variables_count += 1;
-        self.cs_state.assign_multiplier(left, right, out)
+        Ok(Variable::from_multiplier(
+            self.variables_count - 1,
+            left,
+            right,
+            out,
+        ))
     }
 
     fn add_constraint(&mut self, constraint: Constraint) {
-        self.cs_state.add_constraint(constraint);
+        self.constraints.push(constraint);
     }
 
     fn challenge_scalar<F>(&mut self, label: &'static [u8], callback: F) -> Result<(), R1CSError>
     where
         F: 'static + Fn(&mut Self, OpaqueScalar) -> Result<(), R1CSError>,
     {
-        match self.cs_state.store_challenge_callback(label, callback) {
-            Some(callback) => {
-                let challenge = self.transcript.challenge_scalar(label);
-                callback(self, challenge.into())
-            }
-            None => Ok(()),
-        }
+        DeferredChallenges::push(self, label, callback)
+    }
+}
+
+impl<'a, 'b> ConstraintSystemInternal for VerifierCS<'a, 'b> {
+    fn transcript(&mut self) -> &mut Transcript {
+        &mut self.transcript
+    }
+
+    fn deferred_challenges(&mut self) -> &mut DeferredChallenges<Self> {
+        &mut self.deferred_challenges
     }
 }
 
@@ -105,15 +115,19 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
         transcript: &'a mut Transcript,
         commitments: Vec<CompressedRistretto>,
     ) -> Self {
-        let cs_state = ConstraintSystemState::new(transcript, &commitments[..]);
+        transcript.r1cs_domain_sep(commitments.len() as u64);
+        for V in commitments.iter() {
+            transcript.commit_point(b"V", V);
+        }
 
         VerifierCS {
             V: commitments,
-            cs_state,
             transcript,
             bp_gens,
             pc_gens,
+            constraints: Vec::new(),
             variables_count: 0,
+            deferred_challenges: DeferredChallenges::new(),
         }
     }
 
@@ -131,10 +145,7 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
             .V
             .iter()
             .enumerate()
-            .map(|(i, _)| Variable {
-                index: VariableIndex::Committed(i),
-                assignment: Assignment::Missing(),
-            })
+            .map(|(i, _)| Variable::committed(i, Assignment::Missing()))
             .collect::<Vec<_>>();
 
         // 1. Build the constraint system.
@@ -147,10 +158,7 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
 
         // 3. Process the second phase of the CS, allocating more variables
         //    and adding more constraints.
-        for (label, callback) in self.cs_state.complete_constraints().into_iter() {
-            let challenge = self.transcript.challenge_scalar(label);
-            callback(&mut self, challenge.into())?;
-        }
+        DeferredChallenges::drain(&mut self)?;
 
         self.transcript.commit_point(b"A_I2", &proof.A_I2);
         self.transcript.commit_point(b"A_O2", &proof.A_O2);
@@ -189,7 +197,8 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
 
         let w = self.transcript.challenge_scalar(b"w");
 
-        let (wL, wR, wO, wV, wc) = self.cs_state.flattened_constraints::<Scalar>(&z);
+        let (wL, wR, wO, wV, wc) =
+            Constraint::flatten::<Scalar, _>(self.constraints.iter(), &z, self.V.len(), n);
 
         // Get IPP variables
         let (u_sq, u_inv_sq, s) = proof.ipp_proof.verification_scalars(self.transcript);

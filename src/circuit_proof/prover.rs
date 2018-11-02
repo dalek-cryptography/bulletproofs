@@ -1,16 +1,17 @@
 #![allow(non_snake_case)]
 
-use circuit_proof::constraints::Constraint;
-use circuit_proof::opaque_scalar::OpaqueScalar;
 use clear_on_drop::clear::Clear;
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::MultiscalarMul;
-use merlin::{Transcript, TranscriptRng};
+use merlin::Transcript;
 
-use super::{Assignment, ConstraintSystem, R1CSProof, ScalarValue, Variable, VariableIndex};
+use super::{
+    cs::ConstraintSystemInternal, cs::DeferredChallenges, Assignment, Constraint, ConstraintSystem,
+    OpaqueScalar, R1CSProof, ScalarValue, Variable,
+};
 
-use super::cs::{ConstraintSystemState, NoScalar};
+use super::constraints::NoScalar;
 
 use errors::R1CSError;
 use generators::{BulletproofGens, PedersenGens};
@@ -31,15 +32,16 @@ use transcript::TranscriptProtocol;
 /// [`ProverCS::prove`], which consumes the `ProverCS`, synthesizes
 /// the witness, and constructs the proof.
 pub struct ProverCS<'a, 'b> {
-    cs_state: ConstraintSystemState<ProverCS<'a, 'b>>,
     transcript: &'a mut Transcript,
     bp_gens: &'b BulletproofGens,
     pc_gens: &'b PedersenGens,
+    constraints: Vec<Constraint>,
     a_L: Vec<Scalar>,
     a_R: Vec<Scalar>,
     a_O: Vec<Scalar>,
     v: Vec<Scalar>,
     v_blinding: Vec<Scalar>,
+    deferred_challenges: DeferredChallenges<ProverCS<'a, 'b>>,
 }
 
 /// Overwrite secrets with null bytes when they go out of scope.
@@ -83,24 +85,33 @@ impl<'a, 'b> ConstraintSystem for ProverCS<'a, 'b> {
         self.a_R.push(r);
         self.a_O.push(o);
 
-        self.cs_state.assign_multiplier(left, right, out)
+        Ok(Variable::from_multiplier(
+            self.a_L.len() - 1,
+            left,
+            right,
+            out,
+        ))
     }
 
     fn add_constraint(&mut self, constraint: Constraint) {
-        self.cs_state.add_constraint(constraint);
+        self.constraints.push(constraint);
     }
 
     fn challenge_scalar<F>(&mut self, label: &'static [u8], callback: F) -> Result<(), R1CSError>
     where
         F: 'static + Fn(&mut Self, OpaqueScalar) -> Result<(), R1CSError>,
     {
-        match self.cs_state.store_challenge_callback(label, callback) {
-            Some(callback) => {
-                let challenge = self.transcript.challenge_scalar(label);
-                callback(self, challenge.into())
-            }
-            None => Ok(()),
-        }
+        DeferredChallenges::push(self, label, callback)
+    }
+}
+
+impl<'a, 'b> ConstraintSystemInternal for ProverCS<'a, 'b> {
+    fn transcript(&mut self) -> &mut Transcript {
+        &mut self.transcript
+    }
+
+    fn deferred_challenges(&mut self) -> &mut DeferredChallenges<Self> {
+        &mut self.deferred_challenges
     }
 }
 
@@ -158,35 +169,25 @@ impl<'a, 'b> ProverCS<'a, 'b> {
             .map(|(v, v_b)| pc_gens.commit(*v, *v_b).compress())
             .collect::<Vec<_>>();
 
-        let cs_state = ConstraintSystemState::new(transcript, &commitments[..]);
+        transcript.r1cs_domain_sep(commitments.len() as u64);
+        for V in commitments.iter() {
+            transcript.commit_point(b"V", V);
+        }
 
         let cs = Self {
-            cs_state,
             transcript,
             pc_gens,
             bp_gens,
+            constraints: Vec::new(),
+            a_L: Vec::new(),
+            a_R: Vec::new(),
+            a_O: Vec::new(),
             v,
             v_blinding,
-            a_L: vec![],
-            a_R: vec![],
-            a_O: vec![],
+            deferred_challenges: DeferredChallenges::new(),
         };
 
         (cs, commitments)
-    }
-
-    /// Creates an RNG out of the current state of the transcript
-    /// and the blinding factors for the external variables.
-    fn rng(&mut self) -> TranscriptRng {
-        let mut builder = self.transcript.build_rng();
-
-        // Commit the blinding factors for the input wires
-        for v_b in &self.v_blinding {
-            builder = builder.commit_witness_bytes(b"v_blinding", v_b.as_bytes());
-        }
-
-        use rand::thread_rng;
-        builder.finalize(&mut thread_rng())
     }
 
     /// Consume this `ConstraintSystem` to produce a proof.
@@ -202,10 +203,7 @@ impl<'a, 'b> ProverCS<'a, 'b> {
             .v
             .iter()
             .enumerate()
-            .map(|(i, v)| Variable {
-                index: VariableIndex::Committed(i),
-                assignment: (*v).into(),
-            })
+            .map(|(i, v)| Variable::committed(i, (*v).into()))
             .collect::<Vec<_>>();
 
         // 1. Build the constraint system.
@@ -215,7 +213,17 @@ impl<'a, 'b> ProverCS<'a, 'b> {
         let gens = self.bp_gens.share(0);
 
         // Create RNG from the transcript and the external secrets.
-        let mut rng = self.rng();
+        let mut rng = {
+            let mut builder = self.transcript.build_rng();
+
+            // Commit the blinding factors for the input wires
+            for v_b in &self.v_blinding {
+                builder = builder.commit_witness_bytes(b"v_blinding", v_b.as_bytes());
+            }
+
+            use rand::thread_rng;
+            builder.finalize(&mut thread_rng())
+        };
 
         // 2. Commit to the first-phase low-level witness data
         let n1 = self.a_L.len();
@@ -262,10 +270,7 @@ impl<'a, 'b> ProverCS<'a, 'b> {
 
         // 3. Process the second phase of the CS, allocating more variables
         //    and adding more constraints.
-        for (label, callback) in self.cs_state.complete_constraints().into_iter() {
-            let challenge = self.transcript.challenge_scalar(label);
-            callback(&mut self, challenge.into())?;
-        }
+        DeferredChallenges::drain(&mut self)?;
 
         // 4. Pad the CS to the power-of-two number of multipliers.
         let n = self.a_L.len();
@@ -324,7 +329,8 @@ impl<'a, 'b> ProverCS<'a, 'b> {
         let y = self.transcript.challenge_scalar(b"y");
         let z = self.transcript.challenge_scalar(b"z");
 
-        let (wL, wR, wO, wV, _) = self.cs_state.flattened_constraints::<NoScalar>(&z);
+        let (wL, wR, wO, wV, _) =
+            Constraint::flatten::<NoScalar, _>(self.constraints.iter(), &z, self.v.len(), n);
 
         let mut l_poly = util::VecPoly3::zero(n);
         let mut r_poly = util::VecPoly3::zero(n);
