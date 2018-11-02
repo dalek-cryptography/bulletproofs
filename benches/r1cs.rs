@@ -1,7 +1,7 @@
 extern crate failure;
 
 extern crate bulletproofs;
-use bulletproofs::r1cs::{OpaqueScalar, Variable, ConstraintSystem, R1CSError, R1CSProof};
+use bulletproofs::r1cs::{ConstraintSystem, OpaqueScalar, R1CSError, R1CSProof, Variable};
 use bulletproofs::{BulletproofGens, PedersenGens};
 
 #[macro_use]
@@ -167,11 +167,13 @@ fn kshuffle_prove_helper(k: usize, c: &mut Criterion) {
         let bp_gens = BulletproofGens::new(128, 1);
         b.iter(|| {
             let mut prover_transcript = Transcript::new(b"ShuffleTest");
-            
+
             let mut v = Vec::with_capacity(2 * k);
             v.extend_from_slice(&input);
             v.extend_from_slice(&output);
-            let v_blinding = (0..v.len()).map(|_| Scalar::random(&mut rand::thread_rng())).collect();
+            let v_blinding = (0..v.len())
+                .map(|_| Scalar::random(&mut rand::thread_rng()))
+                .collect();
 
             R1CSProof::prove(
                 &bp_gens,
@@ -237,7 +239,7 @@ fn kshuffle_verify_helper(k: usize, c: &mut Criterion) {
         let pc_gens = PedersenGens::default();
         let bp_gens = BulletproofGens::new(128, 1);
         let base_transcript = Transcript::new(b"ShuffleTest");
-        
+
         // Prover's scope
         let (proof, commitments) = {
             // Generate inputs and outputs to kshuffle
@@ -250,7 +252,9 @@ fn kshuffle_verify_helper(k: usize, c: &mut Criterion) {
             let mut v = Vec::with_capacity(2 * k);
             v.extend_from_slice(&input);
             v.extend_from_slice(&output);
-            let v_blinding = (0..v.len()).map(|_| Scalar::random(&mut rand::thread_rng())).collect();
+            let v_blinding = (0..v.len())
+                .map(|_| Scalar::random(&mut rand::thread_rng()))
+                .collect();
 
             R1CSProof::prove(
                 &bp_gens,
@@ -274,23 +278,25 @@ fn kshuffle_verify_helper(k: usize, c: &mut Criterion) {
 
         // Verify kshuffle proof
         b.iter(|| {
-            proof.clone().verify(
-                &bp_gens,
-                &pc_gens,
-                &mut base_transcript.clone(),
-                commitments.clone(),
-                |cs, vars| {
-                    KShuffleGadget::fill_cs(
-                        cs,
-                        (&vars[0..k]).into_iter().map(|v| v.into_opaque()).collect(),
-                        (&vars[k..2 * k])
-                            .into_iter()
-                            .map(|v| v.into_opaque())
-                            .collect(),
-                    )
-                },
-            )
-            .unwrap();
+            proof
+                .clone()
+                .verify(
+                    &bp_gens,
+                    &pc_gens,
+                    &mut base_transcript.clone(),
+                    commitments.clone(),
+                    |cs, vars| {
+                        KShuffleGadget::fill_cs(
+                            cs,
+                            (&vars[0..k]).into_iter().map(|v| v.into_opaque()).collect(),
+                            (&vars[k..2 * k])
+                                .into_iter()
+                                .map(|v| v.into_opaque())
+                                .collect(),
+                        )
+                    },
+                )
+                .unwrap();
         })
     });
 }
