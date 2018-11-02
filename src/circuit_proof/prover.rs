@@ -38,7 +38,7 @@ use transcript::TranscriptProtocol;
 /// [`ProverCS::prove`], which consumes the `ProverCS`, synthesizes
 /// the witness, and constructs the proof.
 pub struct ProverCS<'a, 'b> {
-    cs_state: ConstraintSystemState<'a>,
+    cs_state: ConstraintSystemState<'a, ProverCS<'a,'b>>,
     bp_gens: &'b BulletproofGens,
     pc_gens: &'b PedersenGens,
     a_L: Vec<Scalar>,
@@ -72,6 +72,7 @@ impl<'a, 'b> Drop for ProverCS<'a, 'b> {
 }
 
 impl<'a, 'b> ConstraintSystem for ProverCS<'a, 'b> {
+    type CommittedCS = Self;
 
     fn assign_multiplier<S: ScalarValue>(
         &mut self,
@@ -100,8 +101,9 @@ impl<'a, 'b> ConstraintSystem for ProverCS<'a, 'b> {
 
     fn challenge_scalar<F>(&mut self, label: &'static [u8], callback: F) -> Result<(), R1CSError>
     where
-        F: 'static + Fn(OpaqueScalar)-> Result<(), R1CSError> {
-        self.cs_state.challenge_scalar(label, callback)
+        F: 'static + Fn(&mut Self::CommittedCS, OpaqueScalar)-> Result<(), R1CSError>
+    {
+        self.cs_state.delegated_challenge_scalar(&mut self, label, callback)
     }
 }
 
@@ -251,7 +253,7 @@ impl<'a, 'b> ProverCS<'a, 'b> {
 
         // 3. Process the second phase of the CS, allocating more variables
         //    and adding more constraints.
-        self.cs_state.complete_constraints()?;
+        self.cs_state.complete_constraints(&mut self)?;
 
         // 4. Pad the CS to the power-of-two number of multipliers.
         let n = self.a_L.len();

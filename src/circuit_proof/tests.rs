@@ -192,9 +192,7 @@ impl KShuffleGadget {
             return Ok(());
         }
         
-        cs.after_commitment(move |cs| {
-
-            let z = cs.challenge_scalar(b"k-scalar shuffle challenge");
+        cs.challenge_scalar(b"k-scalar shuffle challenge", move |cs, z| {
 
             // Make last x multiplier for i = k-1 and k-2
             let last_mulx_out = KShuffleGadget::last_multiplier(cs, z, x[k - 1], x[k - 2]);

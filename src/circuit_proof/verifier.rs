@@ -38,13 +38,14 @@ use transcript::TranscriptProtocol;
 /// consumes the `VerifierCS` and verifies the proof.
 pub struct VerifierCS<'a, 'b> {
     V: Vec<CompressedRistretto>,
-    cs_state: ConstraintSystemState<'a>,
+    cs_state: ConstraintSystemState<'a, VerifierCS<'a,'b>>,
     bp_gens: &'b BulletproofGens,
     pc_gens: &'b PedersenGens,
     variables_count: usize,
 }
 
 impl<'a, 'b> ConstraintSystem for VerifierCS<'a, 'b> {
+    type CommittedCS = Self;
 
     fn assign_multiplier<S: ScalarValue>(
         &mut self,
@@ -62,8 +63,9 @@ impl<'a, 'b> ConstraintSystem for VerifierCS<'a, 'b> {
 
     fn challenge_scalar<F>(&mut self, label: &'static [u8], callback: F) -> Result<(), R1CSError>
     where
-        F: 'static + Fn(OpaqueScalar)-> Result<(), R1CSError> {
-        self.cs_state.challenge_scalar(label, callback)
+        F: 'static + Fn(&mut Self::CommittedCS, OpaqueScalar)-> Result<(), R1CSError>
+    {
+        self.cs_state.delegated_challenge_scalar(&mut self, label, callback)
     }
 }
 
@@ -145,7 +147,7 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
 
         // 3. Process the second phase of the CS, allocating more variables
         //    and adding more constraints.
-        self.cs_state.complete_constraints()?;
+        self.cs_state.complete_constraints(&mut self)?;
 
         self.cs_state.transcript.commit_point(b"A_I2", &proof.A_I2);
         self.cs_state.transcript.commit_point(b"A_O2", &proof.A_O2);

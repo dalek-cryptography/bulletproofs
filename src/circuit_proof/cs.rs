@@ -19,6 +19,7 @@ use super::constraints::{Variable,VariableIndex,Constraint};
 /// Gadgets receive a mutable instance of the constraint system and use it
 /// to allocate variables and create constraints between them.
 pub trait ConstraintSystem {
+    type CommittedCS: ConstraintSystem;
 
     /// Allocate variables for left, right, and output wires of multiplication,
     /// and assign them the Assignments that are passed in.
@@ -58,27 +59,27 @@ pub trait ConstraintSystem {
     /// family of circuits parameterized by challenge scalars.
     fn challenge_scalar<F>(&mut self, label: &'static [u8], callback: F) -> Result<(), R1CSError>
     where
-        F: 'static + Fn(OpaqueScalar)-> Result<(), R1CSError>;
+        F: 'static + Fn(&mut Self::CommittedCS, OpaqueScalar)-> Result<(), R1CSError>;
 }
 
 
 /// Internal state of the constraint system
-pub(crate) struct ConstraintSystemState<'a> {
+pub(crate) struct ConstraintSystemState<'a, CS: ConstraintSystem> {
     pub(crate) transcript: &'a mut Transcript,
     constraints: Vec<Constraint>,
     external_variables_count: usize,
     variables_count: usize,
-    phase: Phase,
+    phase: Phase<CS>,
 }
 
 /// Represents the current phase of a constraint system
-enum Phase {
+enum Phase<CS: ConstraintSystem> {
     /// First phase collects the callbacks that produce challenges
-    DeferredCS(Vec<(&'static [u8], Box<Fn(OpaqueScalar) -> Result<(), R1CSError>>)>),
+    DeferredCS(Vec<(&'static [u8], Box<Fn(&mut CS, OpaqueScalar) -> Result<(), R1CSError>>)>),
     CommittedCS
 }
 
-impl<'a> ConstraintSystemState<'a> {
+impl<'a, CS> ConstraintSystemState<'a, CS> where CS: ConstraintSystem {
     /// Creates an internal state for the constraint system.
     pub(crate) fn new(
         transcript: &'a mut Transcript,
@@ -100,9 +101,74 @@ impl<'a> ConstraintSystemState<'a> {
         }
     }
 
+    /// Allocate variables for left, right, and output wires of multiplication,
+    /// and assign them the Assignments that are passed in.
+    /// Prover will pass in `Value(Scalar)`s, and Verifier will pass in `Missing`s.
+    pub(crate) fn assign_multiplier<S: ScalarValue>(
+        &mut self,
+        left: Assignment<S>,
+        right: Assignment<S>,
+        out: Assignment<S>,
+    ) -> Result<(Variable<S>, Variable<S>, Variable<S>), R1CSError> {
+
+        let i = self.variables_count;
+        self.variables_count += 1;
+
+        Ok((
+            Variable {
+                index: VariableIndex::MultiplierLeft(i),
+                assignment: left,
+            },
+            Variable {
+                index: VariableIndex::MultiplierRight(i),
+                assignment: right,
+            },
+            Variable {
+                index: VariableIndex::MultiplierOutput(i),
+                assignment: out,
+            },
+        ))
+    }
+
+    /// Enforce that the given linear combination in the constraint is zero.
+    pub(crate) fn add_constraint(&mut self, constraint: Constraint) {
+        self.constraints.push(constraint)
+    }
+
+    /// Obtain a challenge scalar bound to the assignments of all of
+    /// the externally committed wires.
+    /// 
+    /// If the CS is not yet committed, the call returns `Ok()` and saves a callback
+    /// for later, when the constraint system’s free variables are committed.
+    /// If the CS is already committed, the callback is invoked immediately
+    ///
+    /// This allows the prover to select a challenge circuit from a
+    /// family of circuits parameterized by challenge scalars.
+    pub(crate) fn delegated_challenge_scalar<F>(
+        &mut self,
+        cs: &mut CS,
+        label: &'static [u8],
+        callback: F
+    ) -> Result<(), R1CSError>
+    where
+        F: 'static + Fn(&mut CS, OpaqueScalar)-> Result<(), R1CSError>
+    {
+        match &mut self.phase {
+            Phase::DeferredCS(ref mut callbacks) => {
+                callbacks.push((label, Box::new(callback)));
+                Ok(())
+            },
+            Phase::CommittedCS => {
+                let challenge: OpaqueScalar = self.transcript.challenge_scalar(label).into();
+                callback(cs, challenge)
+            }
+        }
+    }
+
+
     /// Builds the second phase of the constraint system and generates deferred challenges.
     /// If the constraint system is already committed, this call has no effect.
-    pub(crate) fn complete_constraints(&mut self) -> Result<(), R1CSError> {
+    pub(crate) fn complete_constraints(&mut self, cs: &mut CS) -> Result<(), R1CSError> {
         let mut callbacks = match &mut self.phase {
             Phase::DeferredCS(ref mut callbacks) => mem::replace(callbacks, Vec::new()),
             _ => {
@@ -118,11 +184,12 @@ impl<'a> ConstraintSystemState<'a> {
             // Note: nested calls for challenges are going to yield immediately as we switched
             // to the second phase already. This means, the order of challenge generation is
             // depth-first: `A(B(C), D(E)), F(G)` -> `[A, B, C, D, E, F, G]`.
-            callback(challenge)?;
+            callback(cs, challenge)?;
         }
 
         Ok(())
     }
+
 
     /// Use a challenge, `z`, to flatten the constraints in the
     /// constraint system into vectors used for proving and
@@ -165,7 +232,7 @@ impl<'a> ConstraintSystemState<'a> {
                         wV[*i] -= exp_z * coeff.internal_scalar;
                     }
                     VariableIndex::One() => {
-                        // Note: this is no-op for the prover because it'll use T=NoScalar.
+                        // Note: this is no-op for the prover because it'll use T = NoScalar.
                         wc -= T::from(exp_z) * coeff.internal_scalar;
                     }
                 }
@@ -174,67 +241,6 @@ impl<'a> ConstraintSystemState<'a> {
         }
 
         (wL, wR, wO, wV, wc)
-    }
-}
-
-impl<'a> ConstraintSystem for ConstraintSystemState<'a> {
-     /// Allocate variables for left, right, and output wires of multiplication,
-    /// and assign them the Assignments that are passed in.
-    /// Prover will pass in `Value(Scalar)`s, and Verifier will pass in `Missing`s.
-    fn assign_multiplier<S: ScalarValue>(
-        &mut self,
-        left: Assignment<S>,
-        right: Assignment<S>,
-        out: Assignment<S>,
-    ) -> Result<(Variable<S>, Variable<S>, Variable<S>), R1CSError> {
-
-        let i = self.variables_count;
-        self.variables_count += 1;
-
-        Ok((
-            Variable {
-                index: VariableIndex::MultiplierLeft(i),
-                assignment: left,
-            },
-            Variable {
-                index: VariableIndex::MultiplierRight(i),
-                assignment: right,
-            },
-            Variable {
-                index: VariableIndex::MultiplierOutput(i),
-                assignment: out,
-            },
-        ))
-    }
-
-    /// Enforce that the given linear combination in the constraint is zero.
-    fn add_constraint(&mut self, constraint: Constraint) {
-        self.constraints.push(constraint)
-    }
-
-    /// Obtain a challenge scalar bound to the assignments of all of
-    /// the externally committed wires.
-    /// 
-    /// If the CS is not yet committed, the call returns `Ok()` and saves a callback
-    /// for later, when the constraint system’s free variables are committed.
-    /// If the CS is already committed, the callback is invoked immediately
-    ///
-    /// This allows the prover to select a challenge circuit from a
-    /// family of circuits parameterized by challenge scalars.
-    fn challenge_scalar<F>(&mut self, label: &'static [u8], callback: F) -> Result<(), R1CSError>
-    where
-        F: 'static + Fn(OpaqueScalar) -> Result<(), R1CSError>
-    {
-        match &mut self.phase {
-            Phase::DeferredCS(ref mut callbacks) => {
-                callbacks.push((label, Box::new(callback)));
-                Ok(())
-            },
-            Phase::CommittedCS => {
-                let challenge = self.transcript.challenge_scalar(label).into();
-                callback(challenge)
-            }
-        }
     }
 }
 
