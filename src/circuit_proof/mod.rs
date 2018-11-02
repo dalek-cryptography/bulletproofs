@@ -5,6 +5,7 @@ mod scalar_value;
 mod assignment;
 mod constraints;
 mod linear_combination;
+mod lc;
 mod cs;
 mod prover;
 mod verifier;
