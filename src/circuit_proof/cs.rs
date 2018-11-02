@@ -19,8 +19,6 @@ use super::constraints::{Variable,VariableIndex,Constraint};
 /// Gadgets receive a mutable instance of the constraint system and use it
 /// to allocate variables and create constraints between them.
 pub trait ConstraintSystem {
-    type CommittedCS: ConstraintSystem;
-
     /// Allocate variables for left, right, and output wires of multiplication,
     /// and assign them the Assignments that are passed in.
     /// Prover will pass in `Value(Scalar)`s, and Verifier will pass in `Missing`s.
@@ -59,7 +57,7 @@ pub trait ConstraintSystem {
     /// family of circuits parameterized by challenge scalars.
     fn challenge_scalar<F>(&mut self, label: &'static [u8], callback: F) -> Result<(), R1CSError>
     where
-        F: 'static + Fn(&mut Self::CommittedCS, OpaqueScalar)-> Result<(), R1CSError>;
+        F: 'static + Fn(&mut Self, OpaqueScalar)-> Result<(), R1CSError>;
 }
 
 
@@ -144,50 +142,51 @@ impl<'a, CS> ConstraintSystemState<'a, CS> where CS: ConstraintSystem {
     ///
     /// This allows the prover to select a challenge circuit from a
     /// family of circuits parameterized by challenge scalars.
-    pub(crate) fn delegated_challenge_scalar<F>(
+    pub(crate) fn store_challenge_callback<F>(
         &mut self,
-        cs: &mut CS,
         label: &'static [u8],
         callback: F
-    ) -> Result<(), R1CSError>
+    ) -> Option<F>
     where
         F: 'static + Fn(&mut CS, OpaqueScalar)-> Result<(), R1CSError>
     {
         match &mut self.phase {
             Phase::DeferredCS(ref mut callbacks) => {
                 callbacks.push((label, Box::new(callback)));
-                Ok(())
+                None
             },
-            Phase::CommittedCS => {
-                let challenge: OpaqueScalar = self.transcript.challenge_scalar(label).into();
-                callback(cs, challenge)
-            }
+            Phase::CommittedCS => Some(callback)
         }
     }
 
-
-    /// Builds the second phase of the constraint system and generates deferred challenges.
-    /// If the constraint system is already committed, this call has no effect.
-    pub(crate) fn complete_constraints(&mut self, cs: &mut CS) -> Result<(), R1CSError> {
-        let mut callbacks = match &mut self.phase {
+    /// Returns an iterator of deferred callbacks with the generated challenges.
+    /// If the constraint system is already committed, this call returns an empty iterator.
+    pub(crate) fn complete_constraints(
+        &mut self
+    ) -> Vec<(&'static [u8], Box<Fn(&mut CS, OpaqueScalar) -> Result<(), R1CSError>>)>
+    {
+        let callbacks = match &mut self.phase {
             Phase::DeferredCS(ref mut callbacks) => mem::replace(callbacks, Vec::new()),
-            _ => {
-                return Ok(());
-            }
+            _ => Vec::new()
         };
 
-        // Switch the phase before we call any callbacks as those can trigger additional queries
+        // Switch the phase before we call any callbacks
+        // as those can trigger additional queries.
         self.phase = Phase::CommittedCS;
 
-        for (label, callback) in callbacks.drain(..) {
-            let challenge = self.transcript.challenge_scalar(label).into();
-            // Note: nested calls for challenges are going to yield immediately as we switched
-            // to the second phase already. This means, the order of challenge generation is
-            // depth-first: `A(B(C), D(E)), F(G)` -> `[A, B, C, D, E, F, G]`.
-            callback(cs, challenge)?;
-        }
-
-        Ok(())
+        // Note: nested calls for challenges are going to yield immediately as we switched
+        // to the second phase already. This means, the order of challenge generation is
+        // depth-first: `A(B(C), D(E)), F(G)` -> `[A, B, C, D, E, F, G]`.
+        // This is guaranteed by map: it iterates only together with the upstream iterator.
+        callbacks
+        
+        // How to:
+        // ```
+        // for (label, callback) in callbacks {
+        //     let challenge = transcript.challenge_scalar(label);
+        //     callback(cs, challenge.into())?;
+        // }
+        // ```
     }
 
 

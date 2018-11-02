@@ -72,7 +72,6 @@ impl<'a, 'b> Drop for ProverCS<'a, 'b> {
 }
 
 impl<'a, 'b> ConstraintSystem for ProverCS<'a, 'b> {
-    type CommittedCS = Self;
 
     fn assign_multiplier<S: ScalarValue>(
         &mut self,
@@ -101,9 +100,15 @@ impl<'a, 'b> ConstraintSystem for ProverCS<'a, 'b> {
 
     fn challenge_scalar<F>(&mut self, label: &'static [u8], callback: F) -> Result<(), R1CSError>
     where
-        F: 'static + Fn(&mut Self::CommittedCS, OpaqueScalar)-> Result<(), R1CSError>
+        F: 'static + Fn(&mut Self, OpaqueScalar)-> Result<(), R1CSError>
     {
-        self.cs_state.delegated_challenge_scalar(&mut self, label, callback)
+        match self.cs_state.store_challenge_callback(label, callback) {
+            Some(callback) => {
+                let challenge = self.cs_state.transcript.challenge_scalar(label);
+                callback(self, challenge.into())
+            },
+            None => Ok(())
+        }
     }
 }
 
@@ -253,7 +258,10 @@ impl<'a, 'b> ProverCS<'a, 'b> {
 
         // 3. Process the second phase of the CS, allocating more variables
         //    and adding more constraints.
-        self.cs_state.complete_constraints(&mut self)?;
+        for (label, callback) in self.cs_state.complete_constraints().into_iter() {
+            let challenge = self.cs_state.transcript.challenge_scalar(label);
+            callback(&mut self, challenge.into())?;
+        }
 
         // 4. Pad the CS to the power-of-two number of multipliers.
         let n = self.a_L.len();
@@ -389,6 +397,7 @@ impl<'a, 'b> ProverCS<'a, 'b> {
             exp_y = exp_y * y; // y^i -> y^(i+1)
         }
 
+        // TODO: apply `e` factor
         let i_blinding = i_blinding1 + /* e* */i_blinding2;
         let o_blinding = o_blinding1 + /* e* */o_blinding2;
         let s_blinding = s_blinding1 + /* e* */s_blinding2;
@@ -418,11 +427,11 @@ impl<'a, 'b> ProverCS<'a, 'b> {
         // We do not yet have a ClearOnDrop wrapper for Vec<Scalar>.
         // When PR 202 [1] is merged, we can simply wrap s_L and s_R at the point of creation.
         // [1] https://github.com/dalek-cryptography/curve25519-dalek/pull/202
-        for e in s_L1.iter_mut()
+        for scalar in s_L1.iter_mut()
                 .chain(s_L2.iter_mut())
                 .chain(s_R1.iter_mut())
                 .chain(s_R2.iter_mut()) {
-            e.clear();
+            scalar.clear();
         }
         
         Ok(R1CSProof {

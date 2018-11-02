@@ -45,7 +45,6 @@ pub struct VerifierCS<'a, 'b> {
 }
 
 impl<'a, 'b> ConstraintSystem for VerifierCS<'a, 'b> {
-    type CommittedCS = Self;
 
     fn assign_multiplier<S: ScalarValue>(
         &mut self,
@@ -63,9 +62,15 @@ impl<'a, 'b> ConstraintSystem for VerifierCS<'a, 'b> {
 
     fn challenge_scalar<F>(&mut self, label: &'static [u8], callback: F) -> Result<(), R1CSError>
     where
-        F: 'static + Fn(&mut Self::CommittedCS, OpaqueScalar)-> Result<(), R1CSError>
+        F: 'static + Fn(&mut Self, OpaqueScalar)-> Result<(), R1CSError>
     {
-        self.cs_state.delegated_challenge_scalar(&mut self, label, callback)
+        match self.cs_state.store_challenge_callback(label, callback) {
+            Some(callback) => {
+                let challenge = self.cs_state.transcript.challenge_scalar(label);
+                callback(self, challenge.into())
+            },
+            None => Ok(())
+        }
     }
 }
 
@@ -147,7 +152,10 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
 
         // 3. Process the second phase of the CS, allocating more variables
         //    and adding more constraints.
-        self.cs_state.complete_constraints(&mut self)?;
+        for (label, callback) in self.cs_state.complete_constraints().into_iter() {
+            let challenge = self.cs_state.transcript.challenge_scalar(label);
+            callback(&mut self, challenge.into())?;
+        }
 
         self.cs_state.transcript.commit_point(b"A_I2", &proof.A_I2);
         self.cs_state.transcript.commit_point(b"A_O2", &proof.A_O2);
