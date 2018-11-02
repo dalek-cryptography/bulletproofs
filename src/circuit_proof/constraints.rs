@@ -144,6 +144,14 @@ impl<T: ScalarValue> IntoLinearCombination<T> for LinearCombination<T> {
     }
 }
 
+impl<T: ScalarValue> IntoLinearCombination<T> for u64 {
+    fn into_lc(self) -> LinearCombination<T> {
+        LinearCombination {
+            terms: vec![(Variable::constant_one(), T::from(self))],
+        }
+    }
+}
+
 impl<T: ScalarValue> IntoLinearCombination<T> for Scalar {
     fn into_lc(self) -> LinearCombination<T> {
         LinearCombination {
