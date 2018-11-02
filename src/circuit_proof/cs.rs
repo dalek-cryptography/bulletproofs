@@ -137,15 +137,11 @@ where
         self.constraints.push(constraint)
     }
 
-    /// Obtain a challenge scalar bound to the assignments of all of
-    /// the externally committed wires.
+    /// Store a callback for a challenge scalar to be produced later.
     ///
-    /// If the CS is not yet committed, the call returns `Ok()` and saves a callback
-    /// for later, when the constraint system’s free variables are committed.
-    /// If the CS is already committed, the callback is invoked immediately
-    ///
-    /// This allows the prover to select a challenge circuit from a
-    /// family of circuits parameterized by challenge scalars.
+    /// If the CS is not yet committed, the call saves the callback and returns `None`.
+    /// If the CS is already committed, the callback is returned as `Some` back to the caller,
+    /// so that the caller can call it immediately.
     pub(crate) fn store_challenge_callback<F>(
         &mut self,
         label: &'static [u8],

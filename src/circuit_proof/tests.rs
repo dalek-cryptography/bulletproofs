@@ -26,7 +26,7 @@ fn example_gadget<S: ScalarValue, CS: ConstraintSystem>(
     let r = b1 + b2;
     let o = c1 + c2;
 
-    // Make low-level VariableIndexs (aL = v_a1 + v_a2, aR = v_b1 + v_b2, aO = v_c1 + v_c2)
+    // Make low-level variables (aL = v_a1 + v_a2, aR = v_b1 + v_b2, aO = v_c1 + v_c2)
     let (aL, aR, aO) = cs.assign_multiplier(l.eval(), r.eval(), o.eval())?;
 
     // Tie high-level and low-level variables together
@@ -102,7 +102,7 @@ K-SHUFFLE GADGET SPECIFICATION:
 
 Represents a permutation of a list of `k` scalars `{x_i}` into a list of `k` scalars `{y_i}`.
 
-Algebraically it can be expressed as a statement that for a free VariableIndex `z`, 
+Algebraically it can be expressed as a statement that for a free variables `z`, 
 the roots of the two polynomials in terms of `z` are the same up to a permutation:
 
     ∏(x_i - z) == ∏(y_i - z)
@@ -133,7 +133,7 @@ For K > 1:
     muly_left[i]  = y_i - z
     muly_right[i] = muly_out[i+1]
 
-    // last multipliers connect two last VariableIndexs (on each side)
+    // last multipliers connect two last variables (on each side)
     mulx_left[k-2]  = x_{k-2} - z
     mulx_right[k-2] = x_{k-1} - z
     muly_left[k-2]  = y_{k-2} - z

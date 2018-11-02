@@ -9,7 +9,8 @@ mod scalar_value;
 mod verifier;
 
 pub use self::assignment::Assignment;
-pub use self::constraints::{Constraint, LinearCombination, Variable, VariableIndex};
+use self::constraints::VariableIndex;
+pub use self::constraints::{Constraint, LinearCombination, Variable};
 pub use self::cs::ConstraintSystem;
 pub use self::opaque_scalar::OpaqueScalar;
 pub use self::prover::ProverCS;

@@ -8,7 +8,7 @@ use super::scalar_value::ScalarValue;
 
 /// Represents a variable in a constraint system.
 #[derive(Copy, Clone, Debug)]
-pub enum VariableIndex {
+pub(crate) enum VariableIndex {
     /// Represents an external input specified by a commitment.
     Committed(usize),
     /// Represents the left input of a multiplication gate.
@@ -27,7 +27,7 @@ pub enum VariableIndex {
 #[derive(Copy, Clone, Debug)]
 pub struct Variable<S: ScalarValue> {
     /// Index of the variable within the constraint system
-    pub index: VariableIndex,
+    pub(crate) index: VariableIndex,
 
     /// Assignment of the variable within the constraint system.
     /// Assignment is present as a plain or opaque scalar for the prover,
@@ -38,7 +38,7 @@ pub struct Variable<S: ScalarValue> {
 /// `Constraint` is a `LinearCombination` over variable indices with opaque scalars
 /// that is required to equal zero.
 /// Create constraints using `equals` method on `LinearCombination`s and `Variable`s.
-pub struct Constraint(pub Vec<(VariableIndex, OpaqueScalar)>);
+pub struct Constraint(pub(crate) Vec<(VariableIndex, OpaqueScalar)>);
 
 /// Trait for types that can be unambiguously converted to a linear combination.
 /// Variable is converted to `(var, 1)`, scalar is converted as `(One, scalar)`,
