@@ -212,15 +212,19 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
 
         let delta = inner_product(&yneg_wR[0..n], &wL);
 
-        let e_for_g = iter::repeat(Scalar::one()).take(n1).chain(iter::repeat(e).take(n2 + pad));
-        let e_for_h = iter::repeat(Scalar::one()).take(n1).chain(iter::repeat(e).take(n2 + pad));
+        let e_for_g = iter::repeat(Scalar::one())
+            .take(n1)
+            .chain(iter::repeat(e).take(n2 + pad));
+        let e_for_h = iter::repeat(Scalar::one())
+            .take(n1)
+            .chain(iter::repeat(e).take(n2 + pad));
 
         // define parameters for P check
         let g_scalars = yneg_wR
             .iter()
             .zip(e_for_g)
             .zip(s.iter().take(padded_n))
-            .map(|((yneg_wRi, e_or_1), s_i)| e_or_1*(x * yneg_wRi - a * s_i));
+            .map(|((yneg_wRi, e_or_1), s_i)| e_or_1 * (x * yneg_wRi - a * s_i));
 
         let h_scalars = y_inv_vec
             .iter()
@@ -253,9 +257,9 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
             iter::once(x) // A_I1
                 .chain(iter::once(xx)) // A_O1
                 .chain(iter::once(xxx)) // S1
-                .chain(iter::once(e*x)) // A_I2
-                .chain(iter::once(e*xx)) // A_O2
-                .chain(iter::once(e*xxx)) // S2
+                .chain(iter::once(e * x)) // A_I2
+                .chain(iter::once(e * xx)) // A_O2
+                .chain(iter::once(e * xxx)) // S2
                 .chain(wV.iter().map(|wVi| wVi * rxx)) // V
                 .chain(T_scalars.iter().cloned()) // T_points
                 .chain(iter::once(

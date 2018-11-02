@@ -132,7 +132,7 @@ impl InnerProductProof {
                 b_L[i] = b_L[i] * u_inv + u * b_R[i];
                 G_L[i] = RistrettoPoint::vartime_multiscalar_mul(
                     &[u_inv * G_factors[i], u * G_factors[n + i]],
-                    &[G_L[i], G_R[i]]
+                    &[G_L[i], G_R[i]],
                 );
                 H_L[i] = RistrettoPoint::vartime_multiscalar_mul(
                     &[u * H_factors[i], u_inv * H_factors[n + i]],
@@ -254,7 +254,7 @@ impl InnerProductProof {
     /// method to combine inner product verification with other checks
     /// in a single multiscalar multiplication.
     #[allow(dead_code)]
-    pub fn verify<IG,IH>(
+    pub fn verify<IG, IH>(
         &self,
         transcript: &mut Transcript,
         G_factors: IG,
@@ -275,7 +275,8 @@ impl InnerProductProof {
         let g_times_a_times_s = G_factors
             .into_iter()
             .zip(s.iter())
-            .map(|(g_i, s_i)| (self.a * s_i) * g_i.borrow()).take(G.len());
+            .map(|(g_i, s_i)| (self.a * s_i) * g_i.borrow())
+            .take(G.len());
 
         // 1/s[i] is s[!i], and !i runs from n-1 to 0 as i runs from 0 to n-1
         let inv_s = s.iter().rev();
@@ -466,7 +467,10 @@ mod tests {
                     &mut verifier,
                     iter::repeat(Scalar::one()).take(n),
                     util::exp_iter(y_inv).take(n),
-                    &P, &Q, &G, &H
+                    &P,
+                    &Q,
+                    &G,
+                    &H
                 )
                 .is_ok()
         );
@@ -479,7 +483,11 @@ mod tests {
                     &mut verifier,
                     iter::repeat(Scalar::one()).take(n),
                     util::exp_iter(y_inv).take(n),
-                    &P, &Q, &G, &H)
+                    &P,
+                    &Q,
+                    &G,
+                    &H
+                )
                 .is_ok()
         );
     }

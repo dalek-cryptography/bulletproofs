@@ -430,12 +430,14 @@ impl<'a, 'b> ProverCS<'a, 'b> {
         let w = self.cs_state.transcript.challenge_scalar(b"w");
         let Q = w * self.pc_gens.B;
 
-        let G_factors = iter::repeat(Scalar::one()).take(n1)
-            .chain(
-                iter::repeat(e).take(n2 + pad)
-            ).collect::<Vec<_>>();
-        let H_factors = exp_y_inv.into_iter().zip(G_factors.iter())
-            .map(|(y,e_or_1)| y*e_or_1 )
+        let G_factors = iter::repeat(Scalar::one())
+            .take(n1)
+            .chain(iter::repeat(e).take(n2 + pad))
+            .collect::<Vec<_>>();
+        let H_factors = exp_y_inv
+            .into_iter()
+            .zip(G_factors.iter())
+            .map(|(y, e_or_1)| y * e_or_1)
             .collect::<Vec<_>>();
 
         let ipp_proof = InnerProductProof::create(
