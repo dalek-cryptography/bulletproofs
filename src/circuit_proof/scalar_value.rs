@@ -18,7 +18,7 @@ pub trait ScalarValue:
     + SubAssign
     + Mul<Output = Self>
 {
-	/// Value of 1, neutral element in multiplication
+    /// Value of 1, neutral element in multiplication
     fn one() -> Self;
 
     /// Value of 0, neutral element in addition
@@ -32,7 +32,7 @@ pub trait ScalarValue:
 }
 
 impl ScalarValue for OpaqueScalar {
-	fn one() -> Self {
+    fn one() -> Self {
         Scalar::one().into()
     }
     fn zero() -> Self {
@@ -42,12 +42,12 @@ impl ScalarValue for OpaqueScalar {
         Scalar::invert(&self.internal_scalar).into()
     }
     fn into_opaque(self) -> OpaqueScalar {
-    	self
+        self
     }
 }
 
 impl ScalarValue for Scalar {
-	fn one() -> Self {
+    fn one() -> Self {
         Scalar::one()
     }
     fn zero() -> Self {
@@ -57,6 +57,6 @@ impl ScalarValue for Scalar {
         Scalar::invert(self)
     }
     fn into_opaque(self) -> OpaqueScalar {
-    	self.into()
+        self.into()
     }
 }

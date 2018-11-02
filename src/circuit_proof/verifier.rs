@@ -6,15 +6,8 @@ use curve25519_dalek::traits::VartimeMultiscalarMul;
 use merlin::Transcript;
 
 use super::{
-    ScalarValue,
-    OpaqueScalar,
-    Assignment,
-    Variable,
-    VariableIndex,
-    Constraint,
-    ConstraintSystem,
-    cs::ConstraintSystemState,
-    R1CSProof,
+    cs::ConstraintSystemState, Assignment, Constraint, ConstraintSystem, OpaqueScalar, R1CSProof,
+    ScalarValue, Variable, VariableIndex,
 };
 
 use errors::R1CSError;
@@ -38,14 +31,13 @@ use transcript::TranscriptProtocol;
 /// consumes the `VerifierCS` and verifies the proof.
 pub struct VerifierCS<'a, 'b> {
     V: Vec<CompressedRistretto>,
-    cs_state: ConstraintSystemState<'a, VerifierCS<'a,'b>>,
+    cs_state: ConstraintSystemState<'a, VerifierCS<'a, 'b>>,
     bp_gens: &'b BulletproofGens,
     pc_gens: &'b PedersenGens,
     variables_count: usize,
 }
 
 impl<'a, 'b> ConstraintSystem for VerifierCS<'a, 'b> {
-
     fn assign_multiplier<S: ScalarValue>(
         &mut self,
         left: Assignment<S>,
@@ -53,7 +45,7 @@ impl<'a, 'b> ConstraintSystem for VerifierCS<'a, 'b> {
         out: Assignment<S>,
     ) -> Result<(Variable<S>, Variable<S>, Variable<S>), R1CSError> {
         self.variables_count += 1;
-        self.cs_state.assign_multiplier(left,right,out)
+        self.cs_state.assign_multiplier(left, right, out)
     }
 
     fn add_constraint(&mut self, constraint: Constraint) {
@@ -62,18 +54,17 @@ impl<'a, 'b> ConstraintSystem for VerifierCS<'a, 'b> {
 
     fn challenge_scalar<F>(&mut self, label: &'static [u8], callback: F) -> Result<(), R1CSError>
     where
-        F: 'static + Fn(&mut Self, OpaqueScalar)-> Result<(), R1CSError>
+        F: 'static + Fn(&mut Self, OpaqueScalar) -> Result<(), R1CSError>,
     {
         match self.cs_state.store_challenge_callback(label, callback) {
             Some(callback) => {
                 let challenge = self.cs_state.transcript.challenge_scalar(label);
                 callback(self, challenge.into())
-            },
-            None => Ok(())
+            }
+            None => Ok(()),
         }
     }
 }
-
 
 impl<'a, 'b> VerifierCS<'a, 'b> {
     /// Construct an empty constraint system with specified external
@@ -113,7 +104,6 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
         transcript: &'a mut Transcript,
         commitments: Vec<CompressedRistretto>,
     ) -> Self {
-
         let cs_state = ConstraintSystemState::new(transcript, &commitments[..]);
 
         VerifierCS {
@@ -126,21 +116,24 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
     }
 
     /// Consume this `VerifierCS` and attempt to verify the supplied `proof`.
-    pub fn verify<F>(mut self, proof: &R1CSProof, builder: F) -> Result<(), R1CSError> 
+    pub fn verify<F>(mut self, proof: &R1CSProof, builder: F) -> Result<(), R1CSError>
     where
-        F: FnOnce(&mut Self, Vec<Variable<Scalar>>) -> Result<(), R1CSError>
+        F: FnOnce(&mut Self, Vec<Variable<Scalar>>) -> Result<(), R1CSError>,
     {
         use inner_product_proof::inner_product;
         use std::iter;
         use util;
 
         // 0. Convert the external commitments into the variables
-        let variables = self.V.iter().enumerate().map(|(i,_)| {
-            Variable {
+        let variables = self
+            .V
+            .iter()
+            .enumerate()
+            .map(|(i, _)| Variable {
                 index: VariableIndex::Committed(i),
-                assignment: Assignment::Missing()
-            }
-        }).collect::<Vec<_>>();
+                assignment: Assignment::Missing(),
+            })
+            .collect::<Vec<_>>();
 
         // 1. Build the constraint system.
         builder(&mut self, variables)?;
@@ -166,7 +159,7 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
         let n2 = n - n1;
         let padded_n = n.next_power_of_two();
         let pad = padded_n - n;
-        
+
         if self.bp_gens.gens_capacity < padded_n {
             return Err(R1CSError::InvalidGeneratorsLength);
         }
@@ -187,9 +180,11 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
         let x = self.cs_state.transcript.challenge_scalar(b"x");
 
         self.cs_state.transcript.commit_scalar(b"t_x", &proof.t_x);
-        self.cs_state.transcript
+        self.cs_state
+            .transcript
             .commit_scalar(b"t_x_blinding", &proof.t_x_blinding);
-        self.cs_state.transcript
+        self.cs_state
+            .transcript
             .commit_scalar(b"e_blinding", &proof.e_blinding);
 
         let w = self.cs_state.transcript.challenge_scalar(b"w");
@@ -197,7 +192,9 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
         let (wL, wR, wO, wV, wc) = self.cs_state.flattened_constraints::<Scalar>(&z);
 
         // Get IPP variables
-        let (u_sq, u_inv_sq, s) = proof.ipp_proof.verification_scalars(self.cs_state.transcript);
+        let (u_sq, u_inv_sq, s) = proof
+            .ipp_proof
+            .verification_scalars(self.cs_state.transcript);
 
         let a = proof.ipp_proof.a;
         let b = proof.ipp_proof.b;
@@ -232,7 +229,11 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
 
         // Create a `TranscriptRng` from the transcript
         use rand::thread_rng;
-        let mut rng = self.cs_state.transcript.build_rng().finalize(&mut thread_rng());
+        let mut rng = self
+            .cs_state
+            .transcript
+            .build_rng()
+            .finalize(&mut thread_rng());
         let r = Scalar::random(&mut rng);
 
         let xx = x * x;
@@ -258,8 +259,12 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
                 .chain(u_sq.iter().cloned()) // ipp_proof.L_vec
                 .chain(u_inv_sq.iter().cloned()), // ipp_proof.R_vec
             iter::once(Some(proof.A_I1.decompress()? + proof.A_I2.decompress()?))
-                .chain(iter::once(Some(proof.A_O1.decompress()? + proof.A_O2.decompress()?)))
-                .chain(iter::once(Some(proof.S1.decompress()? + proof.S2.decompress()?)))
+                .chain(iter::once(Some(
+                    proof.A_O1.decompress()? + proof.A_O2.decompress()?,
+                )))
+                .chain(iter::once(Some(
+                    proof.S1.decompress()? + proof.S2.decompress()?,
+                )))
                 .chain(self.V.iter().map(|V_i| V_i.decompress()))
                 .chain(T_points.iter().map(|T_i| T_i.decompress()))
                 .chain(iter::once(Some(self.pc_gens.B)))

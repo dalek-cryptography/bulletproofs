@@ -1,5 +1,5 @@
-use super::scalar_value::ScalarValue;
 use super::opaque_scalar::OpaqueScalar;
+use super::scalar_value::ScalarValue;
 use super::*;
 
 use errors::R1CSError;
@@ -22,14 +22,12 @@ fn example_gadget<S: ScalarValue, CS: ConstraintSystem>(
     c1: Variable<S>,
     c2: Scalar,
 ) -> Result<(), R1CSError> {
-
     let l = a1 + a2;
     let r = b1 + b2;
     let o = c1 + c2;
 
     // Make low-level VariableIndexs (aL = v_a1 + v_a2, aR = v_b1 + v_b2, aO = v_c1 + v_c2)
-    let (aL, aR, aO) =
-        cs.assign_multiplier(l.eval(), r.eval(), o.eval())?;
+    let (aL, aR, aO) = cs.assign_multiplier(l.eval(), r.eval(), o.eval())?;
 
     // Tie high-level and low-level variables together
     cs.add_constraint(aL.equals(l));
@@ -61,7 +59,6 @@ fn example_gadget_roundtrip_helper(
 
     // Prover's scope
     let (proof, commitments) = {
-
         let v: Vec<_> = [a1, a2, b1, b2, c1]
             .iter()
             .map(|x| Scalar::from(*x))
@@ -74,18 +71,9 @@ fn example_gadget_roundtrip_helper(
             &mut base_transcript.clone(),
             v,
             v_blinding,
-            |cs, vars| {
-                example_gadget(
-                    cs,
-                    vars[0],
-                    vars[1],
-                    vars[2],
-                    vars[3],
-                    vars[4],
-                    c2.into(),
-                )
-            },
-        ).unwrap()
+            |cs, vars| example_gadget(cs, vars[0], vars[1], vars[2], vars[3], vars[4], c2.into()),
+        )
+        .unwrap()
     };
 
     // Verifier's scope
@@ -95,17 +83,7 @@ fn example_gadget_roundtrip_helper(
         &pc_gens,
         &mut base_transcript.clone(),
         commitments,
-        |cs, vars| {
-            example_gadget(
-                cs,
-                vars[0],
-                vars[1],
-                vars[2],
-                vars[3],
-                vars[4],
-                c2.into(),
-            )
-        }
+        |cs, vars| example_gadget(cs, vars[0], vars[1], vars[2], vars[3], vars[4], c2.into()),
     )
 }
 
@@ -174,26 +152,25 @@ For K = 1:
 struct KShuffleGadget {}
 
 impl KShuffleGadget {
-
     fn fill_cs<CS: ConstraintSystem>(
         cs: &mut CS,
         x: Vec<Variable<OpaqueScalar>>,
         y: Vec<Variable<OpaqueScalar>>,
     ) -> Result<(), R1CSError> {
-
         if x.len() != y.len() {
-            return Err(R1CSError::LayoutError{cause: "KShuffleGadget: inputs have different lengths"});
+            return Err(R1CSError::LayoutError {
+                cause: "KShuffleGadget: inputs have different lengths",
+            });
         }
-        
+
         let k = x.len();
 
         if k == 1 {
             cs.add_constraint(x[0].equals(y[0]));
             return Ok(());
         }
-        
-        cs.challenge_scalar(b"k-scalar shuffle challenge", move |cs, z| {
 
+        cs.challenge_scalar(b"k-scalar shuffle challenge", move |cs, z| {
             // Make last x multiplier for i = k-1 and k-2
             let last_mulx_out = KShuffleGadget::last_multiplier(cs, z, x[k - 1], x[k - 2]);
 
@@ -228,8 +205,7 @@ impl KShuffleGadget {
         let l = left - z;
         let r = right - z;
 
-        let (al, ar, ao) =
-            cs.assign_multiplier(l.eval(), r.eval(), l.eval()*r.eval())?;
+        let (al, ar, ao) = cs.assign_multiplier(l.eval(), r.eval(), l.eval() * r.eval())?;
 
         cs.add_constraint(al.equals(l));
         cs.add_constraint(ar.equals(r));
@@ -246,7 +222,7 @@ impl KShuffleGadget {
         let r = right - z;
 
         let (al, ar, ao) =
-            cs.assign_multiplier(left.assignment, r.eval(), left.assignment*r.eval())?;
+            cs.assign_multiplier(left.assignment, r.eval(), left.assignment * r.eval())?;
 
         cs.add_constraint(al.equals(left));
         cs.add_constraint(ar.equals(r));
@@ -267,7 +243,6 @@ fn shuffle_gadget_test_helper(k: usize) {
 
     // Prover's scope
     let (proof, commitments) = {
-
         // Generate inputs and outputs to kshuffle
         let mut rng = rand::thread_rng();
         let (min, max) = (0u64, std::u64::MAX);
@@ -288,29 +263,38 @@ fn shuffle_gadget_test_helper(k: usize) {
             v_blinding,
             |cs, vars| {
                 KShuffleGadget::fill_cs(
-                    cs, 
+                    cs,
                     (&vars[0..k]).into_iter().map(|v| v.into_opaque()).collect(),
-                    (&vars[k..2*k]).into_iter().map(|v| v.into_opaque()).collect()
+                    (&vars[k..2 * k])
+                        .into_iter()
+                        .map(|v| v.into_opaque())
+                        .collect(),
                 )
             },
-        ).unwrap()
+        )
+        .unwrap()
     };
 
     // Verifier's scope
 
-    proof.verify(
-        &bp_gens,
-        &pc_gens,
-        &mut base_transcript.clone(),
-        commitments,
-        |cs, vars| {
-            KShuffleGadget::fill_cs(
-                cs, 
-                (&vars[0..k]).into_iter().map(|v| v.into_opaque()).collect(),
-                (&vars[k..2*k]).into_iter().map(|v| v.into_opaque()).collect()
-            )
-        }
-    ).unwrap()
+    proof
+        .verify(
+            &bp_gens,
+            &pc_gens,
+            &mut base_transcript.clone(),
+            commitments,
+            |cs, vars| {
+                KShuffleGadget::fill_cs(
+                    cs,
+                    (&vars[0..k]).into_iter().map(|v| v.into_opaque()).collect(),
+                    (&vars[k..2 * k])
+                        .into_iter()
+                        .map(|v| v.into_opaque())
+                        .collect(),
+                )
+            },
+        )
+        .unwrap()
 }
 
 #[test]

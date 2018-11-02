@@ -6,16 +6,9 @@ use clear_on_drop::clear::Clear;
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::MultiscalarMul;
-use merlin::{Transcript,TranscriptRng};
+use merlin::{Transcript, TranscriptRng};
 
-use super::{
-    Assignment, 
-    ScalarValue, 
-    Variable, 
-    VariableIndex,
-    ConstraintSystem,
-    R1CSProof
-};
+use super::{Assignment, ConstraintSystem, R1CSProof, ScalarValue, Variable, VariableIndex};
 
 use super::cs::{ConstraintSystemState, NoScalar};
 
@@ -38,7 +31,7 @@ use transcript::TranscriptProtocol;
 /// [`ProverCS::prove`], which consumes the `ProverCS`, synthesizes
 /// the witness, and constructs the proof.
 pub struct ProverCS<'a, 'b> {
-    cs_state: ConstraintSystemState<'a, ProverCS<'a,'b>>,
+    cs_state: ConstraintSystemState<'a, ProverCS<'a, 'b>>,
     bp_gens: &'b BulletproofGens,
     pc_gens: &'b PedersenGens,
     a_L: Vec<Scalar>,
@@ -72,14 +65,12 @@ impl<'a, 'b> Drop for ProverCS<'a, 'b> {
 }
 
 impl<'a, 'b> ConstraintSystem for ProverCS<'a, 'b> {
-
     fn assign_multiplier<S: ScalarValue>(
         &mut self,
         left: Assignment<S>,
         right: Assignment<S>,
         out: Assignment<S>,
     ) -> Result<(Variable<S>, Variable<S>, Variable<S>), R1CSError> {
-
         // Unwrap all of l,r,o up front to ensure we leave the CS in a
         // consistent state if any are missing assignments
         let l = left.into_transparent()?;
@@ -91,7 +82,7 @@ impl<'a, 'b> ConstraintSystem for ProverCS<'a, 'b> {
         self.a_R.push(r);
         self.a_O.push(o);
 
-        self.cs_state.assign_multiplier(left,right,out)
+        self.cs_state.assign_multiplier(left, right, out)
     }
 
     fn add_constraint(&mut self, constraint: Constraint) {
@@ -100,14 +91,14 @@ impl<'a, 'b> ConstraintSystem for ProverCS<'a, 'b> {
 
     fn challenge_scalar<F>(&mut self, label: &'static [u8], callback: F) -> Result<(), R1CSError>
     where
-        F: 'static + Fn(&mut Self, OpaqueScalar)-> Result<(), R1CSError>
+        F: 'static + Fn(&mut Self, OpaqueScalar) -> Result<(), R1CSError>,
     {
         match self.cs_state.store_challenge_callback(label, callback) {
             Some(callback) => {
                 let challenge = self.cs_state.transcript.challenge_scalar(label);
                 callback(self, challenge.into())
-            },
-            None => Ok(())
+            }
+            None => Ok(()),
         }
     }
 }
@@ -160,10 +151,10 @@ impl<'a, 'b> ProverCS<'a, 'b> {
         // Check that the input lengths are consistent
         assert_eq!(v.len(), v_blinding.len());
 
-        let commitments = v.iter().zip(v_blinding.iter())
-            .map(|(v,v_b)| {
-                pc_gens.commit(*v, *v_b).compress()
-            })
+        let commitments = v
+            .iter()
+            .zip(v_blinding.iter())
+            .map(|(v, v_b)| pc_gens.commit(*v, *v_b).compress())
             .collect::<Vec<_>>();
 
         let cs_state = ConstraintSystemState::new(transcript, &commitments[..]);
@@ -197,20 +188,23 @@ impl<'a, 'b> ProverCS<'a, 'b> {
     }
 
     /// Consume this `ConstraintSystem` to produce a proof.
-    pub fn prove<F>(mut self, builder: F) -> Result<R1CSProof, R1CSError> 
+    pub fn prove<F>(mut self, builder: F) -> Result<R1CSProof, R1CSError>
     where
-        F: FnOnce(&mut Self, Vec<Variable<Scalar>>) -> Result<(), R1CSError>
+        F: FnOnce(&mut Self, Vec<Variable<Scalar>>) -> Result<(), R1CSError>,
     {
-        use util;
         use std::iter;
+        use util;
 
         // 0. Convert the external secrets into the variables
-        let variables = self.v.iter().enumerate().map(|(i,v)| {
-            Variable {
+        let variables = self
+            .v
+            .iter()
+            .enumerate()
+            .map(|(i, v)| Variable {
                 index: VariableIndex::Committed(i),
-                assignment: (*v).into()
-            }
-        }).collect::<Vec<_>>();
+                assignment: (*v).into(),
+            })
+            .collect::<Vec<_>>();
 
         // 1. Build the constraint system.
         builder(&mut self, variables)?;
@@ -233,8 +227,12 @@ impl<'a, 'b> ProverCS<'a, 'b> {
 
         // A_I = <a_L, G> + <a_R, H> + i_blinding * B_blinding
         let A_I1 = RistrettoPoint::multiscalar_mul(
-            iter::once(&i_blinding1).chain(self.a_L.iter()).chain(self.a_R.iter()),
-            iter::once(&self.pc_gens.B_blinding).chain(gens.G(n1)).chain(gens.H(n1)),
+            iter::once(&i_blinding1)
+                .chain(self.a_L.iter())
+                .chain(self.a_R.iter()),
+            iter::once(&self.pc_gens.B_blinding)
+                .chain(gens.G(n1))
+                .chain(gens.H(n1)),
         )
         .compress();
 
@@ -247,8 +245,12 @@ impl<'a, 'b> ProverCS<'a, 'b> {
 
         // S = <s_L, G> + <s_R, H> + s_blinding * B_blinding
         let S1 = RistrettoPoint::multiscalar_mul(
-            iter::once(&s_blinding1).chain(s_L1.iter()).chain(s_R1.iter()),
-            iter::once(&self.pc_gens.B_blinding).chain(gens.G(n1)).chain(gens.H(n1)),
+            iter::once(&s_blinding1)
+                .chain(s_L1.iter())
+                .chain(s_R1.iter()),
+            iter::once(&self.pc_gens.B_blinding)
+                .chain(gens.G(n1))
+                .chain(gens.H(n1)),
         )
         .compress();
 
@@ -284,8 +286,12 @@ impl<'a, 'b> ProverCS<'a, 'b> {
 
         // A_I = <a_L, G> + <a_R, H> + i_blinding * B_blinding
         let A_I2 = RistrettoPoint::multiscalar_mul(
-            iter::once(&i_blinding2).chain(self.a_L.iter().skip(n1)).chain(self.a_R.iter().skip(n1)),
-            iter::once(&self.pc_gens.B_blinding).chain(gens.G(n).skip(n1)).chain(gens.H(n).skip(n1)),
+            iter::once(&i_blinding2)
+                .chain(self.a_L.iter().skip(n1))
+                .chain(self.a_R.iter().skip(n1)),
+            iter::once(&self.pc_gens.B_blinding)
+                .chain(gens.G(n).skip(n1))
+                .chain(gens.H(n).skip(n1)),
         )
         .compress();
 
@@ -298,8 +304,12 @@ impl<'a, 'b> ProverCS<'a, 'b> {
 
         // S = <s_L, G> + <s_R, H> + s_blinding * B_blinding
         let S2 = RistrettoPoint::multiscalar_mul(
-            iter::once(&s_blinding2).chain(s_L2.iter()).chain(s_R2.iter()),
-            iter::once(&self.pc_gens.B_blinding).chain(gens.G(n).skip(n1)).chain(gens.H(n).skip(n1)),
+            iter::once(&s_blinding2)
+                .chain(s_L2.iter())
+                .chain(s_R2.iter()),
+            iter::once(&self.pc_gens.B_blinding)
+                .chain(gens.G(n).skip(n1))
+                .chain(gens.H(n).skip(n1)),
         )
         .compress();
 
@@ -321,10 +331,11 @@ impl<'a, 'b> ProverCS<'a, 'b> {
         let y_inv = y.invert();
         let exp_y_inv = util::exp_iter(y_inv).take(padded_n).collect::<Vec<_>>();
 
-        let sLsR = s_L1.iter().chain(s_L2.iter()).zip(
-            s_R1.iter().chain(s_R2.iter())
-        );
-        for (i, (sl,sr)) in sLsR.enumerate() {
+        let sLsR = s_L1
+            .iter()
+            .chain(s_L2.iter())
+            .zip(s_R1.iter().chain(s_R2.iter()));
+        for (i, (sl, sr)) in sLsR.enumerate() {
             // l_poly.0 = 0
             // l_poly.1 = a_L + y^-n * (z * z^Q * W_R)
             l_poly.1[i] = self.a_L[i] + exp_y_inv[i] * wR[i];
@@ -405,9 +416,12 @@ impl<'a, 'b> ProverCS<'a, 'b> {
         let e_blinding = x * (i_blinding + x * (o_blinding + x * s_blinding));
 
         self.cs_state.transcript.commit_scalar(b"t_x", &t_x);
-        self.cs_state.transcript
+        self.cs_state
+            .transcript
             .commit_scalar(b"t_x_blinding", &t_x_blinding);
-        self.cs_state.transcript.commit_scalar(b"e_blinding", &e_blinding);
+        self.cs_state
+            .transcript
+            .commit_scalar(b"e_blinding", &e_blinding);
 
         // Get a challenge value to combine statements for the IPP
         let w = self.cs_state.transcript.challenge_scalar(b"w");
@@ -427,13 +441,15 @@ impl<'a, 'b> ProverCS<'a, 'b> {
         // We do not yet have a ClearOnDrop wrapper for Vec<Scalar>.
         // When PR 202 [1] is merged, we can simply wrap s_L and s_R at the point of creation.
         // [1] https://github.com/dalek-cryptography/curve25519-dalek/pull/202
-        for scalar in s_L1.iter_mut()
-                .chain(s_L2.iter_mut())
-                .chain(s_R1.iter_mut())
-                .chain(s_R2.iter_mut()) {
+        for scalar in s_L1
+            .iter_mut()
+            .chain(s_L2.iter_mut())
+            .chain(s_R1.iter_mut())
+            .chain(s_R2.iter_mut())
+        {
             scalar.clear();
         }
-        
+
         Ok(R1CSProof {
             A_I1,
             A_O1,

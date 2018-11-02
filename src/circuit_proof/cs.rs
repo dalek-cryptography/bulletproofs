@@ -2,18 +2,17 @@
 
 use core::mem;
 
-use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::ristretto::CompressedRistretto;
+use curve25519_dalek::scalar::Scalar;
 use merlin::Transcript;
 
 use errors::R1CSError;
 use transcript::TranscriptProtocol;
 
-use super::scalar_value::ScalarValue;
 use super::assignment::Assignment;
+use super::constraints::{Constraint, Variable, VariableIndex};
 use super::opaque_scalar::OpaqueScalar;
-use super::constraints::{Variable,VariableIndex,Constraint};
-
+use super::scalar_value::ScalarValue;
 
 /// `ConstraintSystem` trait represents the API for the gadgets.
 /// Gadgets receive a mutable instance of the constraint system and use it
@@ -48,7 +47,7 @@ pub trait ConstraintSystem {
 
     /// Obtain a challenge scalar bound to the assignments of all of
     /// the externally committed wires.
-    /// 
+    ///
     /// If the CS is not yet committed, the call returns `Ok()` and saves a callback
     /// for later, when the constraint system’s free variables are committed.
     /// If the CS is already committed, the callback is invoked immediately
@@ -57,9 +56,8 @@ pub trait ConstraintSystem {
     /// family of circuits parameterized by challenge scalars.
     fn challenge_scalar<F>(&mut self, label: &'static [u8], callback: F) -> Result<(), R1CSError>
     where
-        F: 'static + Fn(&mut Self, OpaqueScalar)-> Result<(), R1CSError>;
+        F: 'static + Fn(&mut Self, OpaqueScalar) -> Result<(), R1CSError>;
 }
-
 
 /// Internal state of the constraint system
 pub(crate) struct ConstraintSystemState<'a, CS: ConstraintSystem> {
@@ -73,17 +71,24 @@ pub(crate) struct ConstraintSystemState<'a, CS: ConstraintSystem> {
 /// Represents the current phase of a constraint system
 enum Phase<CS: ConstraintSystem> {
     /// First phase collects the callbacks that produce challenges
-    DeferredCS(Vec<(&'static [u8], Box<Fn(&mut CS, OpaqueScalar) -> Result<(), R1CSError>>)>),
-    CommittedCS
+    DeferredCS(
+        Vec<(
+            &'static [u8],
+            Box<Fn(&mut CS, OpaqueScalar) -> Result<(), R1CSError>>,
+        )>,
+    ),
+    CommittedCS,
 }
 
-impl<'a, CS> ConstraintSystemState<'a, CS> where CS: ConstraintSystem {
+impl<'a, CS> ConstraintSystemState<'a, CS>
+where
+    CS: ConstraintSystem,
+{
     /// Creates an internal state for the constraint system.
     pub(crate) fn new(
         transcript: &'a mut Transcript,
         external_commitments: &[CompressedRistretto],
     ) -> Self {
-
         transcript.r1cs_domain_sep(external_commitments.len() as u64);
 
         for V in external_commitments.iter() {
@@ -91,11 +96,11 @@ impl<'a, CS> ConstraintSystemState<'a, CS> where CS: ConstraintSystem {
         }
 
         Self {
-            transcript, 
+            transcript,
             constraints: Vec::new(),
             external_variables_count: external_commitments.len(),
             variables_count: 0,
-            phase: Phase::DeferredCS(Vec::new())
+            phase: Phase::DeferredCS(Vec::new()),
         }
     }
 
@@ -108,7 +113,6 @@ impl<'a, CS> ConstraintSystemState<'a, CS> where CS: ConstraintSystem {
         right: Assignment<S>,
         out: Assignment<S>,
     ) -> Result<(Variable<S>, Variable<S>, Variable<S>), R1CSError> {
-
         let i = self.variables_count;
         self.variables_count += 1;
 
@@ -135,7 +139,7 @@ impl<'a, CS> ConstraintSystemState<'a, CS> where CS: ConstraintSystem {
 
     /// Obtain a challenge scalar bound to the assignments of all of
     /// the externally committed wires.
-    /// 
+    ///
     /// If the CS is not yet committed, the call returns `Ok()` and saves a callback
     /// for later, when the constraint system’s free variables are committed.
     /// If the CS is already committed, the callback is invoked immediately
@@ -145,29 +149,31 @@ impl<'a, CS> ConstraintSystemState<'a, CS> where CS: ConstraintSystem {
     pub(crate) fn store_challenge_callback<F>(
         &mut self,
         label: &'static [u8],
-        callback: F
+        callback: F,
     ) -> Option<F>
     where
-        F: 'static + Fn(&mut CS, OpaqueScalar)-> Result<(), R1CSError>
+        F: 'static + Fn(&mut CS, OpaqueScalar) -> Result<(), R1CSError>,
     {
         match &mut self.phase {
             Phase::DeferredCS(ref mut callbacks) => {
                 callbacks.push((label, Box::new(callback)));
                 None
-            },
-            Phase::CommittedCS => Some(callback)
+            }
+            Phase::CommittedCS => Some(callback),
         }
     }
 
     /// Returns an iterator of deferred callbacks with the generated challenges.
     /// If the constraint system is already committed, this call returns an empty iterator.
     pub(crate) fn complete_constraints(
-        &mut self
-    ) -> Vec<(&'static [u8], Box<Fn(&mut CS, OpaqueScalar) -> Result<(), R1CSError>>)>
-    {
+        &mut self,
+    ) -> Vec<(
+        &'static [u8],
+        Box<Fn(&mut CS, OpaqueScalar) -> Result<(), R1CSError>>,
+    )> {
         let callbacks = match &mut self.phase {
             Phase::DeferredCS(ref mut callbacks) => mem::replace(callbacks, Vec::new()),
-            _ => Vec::new()
+            _ => Vec::new(),
         };
 
         // Switch the phase before we call any callbacks
@@ -179,7 +185,7 @@ impl<'a, CS> ConstraintSystemState<'a, CS> where CS: ConstraintSystem {
         // depth-first: `A(B(C), D(E)), F(G)` -> `[A, B, C, D, E, F, G]`.
         // This is guaranteed by map: it iterates only together with the upstream iterator.
         callbacks
-        
+
         // How to:
         // ```
         // for (label, callback) in callbacks {
@@ -188,7 +194,6 @@ impl<'a, CS> ConstraintSystemState<'a, CS> where CS: ConstraintSystem {
         // }
         // ```
     }
-
 
     /// Use a challenge, `z`, to flatten the constraints in the
     /// constraint system into vectors used for proving and
@@ -212,11 +217,11 @@ impl<'a, CS> ConstraintSystemState<'a, CS> where CS: ConstraintSystem {
         let mut wR = vec![Scalar::zero(); n];
         let mut wO = vec![Scalar::zero(); n];
         let mut wV = vec![Scalar::zero(); m];
-        let mut wc:T = Scalar::zero().into();
+        let mut wc: T = Scalar::zero().into();
 
         let mut exp_z = *z;
         for c in self.constraints.iter() {
-            for (var, coeff) in &c.0.terms {
+            for (var, coeff) in c.0.iter() {
                 match var {
                     VariableIndex::MultiplierLeft(i) => {
                         wL[*i] += exp_z * coeff.internal_scalar;
@@ -245,11 +250,10 @@ impl<'a, CS> ConstraintSystemState<'a, CS> where CS: ConstraintSystem {
 
 use std::ops::{Mul, SubAssign};
 /// Trait representing either a `Scalar` or `NoScalar` (for which arithmetic is no-op).
-pub(crate) trait ZeroCostOptionalScalar: Mul<Scalar, Output=Self>
-                                       + SubAssign
-                                       + Sized
-                                       + From<Scalar>
-{}
+pub(crate) trait ZeroCostOptionalScalar:
+    Mul<Scalar, Output = Self> + SubAssign + Sized + From<Scalar>
+{
+}
 
 impl ZeroCostOptionalScalar for Scalar {}
 impl ZeroCostOptionalScalar for NoScalar {}
@@ -259,7 +263,7 @@ pub(crate) struct NoScalar {}
 
 impl From<Scalar> for NoScalar {
     fn from(_: Scalar) -> Self {
-        NoScalar{}
+        NoScalar {}
     }
 }
 
@@ -273,4 +277,3 @@ impl Mul<Scalar> for NoScalar {
         self
     }
 }
-

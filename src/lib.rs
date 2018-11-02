@@ -122,53 +122,53 @@ pub mod range_proof_mpc {
 /// */
 ///
 /// struct KShuffleGadget {}
-/// 
+///
 /// impl KShuffleGadget {
-/// 
+///
 ///     fn fill_cs<CS: ConstraintSystem>(
 ///         cs: &mut CS,
 ///         x: Vec<Variable<OpaqueScalar>>,
 ///         y: Vec<Variable<OpaqueScalar>>,
 ///     ) -> Result<(), R1CSError> {
-/// 
+///
 ///         if x.len() != y.len() {
 ///             return Err(R1CSError::LayoutError{cause: "KShuffleGadget: inputs have different lengths"});
 ///         }
 ///         
 ///         let k = x.len();
-/// 
+///
 ///         if k == 1 {
 ///             cs.add_constraint(x[0].equals(y[0]));
 ///             return Ok(());
 ///         }
 ///         
 ///         cs.challenge_scalar(b"k-scalar shuffle challenge", move |cs, z| {
-/// 
+///
 ///             // Make last x multiplier for i = k-1 and k-2
 ///             let last_mulx_out = KShuffleGadget::last_multiplier(cs, z, x[k - 1], x[k - 2]);
-/// 
+///
 ///             // Make multipliers for x from i == [0, k-3]
 ///             let first_mulx_out = (0..k - 2).rev().fold(last_mulx_out, |prev_out, i| {
 ///                 KShuffleGadget::intermediate_multiplier(cs, z, prev_out?, x[i])
 ///             })?;
-/// 
+///
 ///             // Make last y multiplier for i = k-1 and k-2
 ///             let last_muly_out = KShuffleGadget::last_multiplier(cs, z, y[k - 1], y[k - 2]);
-/// 
+///
 ///             // Make multipliers for y from i == [0, k-3]
 ///             let first_muly_out = (0..k - 2).rev().fold(last_muly_out, |prev_out, i| {
 ///                 KShuffleGadget::intermediate_multiplier(cs, z, prev_out?, y[i])
 ///             })?;
-/// 
+///
 ///             // Check equality between last x mul output and last y mul output
 ///             cs.add_constraint(first_mulx_out.equals(first_muly_out));
-/// 
+///
 ///             Ok(())
 ///         })?;
-/// 
+///
 ///         Ok(())
 ///     }
-/// 
+///
 ///     fn last_multiplier<CS: ConstraintSystem>(
 ///         cs: &mut CS,
 ///         z: OpaqueScalar,
@@ -177,16 +177,16 @@ pub mod range_proof_mpc {
 ///     ) -> Result<Variable<OpaqueScalar>, R1CSError> {
 ///         let l = left - z;
 ///         let r = right - z;
-/// 
+///
 ///         let (al, ar, ao) =
 ///             cs.assign_multiplier(l.eval(), r.eval(), l.eval()*r.eval())?;
-/// 
+///
 ///         cs.add_constraint(al.equals(l));
 ///         cs.add_constraint(ar.equals(r));
-/// 
+///
 ///         Ok(ao)
 ///     }
-/// 
+///
 ///     fn intermediate_multiplier<CS: ConstraintSystem>(
 ///         cs: &mut CS,
 ///         z: OpaqueScalar,
@@ -194,13 +194,13 @@ pub mod range_proof_mpc {
 ///         right: Variable<OpaqueScalar>,
 ///     ) -> Result<Variable<OpaqueScalar>, R1CSError> {
 ///         let r = right - z;
-/// 
+///
 ///         let (al, ar, ao) =
 ///             cs.assign_multiplier(left.assignment, r.eval(), left.assignment*r.eval())?;
-/// 
+///
 ///         cs.add_constraint(al.equals(left));
 ///         cs.add_constraint(ar.equals(r));
-/// 
+///
 ///         Ok(ao)
 ///     }
 /// }
@@ -231,7 +231,7 @@ pub mod range_proof_mpc {
 ///             v_blinding,
 ///             |cs, vars| {
 ///                 KShuffleGadget::fill_cs(
-///                     cs, 
+///                     cs,
 ///                     (&vars[0..k]).into_iter().map(|v| v.into_opaque()).collect(),
 ///                     (&vars[k..2*k]).into_iter().map(|v| v.into_opaque()).collect()
 ///                 )
@@ -248,7 +248,7 @@ pub mod range_proof_mpc {
 ///         commitments,
 ///         |cs, vars| {
 ///             KShuffleGadget::fill_cs(
-///                 cs, 
+///                 cs,
 ///                 (&vars[0..k]).into_iter().map(|v| v.into_opaque()).collect(),
 ///                 (&vars[k..2*k]).into_iter().map(|v| v.into_opaque()).collect()
 ///             )
@@ -288,9 +288,9 @@ pub mod range_proof_mpc {
 ///
 /// ```
 pub mod r1cs {
-    pub use circuit_proof::{ScalarValue,OpaqueScalar,Assignment,Variable,VariableIndex};
-    pub use circuit_proof::{Constraint, LinearCombination, IntoLC, LCVariable};
-    pub use circuit_proof::{ConstraintSystem,ProverCS, VerifierCS};
     pub use circuit_proof::R1CSProof;
+    pub use circuit_proof::{Assignment, OpaqueScalar, Variable, VariableIndex};
+    pub use circuit_proof::{Constraint, LinearCombination};
+    pub use circuit_proof::{ConstraintSystem, ProverCS, VerifierCS};
     pub use errors::R1CSError;
 }

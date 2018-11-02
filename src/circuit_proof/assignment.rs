@@ -1,11 +1,11 @@
 use curve25519_dalek::scalar::Scalar;
-use std::ops::{Add, AddAssign, Div, Mul, Sub, SubAssign, Try};
+use std::ops::{Add, AddAssign, Div, Mul, Neg, Sub, SubAssign, Try};
 use subtle::{Choice, ConditionallyAssignable, ConditionallySelectable, ConstantTimeEq};
 
 use errors::R1CSError;
 
-use super::scalar_value::ScalarValue;
 use super::opaque_scalar::OpaqueScalar;
+use super::scalar_value::ScalarValue;
 
 /// Represents an optional assignment to a [`Variable`](::r1cs::Variable).
 ///
@@ -14,7 +14,7 @@ use super::opaque_scalar::OpaqueScalar;
 ///
 /// Proving code creates `Value` assignments, while verification code
 /// creates `Missing` assignments.
-#[derive(Copy,Clone,Debug)]
+#[derive(Copy, Clone, Debug)]
 pub enum Assignment<S>
 where
     S: ScalarValue,
@@ -81,6 +81,20 @@ where
 {
     fn from(int: u64) -> Self {
         Assignment::Value(S::from(int))
+    }
+}
+
+impl<T> Neg for Assignment<T>
+where
+    T: ScalarValue,
+{
+    type Output = Self;
+
+    fn neg(self) -> Self {
+        match self {
+            Assignment::Value(s) => Assignment::Value(-s),
+            Assignment::Missing() => Assignment::Missing(),
+        }
     }
 }
 

@@ -1,22 +1,19 @@
 #![doc(include = "../docs/cs-proof.md")]
 
-mod opaque_scalar;
-mod scalar_value;
 mod assignment;
 mod constraints;
-mod linear_combination;
-mod lc;
 mod cs;
+mod opaque_scalar;
 mod prover;
+mod scalar_value;
 mod verifier;
 
-pub use self::scalar_value::ScalarValue;
-pub use self::opaque_scalar::OpaqueScalar;
 pub use self::assignment::Assignment;
-pub use self::constraints::{Variable,VariableIndex,Constraint};
-pub use self::linear_combination::{IntoLC, Variable as LCVariable, LinearCombination};
+pub use self::constraints::{Constraint, LinearCombination, Variable, VariableIndex};
 pub use self::cs::ConstraintSystem;
+pub use self::opaque_scalar::OpaqueScalar;
 pub use self::prover::ProverCS;
+pub use self::scalar_value::ScalarValue;
 pub use self::verifier::VerifierCS;
 
 #[cfg(test)]
@@ -82,8 +79,8 @@ pub struct R1CSProof {
 }
 
 impl R1CSProof {
-	/// Creates and returns a proof, along with the Pedersen commitments for all provided secrets.
-	/// The constraint system is specified using the `builder` closure.
+    /// Creates and returns a proof, along with the Pedersen commitments for all provided secrets.
+    /// The constraint system is specified using the `builder` closure.
     pub fn prove<'a, 'b, F>(
         bp_gens: &'b BulletproofGens,
         pc_gens: &'b PedersenGens,
@@ -95,43 +92,32 @@ impl R1CSProof {
     where
         F: FnOnce(&mut ProverCS, Vec<Variable<Scalar>>) -> Result<(), R1CSError>,
     {
-    	// 1. Prepare a proving CS.
-    	let (prover, commitments) = ProverCS::new(
-        	bp_gens,
-        	pc_gens,
-        	transcript,
-        	v,
-        	v_blinding
-        );
-    	
-    	// 2. Create a proof.
+        // 1. Prepare a proving CS.
+        let (prover, commitments) = ProverCS::new(bp_gens, pc_gens, transcript, v, v_blinding);
+
+        // 2. Create a proof.
         let proof = prover.prove(builder)?;
 
         Ok((proof, commitments))
     }
 
-	/// Verifies the proof for the given commitments.
-	/// The constraint system is specified using the `builder` closure.
+    /// Verifies the proof for the given commitments.
+    /// The constraint system is specified using the `builder` closure.
     pub fn verify<'a, 'b, F>(
-    	&self,
-    	bp_gens: &'b BulletproofGens,
+        &self,
+        bp_gens: &'b BulletproofGens,
         pc_gens: &'b PedersenGens,
         transcript: &'a mut Transcript,
         commitments: Vec<CompressedRistretto>,
         builder: F,
-    ) -> Result<(), R1CSError> 
+    ) -> Result<(), R1CSError>
     where
         F: FnOnce(&mut VerifierCS, Vec<Variable<Scalar>>) -> Result<(), R1CSError>,
     {
-    	// 1. Prepare a verifying CS.
-    	let verifier = VerifierCS::new(
-        	bp_gens,
-        	pc_gens,
-        	transcript,
-        	commitments,
-    	);
+        // 1. Prepare a verifying CS.
+        let verifier = VerifierCS::new(bp_gens, pc_gens, transcript, commitments);
 
-    	// 2. Verify the proof.
+        // 2. Verify the proof.
         verifier.verify(&self, builder)
     }
 }

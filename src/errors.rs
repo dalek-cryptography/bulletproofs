@@ -119,7 +119,7 @@ pub enum R1CSError {
     )]
     LayoutError {
         /// Underlying cause of the error.
-        cause: &'static str
+        cause: &'static str,
     },
 }
 
