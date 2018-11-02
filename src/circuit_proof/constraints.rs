@@ -43,7 +43,7 @@ pub struct Constraint(pub Vec<(VariableIndex, OpaqueScalar)>);
 /// Trait for types that can be unambiguously converted to a linear combination.
 /// Variable is converted to `(var, 1)`, scalar is converted as `(One, scalar)`,
 /// tuple `(v,w)` is converted to a single term.
-pub trait IntoLC<T>
+pub trait IntoLinearCombination<T>
 where
     T: ScalarValue,
 {
@@ -73,7 +73,7 @@ impl<T: ScalarValue> Variable<T> {
     /// Creates a `Constraint` that this variable equals the given linear combination.
     pub fn equals<L>(self, lc: L) -> Constraint
     where
-        L: IntoLC<T>,
+        L: IntoLinearCombination<T>,
     {
         (self - lc).into_constraint()
     }
@@ -113,7 +113,7 @@ impl<T: ScalarValue> LinearCombination<T> {
     /// Creates a `Constraint` that this linear combination equals the other linear combination.
     pub fn equals<L>(self, lc: L) -> Constraint
     where
-        L: IntoLC<T>,
+        L: IntoLinearCombination<T>,
     {
         (self - lc.into_lc()).into_constraint()
     }
@@ -136,15 +136,15 @@ impl<T: ScalarValue> Default for LinearCombination<T> {
     }
 }
 
-// Implementation of IntoLC trait for various types
+// Implementation of IntoLinearCombination trait for various types
 
-impl<T: ScalarValue> IntoLC<T> for LinearCombination<T> {
+impl<T: ScalarValue> IntoLinearCombination<T> for LinearCombination<T> {
     fn into_lc(self) -> LinearCombination<T> {
         self
     }
 }
 
-impl<T: ScalarValue> IntoLC<T> for Scalar {
+impl<T: ScalarValue> IntoLinearCombination<T> for Scalar {
     fn into_lc(self) -> LinearCombination<T> {
         LinearCombination {
             terms: vec![(Variable::constant_one(), T::from(self))],
@@ -152,7 +152,7 @@ impl<T: ScalarValue> IntoLC<T> for Scalar {
     }
 }
 
-impl IntoLC<OpaqueScalar> for OpaqueScalar {
+impl IntoLinearCombination<OpaqueScalar> for OpaqueScalar {
     fn into_lc(self) -> LinearCombination<OpaqueScalar> {
         LinearCombination {
             terms: vec![(Variable::constant_one(), self)],
@@ -160,7 +160,7 @@ impl IntoLC<OpaqueScalar> for OpaqueScalar {
     }
 }
 
-impl<T: ScalarValue> IntoLC<T> for Variable<T> {
+impl<T: ScalarValue> IntoLinearCombination<T> for Variable<T> {
     fn into_lc(self) -> LinearCombination<T> {
         LinearCombination {
             terms: vec![(self, T::one())],
@@ -168,7 +168,7 @@ impl<T: ScalarValue> IntoLC<T> for Variable<T> {
     }
 }
 
-impl<T1, T2> IntoLC<T1> for (Variable<T1>, T2)
+impl<T1, T2> IntoLinearCombination<T1> for (Variable<T1>, T2)
 where
     T1: ScalarValue,
     T2: ScalarValue,
@@ -196,7 +196,7 @@ impl<T: ScalarValue> Neg for LinearCombination<T> {
 
 impl<T, B> Add<B> for LinearCombination<T>
 where
-    B: IntoLC<T>,
+    B: IntoLinearCombination<T>,
     T: ScalarValue,
 {
     type Output = Self;
@@ -210,7 +210,7 @@ where
 
 impl<T, B> Sub<B> for LinearCombination<T>
 where
-    B: IntoLC<T>,
+    B: IntoLinearCombination<T>,
     T: ScalarValue,
 {
     type Output = Self;
@@ -245,7 +245,7 @@ where
 impl<T, L> Add<L> for Variable<T>
 where
     T: ScalarValue,
-    L: IntoLC<T>,
+    L: IntoLinearCombination<T>,
 {
     type Output = LinearCombination<T>;
 
@@ -260,7 +260,7 @@ where
 impl<T, L> Sub<L> for Variable<T>
 where
     T: ScalarValue,
-    L: IntoLC<T>,
+    L: IntoLinearCombination<T>,
 {
     type Output = LinearCombination<T>;
 
