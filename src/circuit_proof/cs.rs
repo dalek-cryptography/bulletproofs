@@ -185,14 +185,6 @@ where
         // depth-first: `A(B(C), D(E)), F(G)` -> `[A, B, C, D, E, F, G]`.
         // This is guaranteed by map: it iterates only together with the upstream iterator.
         callbacks
-
-        // How to:
-        // ```
-        // for (label, callback) in callbacks {
-        //     let challenge = transcript.challenge_scalar(label);
-        //     callback(cs, challenge.into())?;
-        // }
-        // ```
     }
 
     /// Use a challenge, `z`, to flatten the constraints in the
