@@ -315,7 +315,6 @@ impl<T: ScalarValue> IntoLinearCombination<T> for Variable<T> {
 impl<T, S> IntoLinearCombination<T> for (Variable<T>, S)
 where
     T: ScalarValue,
-    T: ScalarValue,
     S: Into<T>,
 {
     type Terms = iter::Once<(Variable<T>, T)>;
