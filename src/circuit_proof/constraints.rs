@@ -276,9 +276,7 @@ impl<T: ScalarValue> IntoLinearCombination<T> for u64 {
     type Terms = iter::Once<(Variable<T>, T)>;
 
     fn into_lc(self) -> LinearCombination<T, Self::Terms> {
-        LinearCombination {
-            terms: iter::once((Variable::constant_one(), T::from(self))),
-        }
+        (Variable::constant_one(), self).into_lc()
     }
 }
 
@@ -286,9 +284,7 @@ impl<T: ScalarValue> IntoLinearCombination<T> for Scalar {
     type Terms = iter::Once<(Variable<T>, T)>;
 
     fn into_lc(self) -> LinearCombination<T, Self::Terms> {
-        LinearCombination {
-            terms: iter::once((Variable::constant_one(), T::from(self))),
-        }
+        (Variable::constant_one(), self).into_lc()
     }
 }
 
@@ -296,9 +292,7 @@ impl IntoLinearCombination<OpaqueScalar> for OpaqueScalar {
     type Terms = iter::Once<(Variable<OpaqueScalar>, OpaqueScalar)>;
 
     fn into_lc(self) -> LinearCombination<OpaqueScalar, Self::Terms> {
-        LinearCombination {
-            terms: iter::once((Variable::constant_one(), self)),
-        }
+        (Variable::constant_one(), self).into_lc()
     }
 }
 
@@ -306,9 +300,7 @@ impl<T: ScalarValue> IntoLinearCombination<T> for Variable<T> {
     type Terms = iter::Once<(Variable<T>, T)>;
 
     fn into_lc(self) -> LinearCombination<T, Self::Terms> {
-        LinearCombination {
-            terms: iter::once((self, T::one())),
-        }
+        (self, T::one()).into_lc()
     }
 }
 
@@ -320,9 +312,7 @@ where
     type Terms = iter::Once<(Variable<T>, T)>;
 
     fn into_lc(self) -> LinearCombination<T, Self::Terms> {
-        LinearCombination {
-            terms: iter::once((self.0, self.1.into())),
-        }
+        iter::once((self.0, self.1.into())).into()
     }
 }
 
@@ -336,9 +326,7 @@ where
     type Output = LinearCombination<T, Negate<I>>;
 
     fn neg(self) -> Self::Output {
-        LinearCombination {
-            terms: Negate { iter: self.terms },
-        }
+        Negate { iter: self.terms }.into()
     }
 }
 
@@ -351,9 +339,7 @@ where
     type Output = LinearCombination<T, iter::Chain<I, L::Terms>>;
 
     fn add(self, other: L) -> Self::Output {
-        LinearCombination {
-            terms: self.terms.chain(other.into_lc().terms),
-        }
+        self.terms.chain(other.into_lc().terms).into()
     }
 }
 
@@ -366,11 +352,7 @@ where
     type Output = LinearCombination<T, iter::Chain<I, Negate<L::Terms>>>;
 
     fn sub(self, other: L) -> Self::Output {
-        LinearCombination {
-            terms: self.terms.chain(Negate {
-                iter: other.into_lc().terms,
-            }),
-        }
+        self.terms.chain((-other.into_lc()).terms).into()
     }
 }
 
@@ -385,13 +367,10 @@ where
     type Output = LinearCombination<T, MulByConstant<I, T>>;
 
     fn mul(self, scalar: T2) -> Self::Output {
-        let scalar = scalar.into();
-        LinearCombination {
-            terms: MulByConstant {
-                scalar,
-                iter: self.terms,
-            },
-        }
+        MulByConstant {
+            scalar: scalar.into(),
+            iter: self.terms,
+        }.into()
     }
 }
 
