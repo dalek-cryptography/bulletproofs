@@ -1,6 +1,7 @@
 #![allow(non_snake_case)]
 
 use core::borrow::Borrow;
+use core::iter;
 use core::ops::{Add, Mul, Neg, Sub, SubAssign};
 
 use curve25519_dalek::scalar::Scalar;
@@ -50,8 +51,10 @@ pub trait IntoLinearCombination<T>
 where
     T: ScalarValue,
 {
+    type Terms: Iterator<Item = (Variable<T>, T)> + Clone;
+
     /// Converts the type into a linear combination
-    fn into_lc(self) -> LinearCombination<T>;
+    fn into_lc(self) -> LinearCombination<T, Self::Terms>;
 }
 
 /// Linear combination of variables `V` and scalars `S` allows
@@ -59,9 +62,14 @@ where
 /// The assignment of the variable must have the same type as the weights to simplify the constraints.
 /// If one needs to make an LC of a clear assignment with opaque weight,
 /// the variable needs to be converted to opaque assignment first using `into_opaque`.
-pub struct LinearCombination<T: ScalarValue> {
-    /// Terms of the linear combination.
-    pub(crate) terms: Vec<(Variable<T>, T)>,
+#[derive(Clone)]
+pub struct LinearCombination<T, I>
+where
+    T: ScalarValue,
+    I: Iterator<Item = (Variable<T>, T)> + Clone,
+{
+    /// Iterator of terms (variable, weight)
+    pub(crate) terms: I,
 }
 
 impl<T: ScalarValue> Variable<T> {
@@ -181,26 +189,29 @@ impl Constraint {
     }
 }
 
-impl<T: ScalarValue> LinearCombination<T> {
+impl<T, I> LinearCombination<T, I>
+where
+    T: ScalarValue,
+    I: Iterator<Item = (Variable<T>, T)> + Clone,
+{
     /// Evaluates the linear combination expression.
     pub fn eval(&self) -> Assignment<T> {
         self.terms
-            .iter()
+            .clone()
             .fold(Assignment::Value(T::zero()), |t, (v, w)| {
-                t + v.assignment * Assignment::Value(*w)
+                t + v.assignment * Assignment::Value(w)
             })
     }
 
     /// Converts variables in the linear combination into opaque variables
-    pub fn into_opaque(self) -> LinearCombination<OpaqueScalar> {
+    pub fn into_opaque(
+        self,
+    ) -> LinearCombination<
+        OpaqueScalar,
+        impl Iterator<Item = (Variable<OpaqueScalar>, OpaqueScalar)> + Clone,
+    > {
         LinearCombination {
-            // XXX: use mem::forget + mem::transmute + Vec::from_raw_parts + packed repr for OpaqueScalar
-            // in order to avoid additional allocation here
-            terms: self
-                .terms
-                .into_iter()
-                .map(|(v, s)| (v.into_opaque(), s.into_opaque()))
-                .collect(),
+            terms: IntoOpaque { iter: self.terms },
         }
     }
 
@@ -219,127 +230,243 @@ impl<T: ScalarValue> LinearCombination<T> {
     fn into_constraint(self) -> Constraint {
         Constraint(
             self.terms
-                .into_iter()
                 .map(|(v, s)| (v.index, s.into_opaque()))
                 .collect(),
         )
     }
 }
 
-impl<T: ScalarValue> Default for LinearCombination<T> {
+impl<T> Default for LinearCombination<T, iter::Empty<(Variable<T>, T)>>
+where
+    T: ScalarValue,
+{
     fn default() -> Self {
-        LinearCombination { terms: Vec::new() }
+        LinearCombination {
+            terms: iter::empty(),
+        }
+    }
+}
+
+/// An iterator of terms can be wrapped into a LinearCombination type.
+impl<T, I> From<I> for LinearCombination<T, I>
+where
+    T: ScalarValue,
+    I: Iterator<Item = (Variable<T>, T)> + Clone,
+{
+    fn from(iter: I) -> Self {
+        LinearCombination { terms: iter }
     }
 }
 
 // Implementation of IntoLinearCombination trait for various types
 
-impl<T: ScalarValue> IntoLinearCombination<T> for LinearCombination<T> {
-    fn into_lc(self) -> LinearCombination<T> {
+impl<T, I> IntoLinearCombination<T> for LinearCombination<T, I>
+where
+    T: ScalarValue,
+    I: Iterator<Item = (Variable<T>, T)> + Clone,
+{
+    type Terms = I;
+
+    fn into_lc(self) -> LinearCombination<T, I> {
         self
     }
 }
 
 impl<T: ScalarValue> IntoLinearCombination<T> for u64 {
-    fn into_lc(self) -> LinearCombination<T> {
+    type Terms = iter::Once<(Variable<T>, T)>;
+
+    fn into_lc(self) -> LinearCombination<T, Self::Terms> {
         LinearCombination {
-            terms: vec![(Variable::constant_one(), T::from(self))],
+            terms: iter::once((Variable::constant_one(), T::from(self))),
         }
     }
 }
 
 impl<T: ScalarValue> IntoLinearCombination<T> for Scalar {
-    fn into_lc(self) -> LinearCombination<T> {
+    type Terms = iter::Once<(Variable<T>, T)>;
+
+    fn into_lc(self) -> LinearCombination<T, Self::Terms> {
         LinearCombination {
-            terms: vec![(Variable::constant_one(), T::from(self))],
+            terms: iter::once((Variable::constant_one(), T::from(self))),
         }
     }
 }
 
 impl IntoLinearCombination<OpaqueScalar> for OpaqueScalar {
-    fn into_lc(self) -> LinearCombination<OpaqueScalar> {
+    type Terms = iter::Once<(Variable<OpaqueScalar>, OpaqueScalar)>;
+
+    fn into_lc(self) -> LinearCombination<OpaqueScalar, Self::Terms> {
         LinearCombination {
-            terms: vec![(Variable::constant_one(), self)],
+            terms: iter::once((Variable::constant_one(), self)),
         }
     }
 }
 
 impl<T: ScalarValue> IntoLinearCombination<T> for Variable<T> {
-    fn into_lc(self) -> LinearCombination<T> {
+    type Terms = iter::Once<(Variable<T>, T)>;
+
+    fn into_lc(self) -> LinearCombination<T, Self::Terms> {
         LinearCombination {
-            terms: vec![(self, T::one())],
+            terms: iter::once((self, T::one())),
         }
     }
 }
 
-impl<T1, T2> IntoLinearCombination<T1> for (Variable<T1>, T2)
+impl<T, S> IntoLinearCombination<T> for (Variable<T>, S)
 where
-    T1: ScalarValue,
-    T2: ScalarValue,
-    T2: Into<T1>,
+    T: ScalarValue,
+    T: ScalarValue,
+    S: Into<T>,
 {
-    fn into_lc(self) -> LinearCombination<T1> {
+    type Terms = iter::Once<(Variable<T>, T)>;
+
+    fn into_lc(self) -> LinearCombination<T, Self::Terms> {
         LinearCombination {
-            terms: vec![(self.0, self.1.into())],
+            terms: iter::once((self.0, self.1.into())),
         }
     }
 }
 
 /// Arithmetic on linear combinations
 
-impl<T: ScalarValue> Neg for LinearCombination<T> {
-    type Output = Self;
+impl<T, I> Neg for LinearCombination<T, I>
+where
+    T: ScalarValue,
+    I: Iterator<Item = (Variable<T>, T)> + Clone,
+{
+    type Output = LinearCombination<T, Negate<I>>;
 
-    fn neg(mut self) -> Self {
-        for (_, ref mut s) in self.terms.iter_mut() {
-            *s = -*s;
+    fn neg(self) -> Self::Output {
+        LinearCombination {
+            terms: Negate { iter: self.terms },
         }
-        self
     }
 }
 
-impl<T, B> Add<B> for LinearCombination<T>
+impl<T, I, L> Add<L> for LinearCombination<T, I>
 where
-    B: IntoLinearCombination<T>,
     T: ScalarValue,
+    I: Iterator<Item = (Variable<T>, T)> + Clone,
+    L: IntoLinearCombination<T>,
 {
-    type Output = Self;
+    type Output = LinearCombination<T, iter::Chain<I, L::Terms>>;
 
-    fn add(mut self, other: B) -> Self {
-        let other = other.into_lc();
-        self.terms.extend(other.terms.into_iter());
-        self
+    fn add(self, other: L) -> Self::Output {
+        LinearCombination {
+            terms: self.terms.chain(other.into_lc().terms),
+        }
     }
 }
 
-impl<T, B> Sub<B> for LinearCombination<T>
+impl<T, I, L> Sub<L> for LinearCombination<T, I>
 where
-    B: IntoLinearCombination<T>,
     T: ScalarValue,
+    I: Iterator<Item = (Variable<T>, T)> + Clone,
+    L: IntoLinearCombination<T>,
 {
-    type Output = Self;
+    type Output = LinearCombination<T, iter::Chain<I, Negate<L::Terms>>>;
 
-    fn sub(mut self, other: B) -> Self {
-        self.terms
-            .extend(other.into_lc().terms.into_iter().map(|(v, w)| (v, -w)));
-        self
+    fn sub(self, other: L) -> Self::Output {
+        LinearCombination {
+            terms: self.terms.chain(Negate {
+                iter: other.into_lc().terms,
+            }),
+        }
     }
 }
 
 // Multiplying a linear combination by a constant
-impl<T1, T2> Mul<T2> for LinearCombination<T1>
+impl<T, I, T2> Mul<T2> for LinearCombination<T, I>
 where
-    T1: ScalarValue,
+    T: ScalarValue,
+    I: Iterator<Item = (Variable<T>, T)> + Clone,
     T2: ScalarValue,
-    T2: Into<T1>,
+    T2: Into<T>,
 {
-    type Output = Self;
+    type Output = LinearCombination<T, MulByConstant<I, T>>;
 
-    fn mul(mut self, scalar: T2) -> Self {
-        for (_, ref mut s) in self.terms.iter_mut() {
-            *s = *s * scalar.into();
+    fn mul(self, scalar: T2) -> Self::Output {
+        let scalar = scalar.into();
+        LinearCombination {
+            terms: MulByConstant {
+                scalar,
+                iter: self.terms,
+            },
         }
-        self
+    }
+}
+
+// Combinators for LC operations
+
+#[derive(Clone)]
+pub struct IntoOpaque<I> {
+    iter: I,
+}
+
+impl<T, I> Iterator for IntoOpaque<I>
+where
+    T: ScalarValue,
+    I: Iterator<Item = (Variable<T>, T)> + Clone,
+{
+    type Item = (Variable<OpaqueScalar>, OpaqueScalar);
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        self.iter
+            .next()
+            .map(|(v, w)| (v.into_opaque(), w.into_opaque()))
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.iter.size_hint()
+    }
+}
+
+#[derive(Clone)]
+pub struct Negate<I> {
+    iter: I,
+}
+
+impl<T, I> Iterator for Negate<I>
+where
+    T: ScalarValue,
+    I: Iterator<Item = (Variable<T>, T)> + Clone,
+{
+    type Item = I::Item;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        self.iter.next().map(|(v, w)| (v, -w))
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.iter.size_hint()
+    }
+}
+
+#[derive(Clone)]
+pub struct MulByConstant<I, T> {
+    iter: I,
+    scalar: T,
+}
+
+impl<T, I> Iterator for MulByConstant<I, T>
+where
+    T: ScalarValue,
+    I: Iterator<Item = (Variable<T>, T)> + Clone,
+{
+    type Item = I::Item;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        self.iter.next().map(|(v, w)| (v, w * self.scalar))
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.iter.size_hint()
     }
 }
 
@@ -351,12 +478,10 @@ where
     T: ScalarValue,
     L: IntoLinearCombination<T>,
 {
-    type Output = LinearCombination<T>;
+    type Output = LinearCombination<T, iter::Chain<iter::Once<(Variable<T>, T)>, L::Terms>>;
 
     fn add(self, lc: L) -> Self::Output {
-        let mut lc = lc.into_lc();
-        lc.terms.push((self, T::one()));
-        lc
+        self.into_lc() + lc
     }
 }
 
@@ -366,31 +491,23 @@ where
     T: ScalarValue,
     L: IntoLinearCombination<T>,
 {
-    type Output = LinearCombination<T>;
+    type Output = LinearCombination<T, iter::Chain<iter::Once<(Variable<T>, T)>, Negate<L::Terms>>>;
 
     fn sub(self, lc: L) -> Self::Output {
-        let mut lc = lc.into_lc();
-        for (_, ref mut s) in lc.terms.iter_mut() {
-            *s = -*s;
-        }
-        lc.terms.push((self, T::one()));
-        lc
+        self.into_lc() - lc
     }
 }
 
 /// Multiplying a variable `v` by a scalar `a` creates a combination `v*a`.
-impl<T1, T2> Mul<T2> for Variable<T1>
+impl<T, T2> Mul<T2> for Variable<T>
 where
-    T1: ScalarValue,
-    T2: Into<T1>,
+    T: ScalarValue,
+    T2: Into<T>,
 {
-    type Output = LinearCombination<T1>;
+    type Output = LinearCombination<T, MulByConstant<iter::Once<(Variable<T>, T)>, T>>;
 
     fn mul(self, scalar: T2) -> Self::Output {
-        let scalar = scalar.into();
-        LinearCombination {
-            terms: vec![(self, scalar)],
-        }
+        self.into_lc() * scalar.into()
     }
 }
 
