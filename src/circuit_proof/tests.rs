@@ -1,3 +1,4 @@
+use super::constraints::IntoLinearCombination;
 use super::opaque_scalar::OpaqueScalar;
 use super::scalar_value::ScalarValue;
 use super::*;
@@ -172,19 +173,19 @@ impl KShuffleGadget {
 
         cs.challenge_scalar(b"k-scalar shuffle challenge", move |cs, z| {
             // Make last x multiplier for i = k-1 and k-2
-            let last_mulx_out = KShuffleGadget::last_multiplier(cs, z, x[k - 1], x[k - 2]);
+            let last_mulx_out = Self::multiply(cs, x[k - 1] - z, x[k - 2] - z);
 
             // Make multipliers for x from i == [0, k-3]
             let first_mulx_out = (0..k - 2).rev().fold(last_mulx_out, |prev_out, i| {
-                KShuffleGadget::intermediate_multiplier(cs, z, prev_out?, x[i])
+                Self::multiply(cs, prev_out?, x[i] - z)
             })?;
 
             // Make last y multiplier for i = k-1 and k-2
-            let last_muly_out = KShuffleGadget::last_multiplier(cs, z, y[k - 1], y[k - 2]);
+            let last_muly_out = Self::multiply(cs, y[k - 1] - z, y[k - 2] - z);
 
             // Make multipliers for y from i == [0, k-3]
             let first_muly_out = (0..k - 2).rev().fold(last_muly_out, |prev_out, i| {
-                KShuffleGadget::intermediate_multiplier(cs, z, prev_out?, y[i])
+                Self::multiply(cs, prev_out?, y[i] - z)
             })?;
 
             // Check equality between last x mul output and last y mul output
@@ -196,35 +197,26 @@ impl KShuffleGadget {
         Ok(())
     }
 
-    fn last_multiplier<CS: ConstraintSystem>(
-        cs: &mut CS,
-        z: OpaqueScalar,
-        left: Variable<OpaqueScalar>,
-        right: Variable<OpaqueScalar>,
-    ) -> Result<Variable<OpaqueScalar>, R1CSError> {
-        let l = left - z;
-        let r = right - z;
+    /// Create a new multiplication constraint out of two input linear combinations.
+    /// This helper constraints each input variable to be equal to a corresponding linear combination.
+    /// The output variable is not constrained.
+    fn multiply<CS, S, L, R>(cs: &mut CS, left: L, right: R) -> Result<Variable<S>, R1CSError>
+    where
+        CS: ConstraintSystem,
+        S: ScalarValue,
+        L: IntoLinearCombination<S>,
+        R: IntoLinearCombination<S>,
+    {
+        let l = left.into_lc();
+        let r = right.into_lc();
 
-        let (al, ar, ao) = cs.assign_multiplier(l.eval(), r.eval(), l.eval() * r.eval())?;
+        let lv = l.eval();
+        let rv = r.eval();
+        let ov = lv * rv;
+
+        let (al, ar, ao) = cs.assign_multiplier(lv, rv, ov)?;
 
         cs.add_constraint(al.equals(l));
-        cs.add_constraint(ar.equals(r));
-
-        Ok(ao)
-    }
-
-    fn intermediate_multiplier<CS: ConstraintSystem>(
-        cs: &mut CS,
-        z: OpaqueScalar,
-        left: Variable<OpaqueScalar>,
-        right: Variable<OpaqueScalar>,
-    ) -> Result<Variable<OpaqueScalar>, R1CSError> {
-        let r = right - z;
-
-        let (al, ar, ao) =
-            cs.assign_multiplier(left.assignment, r.eval(), left.assignment * r.eval())?;
-
-        cs.add_constraint(al.equals(left));
         cs.add_constraint(ar.equals(r));
 
         Ok(ao)

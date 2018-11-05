@@ -47,7 +47,7 @@ impl<'a, 'b> ConstraintSystem for VerifierCS<'a, 'b> {
         out: Assignment<S>,
     ) -> Result<(Variable<S>, Variable<S>, Variable<S>), R1CSError> {
         self.variables_count += 1;
-        Ok(Variable::from_multiplier(
+        Ok(Variable::make_multiplier(
             self.variables_count - 1,
             left,
             right,

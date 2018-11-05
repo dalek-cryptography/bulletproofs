@@ -97,7 +97,7 @@ impl<T: ScalarValue> Variable<T> {
         }
     }
 
-    pub(crate) fn from_multiplier(
+    pub(crate) fn make_multiplier(
         index: usize,
         left: Assignment<T>,
         right: Assignment<T>,

@@ -85,7 +85,7 @@ impl<'a, 'b> ConstraintSystem for ProverCS<'a, 'b> {
         self.a_R.push(r);
         self.a_O.push(o);
 
-        Ok(Variable::from_multiplier(
+        Ok(Variable::make_multiplier(
             self.a_L.len() - 1,
             left,
             right,
