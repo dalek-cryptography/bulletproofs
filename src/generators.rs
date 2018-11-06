@@ -51,8 +51,8 @@ impl GeneratorsChain {
     /// Creates a chain of generators, determined by the hash of `label`.
     fn new(label: &[u8]) -> Self {
         let mut shake = Shake256::default();
-        shake.process(b"GeneratorsChain");
-        shake.process(label);
+        shake.input(b"GeneratorsChain");
+        shake.input(label);
 
         GeneratorsChain {
             reader: shake.xof_result(),

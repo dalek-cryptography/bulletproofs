@@ -18,7 +18,6 @@ extern crate merlin;
 extern crate rand;
 extern crate sha3;
 extern crate subtle;
-extern crate tiny_keccak;
 #[macro_use]
 extern crate serde_derive;
 extern crate serde;
