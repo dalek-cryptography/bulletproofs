@@ -270,13 +270,20 @@ we finally obtain
 \\]
 This is equivalent to the original inner-product equation, but has a single
 inner product with \\({\mathbf{a}}\_{L}\\) on the left, \\({\mathbf{a}}\_{R}\\) on
-the right, and non-secret terms factored out.
+the right, and non-secret terms factored out. Let's call the left-hand side of the single inner product equation "unblinded" \\({\mathbf{l}(x)}\\) and the right-hand side "unblinded" \\({\mathbf{r}(x)}\\), such that 
+\\[
+\begin{aligned}
+\text{unblinded } \mathbf{l}(x) &= {\mathbf{a}}\_{L} - z {\mathbf{1}} \\\\
+\text{unblinded } \mathbf{r}(x) &= {\mathbf{y}}^{n} \circ ({\mathbf{a}}\_{R} + z {\mathbf{1}}) + z^{2} {\mathbf{2}}^{n} \\\\
+z^{2}v + \delta(y,z) &= {\langle \text{unblinded } \mathbf{l}(x), \text{unblinded } \mathbf{r}(x) \rangle}
+\end{aligned}
+\\]
 
 Blinding the inner product
 --------------------------
 
 The prover cannot send the left and right vectors in
-the single inner-product equation to the verifier without revealing information
+the single inner-product equation (unblinded \\({\mathbf{l}(x)}\\) and \\({\mathbf{r}(x)}\\)) to the verifier without revealing information
 about the value \\(v\\), and since the inner-product argument is not
 zero-knowledge, they cannot be used there either.
 
@@ -284,16 +291,15 @@ Instead, the prover chooses vectors of blinding factors
 \\[
 {\mathbf{s}}\_{L}, {\mathbf{s}}\_{R} \\;{\xleftarrow{\\$}}\\; {\mathbb Z\_p}^{n},
 \\]
-and uses them to construct vector polynomials
+and uses them to construct blinded vector polynomials from the unblinded vector polynomials \\({\mathbf{l}(x)}\\) and \\({\mathbf{r}(x)}\\):
 \\[
 \begin{aligned}
   {\mathbf{l}}(x) &= {\mathbf{l}}\_{0} + {\mathbf{l}}\_{1} x = ({\mathbf{a}}\_{L} + {\mathbf{s}}\_{L} x) - z {\mathbf{1}} & \in {\mathbb Z\_p}\[x\]^{n}  \\\\
   {\mathbf{r}}(x) &= {\mathbf{r}}\_{0} + {\mathbf{r}}\_{1} x = {\mathbf{y}}^{n} \circ \left( ({\mathbf{a}}\_{R} + {\mathbf{s}}\_{R} x\right)  + z {\mathbf{1}}) + z^{2} {\mathbf{2}}^{n} &\in {\mathbb Z\_p}\[x\]^{n} 
 \end{aligned}
 \\]
-These are the left and right sides of the combined inner product with \\({\mathbf{a}}\_{L}\\), \\({\mathbf{a}}\_{R}\\)
-replaced by blinded terms \\({\mathbf{a}}\_{L} + {\mathbf{s}}\_{L} x\\),
-\\({\mathbf{a}}\_{R} + {\mathbf{s}}\_{R} x\\). Notice that since only the
+The "blinded" \\({\mathbf{l}}(x)\\) and \\({\mathbf{r}}(x)\\) have \\({\mathbf{a}}\_{L}\\), \\({\mathbf{a}}\_{R}\\) replaced by blinded terms \\({\mathbf{a}}\_{L} + {\mathbf{s}}\_{L} x\\),
+\\({\mathbf{a}}\_{R} + {\mathbf{s}}\_{R} x\\). The \\({\mathbf{l}}\_{0}\\) and \\({\mathbf{r}}\_{0}\\) terms represent the degree-zero terms of the polynomial with respect to \\(x\\), and the \\({\mathbf{l}}\_{1}\\) and \\({\mathbf{r}}\_{1}\\) terms represent the degree-one terms. Notice that since only the
 blinding factors \\({\mathbf{s}}\_{L}\\), \\({\mathbf{s}}\_{R}\\) are multiplied
 by \\(x\\), the vectors \\({\mathbf{l}}\_{0}\\) and \\({\mathbf{r}}\_{0}\\) are
 exactly the left and right sides of the unblinded single inner-product:
@@ -519,7 +525,7 @@ check the final equality directly.
 
 If the prover can demonstrate that the above \\(P'\\) has such structure
 over generators \\({\mathbf{G}}\\), \\({\mathbf{H}}\\) and \\(Q\\) for all
-\\(w \in {\mathbb Z\_{p}^{*}}\\), then the original \\(P\\) and \\(c\\) must satisfy
+\\(w \in {\mathbb Z\_{p}^{\*}}\\), then the original \\(P\\) and \\(c\\) must satisfy
 the original relation
 \\((P = {\langle {\mathbf{a}}, {\mathbf{G}} \rangle} + {\langle {\mathbf{b}}, {\mathbf{H}} \rangle}
 \wedge c = {\langle {\mathbf{a}}, {\mathbf{b}} \rangle})\\).
@@ -606,7 +612,10 @@ additional and final step involves sending a pair of scalars
 Aggregated Range Proof
 ======================
 
-We want to take advantage of the logarithmic size of the inner-product protocol, by creating an aggregated range proof for \\(m\\) values that is smaller than \\(m\\) individual range proofs.
+The goal of an _aggregated range proof_ is to enable a group of parties to produce proofs of their individual statements
+(individual range proofs for the corresponding value commitments), that can be aggregated in a more compact proof.
+This is more efficient due to the logarithmic size of the inner-product protocol: an aggregated range proof for \\(m\\)
+values is smaller than \\(m\\) individual range proofs.
 
 The aggregation protocol is a multi-party computation protocol, involving \\(m\\) parties (one party per value) and one dealer, where the parties don't reveal their secrets to each other. The parties share their commitments with the dealer, and the dealer generates and returns challenge variables. The parties then share their proof shares with the dealer, and the dealer combines their shares to create an aggregated proof. 
 
