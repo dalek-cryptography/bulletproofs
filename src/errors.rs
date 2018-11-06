@@ -72,7 +72,7 @@ pub enum MPCError {
     /// This error occurs when the dealer is given the wrong number of
     /// value commitments.
     #[fail(display = "Wrong number of value commitments")]
-    WrongNumValueCommitments,
+    WrongNumBitCommitments,
     /// This error occurs when the dealer is given the wrong number of
     /// polynomial commitments.
     #[fail(display = "Wrong number of value commitments")]

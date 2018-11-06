@@ -1,13 +1,20 @@
 //! The `party` module contains the API for the party state while the party is
 //! engaging in an aggregated multiparty computation protocol.
 //!
-//! For more explanation of how the `dealer`, `party`, and `messages` modules orchestrate the protocol execution, see
-//! [the API for the aggregated multiparty computation protocol](../aggregation/index.html#api-for-the-aggregated-multiparty-computation-protocol).
+//! Each state of the MPC protocol is represented by a different Rust
+//! type.  The state transitions consume the previous state, making it
+//! a compile error to perform the steps out of order or to repeat a
+//! step.
+//!
+//! For more explanation of how the `dealer`, `party`, and `messages`
+//! modules orchestrate the protocol execution, see the documentation
+//! in the [`aggregation`](::aggregation) module.
 
-use curve25519_dalek::ristretto::RistrettoPoint;
+use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::MultiscalarMul;
 
+use clear_on_drop::clear::Clear;
 use errors::MPCError;
 use generators::{BulletproofGens, PedersenGens};
 use rand;
@@ -16,10 +23,11 @@ use util;
 
 use super::messages::*;
 
-/// Party is an entry-point API for setting up a party.
+/// Used to construct a party for the aggregated rangeproof MPC protocol.
 pub struct Party {}
 
 impl Party {
+    /// Constructs a `PartyAwaitingPosition` with the given rangeproof parameters.
     pub fn new<'a>(
         bp_gens: &'a BulletproofGens,
         pc_gens: &'a PedersenGens,
@@ -30,8 +38,11 @@ impl Party {
         if !(n == 8 || n == 16 || n == 32 || n == 64) {
             return Err(MPCError::InvalidBitsize);
         }
+        if bp_gens.gens_capacity < n {
+            return Err(MPCError::InvalidGeneratorsLength);
+        }
 
-        let V = pc_gens.commit(v.into(), v_blinding);
+        let V = pc_gens.commit(v.into(), v_blinding).compress();
 
         Ok(PartyAwaitingPosition {
             bp_gens,
@@ -44,26 +55,29 @@ impl Party {
     }
 }
 
-/// As party awaits its position, they only know their value and desired bit-size of the proof.
+/// A party waiting for the dealer to assign their position in the aggregation.
 pub struct PartyAwaitingPosition<'a> {
     bp_gens: &'a BulletproofGens,
     pc_gens: &'a PedersenGens,
     n: usize,
     v: u64,
     v_blinding: Scalar,
-    V: RistrettoPoint,
+    V: CompressedRistretto,
 }
 
 impl<'a> PartyAwaitingPosition<'a> {
-    /// Assigns the position to a party,
-    /// at which point the party knows its generators.
+    /// Assigns a position in the aggregated proof to this party,
+    /// allowing the party to commit to the bits of their value.
     pub fn assign_position(
         self,
-        // XXX need to check that j is valid (in gens range)
         j: usize,
-    ) -> (PartyAwaitingValueChallenge<'a>, ValueCommitment) {
+    ) -> Result<(PartyAwaitingBitChallenge<'a>, BitCommitment), MPCError> {
         // XXX use transcript RNG
         let mut rng = rand::thread_rng();
+
+        if self.bp_gens.party_capacity <= j {
+            return Err(MPCError::InvalidGeneratorsLength);
+        }
 
         let bp_share = self.bp_gens.share(j);
 
@@ -96,12 +110,12 @@ impl<'a> PartyAwaitingPosition<'a> {
         );
 
         // Return next state and all commitments
-        let value_commitment = ValueCommitment {
+        let bit_commitment = BitCommitment {
             V_j: self.V,
             A_j: A,
             S_j: S,
         };
-        let next_state = PartyAwaitingValueChallenge {
+        let next_state = PartyAwaitingBitChallenge {
             n: self.n,
             v: self.v,
             v_blinding: self.v_blinding,
@@ -112,13 +126,21 @@ impl<'a> PartyAwaitingPosition<'a> {
             s_L,
             s_R,
         };
-        (next_state, value_commitment)
+        Ok((next_state, bit_commitment))
     }
 }
 
-/// When party knows its position (`j`), it can produce commitments
-/// to all bits of the value and necessary blinding factors.
-pub struct PartyAwaitingValueChallenge<'a> {
+/// Overwrite secrets with null bytes when they go out of scope.
+impl<'a> Drop for PartyAwaitingPosition<'a> {
+    fn drop(&mut self) {
+        self.v.clear();
+        self.v_blinding.clear();
+    }
+}
+
+/// A party which has committed to the bits of its value
+/// and is waiting for the aggregated value challenge from the dealer.
+pub struct PartyAwaitingBitChallenge<'a> {
     n: usize, // bitsize of the range
     v: u64,
     v_blinding: Scalar,
@@ -130,10 +152,12 @@ pub struct PartyAwaitingValueChallenge<'a> {
     s_R: Vec<Scalar>,
 }
 
-impl<'a> PartyAwaitingValueChallenge<'a> {
+impl<'a> PartyAwaitingBitChallenge<'a> {
+    /// Receive a [`BitChallenge`] from the dealer and use it to
+    /// compute commitments to the party's polynomial coefficients.
     pub fn apply_challenge(
         self,
-        vc: &ValueChallenge,
+        vc: &BitChallenge,
     ) -> (PartyAwaitingPolyChallenge, PolyCommitment) {
         let mut rng = rand::thread_rng();
 
@@ -191,6 +215,30 @@ impl<'a> PartyAwaitingValueChallenge<'a> {
     }
 }
 
+/// Overwrite secrets with null bytes when they go out of scope.
+impl<'a> Drop for PartyAwaitingBitChallenge<'a> {
+    fn drop(&mut self) {
+        self.v.clear();
+        self.v_blinding.clear();
+        self.a_blinding.clear();
+        self.s_blinding.clear();
+
+        // Important: due to how ClearOnDrop auto-implements InitializableFromZeroed
+        // for T: Default, calling .clear() on Vec compiles, but does not
+        // clear the content. Instead, it only clears the Vec's header.
+        // Clearing the underlying buffer item-by-item will do the job, but will
+        // keep the header as-is, which is fine since the header does not contain secrets.
+        for e in self.s_L.iter_mut() {
+            e.clear();
+        }
+        for e in self.s_R.iter_mut() {
+            e.clear();
+        }
+    }
+}
+
+/// A party which has committed to their polynomial coefficents
+/// and is waiting for the polynomial challenge from the dealer.
 pub struct PartyAwaitingPolyChallenge {
     z: Scalar,
     offset_z: Scalar,
@@ -205,6 +253,8 @@ pub struct PartyAwaitingPolyChallenge {
 }
 
 impl PartyAwaitingPolyChallenge {
+    /// Receive a [`PolyChallenge`] from the dealer and compute the
+    /// party's proof share.
     pub fn apply_challenge(self, pc: &PolyChallenge) -> Result<ProofShare, MPCError> {
         // Prevent a malicious dealer from annihilating the blinding
         // factors by supplying a zero challenge.
@@ -231,5 +281,19 @@ impl PartyAwaitingPolyChallenge {
             l_vec,
             r_vec,
         })
+    }
+}
+
+/// Overwrite secrets with null bytes when they go out of scope.
+impl Drop for PartyAwaitingPolyChallenge {
+    fn drop(&mut self) {
+        self.v_blinding.clear();
+        self.a_blinding.clear();
+        self.s_blinding.clear();
+        self.t_1_blinding.clear();
+        self.t_2_blinding.clear();
+
+        // Note: polynomials r_poly, l_poly and t_poly
+        // are cleared within their own Drop impls.
     }
 }

@@ -25,7 +25,29 @@ pub mod dealer;
 pub mod messages;
 pub mod party;
 
-/// The `RangeProof` struct represents a single range proof.
+/// The `RangeProof` struct represents a proof that one or more values
+/// are in a range.
+///
+/// The `RangeProof` struct contains functions for creating and
+/// verifying aggregated range proofs.  The single-value case is
+/// implemented as a special case of aggregated range proofs.
+///
+/// The bitsize of the range, as well as the list of commitments to
+/// the values, are not included in the proof, and must be known to
+/// the verifier.
+///
+/// This implementation requires that both the bitsize `n` and the
+/// aggregation size `m` be powers of two, so that `n = 8, 16, 32, 64`
+/// and `m = 1, 2, 4, 8, 16, ...`.  Note that the aggregation size is
+/// not given as an explicit parameter, but is determined by the
+/// number of values or commitments passed to the prover or verifier.
+///
+/// # Note
+///
+/// For proving, these functions run the multiparty aggregation
+/// protocol locally.  That API is exposed in the [`aggregation`](::aggregation)
+/// module and can be used to perform online aggregation between
+/// parties without revealing secret values to each other.
 #[derive(Clone, Debug)]
 pub struct RangeProof {
     /// Commitment to the bits of the value
@@ -49,8 +71,60 @@ pub struct RangeProof {
 impl RangeProof {
     /// Create a rangeproof for a given pair of value `v` and
     /// blinding scalar `v_blinding`.
+    /// This is a convenience wrapper around [`RangeProof::prove_multiple`].
     ///
-    /// XXX add doctests
+    /// # Example
+    /// ```
+    /// extern crate rand;
+    /// use rand::thread_rng;
+    ///
+    /// extern crate curve25519_dalek;
+    /// use curve25519_dalek::scalar::Scalar;
+    ///
+    /// extern crate merlin;
+    /// use merlin::Transcript;
+    ///
+    /// extern crate bulletproofs;
+    /// use bulletproofs::{BulletproofGens, PedersenGens, RangeProof};
+    ///
+    /// # fn main() {
+    /// // Generators for Pedersen commitments.  These can be selected
+    /// // independently of the Bulletproofs generators.
+    /// let pc_gens = PedersenGens::default();
+    ///
+    /// // Generators for Bulletproofs, valid for proofs up to bitsize 64
+    /// // and aggregation size up to 1.
+    /// let bp_gens = BulletproofGens::new(64, 1);
+    ///
+    /// // A secret value we want to prove lies in the range [0, 2^32)
+    /// let secret_value = 1037578891u64;
+    ///
+    /// // The API takes a blinding factor for the commitment.
+    /// let blinding = Scalar::random(&mut thread_rng());
+    ///
+    /// // The proof can be chained to an existing transcript.
+    /// // Here we create a transcript with a doctest domain separator.
+    /// let mut transcript = Transcript::new(b"doctest example");
+    ///
+    /// // Create a 32-bit rangeproof.
+    /// let (proof, committed_value) = RangeProof::prove_single(
+    ///     &bp_gens,
+    ///     &pc_gens,
+    ///     &mut transcript,
+    ///     secret_value,
+    ///     &blinding,
+    ///     32,
+    /// ).expect("A real program could handle errors");
+    ///
+    /// // Verification requires a transcript with identical initial state:
+    /// let mut transcript = Transcript::new(b"doctest example");
+    /// assert!(
+    ///     proof
+    ///         .verify_single(&bp_gens, &pc_gens, &mut transcript, &committed_value, 32)
+    ///         .is_ok()
+    /// );
+    /// # }
+    /// ```
     pub fn prove_single(
         bp_gens: &BulletproofGens,
         pc_gens: &PedersenGens,
@@ -58,13 +132,66 @@ impl RangeProof {
         v: u64,
         v_blinding: &Scalar,
         n: usize,
-    ) -> Result<RangeProof, ProofError> {
-        RangeProof::prove_multiple(bp_gens, pc_gens, transcript, &[v], &[*v_blinding], n)
+    ) -> Result<(RangeProof, CompressedRistretto), ProofError> {
+        let (p, Vs) =
+            RangeProof::prove_multiple(bp_gens, pc_gens, transcript, &[v], &[*v_blinding], n)?;
+        Ok((p, Vs[0]))
     }
 
     /// Create a rangeproof for a set of values.
     ///
-    /// XXX add doctests
+    /// # Example
+    /// ```
+    /// extern crate rand;
+    /// use rand::thread_rng;
+    ///
+    /// extern crate curve25519_dalek;
+    /// use curve25519_dalek::scalar::Scalar;
+    ///
+    /// extern crate merlin;
+    /// use merlin::Transcript;
+    ///
+    /// extern crate bulletproofs;
+    /// use bulletproofs::{BulletproofGens, PedersenGens, RangeProof};
+    ///
+    /// # fn main() {
+    /// // Generators for Pedersen commitments.  These can be selected
+    /// // independently of the Bulletproofs generators.
+    /// let pc_gens = PedersenGens::default();
+    ///
+    /// // Generators for Bulletproofs, valid for proofs up to bitsize 64
+    /// // and aggregation size up to 16.
+    /// let bp_gens = BulletproofGens::new(64, 16);
+    ///
+    /// // Four secret values we want to prove lie in the range [0, 2^32)
+    /// let secrets = [4242344947u64, 3718732727u64, 2255562556u64, 2526146994u64];
+    ///
+    /// // The API takes blinding factors for the commitments.
+    /// let blindings: Vec<_> = (0..4).map(|_| Scalar::random(&mut thread_rng())).collect();
+    ///
+    /// // The proof can be chained to an existing transcript.
+    /// // Here we create a transcript with a doctest domain separator.
+    /// let mut transcript = Transcript::new(b"doctest example");
+    ///
+    /// // Create an aggregated 32-bit rangeproof and corresponding commitments.
+    /// let (proof, commitments) = RangeProof::prove_multiple(
+    ///     &bp_gens,
+    ///     &pc_gens,
+    ///     &mut transcript,
+    ///     &secrets,
+    ///     &blindings,
+    ///     32,
+    /// ).expect("A real program could handle errors");
+    ///
+    /// // Verification requires a transcript with identical initial state:
+    /// let mut transcript = Transcript::new(b"doctest example");
+    /// assert!(
+    ///     proof
+    ///         .verify_multiple(&bp_gens, &pc_gens, &mut transcript, &commitments, 32)
+    ///         .is_ok()
+    /// );
+    /// # }
+    /// ```
     pub fn prove_multiple(
         bp_gens: &BulletproofGens,
         pc_gens: &PedersenGens,
@@ -72,21 +199,12 @@ impl RangeProof {
         values: &[u64],
         blindings: &[Scalar],
         n: usize,
-    ) -> Result<RangeProof, ProofError> {
+    ) -> Result<(RangeProof, Vec<CompressedRistretto>), ProofError> {
         use self::dealer::*;
         use self::party::*;
 
         if values.len() != blindings.len() {
             return Err(ProofError::WrongNumBlindingFactors);
-        }
-        if !(n == 8 || n == 16 || n == 32 || n == 64) {
-            return Err(ProofError::InvalidBitsize);
-        }
-        if bp_gens.gens_capacity < n {
-            return Err(ProofError::InvalidGeneratorsLength);
-        }
-        if bp_gens.party_capacity < values.len() {
-            return Err(ProofError::InvalidGeneratorsLength);
         }
 
         let dealer = Dealer::new(bp_gens, pc_gens, transcript, n, values.len())?;
@@ -98,17 +216,21 @@ impl RangeProof {
             // Collect the iterator of Results into a Result<Vec>, then unwrap it
             .collect::<Result<Vec<_>, _>>()?;
 
-        let (parties, value_commitments): (Vec<_>, Vec<_>) = parties
+        let (parties, bit_commitments): (Vec<_>, Vec<_>) = parties
             .into_iter()
             .enumerate()
-            .map(|(j, p)| p.assign_position(j))
-            .unzip();
+            .map(|(j, p)| {
+                p.assign_position(j)
+                    .expect("We already checked the parameters, so this should never happen")
+            }).unzip();
 
-        let (dealer, value_challenge) = dealer.receive_value_commitments(value_commitments)?;
+        let value_commitments: Vec<_> = bit_commitments.iter().map(|c| c.V_j).collect();
+
+        let (dealer, bit_challenge) = dealer.receive_bit_commitments(bit_commitments)?;
 
         let (parties, poly_commitments): (Vec<_>, Vec<_>) = parties
             .into_iter()
-            .map(|p| p.apply_challenge(&value_challenge))
+            .map(|p| p.apply_challenge(&bit_challenge))
             .unzip();
 
         let (dealer, poly_challenge) = dealer.receive_poly_commitments(poly_commitments)?;
@@ -121,34 +243,30 @@ impl RangeProof {
 
         let proof = dealer.receive_trusted_shares(&proof_shares)?;
 
-        Ok(proof)
+        Ok((proof, value_commitments))
     }
 
     /// Verifies a rangeproof for a given value commitment \\(V\\).
     ///
-    /// This is a convenience wrapper around `verify` for the `m=1` case.
-    ///
-    /// XXX add doctests
+    /// This is a convenience wrapper around `verify_multiple` for the `m=1` case.
     pub fn verify_single(
         &self,
         bp_gens: &BulletproofGens,
         pc_gens: &PedersenGens,
         transcript: &mut Transcript,
-        V: &RistrettoPoint,
+        V: &CompressedRistretto,
         n: usize,
     ) -> Result<(), ProofError> {
-        self.verify(bp_gens, pc_gens, transcript, &[*V], n)
+        self.verify_multiple(bp_gens, pc_gens, transcript, &[*V], n)
     }
 
     /// Verifies an aggregated rangeproof for the given value commitments.
-    ///
-    /// XXX add doctests
-    pub fn verify(
+    pub fn verify_multiple(
         &self,
         bp_gens: &BulletproofGens,
         pc_gens: &PedersenGens,
         transcript: &mut Transcript,
-        value_commitments: &[RistrettoPoint],
+        value_commitments: &[CompressedRistretto],
         n: usize,
     ) -> Result<(), ProofError> {
         let m = value_commitments.len();
@@ -167,10 +285,8 @@ impl RangeProof {
 
         transcript.rangeproof_domain_sep(n as u64, m as u64);
 
-        // TODO: allow user to supply compressed commitments
-        // to avoid unnecessary compression
         for V in value_commitments.iter() {
-            transcript.commit_point(b"V", &V.compress());
+            transcript.commit_point(b"V", V);
         }
         transcript.commit_point(b"A", &self.A);
         transcript.commit_point(b"S", &self.S);
@@ -241,7 +357,7 @@ impl RangeProof {
                 .chain(iter::once(Some(pc_gens.B)))
                 .chain(bp_gens.G(n, m).map(|&x| Some(x)))
                 .chain(bp_gens.H(n, m).map(|&x| Some(x)))
-                .chain(value_commitments.iter().map(|&x| Some(x))),
+                .chain(value_commitments.iter().map(|V| V.decompress())),
         ).ok_or_else(|| ProofError::VerificationError)?;
 
         if mega_check.is_identity() {
@@ -415,23 +531,19 @@ mod tests {
         let pc_gens = PedersenGens::default();
         let bp_gens = BulletproofGens::new(max_bitsize, max_parties);
 
-        // Serialized proof data
-        let proof_bytes: Vec<u8>;
-        let value_commitments: Vec<RistrettoPoint>;
-
         // Prover's scope
-        {
-            // 1. Generate the proof
-            let mut transcript = Transcript::new(b"AggregatedRangeProofTest");
-
+        let (proof_bytes, value_commitments) = {
             use rand::Rng;
             let mut rng = rand::thread_rng();
 
+            // 0. Create witness data
             let (min, max) = (0u64, ((1u128 << n) - 1) as u64);
             let values: Vec<u64> = (0..m).map(|_| rng.gen_range(min, max)).collect();
             let blindings: Vec<Scalar> = (0..m).map(|_| Scalar::random(&mut rng)).collect();
 
-            let proof = RangeProof::prove_multiple(
+            // 1. Create the proof
+            let mut transcript = Transcript::new(b"AggregatedRangeProofTest");
+            let (proof, value_commitments) = RangeProof::prove_multiple(
                 &bp_gens,
                 &pc_gens,
                 &mut transcript,
@@ -440,16 +552,9 @@ mod tests {
                 n,
             ).unwrap();
 
-            // 2. Serialize
-            proof_bytes = bincode::serialize(&proof).unwrap();
-
-            // XXX would be nice to have some convenience API for this
-            value_commitments = values
-                .iter()
-                .zip(blindings.iter())
-                .map(|(&v, &v_blinding)| pc_gens.commit(v.into(), v_blinding))
-                .collect();
-        }
+            // 2. Return serialized proof and value commitments
+            (bincode::serialize(&proof).unwrap(), value_commitments)
+        };
 
         println!(
             "Aggregated rangeproof of m={} proofs of n={} bits has size {} bytes",
@@ -468,7 +573,7 @@ mod tests {
 
             assert!(
                 proof
-                    .verify(&bp_gens, &pc_gens, &mut transcript, &value_commitments, n)
+                    .verify_multiple(&bp_gens, &pc_gens, &mut transcript, &value_commitments, n)
                     .is_ok()
             );
         }
@@ -552,19 +657,19 @@ mod tests {
 
         let dealer = Dealer::new(&bp_gens, &pc_gens, &mut transcript, n, m).unwrap();
 
-        let (party0, value_com0) = party0.assign_position(0);
-        let (party1, value_com1) = party1.assign_position(1);
-        let (party2, value_com2) = party2.assign_position(2);
-        let (party3, value_com3) = party3.assign_position(3);
+        let (party0, bit_com0) = party0.assign_position(0).unwrap();
+        let (party1, bit_com1) = party1.assign_position(1).unwrap();
+        let (party2, bit_com2) = party2.assign_position(2).unwrap();
+        let (party3, bit_com3) = party3.assign_position(3).unwrap();
 
-        let (dealer, value_challenge) = dealer
-            .receive_value_commitments(vec![value_com0, value_com1, value_com2, value_com3])
+        let (dealer, bit_challenge) = dealer
+            .receive_bit_commitments(vec![bit_com0, bit_com1, bit_com2, bit_com3])
             .unwrap();
 
-        let (party0, poly_com0) = party0.apply_challenge(&value_challenge);
-        let (party1, poly_com1) = party1.apply_challenge(&value_challenge);
-        let (party2, poly_com2) = party2.apply_challenge(&value_challenge);
-        let (party3, poly_com3) = party3.apply_challenge(&value_challenge);
+        let (party0, poly_com0) = party0.apply_challenge(&bit_challenge);
+        let (party1, poly_com1) = party1.apply_challenge(&bit_challenge);
+        let (party2, poly_com2) = party2.apply_challenge(&bit_challenge);
+        let (party3, poly_com3) = party3.apply_challenge(&bit_challenge);
 
         let (dealer, poly_challenge) = dealer
             .receive_poly_commitments(vec![poly_com0, poly_com1, poly_com2, poly_com3])
@@ -612,11 +717,11 @@ mod tests {
 
         // Now do the protocol flow as normal....
 
-        let (party0, value_com0) = party0.assign_position(0);
+        let (party0, bit_com0) = party0.assign_position(0).unwrap();
 
-        let (dealer, value_challenge) = dealer.receive_value_commitments(vec![value_com0]).unwrap();
+        let (dealer, bit_challenge) = dealer.receive_bit_commitments(vec![bit_com0]).unwrap();
 
-        let (party0, poly_com0) = party0.apply_challenge(&value_challenge);
+        let (party0, poly_com0) = party0.apply_challenge(&bit_challenge);
 
         let (_dealer, mut poly_challenge) =
             dealer.receive_poly_commitments(vec![poly_com0]).unwrap();

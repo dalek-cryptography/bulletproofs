@@ -287,8 +287,8 @@ Instead, the prover chooses vectors of blinding factors
 and uses them to construct vector polynomials
 \\[
 \begin{aligned}
-  {\mathbf{l}}(x) &= {\mathbf{l}}\_{0} + {\mathbf{l}}\_{1} x = ({\mathbf{a}}\_{L} + {\mathbf{s}}\_{L} x) - z {\mathbf{1}} & \in {\mathbb Z\_p}[x]^{n}  \\\\
-  {\mathbf{r}}(x) &= {\mathbf{r}}\_{0} + {\mathbf{r}}\_{1} x = {\mathbf{y}}^{n} \circ \left( ({\mathbf{a}}\_{R} + {\mathbf{s}}\_{R} x\right)  + z {\mathbf{1}}) + z^{2} {\mathbf{2}}^{n} &\in {\mathbb Z\_p}[x]^{n} 
+  {\mathbf{l}}(x) &= {\mathbf{l}}\_{0} + {\mathbf{l}}\_{1} x = ({\mathbf{a}}\_{L} + {\mathbf{s}}\_{L} x) - z {\mathbf{1}} & \in {\mathbb Z\_p}\[x\]^{n}  \\\\
+  {\mathbf{r}}(x) &= {\mathbf{r}}\_{0} + {\mathbf{r}}\_{1} x = {\mathbf{y}}^{n} \circ \left( ({\mathbf{a}}\_{R} + {\mathbf{s}}\_{R} x\right)  + z {\mathbf{1}}) + z^{2} {\mathbf{2}}^{n} &\in {\mathbb Z\_p}\[x\]^{n} 
 \end{aligned}
 \\]
 These are the left and right sides of the combined inner product with \\({\mathbf{a}}\_{L}\\), \\({\mathbf{a}}\_{R}\\)
@@ -529,10 +529,10 @@ and compress the vectors by adding the left and the right halves
 separated by the variable \\(u\_k\\):
 \\[
 \begin{aligned}
-  {\mathbf{a}}^{(k-1)} &= {\mathbf{a}}\_L \cdot u\_k        + u^{-1}\_k \cdot {\mathbf{a}}\_R \\\\
-  {\mathbf{b}}^{(k-1)} &= {\mathbf{b}}\_L \cdot u^{-1}\_k   + u\_k \cdot {\mathbf{b}}\_R \\\\
-  {\mathbf{G}}^{(k-1)} &= {\mathbf{G}}\_L \cdot u^{-1}\_k   + u\_k \cdot {\mathbf{G}}\_R \\\\
-  {\mathbf{H}}^{(k-1)} &= {\mathbf{H}}\_L \cdot u\_k        + u^{-1}\_k \cdot {\mathbf{H}}\_R 
+  {\mathbf{a}}^{(k-1)} &= {\mathbf{a}}\_{\operatorname{lo}} \cdot u\_k        + u^{-1}\_k \cdot {\mathbf{a}}\_{\operatorname{hi}} \\\\
+  {\mathbf{b}}^{(k-1)} &= {\mathbf{b}}\_{\operatorname{lo}} \cdot u^{-1}\_k   + u\_k \cdot {\mathbf{b}}\_{\operatorname{hi}} \\\\
+  {\mathbf{G}}^{(k-1)} &= {\mathbf{G}}\_{\operatorname{lo}} \cdot u^{-1}\_k   + u\_k \cdot {\mathbf{G}}\_{\operatorname{hi}} \\\\
+  {\mathbf{H}}^{(k-1)} &= {\mathbf{H}}\_{\operatorname{lo}} \cdot u\_k        + u^{-1}\_k \cdot {\mathbf{H}}\_{\operatorname{hi}}
 \end{aligned}
 \\]
 The powers of \\(u\_k\\) are chosen so they cancel out in the
@@ -546,17 +546,17 @@ Expanding it in terms of the original \\({\mathbf{a}}\\), \\({\mathbf{b}}\\),
 \\({\mathbf{G}}\\) and \\({\mathbf{H}}\\) gives:
 \\[
 \begin{aligned}
-    P\_{k-1} &{}={}& &{\langle {\mathbf{a}}\_L \cdot u\_k   + u\_k^{-1} \cdot {\mathbf{a}}\_R, {\mathbf{G}}\_L \cdot u^{-1}\_k + u\_k \cdot {\mathbf{G}}\_R      \rangle} + \\\\
-             &&  &{\langle {\mathbf{b}}\_L \cdot u^{-1}\_k  + u\_k \cdot {\mathbf{b}}\_R,      {\mathbf{H}}\_L \cdot u\_k      + u^{-1}\_k \cdot {\mathbf{H}}\_R \rangle} + \\\\
-             &&  &{\langle {\mathbf{a}}\_L \cdot u\_k       + u^{-1}\_k \cdot {\mathbf{a}}\_R,      {\mathbf{b}}\_L \cdot u^{-1}\_k + u\_k \cdot {\mathbf{b}}\_R      \rangle} \cdot Q
+    P\_{k-1} &{}={}& &{\langle {\mathbf{a}}\_{\operatorname{lo}} \cdot u\_k   + u\_k^{-1} \cdot {\mathbf{a}}\_{\operatorname{hi}}, {\mathbf{G}}\_{\operatorname{lo}} \cdot u^{-1}\_k + u\_k \cdot {\mathbf{G}}\_{\operatorname{hi}}      \rangle} + \\\\
+             &&  &{\langle {\mathbf{b}}\_{\operatorname{lo}} \cdot u^{-1}\_k  + u\_k \cdot {\mathbf{b}}\_{\operatorname{hi}},      {\mathbf{H}}\_{\operatorname{lo}} \cdot u\_k      + u^{-1}\_k \cdot {\mathbf{H}}\_{\operatorname{hi}} \rangle} + \\\\
+             &&  &{\langle {\mathbf{a}}\_{\operatorname{lo}} \cdot u\_k       + u^{-1}\_k \cdot {\mathbf{a}}\_{\operatorname{hi}},      {\mathbf{b}}\_{\operatorname{lo}} \cdot u^{-1}\_k + u\_k \cdot {\mathbf{b}}\_{\operatorname{hi}}      \rangle} \cdot Q
 \end{aligned}
 \\]
 Breaking down in simpler products:
 \\[
 \begin{aligned}
-    P\_{k-1} &{}={}& &{\langle {\mathbf{a}}\_L, {\mathbf{G}}\_L \rangle} + {\langle {\mathbf{a}}\_R, {\mathbf{G}}\_R \rangle} &{}+{}& u\_k^2 {\langle {\mathbf{a}}\_L, {\mathbf{G}}\_R \rangle} + u^{-2}\_k {\langle {\mathbf{a}}\_R, {\mathbf{G}}\_L \rangle} + \\\\
-       &&      &{\langle {\mathbf{b}}\_L, {\mathbf{H}}\_L \rangle} + {\langle {\mathbf{b}}\_R, {\mathbf{H}}\_R \rangle} &{}+{}& u^2\_k {\langle {\mathbf{b}}\_R, {\mathbf{H}}\_L \rangle} + u^{-2}\_k {\langle {\mathbf{b}}\_L, {\mathbf{H}}\_R \rangle} + \\\\
-       &&      &({\langle {\mathbf{a}}\_L, {\mathbf{b}}\_L \rangle} + {\langle {\mathbf{a}}\_R, {\mathbf{b}}\_R \rangle})\cdot Q &{}+{}& (u^2\_k {\langle {\mathbf{a}}\_L, {\mathbf{b}}\_R \rangle} + u^{-2}\_k {\langle {\mathbf{a}}\_R, {\mathbf{b}}\_L \rangle}) \cdot Q
+    P\_{k-1} &{}={}& &{\langle {\mathbf{a}}\_{\operatorname{lo}}, {\mathbf{G}}\_{\operatorname{lo}} \rangle} + {\langle {\mathbf{a}}\_{\operatorname{hi}}, {\mathbf{G}}\_{\operatorname{hi}} \rangle} &{}+{}& u\_k^2 {\langle {\mathbf{a}}\_{\operatorname{lo}}, {\mathbf{G}}\_{\operatorname{hi}} \rangle} + u^{-2}\_k {\langle {\mathbf{a}}\_{\operatorname{hi}}, {\mathbf{G}}\_{\operatorname{lo}} \rangle} + \\\\
+       &&      &{\langle {\mathbf{b}}\_{\operatorname{lo}}, {\mathbf{H}}\_{\operatorname{lo}} \rangle} + {\langle {\mathbf{b}}\_{\operatorname{hi}}, {\mathbf{H}}\_{\operatorname{hi}} \rangle} &{}+{}& u^2\_k {\langle {\mathbf{b}}\_{\operatorname{hi}}, {\mathbf{H}}\_{\operatorname{lo}} \rangle} + u^{-2}\_k {\langle {\mathbf{b}}\_{\operatorname{lo}}, {\mathbf{H}}\_{\operatorname{hi}} \rangle} + \\\\
+       &&      &({\langle {\mathbf{a}}\_{\operatorname{lo}}, {\mathbf{b}}\_{\operatorname{lo}} \rangle} + {\langle {\mathbf{a}}\_{\operatorname{hi}}, {\mathbf{b}}\_{\operatorname{hi}} \rangle})\cdot Q &{}+{}& (u^2\_k {\langle {\mathbf{a}}\_{\operatorname{lo}}, {\mathbf{b}}\_{\operatorname{hi}} \rangle} + u^{-2}\_k {\langle {\mathbf{a}}\_{\operatorname{hi}}, {\mathbf{b}}\_{\operatorname{lo}} \rangle}) \cdot Q
 \end{aligned}
 \\]
 We now see that the left two columns in the above equation is the
@@ -566,8 +566,8 @@ terms with \\(u^2\_k\\) as \\(L\_k\\) and all terms with \\(u^{-2}\_k\\) as \\(R
 \\[
 \begin{aligned}
     P\_{k-1} &= P\_k + u^2\_k \cdot L\_k + u^{-2}\_k \cdot R\_k\\\\
-    L\_k  &= {\langle {\mathbf{a}}\_L, {\mathbf{G}}\_R \rangle} + {\langle {\mathbf{b}}\_R, {\mathbf{H}}\_L \rangle} + {\langle {\mathbf{a}}\_L, {\mathbf{b}}\_R \rangle} \cdot Q\\\\
-    R\_k  &= {\langle {\mathbf{a}}\_R, {\mathbf{G}}\_L \rangle} + {\langle {\mathbf{b}}\_L, {\mathbf{H}}\_R \rangle} + {\langle {\mathbf{a}}\_R, {\mathbf{b}}\_L \rangle} \cdot Q
+    L\_k  &= {\langle {\mathbf{a}}\_{\operatorname{lo}}, {\mathbf{G}}\_{\operatorname{hi}} \rangle} + {\langle {\mathbf{b}}\_{\operatorname{hi}}, {\mathbf{H}}\_{\operatorname{lo}} \rangle} + {\langle {\mathbf{a}}\_{\operatorname{lo}}, {\mathbf{b}}\_{\operatorname{hi}} \rangle} \cdot Q\\\\
+    R\_k  &= {\langle {\mathbf{a}}\_{\operatorname{hi}}, {\mathbf{G}}\_{\operatorname{lo}} \rangle} + {\langle {\mathbf{b}}\_{\operatorname{lo}}, {\mathbf{H}}\_{\operatorname{hi}} \rangle} + {\langle {\mathbf{a}}\_{\operatorname{hi}}, {\mathbf{b}}\_{\operatorname{lo}} \rangle} \cdot Q
 \end{aligned}
 \\]
 If the prover commits to \\(L\_k\\) and \\(R\_k\\) before \\(u\_k\\) is randomly
@@ -623,7 +623,7 @@ New notation for aggregated proofs
 
 The subscript \\({(j)}\\) denotes the \\(j\\)th party's share. For instance, \\(v_{(j)}\\) is the \\(v\\) value of the \\(j\\)th party; \\( \mathbf{a}\_{L, (j)}\\) is the \\( \mathbf{a}\_L \\) vector of the \\(j\\)th party; \\(\mathbf{l}\_{(0)}(x)\\) is the \\(\mathbf{l}(x)\\) polynomial of party \\(0\\). 
 
-We use pythonic notation to denote slices of vectors, such that \\(\mathbf{G}\_{[a:b]} = [\mathbf{G}\_{a}, \mathbf{G}\_{a+1}, \dots, \mathbf{G}\_{b-1} ]\\).
+We use pythonic notation to denote slices of vectors, such that \\(\mathbf{G}\_{\[a:b\]} = [\mathbf{G}\_{a}, \mathbf{G}\_{a+1}, \dots, \mathbf{G}\_{b-1} ]\\).
 
 \\({\mathbf{G}\_{(j)}}\\) is party \\(j\\)'s share of the generators \\({\mathbf{G}}\\), or \\({\mathbf{G}\_{[j\cdot n : (j+1)n]}}\\), and \\({\mathbf{H}'\_{(j)}}\\) is party \\(j\\)'s share of the generators \\({\mathbf{H}'}\\), or \\({\mathbf{H}'\_{[j\cdot n : (j+1)n]}}\\).
 
@@ -692,8 +692,8 @@ The prover chooses vectors of blinding factors \\( \mathbf{s}\_{L, (j)}, {\mathb
 
 \\[
 \begin{aligned}
-  {\mathbf{l}}\_{(j)}(x) &= ({\mathbf{a}}\_{L, (j)} + {\mathbf{s}}\_{L, (j)} x) - z {\mathbf{1}} & \in {\mathbb Z\_p}[x]^{n}  \\\\
-  {\mathbf{r}}\_{(j)}(x) &= {\mathbf{y}}^{n}\_{(j)} \circ \left( ({\mathbf{a}}\_{R, (j)} + {\mathbf{s}}\_{R, (j)} x\right)  + z {\mathbf{1}}) + z^{2} z_{(j)} {\mathbf{2}}^{n} &\in {\mathbb Z\_p}[x]^{n} 
+  {\mathbf{l}}\_{(j)}(x) &= ({\mathbf{a}}\_{L, (j)} + {\mathbf{s}}\_{L, (j)} x) - z {\mathbf{1}} & \in {\mathbb Z\_p}\[x\]^{n}  \\\\
+  {\mathbf{r}}\_{(j)}(x) &= {\mathbf{y}}^{n}\_{(j)} \circ \left( ({\mathbf{a}}\_{R, (j)} + {\mathbf{s}}\_{R, (j)} x\right)  + z {\mathbf{1}}) + z^{2} z_{(j)} {\mathbf{2}}^{n} &\in {\mathbb Z\_p}\[x\]^{n} 
 \end{aligned}
 \\]
 
