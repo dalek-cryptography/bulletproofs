@@ -291,7 +291,7 @@ Instead, the prover chooses vectors of blinding factors
 \\[
 {\mathbf{s}}\_{L}, {\mathbf{s}}\_{R} \\;{\xleftarrow{\\$}}\\; {\mathbb Z\_p}^{n},
 \\]
-and uses them to construct blinded vector polynomials from unblinded \\({\mathbf{l}(x)}\\) and \\({\mathbf{r}(x)}\\):
+and uses them to construct blinded vector polynomials from the unblinded vector polynomials \\({\mathbf{l}(x)}\\) and \\({\mathbf{r}(x)}\\):
 \\[
 \begin{aligned}
   {\mathbf{l}}(x) &= {\mathbf{l}}\_{0} + {\mathbf{l}}\_{1} x = ({\mathbf{a}}\_{L} + {\mathbf{s}}\_{L} x) - z {\mathbf{1}} & \in {\mathbb Z\_p}\[x\]^{n}  \\\\
