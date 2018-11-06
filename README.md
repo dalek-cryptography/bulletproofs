@@ -133,7 +133,6 @@ assert!(
 ## Tests and Benchmarks
 
 Run tests with `cargo test`.
-
 Run benchmarks with `cargo bench`. This crate uses [criterion.rs][criterion] for benchmarks. 
 
 ## Features
