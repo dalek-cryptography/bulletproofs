@@ -78,7 +78,7 @@ deployment.  The development roadmap can be found in the
 
 ## Example
 
-```
+```rust
 # extern crate rand;
 # use rand::thread_rng;
 #
