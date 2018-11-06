@@ -697,6 +697,7 @@ mod tests {
     fn detect_dishonest_dealer_during_aggregation() {
         use self::dealer::*;
         use self::party::*;
+        use errors::MPCError;
 
         // Simulate one party
         let m = 1;
@@ -731,7 +732,6 @@ mod tests {
 
         let maybe_share0 = party0.apply_challenge(&poly_challenge);
 
-        // XXX when we have error types, check finer info than "was error"
-        assert!(maybe_share0.is_err());
+        assert!(maybe_share0.unwrap_err() == MPCError::MaliciousDealer);
     }
 }
