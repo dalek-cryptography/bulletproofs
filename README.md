@@ -74,7 +74,7 @@ section below for details.
 
 This code is still research-quality.  It is not (yet) suitable for
 deployment.  The development roadmap can be found in the
-[Milestones][gh_milestones] section of the [Github repo][gh_repo]. 
+[Milestones][gh_milestones] section of the [Github repo][gh_repo].
 
 ## Example
 
