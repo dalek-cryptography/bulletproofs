@@ -75,17 +75,17 @@ impl RangeProof {
     ///
     /// # Example
     /// ```
-    /// # extern crate rand;
-    /// # use rand::thread_rng;
+    /// extern crate rand;
+    /// use rand::thread_rng;
     ///
-    /// # extern crate curve25519_dalek;
-    /// # use curve25519_dalek::scalar::Scalar;
+    /// extern crate curve25519_dalek;
+    /// use curve25519_dalek::scalar::Scalar;
     ///
-    /// # extern crate merlin;
-    /// # use merlin::Transcript;
+    /// extern crate merlin;
+    /// use merlin::Transcript;
     ///
-    /// # extern crate bulletproofs;
-    /// # use bulletproofs::{BulletproofGens, PedersenGens, RangeProof};
+    /// extern crate bulletproofs;
+    /// use bulletproofs::{BulletproofGens, PedersenGens, RangeProof};
     ///
     /// # fn main() {
     /// // Generators for Pedersen commitments.  These can be selected
@@ -104,23 +104,23 @@ impl RangeProof {
     ///
     /// // The proof can be chained to an existing transcript.
     /// // Here we create a transcript with a doctest domain separator.
-    /// let mut transcript = Transcript::new(b"doctest example");
+    /// let mut prover_transcript = Transcript::new(b"doctest example");
     ///
     /// // Create a 32-bit rangeproof.
     /// let (proof, committed_value) = RangeProof::prove_single(
     ///     &bp_gens,
     ///     &pc_gens,
-    ///     &mut transcript,
+    ///     &mut prover_transcript,
     ///     secret_value,
     ///     &blinding,
     ///     32,
     /// ).expect("A real program could handle errors");
     ///
     /// // Verification requires a transcript with identical initial state:
-    /// let mut transcript = Transcript::new(b"doctest example");
+    /// let mut verifier_transcript = Transcript::new(b"doctest example");
     /// assert!(
     ///     proof
-    ///         .verify_single(&bp_gens, &pc_gens, &mut transcript, &committed_value, 32)
+    ///         .verify_single(&bp_gens, &pc_gens, &mut verifier_transcript, &committed_value, 32)
     ///         .is_ok()
     /// );
     /// # }
@@ -171,23 +171,23 @@ impl RangeProof {
     ///
     /// // The proof can be chained to an existing transcript.
     /// // Here we create a transcript with a doctest domain separator.
-    /// let mut transcript = Transcript::new(b"doctest example");
+    /// let mut prover_transcript = Transcript::new(b"doctest example");
     ///
     /// // Create an aggregated 32-bit rangeproof and corresponding commitments.
     /// let (proof, commitments) = RangeProof::prove_multiple(
     ///     &bp_gens,
     ///     &pc_gens,
-    ///     &mut transcript,
+    ///     &mut prover_transcript,
     ///     &secrets,
     ///     &blindings,
     ///     32,
     /// ).expect("A real program could handle errors");
     ///
     /// // Verification requires a transcript with identical initial state:
-    /// let mut transcript = Transcript::new(b"doctest example");
+    /// let mut verifier_transcript = Transcript::new(b"doctest example");
     /// assert!(
     ///     proof
-    ///         .verify_multiple(&bp_gens, &pc_gens, &mut transcript, &commitments, 32)
+    ///         .verify_multiple(&bp_gens, &pc_gens, &mut verifier_transcript, &commitments, 32)
     ///         .is_ok()
     /// );
     /// # }
