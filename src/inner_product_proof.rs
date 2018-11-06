@@ -177,7 +177,7 @@ impl InnerProductProof {
 
     /// Computes three vectors of verification scalars \\([u\_{i}^{2}]\\), \\([u\_{i}^{-2}]\\) and \\([s\_{i}]\\) for combined multiscalar multiplication
     /// in a parent protocol. See [inner product protocol notes](index.html#verification-equation) for details.
-    /// Verifier must provide the input length \\(n\\) explicitly to avoid unbounded allocation within the inner product proof.
+    /// The verifier must provide the input length \\(n\\) explicitly to avoid unbounded allocation within the inner product proof.
     pub(crate) fn verification_scalars(
         &self,
         n: usize,
