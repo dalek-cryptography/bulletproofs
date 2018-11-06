@@ -184,7 +184,7 @@ impl InnerProductProof {
         transcript: &mut Transcript,
     ) -> Result<(Vec<Scalar>, Vec<Scalar>, Vec<Scalar>), ProofError> {
         let lg_n = self.L_vec.len();
-        if lg_n > 32 {
+        if lg_n >= 32 {
             // 4 billion multiplications should be enough for anyone
             // and this check prevents overflow in 1<<lg_n below.
             return Err(ProofError::VerificationError);
