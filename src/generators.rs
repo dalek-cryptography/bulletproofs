@@ -4,19 +4,30 @@
 #![allow(non_snake_case)]
 #![deny(missing_docs)]
 
+use curve25519_dalek::constants::RISTRETTO_BASEPOINT_COMPRESSED;
+use curve25519_dalek::constants::RISTRETTO_BASEPOINT_POINT;
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::MultiscalarMul;
 
 use digest::{ExtendableOutput, Input, XofReader};
-use sha3::{Sha3XofReader, Shake256};
+use sha3::{Sha3XofReader, Sha3_512, Shake256};
 
 /// Represents a pair of base points for Pedersen commitments.
+///
+/// The Bulletproofs implementation and API is designed to support
+/// pluggable bases for Pedersen commitments, so that the choice of
+/// bases is not hard-coded.
+///
+/// The default generators are:
+///
+/// * `B`: the `ristretto255` basepoint;
+/// * `B_blinding`: the result of `ristretto255` SHA3-512
+/// hash-to-group on input `B_bytes`.
 #[derive(Copy, Clone)]
 pub struct PedersenGens {
     /// Base for the committed value
     pub B: RistrettoPoint,
-
     /// Base for the blinding factor
     pub B_blinding: RistrettoPoint,
 }
@@ -31,18 +42,17 @@ impl PedersenGens {
 impl Default for PedersenGens {
     fn default() -> Self {
         PedersenGens {
-            B: GeneratorsChain::new(b"Bulletproofs.Generators.B")
-                .next()
-                .unwrap(),
-            B_blinding: GeneratorsChain::new(b"Bulletproofs.Generators.B_blinding")
-                .next()
-                .unwrap(),
+            B: RISTRETTO_BASEPOINT_POINT,
+            B_blinding: RistrettoPoint::hash_from_bytes::<Sha3_512>(
+                RISTRETTO_BASEPOINT_COMPRESSED.as_bytes(),
+            ),
         }
     }
 }
 
-/// The `GeneratorsChain` creates an arbitrary-long sequence of orthogonal generators.
-/// The sequence can be deterministically produced starting with an arbitrary point.
+/// The `GeneratorsChain` creates an arbitrary-long sequence of
+/// orthogonal generators.  The sequence can be deterministically
+/// produced starting with an arbitrary point.
 struct GeneratorsChain {
     reader: Sha3XofReader,
 }
@@ -75,14 +85,37 @@ impl Iterator for GeneratorsChain {
 
         Some(RistrettoPoint::from_uniform_bytes(&uniform_bytes))
     }
-
     fn size_hint(&self) -> (usize, Option<usize>) {
         (usize::max_value(), None)
     }
 }
 
-/// The `BulletproofGens` struct contains all the generators needed for
-/// aggregating `m` range proofs of `n` bits each.
+/// The `BulletproofGens` struct contains all the generators needed
+/// for aggregating up to `m` range proofs of up to `n` bits each.
+///
+/// # Extensible Generator Generation
+///
+/// Instead of constructing a single vector of size `m*n`, as
+/// described in the Bulletproofs paper, we construct each party's
+/// generators separately.
+///
+/// To construct an arbitrary-length chain of generators, we apply
+/// SHAKE256 to a domain separator label, and feed each 64 bytes of
+/// XOF output into the `ristretto255` hash-to-group function.
+/// Each of the `m` parties' generators are constructed using a
+/// different domain separation label, and proving and verification
+/// uses the first `n` elements of the arbitrary-length chain.
+///
+/// This means that the aggregation size (number of
+/// parties) is orthogonal to the rangeproof size (number of bits),
+/// and allows using the same `BulletproofGens` object for different
+/// proving parameters.
+///
+/// This construction is also forward-compatible with constraint
+/// system proofs, which use a much larger slice of the generator
+/// chain, and even forward-compatible to multiparty aggregation of
+/// constraint system proofs, since the generators are namespaced by
+/// their party index.
 #[derive(Clone)]
 pub struct BulletproofGens {
     /// The maximum number of usable generators for each party.
@@ -105,6 +138,7 @@ impl BulletproofGens {
     ///    `64`, the maximum bitsize of the rangeproofs.  For circuit
     ///    proofs, the capacity must be greater than the number of
     ///    multipliers, rounded up to the next power of two.
+    ///
     /// * `party_capacity` is the maximum number of parties that can
     ///    produce an aggregated proof.
     pub fn new(gens_capacity: usize, party_capacity: usize) -> Self {
@@ -200,11 +234,14 @@ impl<'a> Iterator for AggregatedGensIter<'a> {
     }
 }
 
-/// The `BulletproofGensShare` is produced by `BulletproofGens::share()`.
+/// Represents a view of the generators used by a specific party in an
+/// aggregated proof.
 ///
 /// The `BulletproofGens` struct represents generators for an aggregated
 /// range proof `m` proofs of `n` bits each; the `BulletproofGensShare`
-/// represents the generators for one of the `m` parties' shares.
+/// provides a view of the generators for one of the `m` parties' shares.
+///
+/// The `BulletproofGensShare` is produced by [`BulletproofGens::share()`].
 #[derive(Copy, Clone)]
 pub struct BulletproofGensShare<'a> {
     /// The parent object that this is a view into
