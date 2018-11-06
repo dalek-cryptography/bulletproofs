@@ -614,7 +614,7 @@ Aggregated Range Proof
 
 The goal of an _aggregated range proof_ is to enable a group of parties to produce proofs of their individual statements
 (individual range proofs for the corresponding value commitments), that can be aggregated in a more compact proof.
-This is made efficient due to a logarithmic size of the inner-product protocol: an aggregated range proof for \\(m\\)
+This is more efficient due to the logarithmic size of the inner-product protocol: an aggregated range proof for \\(m\\)
 values is smaller than \\(m\\) individual range proofs.
 
 The aggregation protocol is a multi-party computation protocol, involving \\(m\\) parties (one party per value) and one dealer, where the parties don't reveal their secrets to each other. The parties share their commitments with the dealer, and the dealer generates and returns challenge variables. The parties then share their proof shares with the dealer, and the dealer combines their shares to create an aggregated proof. 
