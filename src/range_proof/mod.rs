@@ -312,7 +312,7 @@ impl RangeProof {
         // Challenge value for batching statements to be verified
         let c = Scalar::random(&mut rng);
 
-        let (x_sq, x_inv_sq, s) = self.ipp_proof.verification_scalars(transcript);
+        let (x_sq, x_inv_sq, s) = self.ipp_proof.verification_scalars(n * m, transcript)?;
         let s_inv = s.iter().rev();
 
         let a = self.ipp_proof.a;
@@ -555,13 +555,6 @@ mod tests {
             // 2. Return serialized proof and value commitments
             (bincode::serialize(&proof).unwrap(), value_commitments)
         };
-
-        println!(
-            "Aggregated rangeproof of m={} proofs of n={} bits has size {} bytes",
-            m,
-            n,
-            proof_bytes.len(),
-        );
 
         // Verifier's scope
         {
