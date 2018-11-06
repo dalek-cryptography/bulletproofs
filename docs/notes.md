@@ -273,13 +273,20 @@ we finally obtain
 \\]
 This is equivalent to the original inner-product equation, but has a single
 inner product with \\({\mathbf{a}}\_{L}\\) on the left, \\({\mathbf{a}}\_{R}\\) on
-the right, and non-secret terms factored out.
+the right, and non-secret terms factored out. Let's call the left-hand side of the single inner product equation "unblinded" \\({\mathbf{l}(x)}\\) and the right-hand side "unblinded" \\({\mathbf{r}(x)}\\), such that 
+\\[
+\begin{aligned}
+\text{unblinded } \mathbf{l}(x) &= {\mathbf{a}}\_{L} - z {\mathbf{1}} \\\\
+\text{unblinded } \mathbf{r}(x) &= {\mathbf{y}}^{n} \circ ({\mathbf{a}}\_{R} + z {\mathbf{1}}) + z^{2} {\mathbf{2}}^{n} \\\\
+z^{2}v + \delta(y,z) &= {\langle \text{unblinded } \mathbf{l}(x), \text{unblinded } \mathbf{r}(x) \rangle}
+\end{aligned}
+\\]
 
 Blinding the inner product
 --------------------------
 
 The prover cannot send the left and right vectors in
-the single inner-product equation to the verifier without revealing information
+the single inner-product equation ("unblinded" \\({\mathbf{l}(x)}\\) and "unblinded" \\({\mathbf{r}(x)}\\)) to the verifier without revealing information
 about the value \\(v\\), and since the inner-product argument is not
 zero-knowledge, they cannot be used there either.
 
@@ -287,16 +294,16 @@ Instead, the prover chooses vectors of blinding factors
 \\[
 {\mathbf{s}}\_{L}, {\mathbf{s}}\_{R} \\;{\xleftarrow{\\$}}\\; {\mathbb Z\_p}^{n},
 \\]
-and uses them to construct vector polynomials
+and uses them to construct blinded vector polynomials from "unblinded" \\({\mathbf{l}(x)}\\) and \\({\mathbf{r}(x)}\\):
 \\[
 \begin{aligned}
   {\mathbf{l}}(x) &= {\mathbf{l}}\_{0} + {\mathbf{l}}\_{1} x = ({\mathbf{a}}\_{L} + {\mathbf{s}}\_{L} x) - z {\mathbf{1}} & \in {\mathbb Z\_p}\[x\]^{n}  \\\\
   {\mathbf{r}}(x) &= {\mathbf{r}}\_{0} + {\mathbf{r}}\_{1} x = {\mathbf{y}}^{n} \circ \left( ({\mathbf{a}}\_{R} + {\mathbf{s}}\_{R} x\right)  + z {\mathbf{1}}) + z^{2} {\mathbf{2}}^{n} &\in {\mathbb Z\_p}\[x\]^{n} 
 \end{aligned}
 \\]
-These are the left and right sides of the combined inner product with \\({\mathbf{a}}\_{L}\\), \\({\mathbf{a}}\_{R}\\)
+These are the "unblinded" \\({\mathbf{l}(x)}\\) and "unblinded" \\({\mathbf{r}(x)}\\), with \\({\mathbf{a}}\_{L}\\), \\({\mathbf{a}}\_{R}\\)
 replaced by blinded terms \\({\mathbf{a}}\_{L} + {\mathbf{s}}\_{L} x\\),
-\\({\mathbf{a}}\_{R} + {\mathbf{s}}\_{R} x\\). Notice that since only the
+\\({\mathbf{a}}\_{R} + {\mathbf{s}}\_{R} x\\). The \\({\mathbf{l}}\_{0}\\) and \\({\mathbf{r}}\_{0}\\) terms represent the degree-zero terms of the polynomial with respect to \\(x\\), and the \\({\mathbf{l}}\_{1}\\) and \\({\mathbf{r}}\_{1}\\) terms represent the degree-one terms. Notice that since only the
 blinding factors \\({\mathbf{s}}\_{L}\\), \\({\mathbf{s}}\_{R}\\) are multiplied
 by \\(x\\), the vectors \\({\mathbf{l}}\_{0}\\) and \\({\mathbf{r}}\_{0}\\) are
 exactly the left and right sides of the unblinded single inner-product:
