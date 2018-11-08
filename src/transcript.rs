@@ -28,13 +28,13 @@ fn le_u64(value: u64) -> [u8; 8] {
 
 impl TranscriptProtocol for Transcript {
     fn rangeproof_domain_sep(&mut self, n: u64, m: u64) {
-        self.commit_bytes(b"dom-sep", b"rangeproof");
+        self.commit_bytes(b"dom-sep", b"rangeproof v1");
         self.commit_bytes(b"n", &le_u64(n));
         self.commit_bytes(b"m", &le_u64(m));
     }
 
     fn innerproduct_domain_sep(&mut self, n: u64) {
-        self.commit_bytes(b"dom-sep", b"ipp");
+        self.commit_bytes(b"dom-sep", b"ipp v1");
         self.commit_bytes(b"n", &le_u64(n));
     }
 

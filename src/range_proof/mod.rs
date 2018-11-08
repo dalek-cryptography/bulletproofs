@@ -104,23 +104,23 @@ impl RangeProof {
     ///
     /// // The proof can be chained to an existing transcript.
     /// // Here we create a transcript with a doctest domain separator.
-    /// let mut transcript = Transcript::new(b"doctest example");
+    /// let mut prover_transcript = Transcript::new(b"doctest example");
     ///
     /// // Create a 32-bit rangeproof.
     /// let (proof, committed_value) = RangeProof::prove_single(
     ///     &bp_gens,
     ///     &pc_gens,
-    ///     &mut transcript,
+    ///     &mut prover_transcript,
     ///     secret_value,
     ///     &blinding,
     ///     32,
     /// ).expect("A real program could handle errors");
     ///
     /// // Verification requires a transcript with identical initial state:
-    /// let mut transcript = Transcript::new(b"doctest example");
+    /// let mut verifier_transcript = Transcript::new(b"doctest example");
     /// assert!(
     ///     proof
-    ///         .verify_single(&bp_gens, &pc_gens, &mut transcript, &committed_value, 32)
+    ///         .verify_single(&bp_gens, &pc_gens, &mut verifier_transcript, &committed_value, 32)
     ///         .is_ok()
     /// );
     /// # }
@@ -171,23 +171,23 @@ impl RangeProof {
     ///
     /// // The proof can be chained to an existing transcript.
     /// // Here we create a transcript with a doctest domain separator.
-    /// let mut transcript = Transcript::new(b"doctest example");
+    /// let mut prover_transcript = Transcript::new(b"doctest example");
     ///
     /// // Create an aggregated 32-bit rangeproof and corresponding commitments.
     /// let (proof, commitments) = RangeProof::prove_multiple(
     ///     &bp_gens,
     ///     &pc_gens,
-    ///     &mut transcript,
+    ///     &mut prover_transcript,
     ///     &secrets,
     ///     &blindings,
     ///     32,
     /// ).expect("A real program could handle errors");
     ///
     /// // Verification requires a transcript with identical initial state:
-    /// let mut transcript = Transcript::new(b"doctest example");
+    /// let mut verifier_transcript = Transcript::new(b"doctest example");
     /// assert!(
     ///     proof
-    ///         .verify_multiple(&bp_gens, &pc_gens, &mut transcript, &commitments, 32)
+    ///         .verify_multiple(&bp_gens, &pc_gens, &mut verifier_transcript, &commitments, 32)
     ///         .is_ok()
     /// );
     /// # }
@@ -313,7 +313,7 @@ impl RangeProof {
         // Challenge value for batching statements to be verified
         let c = Scalar::random(&mut rng);
 
-        let (x_sq, x_inv_sq, s) = self.ipp_proof.verification_scalars(transcript);
+        let (x_sq, x_inv_sq, s) = self.ipp_proof.verification_scalars(n * m, transcript)?;
         let s_inv = s.iter().rev();
 
         let a = self.ipp_proof.a;
@@ -559,13 +559,6 @@ mod tests {
             (bincode::serialize(&proof).unwrap(), value_commitments)
         };
 
-        println!(
-            "Aggregated rangeproof of m={} proofs of n={} bits has size {} bytes",
-            m,
-            n,
-            proof_bytes.len(),
-        );
-
         // Verifier's scope
         {
             // 3. Deserialize
@@ -700,6 +693,7 @@ mod tests {
     fn detect_dishonest_dealer_during_aggregation() {
         use self::dealer::*;
         use self::party::*;
+        use errors::MPCError;
 
         // Simulate one party
         let m = 1;
@@ -734,7 +728,6 @@ mod tests {
 
         let maybe_share0 = party0.apply_challenge(&poly_challenge);
 
-        // XXX when we have error types, check finer info than "was error"
-        assert!(maybe_share0.is_err());
+        assert!(maybe_share0.unwrap_err() == MPCError::MaliciousDealer);
     }
 }
