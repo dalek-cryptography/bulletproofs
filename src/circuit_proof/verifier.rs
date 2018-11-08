@@ -230,7 +230,10 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
         let (wL, wR, wO, wV, wc) = self.flattened_constraints(&z);
 
         // Get IPP variables
-        let (u_sq, u_inv_sq, s) = proof.ipp_proof.verification_scalars(self.transcript);
+        let (u_sq, u_inv_sq, s) = proof
+            .ipp_proof
+            .verification_scalars(padded_n, self.transcript)
+            .map_err(|_| R1CSError::VerificationError)?;
 
         let a = proof.ipp_proof.a;
         let b = proof.ipp_proof.b;

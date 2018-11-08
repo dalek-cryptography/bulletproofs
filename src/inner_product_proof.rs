@@ -455,7 +455,7 @@ mod tests {
         let mut verifier = Transcript::new(b"innerproducttest");
         assert!(
             proof
-                .verify(&mut verifier, util::exp_iter(y_inv).take(n), &P, &Q, &G, &H)
+                .verify(n, &mut verifier, util::exp_iter(y_inv).take(n), &P, &Q, &G, &H)
                 .is_ok()
         );
 
@@ -463,7 +463,7 @@ mod tests {
         let mut verifier = Transcript::new(b"innerproducttest");
         assert!(
             proof
-                .verify(&mut verifier, util::exp_iter(y_inv).take(n), &P, &Q, &G, &H)
+                .verify(n, &mut verifier, util::exp_iter(y_inv).take(n), &P, &Q, &G, &H)
                 .is_ok()
         );
     }

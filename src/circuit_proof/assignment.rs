@@ -1,7 +1,7 @@
 use curve25519_dalek::scalar::Scalar;
 use errors::R1CSError;
 use std::ops::{Add, Div, Mul, Sub, Try};
-use subtle::{Choice, ConditionallyAssignable, ConditionallySelectable, ConstantTimeEq};
+use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
 
 /// Represents an optional assignment to a [`Variable`](::r1cs::Variable).
 ///
