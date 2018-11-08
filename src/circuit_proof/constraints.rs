@@ -370,7 +370,8 @@ where
         MulByConstant {
             scalar: scalar.into(),
             iter: self.terms,
-        }.into()
+        }
+        .into()
     }
 }
 
