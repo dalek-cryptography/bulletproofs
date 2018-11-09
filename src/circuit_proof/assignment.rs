@@ -10,6 +10,10 @@ use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
 ///
 /// Proving code creates `Value` assignments, while verification code
 /// creates `Missing` assignments.
+///
+/// This allows the prover and verifier to use the same code for
+/// defining gadgets, eliminating the possibility of a constraint
+/// system mismatch.
 #[derive(Copy, Clone, Debug)]
 pub enum Assignment {
     /// A known assignment to a variable in a [`ConstraintSystem`](::r1cs::ConstraintSystem).
@@ -18,7 +22,12 @@ pub enum Assignment {
     Missing(),
 }
 
-// Default implementation is used for zeroing secrets from allocated memory via `clear_on_drop`.
+// Implementing `Default` means that the generic impl of
+// `clear_on_drop::clear::InitializableFromZeroed` applies, which
+// makes the generic impl of `clear_on_drop::clear::Clear` applies,
+// which makes `Assignment`s erasable.
+//
+// This is somewhat baroque.
 impl Default for Assignment {
     fn default() -> Assignment {
         Assignment::Missing()
