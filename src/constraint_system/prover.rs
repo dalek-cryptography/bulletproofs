@@ -406,6 +406,7 @@ impl<'a, 'b> ProverCS<'a, 'b> {
         let mut r_vec = r_poly.eval(x);
         r_vec.append(&mut vec![Scalar::zero(); pad]);
 
+        // XXX this should refer to the notes to explain why this is correct
         for i in n..padded_n {
             r_vec[i] = -exp_y;
             exp_y = exp_y * y; // y^i -> y^(i+1)
