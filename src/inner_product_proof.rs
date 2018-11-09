@@ -51,15 +51,6 @@ impl InnerProductProof {
 
         let mut n = G.len();
 
-        if n == 0 {
-            return InnerProductProof {
-                L_vec: vec![],
-                R_vec: vec![],
-                a: Scalar::zero(),
-                b: Scalar::zero(),
-            };
-        }
-
         // All of the input vectors must have the same length.
         assert_eq!(G.len(), n);
         assert_eq!(H.len(), n);
@@ -466,11 +457,6 @@ mod tests {
                 .verify(n, &mut verifier, util::exp_iter(y_inv).take(n), &P, &Q, &G, &H)
                 .is_ok()
         );
-    }
-
-    #[test]
-    fn make_ipp_0() {
-        test_helper_create(0);
     }
 
     #[test]
