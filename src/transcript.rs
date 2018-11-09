@@ -39,7 +39,7 @@ impl TranscriptProtocol for Transcript {
     }
 
     fn r1cs_domain_sep(&mut self, m: u64) {
-        self.commit_bytes(b"dom-sep", b"r1cs");
+        self.commit_bytes(b"dom-sep", b"r1cs v1");
         self.commit_bytes(b"m", &le_u64(m));
     }
 
