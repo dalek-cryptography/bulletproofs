@@ -188,7 +188,7 @@ impl ConstantTimeEq for Assignment {
             }
             // For all other combinations of Value/Missing, define the
             // comparison as "not equal"
-            (_,_) => Choice::from(0),
+            (_, _) => Choice::from(0),
         }
     }
 }
