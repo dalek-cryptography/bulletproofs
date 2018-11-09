@@ -359,7 +359,7 @@ impl<'a, 'b> ProverCS<'a, 'b> {
             exp_y = exp_y * y; // y^i -> y^(i+1)
         }
 
-        let t_poly = l_poly.inner_product(&r_poly);
+        let t_poly = util::VecPoly3::special_inner_product(&l_poly, &r_poly);
 
         let t_1_blinding = Scalar::random(&mut rng);
         let t_3_blinding = Scalar::random(&mut rng);

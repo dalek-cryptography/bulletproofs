@@ -112,21 +112,19 @@ impl VecPoly3 {
         )
     }
 
-    // Optimized performance given properties of l(x) and r(x) in circuit proof.
-    // We know that l(x).0 and r(x).2 are zeroes.
-    // MUST call l_poly.inner_product(r_poly).
-    pub fn inner_product(&self, rhs: &VecPoly3) -> Poly6 {
-        let l = self;
-        let r = rhs;
-
+    /// Compute an inner product of `lhs`, `rhs` which have the property that:
+    /// - `lhs.0` is zero;
+    /// - `rhs.2` is zero;
+    /// This is the case in the constraint system proof.
+    pub fn special_inner_product(lhs: &Self, rhs: &Self) -> Poly6 {
         // TODO: make checks that l_poly.0 and r_poly.2 are zero.
 
-        let t1 = inner_product(&l.1, &r.0);
-        let t2 = inner_product(&l.1, &r.1) + inner_product(&l.2, &r.0);
-        let t3 = inner_product(&l.2, &r.1) + inner_product(&l.3, &r.0);
-        let t4 = inner_product(&l.1, &r.3) + inner_product(&l.3, &r.1);
-        let t5 = inner_product(&l.2, &r.3);
-        let t6 = inner_product(&l.3, &r.3);
+        let t1 = inner_product(&lhs.1, &rhs.0);
+        let t2 = inner_product(&lhs.1, &rhs.1) + inner_product(&lhs.2, &rhs.0);
+        let t3 = inner_product(&lhs.2, &rhs.1) + inner_product(&lhs.3, &rhs.0);
+        let t4 = inner_product(&lhs.1, &rhs.3) + inner_product(&lhs.3, &rhs.1);
+        let t5 = inner_product(&lhs.2, &rhs.3);
+        let t6 = inner_product(&lhs.3, &rhs.3);
 
         Poly6 {
             t1,
