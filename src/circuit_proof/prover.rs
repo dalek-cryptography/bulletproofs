@@ -31,11 +31,17 @@ pub struct ProverCS<'a, 'b> {
     transcript: &'a mut Transcript,
     bp_gens: &'b BulletproofGens,
     pc_gens: &'b PedersenGens,
+    /// The constraints accumulated so far.
     constraints: Vec<LinearCombination>,
+    /// Stores assignments to the "left" of multiplication gates
     a_L: Vec<Scalar>,
+    /// Stores assignments to the "right" of multiplication gates
     a_R: Vec<Scalar>,
+    /// Stores assignments to the "output" of multiplication gates
     a_O: Vec<Scalar>,
+    /// High-level witness data (value openings to V commitments)
     v: Vec<Scalar>,
+    /// High-level witness data (blinding openings to V commitments)
     v_blinding: Vec<Scalar>,
 }
 
