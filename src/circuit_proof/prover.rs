@@ -65,6 +65,7 @@ impl<'a, 'b> Drop for ProverCS<'a, 'b> {
         for e in self.a_O.iter_mut() {
             e.clear();
         }
+        // XXX use ClearOnDrop instead of doing the above
     }
 }
 
