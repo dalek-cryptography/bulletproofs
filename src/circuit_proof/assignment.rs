@@ -186,8 +186,9 @@ impl ConstantTimeEq for Assignment {
             (Assignment::Value(self_value), Assignment::Value(other_value)) => {
                 self_value.ct_eq(other_value)
             }
-            (Assignment::Missing(), Assignment::Missing()) => Choice::from(1),
-            _ => Choice::from(0),
+            // For all other combinations of Value/Missing, define the
+            // comparison as "not equal"
+            (_,_) => Choice::from(0),
         }
     }
 }
