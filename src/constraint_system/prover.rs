@@ -262,7 +262,18 @@ impl<'a, 'b> ProverCS<'a, 'b> {
         let gens = self.bp_gens.share(0);
 
         // 1. Create a `TranscriptRng` from the high-level witness data
-
+        //
+        // The prover wants to rekey the RNG with its witness data.
+        //
+        // This consists of the high level witness data (the v's and
+        // v_blinding's), as well as the low-level witness data (a_L,
+        // a_R, a_O).  Since the low-level data should (hopefully) be
+        // determined by the high-level data, it doesn't give any
+        // extra entropy for reseeding the RNG.
+        //
+        // Since the v_blindings should be random scalars (in order to
+        // protect the v's in the commitments), we don't gain much by
+        // committing the v's as well as the v_blinding's.
         let mut rng = {
             let mut builder = self.transcript.build_rng();
 
