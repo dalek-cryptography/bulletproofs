@@ -29,7 +29,7 @@ mod util;
 
 #[doc(include = "../docs/notes.md")]
 mod notes {}
-mod circuit_proof;
+mod constraint_system;
 mod errors;
 mod generators;
 mod inner_product_proof;
@@ -398,12 +398,12 @@ pub mod range_proof_mpc {
 /// ```
 
 pub mod r1cs {
-    pub use circuit_proof::assignment::Assignment;
-    pub use circuit_proof::prover::ProverCS;
-    pub use circuit_proof::verifier::VerifierCS;
-    pub use circuit_proof::ConstraintSystem;
-    pub use circuit_proof::LinearCombination;
-    pub use circuit_proof::R1CSProof;
-    pub use circuit_proof::Variable;
+    pub use constraint_system::assignment::Assignment;
+    pub use constraint_system::prover::ProverCS;
+    pub use constraint_system::verifier::VerifierCS;
+    pub use constraint_system::ConstraintSystem;
+    pub use constraint_system::LinearCombination;
+    pub use constraint_system::R1CSProof;
+    pub use constraint_system::Variable;
     pub use errors::R1CSError;
 }
