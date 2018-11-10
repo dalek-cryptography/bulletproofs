@@ -316,7 +316,7 @@ we can express the coefficients of \\(t(x)\\) using Karatsuba’s method:
 \begin{aligned}
   t\_{0} &= {\langle {\mathbf{l}}\_{0}, {\mathbf{r}}\_{0} \rangle},  \\\\
   t\_{2} &= {\langle {\mathbf{l}}\_{1}, {\mathbf{r}}\_{1} \rangle},  \\\\
-  t\_{1} &= {\langle {\mathbf{l}}\_{0} + {\mathbf{l}}\_{1}, {\mathbf{r}}\_{0} + {\mathbf{r}}\_{1} \rangle} - t\_{0} - t\_{2} 
+  t\_{1} &= {\langle {\mathbf{l}}\_{0} + {\mathbf{l}}\_{1}, {\mathbf{r}}\_{0} + {\mathbf{r}}\_{1} \rangle} - t\_{0} - t\_{2} &= {\langle {\mathbf{l}}\_{1}, {\mathbf{r}}\_{0} \rangle} + {\langle {\mathbf{l}}\_{0}, {\mathbf{r}}\_{1} \rangle}
 \end{aligned}
 \\]
 Since \\[
