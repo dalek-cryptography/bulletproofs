@@ -2,7 +2,9 @@
 extern crate failure;
 
 extern crate bulletproofs;
-use bulletproofs::r1cs::{Assignment, ConstraintSystem, ProverCS, R1CSError, Variable, VerifierCS};
+use bulletproofs::r1cs::{
+    Assignment, ConstraintSystem, ConstraintSystemError, ProverCS, Variable, VerifierCS,
+};
 use bulletproofs::{BulletproofGens, PedersenGens};
 
 #[macro_use]
@@ -82,7 +84,7 @@ pub fn fill_cs<CS: ConstraintSystem>(
     let neg_z = -z;
 
     if x.len() != y.len() {
-        return Err(KShuffleError::InvalidR1CSConstruction);
+        return Err(KShuffleError::InvalidConstraintSystemConstruction);
     }
     let k = x.len();
     if k == 1 {
@@ -181,7 +183,7 @@ fn intermediate_multiplier<CS: ConstraintSystem>(
 pub enum KShuffleError {
     /// Error in the constraint system creation process
     #[fail(display = "Invalid KShuffle constraint system construction")]
-    InvalidR1CSConstruction,
+    InvalidConstraintSystemConstruction,
     /// Occurs when there are insufficient generators for the proof.
     #[fail(display = "Invalid generators size, too few generators for proof")]
     InvalidGeneratorsLength,
@@ -190,12 +192,16 @@ pub enum KShuffleError {
     VerificationError,
 }
 
-impl From<R1CSError> for KShuffleError {
-    fn from(e: R1CSError) -> KShuffleError {
+impl From<ConstraintSystemError> for KShuffleError {
+    fn from(e: ConstraintSystemError) -> KShuffleError {
         match e {
-            R1CSError::InvalidGeneratorsLength => KShuffleError::InvalidGeneratorsLength,
-            R1CSError::MissingAssignment => KShuffleError::InvalidR1CSConstruction,
-            R1CSError::VerificationError => KShuffleError::VerificationError,
+            ConstraintSystemError::InvalidGeneratorsLength => {
+                KShuffleError::InvalidGeneratorsLength
+            }
+            ConstraintSystemError::MissingAssignment => {
+                KShuffleError::InvalidConstraintSystemConstruction
+            }
+            ConstraintSystemError::VerificationError => KShuffleError::VerificationError,
         }
     }
 }
