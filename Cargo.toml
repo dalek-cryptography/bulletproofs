@@ -37,5 +37,5 @@ name = "range_proof"
 harness = false
 
 [[bench]]
-name = "r1cs"
+name = "constraint_system"
 harness = false

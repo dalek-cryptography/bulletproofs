@@ -131,7 +131,6 @@ pub mod range_proof_mpc {
 /// ) -> Result<(), KShuffleError> {
 ///     let one = Scalar::one();
 ///     let z = cs.challenge_scalar(b"k-scalar shuffle challenge");
-///     let neg_z = -z;
 ///
 ///     if x.len() != y.len() {
 ///         return Err(KShuffleError::InvalidConstraintSystemConstruction);
@@ -143,19 +142,19 @@ pub mod range_proof_mpc {
 ///     }
 ///
 ///     // Make last x multiplier for i = k-1 and k-2
-///     let last_mulx_out = last_multiplier(cs, neg_z, x[k - 1], x[k - 2]);
+///     let last_mulx_out = last_multiplier(cs, z, x[k - 1], x[k - 2]);
 ///
 ///     // Make multipliers for x from i == [0, k-3]
 ///     let first_mulx_out = (0..k - 2).rev().fold(last_mulx_out, |prev_out, i| {
-///         intermediate_multiplier(cs, neg_z, prev_out?, x[i])
+///         intermediate_multiplier(cs, z, prev_out?, x[i])
 ///     })?;
 ///
 ///     // Make last y multiplier for i = k-1 and k-2
-///     let last_muly_out = last_multiplier(cs, neg_z, y[k - 1], y[k - 2]);
+///     let last_muly_out = last_multiplier(cs, z, y[k - 1], y[k - 2]);
 ///
 ///     // Make multipliers for y from i == [0, k-3]
 ///     let first_muly_out = (0..k - 2).rev().fold(last_muly_out, |prev_out, i| {
-///         intermediate_multiplier(cs, neg_z, prev_out?, y[i])
+///         intermediate_multiplier(cs, z, prev_out?, y[i])
 ///     })?;
 ///
 ///     // Check equality between last x mul output and last y mul output
@@ -170,15 +169,15 @@ pub mod range_proof_mpc {
 ///
 /// fn last_multiplier<CS: ConstraintSystem>(
 ///     cs: &mut CS,
-///     neg_z: Scalar,
+///     z: Scalar,
 ///     left: (Variable, Assignment),
 ///     right: (Variable, Assignment),
 /// ) -> Result<(Variable, Assignment), KShuffleError> {
 ///     let one = Scalar::one();
 ///     let var_one = Variable::One();
 ///
-///     let mul_left = left.1 + neg_z;
-///     let mul_right = right.1 + neg_z;
+///     let mul_left = left.1 - z;
+///     let mul_right = right.1 - z;
 ///     let mul_out = mul_left * mul_right;
 ///
 ///     // Make multiplier gate variables
@@ -187,12 +186,12 @@ pub mod range_proof_mpc {
 ///
 ///     // Make multipliers
 ///     cs.add_constraint(
-///         [(mul_left_var, -one), (var_one, neg_z), (left.0, one)]
+///         [(mul_left_var, -one), (var_one, -z), (left.0, one)]
 ///             .iter()
 ///             .collect(),
 ///     );
 ///     cs.add_constraint(
-///         [(mul_right_var, -one), (var_one, neg_z), (right.0, one)]
+///         [(mul_right_var, -one), (var_one, -z), (right.0, one)]
 ///             .iter()
 ///             .collect(),
 ///     );
@@ -202,7 +201,7 @@ pub mod range_proof_mpc {
 ///
 /// fn intermediate_multiplier<CS: ConstraintSystem>(
 ///     cs: &mut CS,
-///     neg_z: Scalar,
+///     z: Scalar,
 ///     left: (Variable, Assignment),
 ///     right: (Variable, Assignment),
 /// ) -> Result<(Variable, Assignment), KShuffleError> {
@@ -210,7 +209,7 @@ pub mod range_proof_mpc {
 ///     let var_one = Variable::One();
 ///
 ///     let mul_left = left.1;
-///     let mul_right = right.1 + neg_z;
+///     let mul_right = right.1 - z;
 ///     let mul_out = mul_left * mul_right;
 ///
 ///     // Make multiplier gate variables
@@ -220,7 +219,7 @@ pub mod range_proof_mpc {
 ///     // Make multipliers
 ///     cs.add_constraint([(mul_left_var, -one), (left.0, one)].iter().collect());
 ///     cs.add_constraint(
-///         [(mul_right_var, -one), (var_one, neg_z), (right.0, one)]
+///         [(mul_right_var, -one), (var_one, -z), (right.0, one)]
 ///             .iter()
 ///             .collect(),
 ///     );
