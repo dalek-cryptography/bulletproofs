@@ -9,7 +9,7 @@ use merlin::Transcript;
 use super::assignment::Assignment;
 use super::{ConstraintSystem, LinearCombination, ConstraintSystemProof, Variable};
 
-use errors::R1CSError;
+use errors::ConstraintSystemError;
 use generators::{BulletproofGens, PedersenGens};
 use inner_product_proof::InnerProductProof;
 use transcript::TranscriptProtocol;
@@ -75,7 +75,7 @@ impl<'a, 'b> ConstraintSystem for ProverCS<'a, 'b> {
         left: Assignment,
         right: Assignment,
         out: Assignment,
-    ) -> Result<(Variable, Variable, Variable), R1CSError> {
+    ) -> Result<(Variable, Variable, Variable), ConstraintSystemError> {
         // Unwrap all of l,r,o up front to ensure we leave the CS in a
         // consistent state if any are missing assignments
         let l = left?;
@@ -96,7 +96,7 @@ impl<'a, 'b> ConstraintSystem for ProverCS<'a, 'b> {
         &mut self,
         val_1: Assignment,
         val_2: Assignment,
-    ) -> Result<(Variable, Variable), R1CSError> {
+    ) -> Result<(Variable, Variable), ConstraintSystemError> {
         let val_3 = val_1 * val_2;
 
         let (left, right, _) = self.assign_multiplier(val_1, val_2, val_3)?;
@@ -243,7 +243,7 @@ impl<'a, 'b> ProverCS<'a, 'b> {
     }
 
     /// Consume this `ConstraintSystem` to produce a proof.
-    pub fn prove(mut self) -> Result<ConstraintSystemProof, R1CSError> {
+    pub fn prove(mut self) -> Result<ConstraintSystemProof, ConstraintSystemError> {
         use std::iter;
         use util;
 
@@ -255,7 +255,7 @@ impl<'a, 'b> ProverCS<'a, 'b> {
         let pad = padded_n - n;
 
         if self.bp_gens.gens_capacity < padded_n {
-            return Err(R1CSError::InvalidGeneratorsLength);
+            return Err(ConstraintSystemError::InvalidGeneratorsLength);
         }
 
         // We are performing a single-party circuit proof, so party index is 0.

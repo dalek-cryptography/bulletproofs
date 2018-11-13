@@ -95,7 +95,7 @@ pub enum MPCError {
 
 /// Represents an error during the proving or verifying of a constraint system.
 #[derive(Fail, Copy, Clone, Debug, Eq, PartialEq)]
-pub enum R1CSError {
+pub enum ConstraintSystemError {
     /// Occurs when there are insufficient generators for the proof.
     #[fail(display = "Invalid generators size, too few generators for proof")]
     InvalidGeneratorsLength,
@@ -106,7 +106,7 @@ pub enum R1CSError {
     #[fail(display = "Variable does not have a value assignment.")]
     MissingAssignment,
     /// Occurs when verification of an
-    /// [`R1CSProof`](::r1cs::R1CSProof) fails.
-    #[fail(display = "R1CSProof did not verify correctly.")]
+    /// [`ConstraintSystemProof`](::r1cs::ConstraintSystemProof) fails.
+    #[fail(display = "ConstraintSystemProof did not verify correctly.")]
     VerificationError,
 }

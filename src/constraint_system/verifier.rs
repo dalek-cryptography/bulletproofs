@@ -8,7 +8,7 @@ use merlin::Transcript;
 use super::assignment::Assignment;
 use super::{ConstraintSystem, LinearCombination, ConstraintSystemProof, Variable};
 
-use errors::R1CSError;
+use errors::ConstraintSystemError;
 use generators::{BulletproofGens, PedersenGens};
 use transcript::TranscriptProtocol;
 
@@ -49,7 +49,7 @@ impl<'a, 'b> ConstraintSystem for VerifierCS<'a, 'b> {
         _left: Assignment,
         _right: Assignment,
         _out: Assignment,
-    ) -> Result<(Variable, Variable, Variable), R1CSError> {
+    ) -> Result<(Variable, Variable, Variable), ConstraintSystemError> {
         let var = self.num_vars;
         self.num_vars += 1;
 
@@ -64,7 +64,7 @@ impl<'a, 'b> ConstraintSystem for VerifierCS<'a, 'b> {
         &mut self,
         val_1: Assignment,
         val_2: Assignment,
-    ) -> Result<(Variable, Variable), R1CSError> {
+    ) -> Result<(Variable, Variable), ConstraintSystemError> {
         let (left, right, _) = self.assign_multiplier(val_1, val_2, Assignment::Missing())?;
         Ok((left, right))
     }
@@ -199,7 +199,7 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
     }
 
     /// Consume this `VerifierCS` and attempt to verify the supplied `proof`.
-    pub fn verify(mut self, proof: &ConstraintSystemProof) -> Result<(), R1CSError> {
+    pub fn verify(mut self, proof: &ConstraintSystemProof) -> Result<(), ConstraintSystemError> {
         // If the number of multiplications is not 0 or a power of 2, then pad the circuit.
         let n = self.num_vars;
         let padded_n = self.num_vars.next_power_of_two();
@@ -210,7 +210,7 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
         use util;
 
         if self.bp_gens.gens_capacity < padded_n {
-            return Err(R1CSError::InvalidGeneratorsLength);
+            return Err(ConstraintSystemError::InvalidGeneratorsLength);
         }
         // We are performing a single-party circuit proof, so party index is 0.
         let gens = self.bp_gens.share(0);
@@ -244,7 +244,7 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
         let (u_sq, u_inv_sq, s) = proof
             .ipp_proof
             .verification_scalars(padded_n, self.transcript)
-            .map_err(|_| R1CSError::VerificationError)?;
+            .map_err(|_| ConstraintSystemError::VerificationError)?;
 
         let a = proof.ipp_proof.a;
         let b = proof.ipp_proof.b;
@@ -318,12 +318,12 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
                 .chain(proof.ipp_proof.L_vec.iter().map(|L_i| L_i.decompress()))
                 .chain(proof.ipp_proof.R_vec.iter().map(|R_i| R_i.decompress())),
         )
-        .ok_or_else(|| R1CSError::VerificationError)?;
+        .ok_or_else(|| ConstraintSystemError::VerificationError)?;
 
         use curve25519_dalek::traits::IsIdentity;
 
         if !mega_check.is_identity() {
-            return Err(R1CSError::VerificationError);
+            return Err(ConstraintSystemError::VerificationError);
         }
 
         Ok(())

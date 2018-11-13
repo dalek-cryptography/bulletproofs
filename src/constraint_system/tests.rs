@@ -3,7 +3,7 @@ use super::prover::ProverCS;
 use super::verifier::VerifierCS;
 use super::*;
 
-use errors::R1CSError;
+use errors::ConstraintSystemError;
 use generators::{BulletproofGens, PedersenGens};
 
 use curve25519_dalek::scalar::Scalar;
@@ -22,7 +22,7 @@ fn example_gadget<CS: ConstraintSystem>(
     b2: (Variable, Assignment),
     c1: (Variable, Assignment),
     c2: Scalar,
-) -> Result<(), R1CSError> {
+) -> Result<(), ConstraintSystemError> {
     // Make low-level variables (aL = v_a1 + v_a2, aR = v_b1 + v_b2, aO = v_c1 + v_c2)
     let (aL, aR, aO) =
         cs.assign_multiplier(a1.1 + a2.1, b1.1 + b2.1, c1.1 + Assignment::from(c2))?;
@@ -53,7 +53,7 @@ fn example_gadget_roundtrip_helper(
     b2: u64,
     c1: u64,
     c2: u64,
-) -> Result<(), R1CSError> {
+) -> Result<(), ConstraintSystemError> {
     // Common
     let pc_gens = PedersenGens::default();
     let bp_gens = BulletproofGens::new(128, 1);
@@ -111,7 +111,7 @@ fn example_gadget_roundtrip_helper(
     )?;
 
     // 3. Verify.
-    cs.verify(&proof).map_err(|_| R1CSError::VerificationError)
+    cs.verify(&proof).map_err(|_| ConstraintSystemError::VerificationError)
 }
 
 #[test]
@@ -192,12 +192,12 @@ pub enum KShuffleError {
     VerificationError,
 }
 
-impl From<R1CSError> for KShuffleError {
-    fn from(e: R1CSError) -> KShuffleError {
+impl From<ConstraintSystemError> for KShuffleError {
+    fn from(e: ConstraintSystemError) -> KShuffleError {
         match e {
-            R1CSError::InvalidGeneratorsLength => KShuffleError::InvalidGeneratorsLength,
-            R1CSError::MissingAssignment => KShuffleError::InvalidR1CSConstruction,
-            R1CSError::VerificationError => KShuffleError::VerificationError,
+            ConstraintSystemError::InvalidGeneratorsLength => KShuffleError::InvalidGeneratorsLength,
+            ConstraintSystemError::MissingAssignment => KShuffleError::InvalidR1CSConstruction,
+            ConstraintSystemError::VerificationError => KShuffleError::VerificationError,
         }
     }
 }

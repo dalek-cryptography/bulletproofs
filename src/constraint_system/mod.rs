@@ -13,7 +13,7 @@ use curve25519_dalek::ristretto::CompressedRistretto;
 use curve25519_dalek::scalar::Scalar;
 
 use self::assignment::Assignment;
-use errors::R1CSError;
+use errors::ConstraintSystemError;
 use inner_product_proof::InnerProductProof;
 
 /// A proof of some statement specified by a [`ConstraintSystem`].
@@ -142,7 +142,7 @@ pub trait ConstraintSystem {
         left: Assignment,
         right: Assignment,
         out: Assignment,
-    ) -> Result<(Variable, Variable, Variable), R1CSError>;
+    ) -> Result<(Variable, Variable, Variable), ConstraintSystemError>;
 
     /// Allocate two uncommitted variables, and assign them the
     /// `Assignments` passed in.
@@ -160,7 +160,7 @@ pub trait ConstraintSystem {
         &mut self,
         val_1: Assignment,
         val_2: Assignment,
-    ) -> Result<(Variable, Variable), R1CSError>;
+    ) -> Result<(Variable, Variable), ConstraintSystemError>;
 
     /// Enforce that the given `LinearCombination` is zero.
     fn add_constraint(&mut self, lc: LinearCombination);

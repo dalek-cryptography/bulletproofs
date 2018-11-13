@@ -54,7 +54,7 @@ pub mod range_proof_mpc {
 ///
 /// ```
 /// extern crate bulletproofs;
-/// use bulletproofs::r1cs::{Assignment, ConstraintSystem, Variable, ProverCS, VerifierCS, R1CSError};
+/// use bulletproofs::r1cs::{Assignment, ConstraintSystem, Variable, ProverCS, VerifierCS, ConstraintSystemError};
 /// use bulletproofs::{BulletproofGens, PedersenGens};
 ///
 /// extern crate curve25519_dalek;
@@ -134,7 +134,7 @@ pub mod range_proof_mpc {
 ///     let neg_z = -z;
 ///
 ///     if x.len() != y.len() {
-///         return Err(KShuffleError::InvalidR1CSConstruction);
+///         return Err(KShuffleError::InvalidConstraintSystemConstruction);
 ///     }
 ///     let k = x.len();
 ///     if k == 1 {
@@ -233,7 +233,7 @@ pub mod range_proof_mpc {
 /// pub enum KShuffleError {
 ///     /// Error in the constraint system creation process
 ///     #[fail(display = "Invalid KShuffle constraint system construction")]
-///     InvalidR1CSConstruction,
+///     InvalidConstraintSystemConstruction,
 ///     /// Occurs when there are insufficient generators for the proof.
 ///     #[fail(display = "Invalid generators size, too few generators for proof")]
 ///     InvalidGeneratorsLength,
@@ -242,12 +242,12 @@ pub mod range_proof_mpc {
 ///     VerificationError,
 /// }
 ///
-/// impl From<R1CSError> for KShuffleError {
-///     fn from(e: R1CSError) -> KShuffleError {
+/// impl From<ConstraintSystemError> for KShuffleError {
+///     fn from(e: ConstraintSystemError) -> KShuffleError {
 ///         match e {
-///             R1CSError::InvalidGeneratorsLength => KShuffleError::InvalidGeneratorsLength,
-///             R1CSError::MissingAssignment => KShuffleError::InvalidR1CSConstruction,
-///             R1CSError::VerificationError => KShuffleError::VerificationError,
+///             ConstraintSystemError::InvalidGeneratorsLength => KShuffleError::InvalidGeneratorsLength,
+///             ConstraintSystemError::MissingAssignment => KShuffleError::InvalidConstraintSystemConstruction,
+///             ConstraintSystemError::VerificationError => KShuffleError::VerificationError,
 ///         }
 ///     }
 /// }
@@ -261,7 +261,7 @@ pub mod range_proof_mpc {
 ///
 ///     let k = input.len();
 ///     if k != output.len() {
-///         return Err(KShuffleError::InvalidR1CSConstruction);
+///         return Err(KShuffleError::InvalidConstraintSystemConstruction);
 ///     }
 ///
 ///     // Prover's scope
@@ -377,5 +377,5 @@ pub mod r1cs {
     pub use constraint_system::LinearCombination;
     pub use constraint_system::ConstraintSystemProof;
     pub use constraint_system::Variable;
-    pub use errors::R1CSError;
+    pub use errors::ConstraintSystemError;
 }

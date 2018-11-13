@@ -1,5 +1,5 @@
 use curve25519_dalek::scalar::Scalar;
-use errors::R1CSError;
+use errors::ConstraintSystemError;
 use std::ops::{Add, Div, Mul, Sub, Try};
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
 
@@ -147,12 +147,12 @@ impl Div<Scalar> for Assignment {
 
 impl Try for Assignment {
     type Ok = Scalar;
-    type Error = R1CSError;
+    type Error = ConstraintSystemError;
 
     fn into_result(self) -> Result<Self::Ok, Self::Error> {
         match self {
             Assignment::Value(val) => Ok(val),
-            Assignment::Missing() => Err(R1CSError::MissingAssignment),
+            Assignment::Missing() => Err(ConstraintSystemError::MissingAssignment),
         }
     }
 
