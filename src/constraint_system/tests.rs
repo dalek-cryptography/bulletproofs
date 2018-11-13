@@ -203,14 +203,14 @@ impl From<R1CSError> for KShuffleError {
 }
 
 impl KShuffleGadget {
-    fn fill_cs<CS: ConstraintSystem>(
+    pub fn fill_cs<CS: ConstraintSystem>(
         cs: &mut CS,
         x: Vec<(Variable, Assignment)>,
         y: Vec<(Variable, Assignment)>,
     ) -> Result<(), KShuffleError> {
         let one = Scalar::one();
-        let z = cs.challenge_scalar(b"k-shuffle challenge");
-        let neg_z = -z;
+        let z = cs.challenge_scalar(b"k-scalar shuffle challenge");
+
         if x.len() != y.len() {
             return Err(KShuffleError::InvalidR1CSConstruction);
         }
@@ -219,106 +219,91 @@ impl KShuffleGadget {
             cs.add_constraint([(x[0].0, -one), (y[0].0, one)].iter().collect());
             return Ok(());
         }
+
         // Make last x multiplier for i = k-1 and k-2
-        let mut mulx_left = x[k - 1].1 + neg_z;
-        let mut mulx_right = x[k - 2].1 + neg_z;
-        let mut mulx_out = mulx_left * mulx_right;
-        let mut mulx_out_var_prev = KShuffleGadget::multiplier_helper(
-            cs,
-            neg_z,
-            mulx_left,
-            mulx_right,
-            mulx_out,
-            x[k - 1].0,
-            x[k - 2].0,
-            true,
-        )?;
+        let last_mulx_out = KShuffleGadget::last_multiplier(cs, z, x[k - 1], x[k - 2]);
+
         // Make multipliers for x from i == [0, k-3]
-        for i in (0..k - 2).rev() {
-            mulx_left = mulx_out;
-            mulx_right = x[i].1 + neg_z;
-            mulx_out = mulx_left * mulx_right;
-            mulx_out_var_prev = KShuffleGadget::multiplier_helper(
-                cs,
-                neg_z,
-                mulx_left,
-                mulx_right,
-                mulx_out,
-                mulx_out_var_prev,
-                x[i].0,
-                false,
-            )?;
-        }
+        let first_mulx_out = (0..k - 2).rev().fold(last_mulx_out, |prev_out, i| {
+            KShuffleGadget::intermediate_multiplier(cs, z, prev_out?, x[i])
+        })?;
+
         // Make last y multiplier for i = k-1 and k-2
-        let mut muly_left = y[k - 1].1 - z;
-        let mut muly_right = y[k - 2].1 - z;
-        let mut muly_out = muly_left * muly_right;
-        let mut muly_out_var_prev = KShuffleGadget::multiplier_helper(
-            cs,
-            neg_z,
-            muly_left,
-            muly_right,
-            muly_out,
-            y[k - 1].0,
-            y[k - 2].0,
-            true,
-        )?;
+        let last_muly_out = KShuffleGadget::last_multiplier(cs, z, y[k - 1], y[k - 2]);
+
         // Make multipliers for y from i == [0, k-3]
-        for i in (0..k - 2).rev() {
-            muly_left = muly_out;
-            muly_right = y[i].1 + neg_z;
-            muly_out = muly_left * muly_right;
-            muly_out_var_prev = KShuffleGadget::multiplier_helper(
-                cs,
-                neg_z,
-                muly_left,
-                muly_right,
-                muly_out,
-                muly_out_var_prev,
-                y[i].0,
-                false,
-            )?;
-        }
+        let first_muly_out = (0..k - 2).rev().fold(last_muly_out, |prev_out, i| {
+            KShuffleGadget::intermediate_multiplier(cs, z, prev_out?, y[i])
+        })?;
+
         // Check equality between last x mul output and last y mul output
         cs.add_constraint(
-            [(muly_out_var_prev, -one), (mulx_out_var_prev, one)]
+            [(first_muly_out.0, -one), (first_mulx_out.0, one)]
                 .iter()
                 .collect(),
         );
+
         Ok(())
     }
 
-    fn multiplier_helper<CS: ConstraintSystem>(
+    fn last_multiplier<CS: ConstraintSystem>(
         cs: &mut CS,
-        neg_z: Scalar,
-        left: Assignment,
-        right: Assignment,
-        out: Assignment,
-        left_var: Variable,
-        right_var: Variable,
-        is_last_mul: bool,
-    ) -> Result<Variable, KShuffleError> {
+        z: Scalar,
+        left: (Variable, Assignment),
+        right: (Variable, Assignment),
+    ) -> Result<(Variable, Assignment), KShuffleError> {
         let one = Scalar::one();
         let var_one = Variable::One();
+
+        let mul_left = left.1 - z;
+        let mul_right = right.1 - z;
+        let mul_out = mul_left * mul_right;
+
         // Make multiplier gate variables
-        let (left_mul_var, right_mul_var, out_mul_var) = cs.assign_multiplier(left, right, out)?;
-        if is_last_mul {
-            // Make last multiplier
-            cs.add_constraint(
-                [(left_mul_var, -one), (var_one, neg_z), (left_var, one)]
-                    .iter()
-                    .collect(),
-            );
-        } else {
-            // Make intermediate multiplier
-            cs.add_constraint([(left_mul_var, -one), (left_var, one)].iter().collect());
-        }
+        let (mul_left_var, mul_right_var, mul_out_var) =
+            cs.assign_multiplier(mul_left, mul_right, mul_out)?;
+
+        // Make multipliers
         cs.add_constraint(
-            [(right_mul_var, -one), (var_one, neg_z), (right_var, one)]
+            [(mul_left_var, -one), (var_one, -z), (left.0, one)]
                 .iter()
                 .collect(),
         );
-        Ok(out_mul_var)
+        cs.add_constraint(
+            [(mul_right_var, -one), (var_one, -z), (right.0, one)]
+                .iter()
+                .collect(),
+        );
+
+        Ok((mul_out_var, mul_out))
+    }
+
+    fn intermediate_multiplier<CS: ConstraintSystem>(
+        cs: &mut CS,
+        z: Scalar,
+        left: (Variable, Assignment),
+        right: (Variable, Assignment),
+    ) -> Result<(Variable, Assignment), KShuffleError> {
+        let one = Scalar::one();
+        let var_one = Variable::One();
+
+        let mul_left = left.1;
+        let mul_right = right.1 - z;
+        let mul_out = mul_left * mul_right;
+
+        // Make multiplier gate variables
+        let (mul_left_var, mul_right_var, mul_out_var) =
+            cs.assign_multiplier(mul_left, mul_right, mul_out)?;
+
+        // Make multipliers
+        cs.add_constraint([(mul_left_var, -one), (left.0, one)].iter().collect());
+        cs.add_constraint(
+            [(mul_right_var, -one), (var_one, -z), (right.0, one)]
+                .iter()
+                .collect(),
+        );
+
+        Ok((mul_out_var, mul_out))
     }
 }
 
