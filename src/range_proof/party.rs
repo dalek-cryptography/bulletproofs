@@ -8,7 +8,7 @@
 //!
 //! For more explanation of how the `dealer`, `party`, and `messages`
 //! modules orchestrate the protocol execution, see the documentation
-//! in the [`aggregation`](::rangeproof_mpc) module.
+//! in the [`aggregation`](::range_proof_mpc) module.
 
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
@@ -85,7 +85,7 @@ impl<'a> PartyAwaitingPosition<'a> {
         // Compute A = <a_L, G> + <a_R, H> + a_blinding * B_blinding
         let mut A = self.pc_gens.B_blinding * a_blinding;
 
-        use subtle::{Choice, ConditionallyAssignable};
+        use subtle::{Choice, ConditionallySelectable};
         let mut i = 0;
         for (G_i, H_i) in bp_share.G(self.n).zip(bp_share.H(self.n)) {
             // If v_i = 0, we add a_L[i] * G[i] + a_R[i] * H[i] = - H[i]

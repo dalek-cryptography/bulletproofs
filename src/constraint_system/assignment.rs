@@ -1,7 +1,7 @@
 use curve25519_dalek::scalar::Scalar;
 use errors::R1CSError;
 use std::ops::{Add, Div, Mul, Sub, Try};
-use subtle::{Choice, ConditionallyAssignable, ConditionallySelectable, ConstantTimeEq};
+use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
 
 /// Represents an optional assignment to a [`Variable`](::r1cs::Variable).
 ///
@@ -10,6 +10,10 @@ use subtle::{Choice, ConditionallyAssignable, ConditionallySelectable, ConstantT
 ///
 /// Proving code creates `Value` assignments, while verification code
 /// creates `Missing` assignments.
+///
+/// This allows the prover and verifier to use the same code for
+/// defining gadgets, eliminating the possibility of a constraint
+/// system mismatch.
 #[derive(Copy, Clone, Debug)]
 pub enum Assignment {
     /// A known assignment to a variable in a [`ConstraintSystem`](::r1cs::ConstraintSystem).
@@ -18,7 +22,12 @@ pub enum Assignment {
     Missing(),
 }
 
-// Default implementation is used for zeroing secrets from allocated memory via `clear_on_drop`.
+// Implementing `Default` means that the generic impl of
+// `clear_on_drop::clear::InitializableFromZeroed` applies, which
+// makes the generic impl of `clear_on_drop::clear::Clear` applies,
+// which makes `Assignment`s erasable.
+//
+// This is somewhat baroque.
 impl Default for Assignment {
     fn default() -> Assignment {
         Assignment::Missing()
@@ -163,12 +172,7 @@ impl ConditionallySelectable for Assignment {
     fn conditional_select(a: &Self, b: &Self, choice: Choice) -> Self {
         match (a, b) {
             (Assignment::Value(a_val), Assignment::Value(b_val)) => {
-                // FIXME: use `Scalar::conditional_select(&a_val, &b_val, choice)` instead
-                // Currently that trait is not available because of a bug in `curve25519-dalek`.
-                // Filed issue: https://github.com/dalek-cryptography/curve25519-dalek/issues/200
-                let mut out_val = a_val.clone();
-                out_val.conditional_assign(&b_val, choice);
-                Assignment::from(out_val)
+                Assignment::Value(Scalar::conditional_select(&a_val, &b_val, choice))
             }
             (_, _) => Assignment::Missing(),
         }
@@ -182,8 +186,9 @@ impl ConstantTimeEq for Assignment {
             (Assignment::Value(self_value), Assignment::Value(other_value)) => {
                 self_value.ct_eq(other_value)
             }
-            (Assignment::Missing(), Assignment::Missing()) => Choice::from(1),
-            _ => Choice::from(0),
+            // For all other combinations of Value/Missing, define the
+            // comparison as "not equal"
+            (_, _) => Choice::from(0),
         }
     }
 }

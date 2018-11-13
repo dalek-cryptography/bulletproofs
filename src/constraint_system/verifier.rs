@@ -32,6 +32,13 @@ pub struct VerifierCS<'a, 'b> {
     pc_gens: &'b PedersenGens,
     transcript: &'a mut Transcript,
     constraints: Vec<LinearCombination>,
+    /// Records the number of low-level variables allocated in the
+    /// constraint system.
+    ///
+    /// Because the `VerifierCS` only keeps the constraints
+    /// themselves, it doesn't record the assignments (they're all
+    /// `Missing`), so the `num_vars` isn't kept implicitly in the
+    /// variable assignments.
     num_vars: usize,
     V: Vec<CompressedRistretto>,
 }
@@ -147,6 +154,10 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
     /// (wL, wR, wO, wV, wc)
     /// ```
     /// where `w{L,R,O}` is \\( z \cdot z^Q \cdot W_{L,R,O} \\).
+    ///
+    /// This has the same logic as `ProverCS::flattened_constraints()`
+    /// but also computes the constant terms (which the prover skips
+    /// because they're not needed to construct the proof).
     fn flattened_constraints(
         &mut self,
         z: &Scalar,
@@ -230,7 +241,10 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
         let (wL, wR, wO, wV, wc) = self.flattened_constraints(&z);
 
         // Get IPP variables
-        let (u_sq, u_inv_sq, s) = proof.ipp_proof.verification_scalars(self.transcript);
+        let (u_sq, u_inv_sq, s) = proof
+            .ipp_proof
+            .verification_scalars(padded_n, self.transcript)
+            .map_err(|_| R1CSError::VerificationError)?;
 
         let a = proof.ipp_proof.a;
         let b = proof.ipp_proof.b;
@@ -263,7 +277,9 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
                 y_inv_i * (x * wLi + wOi - b * s_i_inv) - Scalar::one()
             });
 
-        // Create a `TranscriptRng` from the transcript
+        // Create a `TranscriptRng` from the transcript. The verifier
+        // has no witness data to commit, so this just mixes external
+        // randomness into the existing transcript.
         use rand::thread_rng;
         let mut rng = self.transcript.build_rng().finalize(&mut thread_rng());
         let r = Scalar::random(&mut rng);

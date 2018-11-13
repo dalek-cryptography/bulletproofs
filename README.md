@@ -67,7 +67,7 @@ relative speed compared to the fastest implementation.
 | libsecp-endo   | secp256k1        |        16800 | **2.30x** |              2080 | **2.00x** |
 | Monero         | ed25519 (unsafe) |        53300 | **7.30x** |              4810 | **4.63x** |
 
-This crate also contains other benchmarks; see the *Benchmarks*
+This crate also contains other benchmarks; see the *Tests and Benchmarks*
 section below for details.
 
 ## WARNING
@@ -76,14 +76,64 @@ This code is still research-quality.  It is not (yet) suitable for
 deployment.  The development roadmap can be found in the
 [Milestones][gh_milestones] section of the [Github repo][gh_repo].
 
-## Tests
+## Example
+
+```rust
+# extern crate rand;
+# use rand::thread_rng;
+#
+# extern crate curve25519_dalek;
+# use curve25519_dalek::scalar::Scalar;
+#
+# extern crate merlin;
+# use merlin::Transcript;
+#
+# extern crate bulletproofs;
+# use bulletproofs::{BulletproofGens, PedersenGens, RangeProof};
+#
+# fn main() {
+// Generators for Pedersen commitments.  These can be selected
+// independently of the Bulletproofs generators.
+let pc_gens = PedersenGens::default();
+
+// Generators for Bulletproofs, valid for proofs up to bitsize 64
+// and aggregation size up to 1.
+let bp_gens = BulletproofGens::new(64, 1);
+
+// A secret value we want to prove lies in the range [0, 2^32)
+let secret_value = 1037578891u64;
+
+// The API takes a blinding factor for the commitment.
+let blinding = Scalar::random(&mut thread_rng());
+
+// The proof can be chained to an existing transcript.
+// Here we create a transcript with a doctest domain separator.
+let mut prover_transcript = Transcript::new(b"doctest example");
+
+// Create a 32-bit rangeproof.
+let (proof, committed_value) = RangeProof::prove_single(
+    &bp_gens,
+    &pc_gens,
+    &mut prover_transcript,
+    secret_value,
+    &blinding,
+    32,
+).expect("A real program could handle errors");
+
+// Verification requires a transcript with identical initial state:
+let mut verifier_transcript = Transcript::new(b"doctest example");
+assert!(
+    proof
+        .verify_single(&bp_gens, &pc_gens, &mut verifier_transcript, &committed_value, 32)
+        .is_ok()
+);
+# }
+```
+
+## Tests and Benchmarks
 
 Run tests with `cargo test`.
-
-## Benchmarks
-
-This crate uses [criterion.rs][criterion] for benchmarks.  Run
-benchmarks with `cargo bench`.
+Run benchmarks with `cargo bench`. This crate uses [criterion.rs][criterion] for benchmarks. 
 
 ## Features
 

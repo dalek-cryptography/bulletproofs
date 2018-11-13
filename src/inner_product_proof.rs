@@ -51,15 +51,6 @@ impl InnerProductProof {
 
         let mut n = G.len();
 
-        if n == 0 {
-            return InnerProductProof {
-                L_vec: vec![],
-                R_vec: vec![],
-                a: Scalar::zero(),
-                b: Scalar::zero(),
-            };
-        }
-
         // All of the input vectors must have the same length.
         assert_eq!(G.len(), n);
         assert_eq!(H.len(), n);
@@ -192,12 +183,21 @@ impl InnerProductProof {
 
     /// Computes three vectors of verification scalars \\([u\_{i}^{2}]\\), \\([u\_{i}^{-2}]\\) and \\([s\_{i}]\\) for combined multiscalar multiplication
     /// in a parent protocol. See [inner product protocol notes](index.html#verification-equation) for details.
+    /// The verifier must provide the input length \\(n\\) explicitly to avoid unbounded allocation within the inner product proof.
     pub(crate) fn verification_scalars(
         &self,
+        n: usize,
         transcript: &mut Transcript,
-    ) -> (Vec<Scalar>, Vec<Scalar>, Vec<Scalar>) {
+    ) -> Result<(Vec<Scalar>, Vec<Scalar>, Vec<Scalar>), ProofError> {
         let lg_n = self.L_vec.len();
-        let n = 1 << lg_n;
+        if lg_n >= 32 {
+            // 4 billion multiplications should be enough for anyone
+            // and this check prevents overflow in 1<<lg_n below.
+            return Err(ProofError::VerificationError);
+        }
+        if n != (1 << lg_n) {
+            return Err(ProofError::VerificationError);
+        }
 
         transcript.innerproduct_domain_sep(n as u64);
 
@@ -238,7 +238,7 @@ impl InnerProductProof {
             s.push(s[i - k] * u_lg_i_sq);
         }
 
-        (challenges_sq, challenges_inv_sq, s)
+        Ok((challenges_sq, challenges_inv_sq, s))
     }
 
     /// This method is for testing that proof generation work,
@@ -248,6 +248,7 @@ impl InnerProductProof {
     #[allow(dead_code)]
     pub fn verify<I>(
         &self,
+        n: usize,
         transcript: &mut Transcript,
         Hprime_factors: I,
         P: &RistrettoPoint,
@@ -259,7 +260,7 @@ impl InnerProductProof {
         I: IntoIterator,
         I::Item: Borrow<Scalar>,
     {
-        let (u_sq, u_inv_sq, s) = self.verification_scalars(transcript);
+        let (u_sq, u_inv_sq, s) = self.verification_scalars(n, transcript)?;
 
         let a_times_s = s.iter().map(|s_i| self.a * s_i).take(G.len());
 
@@ -445,7 +446,15 @@ mod tests {
         let mut verifier = Transcript::new(b"innerproducttest");
         assert!(
             proof
-                .verify(&mut verifier, util::exp_iter(y_inv).take(n), &P, &Q, &G, &H)
+                .verify(
+                    n,
+                    &mut verifier,
+                    util::exp_iter(y_inv).take(n),
+                    &P,
+                    &Q,
+                    &G,
+                    &H
+                )
                 .is_ok()
         );
 
@@ -453,14 +462,17 @@ mod tests {
         let mut verifier = Transcript::new(b"innerproducttest");
         assert!(
             proof
-                .verify(&mut verifier, util::exp_iter(y_inv).take(n), &P, &Q, &G, &H)
+                .verify(
+                    n,
+                    &mut verifier,
+                    util::exp_iter(y_inv).take(n),
+                    &P,
+                    &Q,
+                    &G,
+                    &H
+                )
                 .is_ok()
         );
-    }
-
-    #[test]
-    fn make_ipp_0() {
-        test_helper_create(0);
     }
 
     #[test]

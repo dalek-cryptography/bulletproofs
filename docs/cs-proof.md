@@ -1,7 +1,7 @@
 Constraint system proof protocol
 ================================
 
-The `circuit_proof` module contains an API for producing a proof that a set of secret values satisfies a given constraint system.
+The `constraint_system` module contains an API for producing a proof that a set of secret values satisfies a given constraint system.
 
 For more background on the constraint system proofs, see these two sections in the `notes` module:
 

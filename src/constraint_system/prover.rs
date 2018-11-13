@@ -31,11 +31,17 @@ pub struct ProverCS<'a, 'b> {
     transcript: &'a mut Transcript,
     bp_gens: &'b BulletproofGens,
     pc_gens: &'b PedersenGens,
+    /// The constraints accumulated so far.
     constraints: Vec<LinearCombination>,
+    /// Stores assignments to the "left" of multiplication gates
     a_L: Vec<Scalar>,
+    /// Stores assignments to the "right" of multiplication gates
     a_R: Vec<Scalar>,
+    /// Stores assignments to the "output" of multiplication gates
     a_O: Vec<Scalar>,
+    /// High-level witness data (value openings to V commitments)
     v: Vec<Scalar>,
+    /// High-level witness data (blinding openings to V commitments)
     v_blinding: Vec<Scalar>,
 }
 
@@ -59,6 +65,7 @@ impl<'a, 'b> Drop for ProverCS<'a, 'b> {
         for e in self.a_O.iter_mut() {
             e.clear();
         }
+        // XXX use ClearOnDrop instead of doing the above
     }
 }
 
@@ -255,7 +262,18 @@ impl<'a, 'b> ProverCS<'a, 'b> {
         let gens = self.bp_gens.share(0);
 
         // 1. Create a `TranscriptRng` from the high-level witness data
-
+        //
+        // The prover wants to rekey the RNG with its witness data.
+        //
+        // This consists of the high level witness data (the v's and
+        // v_blinding's), as well as the low-level witness data (a_L,
+        // a_R, a_O).  Since the low-level data should (hopefully) be
+        // determined by the high-level data, it doesn't give any
+        // extra entropy for reseeding the RNG.
+        //
+        // Since the v_blindings should be random scalars (in order to
+        // protect the v's in the commitments), we don't gain much by
+        // committing the v's as well as the v_blinding's.
         let mut rng = {
             let mut builder = self.transcript.build_rng();
 
@@ -341,7 +359,7 @@ impl<'a, 'b> ProverCS<'a, 'b> {
             exp_y = exp_y * y; // y^i -> y^(i+1)
         }
 
-        let t_poly = l_poly.inner_product(&r_poly);
+        let t_poly = util::VecPoly3::special_inner_product(&l_poly, &r_poly);
 
         let t_1_blinding = Scalar::random(&mut rng);
         let t_3_blinding = Scalar::random(&mut rng);
@@ -388,6 +406,7 @@ impl<'a, 'b> ProverCS<'a, 'b> {
         let mut r_vec = r_poly.eval(x);
         r_vec.append(&mut vec![Scalar::zero(); pad]);
 
+        // XXX this should refer to the notes to explain why this is correct
         for i in n..padded_n {
             r_vec[i] = -exp_y;
             exp_y = exp_y * y; // y^i -> y^(i+1)

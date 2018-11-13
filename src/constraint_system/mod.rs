@@ -124,9 +124,19 @@ impl<'a> FromIterator<&'a (Variable, Scalar)> for LinearCombination {
 /// using the `ConstraintSystem` trait, so that the prover and
 /// verifier share the logic for specifying constraints.
 pub trait ConstraintSystem {
-    /// Allocate variables for left, right, and output wires of multiplication,
-    /// and assign them the Assignments that are passed in.
-    /// Prover will pass in `Value(Scalar)`s, and Verifier will pass in `Missing`s.
+    /// Allocate variables for left, right, and output wires of
+    /// multiplication, and assign them the Assignments that are
+    /// passed in.
+    ///
+    /// The `ProverCS` should pass `Value(Scalar)`s to synthesize the
+    /// witness.
+    ///
+    /// The `VerifierCS` should pass `Missing` (since it does not have
+    /// the witness).
+    ///
+    /// This allows the prover and verifier to use the same code for
+    /// defining gadgets, eliminating the possibility of a constraint
+    /// system mismatch.
     fn assign_multiplier(
         &mut self,
         left: Assignment,
@@ -134,8 +144,18 @@ pub trait ConstraintSystem {
         out: Assignment,
     ) -> Result<(Variable, Variable, Variable), R1CSError>;
 
-    /// Allocate two uncommitted variables, and assign them the Assignments passed in.
-    /// Prover will pass in `Value(Scalar)`s, and Verifier will pass in `Missing`s.
+    /// Allocate two uncommitted variables, and assign them the
+    /// `Assignments` passed in.
+    ///
+    /// The `ProverCS` should pass `Value(Scalar)`s to synthesize the
+    /// witness.
+    ///
+    /// The `VerifierCS` should pass `Missing` (since it does not have
+    /// the witness).
+    ///
+    /// This allows the prover and verifier to use the same code for
+    /// defining gadgets, eliminating the possibility of a constraint
+    /// system mismatch.
     fn assign_uncommitted(
         &mut self,
         val_1: Assignment,
