@@ -29,7 +29,7 @@ mod util;
 
 #[doc(include = "../docs/notes.md")]
 mod notes {}
-mod constraint_system;
+mod cs;
 mod errors;
 mod generators;
 mod inner_product_proof;
@@ -54,7 +54,7 @@ pub mod range_proof_mpc {
 ///
 /// ```
 /// extern crate bulletproofs;
-/// use bulletproofs::r1cs::{Assignment, ConstraintSystem, Variable, ProverCS, VerifierCS, ConstraintSystemError};
+/// use bulletproofs::constraint_system::{Assignment, ConstraintSystem, Variable, ProverCS, VerifierCS, ConstraintSystemError};
 /// use bulletproofs::{BulletproofGens, PedersenGens};
 ///
 /// extern crate curve25519_dalek;
@@ -236,8 +236,8 @@ pub mod range_proof_mpc {
 ///     /// Occurs when there are insufficient generators for the proof.
 ///     #[fail(display = "Invalid generators size, too few generators for proof")]
 ///     InvalidGeneratorsLength,
-///     /// Occurs when verification of an [`R1CSProof`](::r1cs::R1CSProof) fails.
-///     #[fail(display = "R1CSProof did not verify correctly.")]
+///     /// Occurs when verification of an [`ConstraintSystemProof`](::constraint_system::ConstraintSystemProof) fails.
+///     #[fail(display = "ConstraintSystemProof did not verify correctly.")]
 ///     VerificationError,
 /// }
 ///
@@ -368,13 +368,13 @@ pub mod range_proof_mpc {
 ///
 /// ```
 
-pub mod r1cs {
-    pub use constraint_system::assignment::Assignment;
-    pub use constraint_system::prover::ProverCS;
-    pub use constraint_system::verifier::VerifierCS;
-    pub use constraint_system::ConstraintSystem;
-    pub use constraint_system::ConstraintSystemProof;
-    pub use constraint_system::LinearCombination;
-    pub use constraint_system::Variable;
+pub mod constraint_system {
+    pub use cs::assignment::Assignment;
+    pub use cs::prover::ProverCS;
+    pub use cs::verifier::VerifierCS;
+    pub use cs::ConstraintSystem;
+    pub use cs::ConstraintSystemProof;
+    pub use cs::LinearCombination;
+    pub use cs::Variable;
     pub use errors::ConstraintSystemError;
 }

@@ -162,7 +162,7 @@ impl<'a, 'b> ProverCS<'a, 'b> {
         // Check that the input lengths are consistent
         assert_eq!(v.len(), v_blinding.len());
         let m = v.len();
-        transcript.r1cs_domain_sep(m as u64);
+        transcript.constraint_system_domain_sep(m as u64);
 
         let mut variables = Vec::with_capacity(m);
         let mut commitments = Vec::with_capacity(m);

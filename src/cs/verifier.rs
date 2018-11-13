@@ -25,7 +25,7 @@ use transcript::TranscriptProtocol;
 /// variables to the same gadget code as the prover, using
 /// `Assignment::Missing` for witness variables, to build an identical
 /// constraint system to the one the prover built.  Finally, they pass
-/// the prover's [`R1CSProof`] to [`VerifierCS::verify`], which
+/// the prover's [`ConstraintSystemProof`] to [`VerifierCS::verify`], which
 /// consumes the `VerifierCS` and verifies the proof.
 pub struct VerifierCS<'a, 'b> {
     bp_gens: &'b BulletproofGens,
@@ -120,7 +120,7 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
         commitments: Vec<CompressedRistretto>,
     ) -> (Self, Vec<Variable>) {
         let m = commitments.len();
-        transcript.r1cs_domain_sep(m as u64);
+        transcript.constraint_system_domain_sep(m as u64);
 
         let mut variables = Vec::with_capacity(m);
         for (i, commitment) in commitments.iter().enumerate() {

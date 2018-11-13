@@ -101,12 +101,12 @@ pub enum ConstraintSystemError {
     InvalidGeneratorsLength,
     /// Occurs when trying to use a missing variable assignment, for
     /// instance if
-    /// [`Assignment::Missing`](::r1cs::Assignment::Missing) is passed
-    /// to a [`ProverCS`](::r1cs::ProverCS).
+    /// [`Assignment::Missing`](::constraint_system::Assignment::Missing) is passed
+    /// to a [`ProverCS`](::constraint_system::ProverCS).
     #[fail(display = "Variable does not have a value assignment.")]
     MissingAssignment,
     /// Occurs when verification of an
-    /// [`ConstraintSystemProof`](::r1cs::ConstraintSystemProof) fails.
+    /// [`ConstraintSystemProof`](::constraint_system::ConstraintSystemProof) fails.
     #[fail(display = "ConstraintSystemProof did not verify correctly.")]
     VerificationError,
 }

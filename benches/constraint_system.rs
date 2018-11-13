@@ -2,7 +2,7 @@
 extern crate failure;
 
 extern crate bulletproofs;
-use bulletproofs::r1cs::{
+use bulletproofs::constraint_system::{
     Assignment, ConstraintSystem, ConstraintSystemError, ProverCS, Variable, VerifierCS,
 };
 use bulletproofs::{BulletproofGens, PedersenGens};

@@ -20,15 +20,15 @@ use inner_product_proof::InnerProductProof;
 ///
 /// Statements are specified by writing gadget functions which add
 /// constraints to a `ConstraintSystem` implementation.  To construct
-/// an `R1CSProof`, a prover constructs a
-/// [`ProverCS`](::r1cs::ProverCS), then passes it to gadget functions
+/// an `ConstraintSystemProof`, a prover constructs a
+/// [`ProverCS`](::constraint_system::ProverCS), then passes it to gadget functions
 /// to build the constraint system, then consumes the constraint
-/// system using [`ProverCS::prove`](::r1cs::ProverCS::prove) to
-/// produce an `R1CSProof`.  To verify an `R1CSProof`, a verifier
-/// constructs a [`VerifierCS`](::r1cs::VerifierCS), then passes it to
+/// system using [`ProverCS::prove`](::constraint_system::ProverCS::prove) to
+/// produce an `ConstraintSystemProof`.  To verify an `ConstraintSystemProof`, a verifier
+/// constructs a [`VerifierCS`](::constraint_system::VerifierCS), then passes it to
 /// the same gadget functions to (re)build the constraint system, then
 /// consumes the constraint system using
-/// [`VerifierCS::verify`](::r1cs::VerifierCS::verify) to verify the
+/// [`VerifierCS::verify`](::constraint_system::VerifierCS::verify) to verify the
 /// proof.
 #[derive(Clone, Debug)]
 #[allow(non_snake_case)]
@@ -76,7 +76,7 @@ pub enum Variable {
 }
 
 /// Represents a linear combination of
-/// [`Variables`](::r1cs::Variable).  Each term is represented by a
+/// [`Variables`](::constraint_system::Variable).  Each term is represented by a
 /// `(Variable, Scalar)` pair.
 #[derive(Clone, Debug)]
 pub struct LinearCombination {
@@ -114,7 +114,7 @@ impl<'a> FromIterator<&'a (Variable, Scalar)> for LinearCombination {
 /// The interface for a constraint system, abstracting over the prover
 /// and verifier's roles.
 ///
-/// Statements to be proved by an [`R1CSProof`] are specified by
+/// Statements to be proved by an [`ConstraintSystemProof`] are specified by
 /// programmatically constructing constraints.  These constraints need
 /// to be identical between the prover and verifier, since the prover
 /// and verifier need to construct the same statement.
