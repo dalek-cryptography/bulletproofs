@@ -111,7 +111,8 @@ fn example_gadget_roundtrip_helper(
     )?;
 
     // 3. Verify.
-    cs.verify(&proof).map_err(|_| ConstraintSystemError::VerificationError)
+    cs.verify(&proof)
+        .map_err(|_| ConstraintSystemError::VerificationError)
 }
 
 #[test]
@@ -195,7 +196,9 @@ pub enum KShuffleError {
 impl From<ConstraintSystemError> for KShuffleError {
     fn from(e: ConstraintSystemError) -> KShuffleError {
         match e {
-            ConstraintSystemError::InvalidGeneratorsLength => KShuffleError::InvalidGeneratorsLength,
+            ConstraintSystemError::InvalidGeneratorsLength => {
+                KShuffleError::InvalidGeneratorsLength
+            }
             ConstraintSystemError::MissingAssignment => KShuffleError::InvalidR1CSConstruction,
             ConstraintSystemError::VerificationError => KShuffleError::VerificationError,
         }

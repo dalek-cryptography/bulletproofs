@@ -6,7 +6,7 @@ use curve25519_dalek::traits::VartimeMultiscalarMul;
 use merlin::Transcript;
 
 use super::assignment::Assignment;
-use super::{ConstraintSystem, LinearCombination, ConstraintSystemProof, Variable};
+use super::{ConstraintSystem, ConstraintSystemProof, LinearCombination, Variable};
 
 use errors::ConstraintSystemError;
 use generators::{BulletproofGens, PedersenGens};

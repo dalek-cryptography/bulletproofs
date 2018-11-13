@@ -374,8 +374,8 @@ pub mod r1cs {
     pub use constraint_system::prover::ProverCS;
     pub use constraint_system::verifier::VerifierCS;
     pub use constraint_system::ConstraintSystem;
-    pub use constraint_system::LinearCombination;
     pub use constraint_system::ConstraintSystemProof;
+    pub use constraint_system::LinearCombination;
     pub use constraint_system::Variable;
     pub use errors::ConstraintSystemError;
 }
