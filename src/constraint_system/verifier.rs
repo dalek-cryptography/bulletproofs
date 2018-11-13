@@ -6,7 +6,7 @@ use curve25519_dalek::traits::VartimeMultiscalarMul;
 use merlin::Transcript;
 
 use super::assignment::Assignment;
-use super::{ConstraintSystem, LinearCombination, R1CSProof, Variable};
+use super::{ConstraintSystem, LinearCombination, ConstraintSystemProof, Variable};
 
 use errors::R1CSError;
 use generators::{BulletproofGens, PedersenGens};
@@ -199,7 +199,7 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
     }
 
     /// Consume this `VerifierCS` and attempt to verify the supplied `proof`.
-    pub fn verify(mut self, proof: &R1CSProof) -> Result<(), R1CSError> {
+    pub fn verify(mut self, proof: &ConstraintSystemProof) -> Result<(), R1CSError> {
         // If the number of multiplications is not 0 or a power of 2, then pad the circuit.
         let n = self.num_vars;
         let padded_n = self.num_vars.next_power_of_two();

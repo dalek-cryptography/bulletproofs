@@ -32,7 +32,7 @@ use inner_product_proof::InnerProductProof;
 /// proof.
 #[derive(Clone, Debug)]
 #[allow(non_snake_case)]
-pub struct R1CSProof {
+pub struct ConstraintSystemProof {
     /// Commitment to the values of input wires
     A_I: CompressedRistretto,
     /// Commitment to the values of output wires

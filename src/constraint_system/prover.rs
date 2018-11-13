@@ -7,7 +7,7 @@ use curve25519_dalek::traits::MultiscalarMul;
 use merlin::Transcript;
 
 use super::assignment::Assignment;
-use super::{ConstraintSystem, LinearCombination, R1CSProof, Variable};
+use super::{ConstraintSystem, LinearCombination, ConstraintSystemProof, Variable};
 
 use errors::R1CSError;
 use generators::{BulletproofGens, PedersenGens};
@@ -243,7 +243,7 @@ impl<'a, 'b> ProverCS<'a, 'b> {
     }
 
     /// Consume this `ConstraintSystem` to produce a proof.
-    pub fn prove(mut self) -> Result<R1CSProof, R1CSError> {
+    pub fn prove(mut self) -> Result<ConstraintSystemProof, R1CSError> {
         use std::iter;
         use util;
 
@@ -443,7 +443,7 @@ impl<'a, 'b> ProverCS<'a, 'b> {
             e.clear();
         }
 
-        Ok(R1CSProof {
+        Ok(ConstraintSystemProof {
             A_I,
             A_O,
             S,
