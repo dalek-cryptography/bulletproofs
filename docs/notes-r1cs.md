@@ -5,8 +5,8 @@ Constraint system
 
 A **constraint system** is a collection of arithmetic constraints over a set of variables.
 
-The constraint system we use is specifically a **rank-1 quadratic constraint system** or **R1CS**.
-Such system consists of two sets of constraints: [multiplication gates](#multiplication-gates) and [linear constraints](#linear-constraints) in terms of the [variables](#variables).
+The constraint system we use is specifically a **rank-1 constraint system** or **R1CS**.
+Such a system consists of two sets of constraints: [multiplication gates](#multiplication-gates) and [linear constraints](#linear-constraints) in terms of the [variables](#variables).
 
 ## Variables
 
