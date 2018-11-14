@@ -10,12 +10,12 @@ use inner_product_proof::InnerProductProof;
 ///
 /// Statements are specified by writing gadget functions which add
 /// constraints to a [`ConstraintSystem`](::r1cs::ConstraintSystem)
-/// implementation.  To construct an `R1CSProof`, a prover constructs
+/// implementation.  To construct an [`R1CSProof`], a prover constructs
 /// a [`ProverCS`](::r1cs::ProverCS), then passes it to gadget
 /// functions to build the constraint system, then consumes the
 /// constraint system using
 /// [`ProverCS::prove`](::r1cs::ProverCS::prove) to produce an
-/// `R1CSProof`.  To verify an `R1CSProof`, a verifier constructs a
+/// [`R1CSProof`].  To verify an [`R1CSProof`], a verifier constructs a
 /// [`VerifierCS`](::r1cs::VerifierCS), then passes it to the same
 /// gadget functions to (re)build the constraint system, then consumes
 /// the constraint system using
