@@ -19,6 +19,26 @@ pub enum Variable {
     One(),
 }
 
+impl Add<Variable> for Variable {
+    type Output = LinearCombination;
+
+    fn add(self, other: Variable) -> LinearCombination {
+        LinearCombination {
+            terms: vec![(self, Scalar::one()), (other, Scalar::one())],
+        }
+    }
+}
+
+impl Sub<Variable> for Variable {
+    type Output = LinearCombination;
+
+    fn sub(self, other: Variable) -> LinearCombination {
+        LinearCombination {
+            terms: vec![(self, Scalar::one()), (other, -Scalar::one())],
+        }
+    }
+}
+
 /// Represents a linear combination of
 /// [`Variables`](::r1cs::Variable).  Each term is represented by a
 /// `(Variable, Scalar)` pair.
