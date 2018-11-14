@@ -1,15 +1,13 @@
-use super::assignment::Assignment;
-use super::prover::ProverCS;
-use super::verifier::VerifierCS;
-use super::*;
+use rand::thread_rng;
+
+use curve25519_dalek::ristretto::CompressedRistretto;
+use curve25519_dalek::scalar::Scalar;
+use merlin::Transcript;
 
 use errors::R1CSError;
 use generators::{BulletproofGens, PedersenGens};
 
-use curve25519_dalek::scalar::Scalar;
-use merlin::Transcript;
-
-use rand::thread_rng;
+use super::*;
 
 /// Constrains (a1 + a2) * (b1 + b2) = (c1 + c2),
 /// where c2 is a constant.
