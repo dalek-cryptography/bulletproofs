@@ -66,15 +66,12 @@ For K = 1:
     x_0 = y_0
 */
 
-/// Enforces that the output variables `y` are a valid reordering of the inputs variables `x`.
-/// The inputs and outputs are all tuples of the `Variable, Assignment`, where the `Assignment`
-/// can be either assigned as `Value::Scalar` or unassigned as `Missing`.
 // Make a gadget that adds constraints to a ConstraintSystem, such that the
 // y variables are constrained to be a valid shuffle of the x variables.
 struct KShuffleGadget {}
 
 impl KShuffleGadget {
-    fn fill_cs<CS: ConstraintSystem>(cs: &mut CS, x: Vec<Variable>, y: Vec<Variable>) {
+    fn fill_cs<CS: ConstraintSystem>(cs: &mut CS, x: &[Variable], y: &[Variable]) {
         let one = Scalar::one();
         let z = cs.challenge_scalar(b"k-scalar shuffle challenge");
 
@@ -142,11 +139,8 @@ impl KShuffleGadget {
             ProverCS::new(&bp_gens, &pc_gens, transcript, v, v_blinding.clone());
 
         // Prover allocates variables and adds constraints to the constraint system
-        KShuffleGadget::fill_cs(
-            &mut prover_cs,
-            variables[0..k].to_vec(),
-            variables[k..2 * k].to_vec(),
-        );
+        let (input_vars, output_vars) = variables.split_at(k);
+        KShuffleGadget::fill_cs(&mut prover_cs, input_vars, output_vars);
 
         // Prover generates proof
         let proof = prover_cs.prove()?;
@@ -167,11 +161,8 @@ impl KShuffleGadget {
             VerifierCS::new(&bp_gens, &pc_gens, transcript, commitments.to_vec());
 
         // Verifier allocates variables and adds constraints to the constraint system
-        KShuffleGadget::fill_cs(
-            &mut verifier_cs,
-            variables[0..k].to_vec(),
-            variables[k..2 * k].to_vec(),
-        );
+        let (input_vars, output_vars) = variables.split_at(k);
+        KShuffleGadget::fill_cs(&mut verifier_cs, input_vars, output_vars);
 
         // Verifier verifies proof
         verifier_cs.verify(&proof)
@@ -185,7 +176,9 @@ fn kshuffle_prove_helper(k: usize, c: &mut Criterion) {
         // Generate inputs and outputs to kshuffle
         let mut rng = rand::thread_rng();
         let (min, max) = (0u64, std::u64::MAX);
-        let input: Vec<Scalar> = (0..k).map(|_| Scalar::from(rng.gen_range(min, max))).collect();
+        let input: Vec<Scalar> = (0..k)
+            .map(|_| Scalar::from(rng.gen_range(min, max)))
+            .collect();
         let mut output = input.clone();
         rand::thread_rng().shuffle(&mut output);
 
@@ -234,7 +227,9 @@ fn kshuffle_verify_helper(k: usize, c: &mut Criterion) {
         // Generate inputs and outputs to kshuffle
         let mut rng = rand::thread_rng();
         let (min, max) = (0u64, std::u64::MAX);
-        let input: Vec<Scalar> = (0..k).map(|_| Scalar::from(rng.gen_range(min, max))).collect();
+        let input: Vec<Scalar> = (0..k)
+            .map(|_| Scalar::from(rng.gen_range(min, max)))
+            .collect();
         let mut output = input.clone();
         rand::thread_rng().shuffle(&mut output);
 
