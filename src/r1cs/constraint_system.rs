@@ -16,46 +16,16 @@ use curve25519_dalek::scalar::Scalar;
 /// using the `ConstraintSystem` trait, so that the prover and
 /// verifier share the logic for specifying constraints.
 pub trait ConstraintSystem {
-    /// Allocate variables for left, right, and output wires of
-    /// multiplication, and assign them the Assignments that are
-    /// passed in.
-    ///
-    /// The `ProverCS` should pass `Value(Scalar)`s to synthesize the
-    /// witness.
-    ///
-    /// The `VerifierCS` should pass `Missing` (since it does not have
-    /// the witness).
-    ///
-    /// This allows the prover and verifier to use the same code for
-    /// defining gadgets, eliminating the possibility of a constraint
-    /// system mismatch.
-    fn assign_multiplier(
+    /// XXX
+    fn add_constraint(
         &mut self,
-        left: Assignment,
-        right: Assignment,
-        out: Assignment,
-    ) -> Result<(Variable, Variable, Variable), R1CSError>;
-
-    /// Allocate two uncommitted variables, and assign them the
-    /// `Assignments` passed in.
-    ///
-    /// The `ProverCS` should pass `Value(Scalar)`s to synthesize the
-    /// witness.
-    ///
-    /// The `VerifierCS` should pass `Missing` (since it does not have
-    /// the witness).
-    ///
-    /// This allows the prover and verifier to use the same code for
-    /// defining gadgets, eliminating the possibility of a constraint
-    /// system mismatch.
-    fn assign_uncommitted(
-        &mut self,
-        val_1: Assignment,
-        val_2: Assignment,
-    ) -> Result<(Variable, Variable), R1CSError>;
+        left: LinearCombination,
+        right: LinearCombination,
+        out: LinearCombination,
+    ) -> (Variable, Variable, Variable);
 
     /// Enforce that the given `LinearCombination` is zero.
-    fn add_constraint(&mut self, lc: LinearCombination);
+    fn add_auxiliary_constraint(&mut self, lc: LinearCombination);
 
     /// Obtain a challenge scalar bound to the assignments of all of
     /// the externally committed wires.

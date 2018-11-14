@@ -44,32 +44,32 @@ pub struct VerifierCS<'a, 'b> {
 }
 
 impl<'a, 'b> ConstraintSystem for VerifierCS<'a, 'b> {
-    fn assign_multiplier(
+    fn add_constraint(
         &mut self,
-        _left: Assignment,
-        _right: Assignment,
-        _out: Assignment,
-    ) -> Result<(Variable, Variable, Variable), R1CSError> {
+        mut left: LinearCombination,
+        mut right: LinearCombination,
+        mut out: LinearCombination,
+    ) -> (Variable, Variable, Variable) {
         let var = self.num_vars;
         self.num_vars += 1;
 
-        Ok((
-            Variable::MultiplierLeft(var),
-            Variable::MultiplierRight(var),
-            Variable::MultiplierOutput(var),
-        ))
+        // Create variables for l,r,o
+        let l_var = Variable::MultiplierLeft(var);
+        let r_var = Variable::MultiplierRight(var);
+        let o_var = Variable::MultiplierOutput(var);
+
+        // Constrain l,r,o:
+        left.terms.push((l_var, -Scalar::one()));
+        right.terms.push((r_var, -Scalar::one()));
+        out.terms.push((o_var, -Scalar::one()));
+        self.add_auxiliary_constraint(left);
+        self.add_auxiliary_constraint(right);
+        self.add_auxiliary_constraint(out);
+
+        (l_var, r_var, o_var)
     }
 
-    fn assign_uncommitted(
-        &mut self,
-        val_1: Assignment,
-        val_2: Assignment,
-    ) -> Result<(Variable, Variable), R1CSError> {
-        let (left, right, _) = self.assign_multiplier(val_1, val_2, Assignment::Missing())?;
-        Ok((left, right))
-    }
-
-    fn add_constraint(&mut self, lc: LinearCombination) {
+    fn add_auxiliary_constraint(&mut self, lc: LinearCombination) {
         // TODO: check that the linear combinations are valid
         // (e.g. that variables are valid, that the linear combination
         // evals to 0 for prover, etc).

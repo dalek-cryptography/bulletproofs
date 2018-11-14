@@ -70,40 +70,38 @@ impl<'a, 'b> Drop for ProverCS<'a, 'b> {
 }
 
 impl<'a, 'b> ConstraintSystem for ProverCS<'a, 'b> {
-    fn assign_multiplier(
+    fn add_constraint(
         &mut self,
-        left: Assignment,
-        right: Assignment,
-        out: Assignment,
-    ) -> Result<(Variable, Variable, Variable), R1CSError> {
-        // Unwrap all of l,r,o up front to ensure we leave the CS in a
-        // consistent state if any are missing assignments
-        let l = left?;
-        let r = right?;
-        let o = out?;
-        // Now commit to the assignment
+        mut left: LinearCombination,
+        mut right: LinearCombination,
+        mut out: LinearCombination,
+    ) -> (Variable, Variable, Variable) {
+        // Synthesize the assignments for l,r,o
+        let l = self.eval(&left);
+        let r = self.eval(&right);
+        let o = self.eval(&out);
+
+        // Create variables for l,r,o ...
+        let l_var = Variable::MultiplierLeft(self.a_L.len());
+        let r_var = Variable::MultiplierRight(self.a_R.len());
+        let o_var = Variable::MultiplierOutput(self.a_O.len());
+        // ... and assign them
         self.a_L.push(l);
         self.a_R.push(r);
         self.a_O.push(o);
-        Ok((
-            Variable::MultiplierLeft(self.a_L.len() - 1),
-            Variable::MultiplierRight(self.a_R.len() - 1),
-            Variable::MultiplierOutput(self.a_O.len() - 1),
-        ))
+
+        // Constrain l,r,o:
+        left.terms.push((l_var, -Scalar::one()));
+        right.terms.push((r_var, -Scalar::one()));
+        out.terms.push((o_var, -Scalar::one()));
+        self.add_auxiliary_constraint(left);
+        self.add_auxiliary_constraint(right);
+        self.add_auxiliary_constraint(out);
+
+        (l_var, r_var, o_var)
     }
 
-    fn assign_uncommitted(
-        &mut self,
-        val_1: Assignment,
-        val_2: Assignment,
-    ) -> Result<(Variable, Variable), R1CSError> {
-        let val_3 = val_1 * val_2;
-
-        let (left, right, _) = self.assign_multiplier(val_1, val_2, val_3)?;
-        Ok((left, right))
-    }
-
-    fn add_constraint(&mut self, lc: LinearCombination) {
+    fn add_auxiliary_constraint(&mut self, lc: LinearCombination) {
         // TODO: check that the linear combinations are valid
         // (e.g. that variables are valid, that the linear combination evals to 0 for prover, etc).
         self.constraints.push(lc);
@@ -240,6 +238,21 @@ impl<'a, 'b> ProverCS<'a, 'b> {
         }
 
         (wL, wR, wO, wV)
+    }
+
+    fn eval(&self, lc: &LinearCombination) -> Scalar {
+        lc.terms
+            .iter()
+            .map(|(var, coeff)| {
+                coeff * match var {
+                    Variable::MultiplierLeft(i) => self.a_L[*i],
+                    Variable::MultiplierRight(i) => self.a_R[*i],
+                    Variable::MultiplierOutput(i) => self.a_O[*i],
+                    Variable::Committed(i) => self.v[*i],
+                    Variable::One() => Scalar::one(),
+                }
+            })
+            .sum()
     }
 
     /// Consume this `ConstraintSystem` to produce a proof.
