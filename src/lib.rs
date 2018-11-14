@@ -27,8 +27,15 @@ extern crate bincode;
 
 mod util;
 
-#[doc(include = "../docs/notes.md")]
-mod notes {}
+#[doc(include = "../docs/notes-intro.md")]
+mod notes {
+    #[doc(include = "../docs/notes-ipp.md")]
+    mod inner_product_proof {}
+    #[doc(include = "../docs/notes-rp.md")]
+    mod range_proof {}
+    #[doc(include = "../docs/notes-r1cs.md")]
+    mod r1cs_proof {}
+}
 
 mod errors;
 mod generators;
