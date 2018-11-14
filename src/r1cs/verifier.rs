@@ -5,7 +5,6 @@ use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::VartimeMultiscalarMul;
 use merlin::Transcript;
 
-use super::assignment::Assignment;
 use super::{ConstraintSystem, LinearCombination, R1CSProof, Variable};
 
 use errors::R1CSError;

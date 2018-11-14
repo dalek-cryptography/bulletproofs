@@ -1,8 +1,5 @@
-#[macro_use]
-extern crate failure;
-
 extern crate bulletproofs;
-use bulletproofs::r1cs::{Assignment, ConstraintSystem, ProverCS, R1CSError, Variable, VerifierCS};
+use bulletproofs::r1cs::{ConstraintSystem, ProverCS, Variable, VerifierCS};
 use bulletproofs::{BulletproofGens, PedersenGens};
 
 #[macro_use]
@@ -72,131 +69,42 @@ For K = 1:
 /// Enforces that the output variables `y` are a valid reordering of the inputs variables `x`.
 /// The inputs and outputs are all tuples of the `Variable, Assignment`, where the `Assignment`
 /// can be either assigned as `Value::Scalar` or unassigned as `Missing`.
-pub fn fill_cs<CS: ConstraintSystem>(
-    cs: &mut CS,
-    x: Vec<(Variable, Assignment)>,
-    y: Vec<(Variable, Assignment)>,
-) -> Result<(), KShuffleError> {
+pub fn fill_cs<CS: ConstraintSystem>(cs: &mut CS, x: Vec<Variable>, y: Vec<Variable>) {
     let one = Scalar::one();
     let z = cs.challenge_scalar(b"k-scalar shuffle challenge");
 
-    if x.len() != y.len() {
-        return Err(KShuffleError::InvalidR1CSConstruction);
-    }
+    assert_eq!(x.len(), y.len());
+
     let k = x.len();
     if k == 1 {
-        cs.add_constraint([(x[0].0, -one), (y[0].0, one)].iter().collect());
-        return Ok(());
+        cs.add_auxiliary_constraint([(x[0], -one), (y[0], one)].iter().collect());
+        return;
     }
 
     // Make last x multiplier for i = k-1 and k-2
-    let last_mulx_out = last_multiplier(cs, z, x[k - 1], x[k - 2]);
+    let (_, _, last_mulx_out) = cs.add_intermediate_constraint(x[k - 1] - z, x[k - 2] - z);
 
     // Make multipliers for x from i == [0, k-3]
     let first_mulx_out = (0..k - 2).rev().fold(last_mulx_out, |prev_out, i| {
-        intermediate_multiplier(cs, z, prev_out?, x[i])
-    })?;
+        let (_, _, o) = cs.add_intermediate_constraint(prev_out.into(), x[i] - z);
+        o
+    });
 
     // Make last y multiplier for i = k-1 and k-2
-    let last_muly_out = last_multiplier(cs, z, y[k - 1], y[k - 2]);
+    let (_, _, last_muly_out) = cs.add_intermediate_constraint(y[k - 1] - z, y[k - 2] - z);
 
     // Make multipliers for y from i == [0, k-3]
     let first_muly_out = (0..k - 2).rev().fold(last_muly_out, |prev_out, i| {
-        intermediate_multiplier(cs, z, prev_out?, y[i])
-    })?;
+        let (_, _, o) = cs.add_intermediate_constraint(prev_out.into(), y[i] - z);
+        o
+    });
 
     // Check equality between last x mul output and last y mul output
-    cs.add_constraint(
-        [(first_muly_out.0, -one), (first_mulx_out.0, one)]
+    cs.add_auxiliary_constraint(
+        [(first_muly_out, -one), (first_mulx_out, one)]
             .iter()
             .collect(),
     );
-
-    Ok(())
-}
-
-fn last_multiplier<CS: ConstraintSystem>(
-    cs: &mut CS,
-    z: Scalar,
-    left: (Variable, Assignment),
-    right: (Variable, Assignment),
-) -> Result<(Variable, Assignment), KShuffleError> {
-    let one = Scalar::one();
-    let var_one = Variable::One();
-
-    let mul_left = left.1 - z;
-    let mul_right = right.1 - z;
-    let mul_out = mul_left * mul_right;
-
-    // Make multiplier gate variables
-    let (mul_left_var, mul_right_var, mul_out_var) =
-        cs.assign_multiplier(mul_left, mul_right, mul_out)?;
-
-    // Make multipliers
-    cs.add_constraint(
-        [(mul_left_var, -one), (var_one, -z), (left.0, one)]
-            .iter()
-            .collect(),
-    );
-    cs.add_constraint(
-        [(mul_right_var, -one), (var_one, -z), (right.0, one)]
-            .iter()
-            .collect(),
-    );
-
-    Ok((mul_out_var, mul_out))
-}
-
-fn intermediate_multiplier<CS: ConstraintSystem>(
-    cs: &mut CS,
-    z: Scalar,
-    left: (Variable, Assignment),
-    right: (Variable, Assignment),
-) -> Result<(Variable, Assignment), KShuffleError> {
-    let one = Scalar::one();
-    let var_one = Variable::One();
-
-    let mul_left = left.1;
-    let mul_right = right.1 - z;
-    let mul_out = mul_left * mul_right;
-
-    // Make multiplier gate variables
-    let (mul_left_var, mul_right_var, mul_out_var) =
-        cs.assign_multiplier(mul_left, mul_right, mul_out)?;
-
-    // Make multipliers
-    cs.add_constraint([(mul_left_var, -one), (left.0, one)].iter().collect());
-    cs.add_constraint(
-        [(mul_right_var, -one), (var_one, -z), (right.0, one)]
-            .iter()
-            .collect(),
-    );
-
-    Ok((mul_out_var, mul_out))
-}
-
-/// Represents an error during the proof creation of verification for a KShuffle gadget.
-#[derive(Fail, Copy, Clone, Debug, Eq, PartialEq)]
-pub enum KShuffleError {
-    /// Error in the constraint system creation process
-    #[fail(display = "Invalid KShuffle constraint system construction")]
-    InvalidR1CSConstruction,
-    /// Occurs when there are insufficient generators for the proof.
-    #[fail(display = "Invalid generators size, too few generators for proof")]
-    InvalidGeneratorsLength,
-    /// Occurs when verification of an [`R1CSProof`](::r1cs::R1CSProof) fails.
-    #[fail(display = "R1CSProof did not verify correctly.")]
-    VerificationError,
-}
-
-impl From<R1CSError> for KShuffleError {
-    fn from(e: R1CSError) -> KShuffleError {
-        match e {
-            R1CSError::InvalidGeneratorsLength => KShuffleError::InvalidGeneratorsLength,
-            R1CSError::MissingAssignment => KShuffleError::InvalidR1CSConstruction,
-            R1CSError::VerificationError => KShuffleError::VerificationError,
-        }
-    }
 }
 
 // Helper functions for proof creation
@@ -206,7 +114,7 @@ fn kshuffle_prover_cs<'a, 'b>(
     transcript: &'a mut Transcript,
     input: &Vec<u64>,
     output: &Vec<u64>,
-) -> Result<(ProverCS<'a, 'b>, Vec<CompressedRistretto>), KShuffleError> {
+) -> (ProverCS<'a, 'b>, Vec<CompressedRistretto>) {
     let k = input.len();
 
     // Prover makes a `ConstraintSystem` instance representing a shuffle gadget
@@ -234,19 +142,13 @@ fn kshuffle_prover_cs<'a, 'b>(
         ProverCS::new(&bp_gens, &pc_gens, transcript, v, v_blinding.clone());
 
     // Prover allocates variables and adds constraints to the constraint system
-    let in_pairs = variables[0..k]
-        .iter()
-        .zip(input.iter())
-        .map(|(var_i, in_i)| (*var_i, Assignment::from(in_i.clone())))
-        .collect();
-    let out_pairs = variables[k..2 * k]
-        .iter()
-        .zip(output.iter())
-        .map(|(var_i, out_i)| (*var_i, Assignment::from(out_i.clone())))
-        .collect();
-    fill_cs(&mut prover_cs, in_pairs, out_pairs).unwrap();
+    fill_cs(
+        &mut prover_cs,
+        variables[0..k].to_vec(),
+        variables[k..2 * k].to_vec(),
+    );
 
-    Ok((prover_cs, commitments))
+    (prover_cs, commitments)
 }
 
 fn kshuffle_prove_helper(k: usize, c: &mut Criterion) {
@@ -266,8 +168,7 @@ fn kshuffle_prove_helper(k: usize, c: &mut Criterion) {
         b.iter(|| {
             let mut prover_transcript = Transcript::new(b"ShuffleTest");
             let (prover_cs, _) =
-                kshuffle_prover_cs(&pc_gens, &bp_gens, &mut prover_transcript, &input, &output)
-                    .unwrap();
+                kshuffle_prover_cs(&pc_gens, &bp_gens, &mut prover_transcript, &input, &output);
             prover_cs.prove().unwrap();
         })
     });
@@ -306,7 +207,7 @@ fn kshuffle_verifier_cs<'a, 'b>(
     bp_gens: &'b BulletproofGens,
     transcript: &'a mut Transcript,
     commitments: &Vec<CompressedRistretto>,
-) -> Result<VerifierCS<'a, 'b>, KShuffleError> {
+) -> VerifierCS<'a, 'b> {
     let k = commitments.len() / 2;
 
     // Verifier makes a `ConstraintSystem` instance representing a shuffle gadget
@@ -314,17 +215,13 @@ fn kshuffle_verifier_cs<'a, 'b>(
         VerifierCS::new(&bp_gens, &pc_gens, transcript, commitments.to_vec());
 
     // Verifier allocates variables and adds constraints to the constraint system
-    let in_pairs = variables[0..k]
-        .iter()
-        .map(|var_i| (*var_i, Assignment::Missing()))
-        .collect();
-    let out_pairs = variables[k..2 * k]
-        .iter()
-        .map(|var_i| (*var_i, Assignment::Missing()))
-        .collect();
-    fill_cs(&mut verifier_cs, in_pairs, out_pairs)?;
+    fill_cs(
+        &mut verifier_cs,
+        variables[0..k].to_vec(),
+        variables[k..2 * k].to_vec(),
+    );
 
-    Ok(verifier_cs)
+    verifier_cs
 }
 
 fn kshuffle_verify_helper(k: usize, c: &mut Criterion) {
@@ -343,16 +240,14 @@ fn kshuffle_verify_helper(k: usize, c: &mut Criterion) {
         let bp_gens = BulletproofGens::new(128, 1);
         let mut prover_transcript = Transcript::new(b"ShuffleTest");
         let (prover_cs, commitments) =
-            kshuffle_prover_cs(&pc_gens, &bp_gens, &mut prover_transcript, &input, &output)
-                .unwrap();
+            kshuffle_prover_cs(&pc_gens, &bp_gens, &mut prover_transcript, &input, &output);
         let proof = prover_cs.prove().unwrap();
 
         // Verify kshuffle proof
         b.iter(|| {
             let mut verifier_transcript = Transcript::new(b"ShuffleTest");
             let verifier_cs =
-                kshuffle_verifier_cs(&pc_gens, &bp_gens, &mut verifier_transcript, &commitments)
-                    .unwrap();
+                kshuffle_verifier_cs(&pc_gens, &bp_gens, &mut verifier_transcript, &commitments);
             verifier_cs.verify(&proof).unwrap();
         })
     });

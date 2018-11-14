@@ -267,8 +267,7 @@ fn kshuffle_verifier_cs<'a, 'b>(
     verifier_cs
 }
 
-fn shuffle_gadget_test_helper(k: usize) {
-    use merlin::Transcript;
+fn kshuffle_helper(k: usize) {
     use rand::Rng;
 
     let pc_gens = PedersenGens::default();
@@ -278,7 +277,7 @@ fn shuffle_gadget_test_helper(k: usize) {
     transcript.commit_bytes(b"k", Scalar::from(k as u64).as_bytes());
 
     let (proof, commitments) = {
-        // Generate inputs and outputs to kshuffle
+        // Randomly generate inputs and outputs to kshuffle
         let mut rng = rand::thread_rng();
         let (min, max) = (0u64, std::u64::MAX);
         let input: Vec<u64> = (0..k).map(|_| rng.gen_range(min, max)).collect();
@@ -303,45 +302,45 @@ fn shuffle_gadget_test_helper(k: usize) {
 
 #[test]
 fn shuffle_gadget_test_1() {
-    shuffle_gadget_test_helper(1);
+    kshuffle_helper(1);
 }
 
 #[test]
 fn shuffle_gadget_test_2() {
-    shuffle_gadget_test_helper(2);
+    kshuffle_helper(2);
 }
 
 #[test]
 fn shuffle_gadget_test_3() {
-    shuffle_gadget_test_helper(3);
+    kshuffle_helper(3);
 }
 
 #[test]
 fn shuffle_gadget_test_4() {
-    shuffle_gadget_test_helper(4);
+    kshuffle_helper(4);
 }
 
 #[test]
 fn shuffle_gadget_test_5() {
-    shuffle_gadget_test_helper(5);
+    kshuffle_helper(5);
 }
 
 #[test]
 fn shuffle_gadget_test_6() {
-    shuffle_gadget_test_helper(6);
+    kshuffle_helper(6);
 }
 
 #[test]
 fn shuffle_gadget_test_7() {
-    shuffle_gadget_test_helper(7);
+    kshuffle_helper(7);
 }
 
 #[test]
 fn shuffle_gadget_test_24() {
-    shuffle_gadget_test_helper(24);
+    kshuffle_helper(24);
 }
 
 #[test]
 fn shuffle_gadget_test_42() {
-    shuffle_gadget_test_helper(42);
+    kshuffle_helper(42);
 }
