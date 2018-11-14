@@ -203,20 +203,16 @@ impl KShuffleGadget {
         pc_gens: &'b PedersenGens,
         bp_gens: &'b BulletproofGens,
         transcript: &'a mut Transcript,
-        input: &Vec<u64>,
-        output: &Vec<u64>,
+        input: &[Scalar],
+        output: &[Scalar],
     ) -> Result<(R1CSProof, Vec<CompressedRistretto>), R1CSError> {
         let k = input.len();
 
         // Prover makes a `ConstraintSystem` instance representing a shuffle gadget
         // Make v vector
         let mut v = Vec::with_capacity(2 * k);
-        for i in 0..k {
-            v.push(Scalar::from(input[i]));
-        }
-        for i in 0..k {
-            v.push(Scalar::from(output[i]));
-        }
+        v.extend_from_slice(input);
+        v.extend_from_slice(output);
 
         // Make v_blinding vector using RNG from transcript
         let mut rng = {
@@ -239,6 +235,7 @@ impl KShuffleGadget {
             variables[k..2 * k].to_vec(),
         );
 
+        // Prover generates proof
         let proof = prover_cs.prove()?;
         Ok((proof, commitments))
     }
@@ -263,6 +260,7 @@ impl KShuffleGadget {
             variables[k..2 * k].to_vec(),
         );
 
+        // Verifier verifies proof
         verifier_cs.verify(&proof)
     }
 }
@@ -281,7 +279,7 @@ fn kshuffle_helper(k: usize) {
         // Randomly generate inputs and outputs to kshuffle
         let mut rng = rand::thread_rng();
         let (min, max) = (0u64, std::u64::MAX);
-        let input: Vec<u64> = (0..k).map(|_| rng.gen_range(min, max)).collect();
+        let input: Vec<Scalar> = (0..k).map(|_| Scalar::from(rng.gen_range(min, max))).collect();
         let mut output = input.clone();
         rand::thread_rng().shuffle(&mut output);
 
