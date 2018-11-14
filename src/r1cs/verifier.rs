@@ -13,19 +13,18 @@ use transcript::TranscriptProtocol;
 
 /// A [`ConstraintSystem`] implementation for use by the verifier.
 ///
-/// The lifecycle of a `VerifierCS` is as follows. The verification
+/// The lifecycle of a [`VerifierCS`] is as follows. The verification
 /// code assembles the commitments to the external inputs to the
 /// constraint system, then passes them, along with generators and a
 /// transcript, to [`VerifierCS::new`].  This initializes the
-/// `VerifierCS` and returns [`Variable`]s corresponding to the
+/// [`VerifierCS`] and returns [`Variable`]s corresponding to the
 /// inputs.
 ///
-/// The verifier can then pass the `VerifierCS` and the external
-/// variables to the same gadget code as the prover, using
-/// `Assignment::Missing` for witness variables, to build an identical
-/// constraint system to the one the prover built.  Finally, they pass
-/// the prover's [`R1CSProof`] to [`VerifierCS::verify`], which
-/// consumes the `VerifierCS` and verifies the proof.
+/// The verifier can then pass the [`VerifierCS`] and the external
+/// variables to the same gadget code as the prover, constructing an
+/// identical constraint system to the one the prover built.  Finally,
+/// they pass the prover's [`R1CSProof`] to [`VerifierCS::verify`],
+/// which consumes the [`VerifierCS`] and verifies the proof.
 pub struct VerifierCS<'a, 'b> {
     bp_gens: &'b BulletproofGens,
     pc_gens: &'b PedersenGens,
