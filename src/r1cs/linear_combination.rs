@@ -39,6 +39,46 @@ impl Sub<Variable> for Variable {
     }
 }
 
+impl Add<Variable> for Scalar {
+    type Output = LinearCombination;
+
+    fn add(self, other: Variable) -> LinearCombination {
+        LinearCombination {
+            terms: vec![(Variable::One(), self), (other, Scalar::one())],
+        }
+    }
+}
+
+impl Sub<Variable> for Scalar {
+    type Output = LinearCombination;
+
+    fn sub(self, other: Variable) -> LinearCombination {
+        LinearCombination {
+            terms: vec![(Variable::One(), self), (other, -Scalar::one())],
+        }
+    }
+}
+
+impl Add<Scalar> for Variable {
+    type Output = LinearCombination;
+
+    fn add(self, other: Scalar) -> LinearCombination {
+        LinearCombination {
+            terms: vec![(self, Scalar::one()), (Variable::One(), other)],
+        }
+    }
+}
+
+impl Sub<Scalar> for Variable {
+    type Output = LinearCombination;
+
+    fn sub(self, other: Scalar) -> LinearCombination {
+        LinearCombination {
+            terms: vec![(self, Scalar::one()), (Variable::One(), -other)],
+        }
+    }
+}
+
 /// Represents a linear combination of
 /// [`Variables`](::r1cs::Variable).  Each term is represented by a
 /// `(Variable, Scalar)` pair.

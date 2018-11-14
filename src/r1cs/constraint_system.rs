@@ -24,6 +24,13 @@ pub trait ConstraintSystem {
         out: LinearCombination,
     ) -> (Variable, Variable, Variable);
 
+    /// XXX
+    fn add_intermediate_constraint(
+        &mut self,
+        left: LinearCombination,
+        right: LinearCombination,
+    ) -> (Variable, Variable, Variable);
+
     /// Enforce that the given `LinearCombination` is zero.
     fn add_auxiliary_constraint(&mut self, lc: LinearCombination);
 

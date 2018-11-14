@@ -69,6 +69,28 @@ impl<'a, 'b> ConstraintSystem for VerifierCS<'a, 'b> {
         (l_var, r_var, o_var)
     }
 
+    fn add_intermediate_constraint(
+        &mut self,
+        mut left: LinearCombination,
+        mut right: LinearCombination,
+    ) -> (Variable, Variable, Variable) {
+        let var = self.num_vars;
+        self.num_vars += 1;
+
+        // Create variables for l,r,o
+        let l_var = Variable::MultiplierLeft(var);
+        let r_var = Variable::MultiplierRight(var);
+        let o_var = Variable::MultiplierOutput(var);
+
+        // Constrain l,r,o:
+        left.terms.push((l_var, -Scalar::one()));
+        right.terms.push((r_var, -Scalar::one()));
+        self.add_auxiliary_constraint(left);
+        self.add_auxiliary_constraint(right);
+
+        (l_var, r_var, o_var)
+    }
+
     fn add_auxiliary_constraint(&mut self, lc: LinearCombination) {
         // TODO: check that the linear combinations are valid
         // (e.g. that variables are valid, that the linear combination
