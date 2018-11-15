@@ -6,10 +6,10 @@ rust:
 
 env:
   - TEST_COMMAND=test EXTRA_FLAGS='' FEATURES=''
-  - TEST_COMMAND=test EXTRA_FLAGS='' FEATURES='avx2_backend'
+  - TEST_COMMAND=test EXTRA_FLAGS='' FEATURES='yoloproofs'
   # run cargo bench with a filter that matches no benchmarks.
   # this ensures the benchmarks build but doesn't run them on the CI server.
-  - TEST_COMMAND=bench EXTRA_FLAGS='"DONTRUNBENCHMARKS"' FEATURES='avx2_backend'
+  - TEST_COMMAND=bench EXTRA_FLAGS='"DONTRUNBENCHMARKS"' FEATURES=''
 
 before_script:
   - rustup component add rustfmt-preview

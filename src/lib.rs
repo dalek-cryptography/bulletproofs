@@ -55,4 +55,5 @@ pub mod range_proof_mpc {
     pub use range_proof::party;
 }
 
+#[cfg(feature = "yoloproofs")]
 pub mod r1cs;

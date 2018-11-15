@@ -94,6 +94,7 @@ pub enum MPCError {
 }
 
 /// Represents an error during the proving or verifying of a constraint system.
+#[cfg(feature = "yoloproofs")]
 #[derive(Fail, Copy, Clone, Debug, Eq, PartialEq)]
 pub enum R1CSError {
     /// Occurs when there are insufficient generators for the proof.
