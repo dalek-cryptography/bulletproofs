@@ -21,8 +21,8 @@ pub enum ProofError {
     /// proof with non-power-of-two aggregation size.
     #[fail(display = "Invalid aggregation size, m must be a power of 2.")]
     InvalidAggregation,
-    /// This error occurs when the generators are of the wrong length.
-    #[fail(display = "Invalid generators length, must be equal to n.")]
+    /// This error occurs when there are insufficient generators for the proof.
+    #[fail(display = "Invalid generators size, too few generators for proof")]
     InvalidGeneratorsLength,
     /// This error results from an internal error during proving.
     ///
@@ -66,8 +66,8 @@ pub enum MPCError {
     /// proof with non-power-of-two aggregation size.
     #[fail(display = "Invalid aggregation size, m must be a power of 2")]
     InvalidAggregation,
-    /// This error occurs when the generators are of the wrong length.
-    #[fail(display = "Invalid generators length, must be equal to n.")]
+    /// This error occurs when there are insufficient generators for the proof.
+    #[fail(display = "Invalid generators size, too few generators for proof")]
     InvalidGeneratorsLength,
     /// This error occurs when the dealer is given the wrong number of
     /// value commitments.
@@ -91,4 +91,17 @@ pub enum MPCError {
         /// A vector with the indexes of the parties whose shares were malformed.
         bad_shares: Vec<usize>,
     },
+}
+
+/// Represents an error during the proving or verifying of a constraint system.
+#[cfg(feature = "yoloproofs")]
+#[derive(Fail, Copy, Clone, Debug, Eq, PartialEq)]
+pub enum R1CSError {
+    /// Occurs when there are insufficient generators for the proof.
+    #[fail(display = "Invalid generators size, too few generators for proof")]
+    InvalidGeneratorsLength,
+    /// Occurs when verification of an
+    /// [`R1CSProof`](::r1cs::R1CSProof) fails.
+    #[fail(display = "R1CSProof did not verify correctly.")]
+    VerificationError,
 }

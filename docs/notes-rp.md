@@ -1,94 +1,7 @@
-This module contains notes on how and why Bulletproofs work.
+This module contains notes on how and why range proofs work.
 
-The documentation is laid out roughly as follows.  General notes on
-the range proof and inner-product proofs are here.  The description of
-each protocol is contained in the respective `range_proof` and
-`inner_product_proof` modules.  Finally, structs from those modules
-are publicly re-exported from the crate root, so that the external
-documentation describes how to use the API, while the internal
-documentation describes how it works.
-
-Notation
-========
-
-We change notation from the original [Bulletproofs paper][bulletproofs_paper].
-The primary motivation is that our implementation uses additive notation, and
-we would like our description of the protocol to use the same notation as the
-implementation.
-
-In general, we use lower-case letters
-\\(a, b, c\\)
-for scalars in
-\\({\mathbb Z\_p}\\)
-and upper-case letters
-\\(G,H,P,Q\\)
-for group elements in
-\\({\mathbb G}\\).
-Vectors are denoted as \\({\mathbf{a}}\\) and \\({\mathbf{G}}\\),
-and the inner product of two vectors is denoted by
-\\({\langle -, - \rangle}\\). Notice that
-\\({\langle {\mathbf{a}}, {\mathbf{b}} \rangle} \in {\mathbb Z\_p}\\)
-produces a scalar, while
-\\({\langle {\mathbf{a}}, {\mathbf{G}} \rangle} \in {\mathbb G}\\)
-is a multiscalar multiplication. The vectors of all \\(0\\) and all \\(1\\) are
-denoted by \\({\mathbf{0}}\\), \\({\mathbf{1}}\\) respectively.
-
-Vectors are indexed starting from \\(0\\), unlike the paper, which indexes
-from \\(1\\). For a scalar \\(y\\), we write
-\\[
-\begin{aligned}
-  {\mathbf{y}}^{n} &= (1,y,y^{2},\ldots,y^{n-1})
-\end{aligned}
-\\]
-for the vector whose \\(i\\)-th entry is \\(y^{i}\\). For vectors
-\\({\mathbf{v}}\\) of even
-length \\(2k\\), we define \\({\mathbf{v}}\_{\operatorname{lo}}\\) and
-\\({\mathbf{v}}\_{\operatorname{hi}}\\) to be the low and high halves of
-\\({\mathbf{v}}\\):
-\\[
-\begin{aligned}
-    {\mathbf{v}}\_{\operatorname{lo}} &= (v\_0,   \ldots, v\_{k-1})\\\\
-    {\mathbf{v}}\_{\operatorname{hi}} &= (v\_{k}, \ldots, v\_{2k-1})
-\end{aligned}
-\\]
-Pedersen commitments are written as
-\\[
-\begin{aligned}
-    \operatorname{Com}(v) &= \operatorname{Com}(v, {\widetilde{v}}) = v \cdot B + {\widetilde{v}} \cdot {\widetilde{B}},
-\end{aligned}
-\\]
-where \\(B\\) and \\({\widetilde{B}}\\) are the generators used for the values
-and blinding factors, respectively. We denote the blinding factor for
-the value \\(v\\) by \\({\widetilde{v}}\\), so that it is clear which blinding
-factor corresponds to which value, and write \\(\operatorname{Com}(v)\\)
-instead of \\(\operatorname{Com}(v, {\widetilde{v}})\\) for brevity.
-
-We also make use of *vector Pedersen commitments*, which we define for
-pairs of vectors as \\[
-\begin{aligned}
-    \operatorname{Com}({\mathbf{a}}\_{L}, {\mathbf{a}}\_{R}) 
- &= \operatorname{Com}({\mathbf{a}}\_{L}, {\mathbf{a}}\_{R}, {\widetilde{a}})
-  = {\langle {\mathbf{a}}\_{L}, {\mathbf{G}} \rangle} + {\langle {\mathbf{a}}\_{R}, {\mathbf{H}} \rangle} + {\widetilde{a}} {\widetilde{B}},\end{aligned}
-\\]
-where \\({\mathbf{G}}\\) and \\({\mathbf{H}}\\) are vectors of generators.
-Notice that this is exactly the same as taking a commitment to the
-vector of values \\({\mathbf{a}}\_{L} \Vert {\mathbf{a}}\_{R}\\) with the
-vector of bases \\({\mathbf{G}} \Vert {\mathbf{H}}\\), but defining the
-commitment on pairs of vectors is a more convenient notation.
-
-The variable renaming is as follows:
-\\[
-\begin{aligned}
-    g        &\xrightarrow{} B               & \gamma   &\xrightarrow{} \tilde{v}      \\\\
-    h        &\xrightarrow{} \tilde{B}       & \alpha   &\xrightarrow{} \tilde{a}      \\\\
-    {\mathbf{g}}   &\xrightarrow{} {\mathbf{G}}          & \rho     &\xrightarrow{} \tilde{s}      \\\\
-    {\mathbf{h}}   &\xrightarrow{} {\mathbf{H}}          & \tau\_i   &\xrightarrow{} \tilde{t}\_i    \\\\
-             &                               & \mu      &\xrightarrow{} \tilde{e}      \\\\
-\end{aligned}
-\\]
-
-Range Proofs from inner products
-================================
+Range proof from inner product
+==============================
 
 The goal of a *range proof* is for a prover to convince a verifier
 that a particular value \\(v\\) lies within a valid range, without revealing
@@ -204,7 +117,7 @@ goal is to rearrange the inner product above so that terms
 involving \\({\mathbf{a}}\_{L}\\) appear only on the left-hand side, terms
 involving \\({\mathbf{a}}\_{R}\\) appear only on the right-hand side, and
 non-secret terms (which the verifier can compute on its own) are
-factored out into a new term \\(\delta\\).
+factored out into a new term \\(\delta(y, z) \\).
 
 First, break the statement into simpler terms, then rearrange:
 \\[
@@ -454,174 +367,19 @@ so the verifier uses \\(P\\), \\(t(x)\\) as inputs to the inner-product protocol
 to prove that
 \\(t(x) = {\langle {\mathbf{l}}(x), {\mathbf{r}}(x) \rangle}\\).
 
-Inner-product proof
-===================
-
-First, let’s observe that the prover can simply send vectors
-\\({\mathbf{l}}(x)\\) and \\({\mathbf{r}}(x)\\) and the verifier can check
-directly that the inner product \\(t(x)\\) and commitment \\(P\\) provided in
-the protocols 1 and 2 are correct. This will not leak information (the
-secret bits in these vectors are blinded), but will require us to
-transfer \\(2n\\) scalars between a prover and a verifier.
-
-To minimize the bandwidth cost we will use the inner-product argument
-protocol which enables us to prove *indirectly* and with \\(O(log(n))\\)
-communication cost, that a given inner product \\(t(x)\\) and a commitment
-\\(P\\) are related as:
-\\[
-\begin{aligned}
-t(x) &= {\langle {\mathbf{l}}(x), {\mathbf{r}}(x) \rangle} \\\\
-P    &= {\langle {\mathbf{l}}(x), {\mathbf{G}} \rangle} + {\langle {\mathbf{r}}(x), {\mathbf{H}}' \rangle}
-\end{aligned}
-\\]
-To make the presentation
-cleaner, we will change the notation to one used specifically in the
-inner product argument which is not to be confused with the notation in
-the rangeproof protocol:
-\\[
-\begin{aligned}
-{\mathbf{a}}, {\mathbf{b}}  &\in {\mathbb Z\_{p}^{n}}\\\\
-{\mathbf{G}}, {\mathbf{H}}  &\in {\mathbb G^{n}}\\\\
-c  &= {\langle {\mathbf{a}}, {\mathbf{b}} \rangle}\\\\
-P  &= {\langle {\mathbf{a}}, {\mathbf{G}} \rangle} + {\langle {\mathbf{b}}, {\mathbf{H}} \rangle}
-\end{aligned}
-\\]
-Within the above definitions we need a proof of knowledge
-for the following relation:
-\\[
-\begin{aligned}
-    P &{}={}&& {\langle {\mathbf{a}}, {\mathbf{G}} \rangle} + {\langle {\mathbf{b}}, {\mathbf{H}} \rangle} \hspace{0.2cm} \wedge\\\\
-    c &{}={}&& {\langle {\mathbf{a}}, {\mathbf{b}} \rangle}
-\end{aligned}
-\\]
-Let’s combine these two statements into one equation using an
-indeterminate variable \\(w \in {\mathbb Z\_{p}^{\times}}\\) and multiplying the
-second equation by an orthogonal generator
-\\(B \in {\mathbb G}\\):
-\\[
-\begin{aligned}
-    P &{}={}&& {\langle {\mathbf{a}}, {\mathbf{G}} \rangle} + {\langle {\mathbf{b}}, {\mathbf{H}} \rangle}\\\\
-      &{}+{}&&\\\\
-    c w B &{}={}&&  {\langle {\mathbf{a}}, {\mathbf{b}} \rangle} w B
-\end{aligned}
-\\]
-Let’s simplify the resulting equation using the following definitions:
-\\[
-\begin{aligned}
-    k &= \lg n \\\\
-    P' &= P + cwB \\\\
-    Q &= wB
-\end{aligned}
-\\]
-The equation becomes:
-\\[
-    P' = {\langle {\mathbf{a}}, {\mathbf{G}} \rangle} + {\langle {\mathbf{b}}, {\mathbf{H}} \rangle} + {\langle {\mathbf{a}}, {\mathbf{b}} \rangle} Q 
-\\]
-The combined equation is useful because it will allow us
-to compress each vector in half and arrive to the same form. By doing
-such compression \\(\lg n\\) times we will end up with an equation where
-both vectors are one-element long and we can simply transmit them to
-check the final equality directly.
-
-If the prover can demonstrate that the above \\(P'\\) has such structure
-over generators \\({\mathbf{G}}\\), \\({\mathbf{H}}\\) and \\(Q\\) for all
-\\(w \in {\mathbb Z\_{p}^{\*}}\\), then the original \\(P\\) and \\(c\\) must satisfy
-the original relation
-\\((P = {\langle {\mathbf{a}}, {\mathbf{G}} \rangle} + {\langle {\mathbf{b}}, {\mathbf{H}} \rangle}
-\wedge c = {\langle {\mathbf{a}}, {\mathbf{b}} \rangle})\\).
-
-Let’s introduce an indeterminate variable \\(u\_k \in {\mathbb Z\_{p}^{\times}}\\)
-and compress the vectors by adding the left and the right halves
-separated by the variable \\(u\_k\\):
-\\[
-\begin{aligned}
-  {\mathbf{a}}^{(k-1)} &= {\mathbf{a}}\_{\operatorname{lo}} \cdot u\_k        + u^{-1}\_k \cdot {\mathbf{a}}\_{\operatorname{hi}} \\\\
-  {\mathbf{b}}^{(k-1)} &= {\mathbf{b}}\_{\operatorname{lo}} \cdot u^{-1}\_k   + u\_k \cdot {\mathbf{b}}\_{\operatorname{hi}} \\\\
-  {\mathbf{G}}^{(k-1)} &= {\mathbf{G}}\_{\operatorname{lo}} \cdot u^{-1}\_k   + u\_k \cdot {\mathbf{G}}\_{\operatorname{hi}} \\\\
-  {\mathbf{H}}^{(k-1)} &= {\mathbf{H}}\_{\operatorname{lo}} \cdot u\_k        + u^{-1}\_k \cdot {\mathbf{H}}\_{\operatorname{hi}}
-\end{aligned}
-\\]
-The powers of \\(u\_k\\) are chosen so they cancel out in the
-inner products of interest as will be shown below.
-
-Let \\(P\_k = P'\\) and define \\(P\_{k-1}\\) using the same equation as for \\(P\_k\\), but using the compressed vectors:
-\\[
-    P\_{k-1} = {\langle {\mathbf{a}}^{(k-1)}, {\mathbf{G}}^{(k-1)} \rangle} + {\langle {\mathbf{b}}^{(k-1)}, {\mathbf{H}}^{(k-1)} \rangle} + {\langle {\mathbf{a}}^{(k-1)}, {\mathbf{b}}^{(k-1)} \rangle} \cdot Q
-\\]
-Expanding it in terms of the original \\({\mathbf{a}}\\), \\({\mathbf{b}}\\),
-\\({\mathbf{G}}\\) and \\({\mathbf{H}}\\) gives:
-\\[
-\begin{aligned}
-    P\_{k-1} &{}={}& &{\langle {\mathbf{a}}\_{\operatorname{lo}} \cdot u\_k   + u\_k^{-1} \cdot {\mathbf{a}}\_{\operatorname{hi}}, {\mathbf{G}}\_{\operatorname{lo}} \cdot u^{-1}\_k + u\_k \cdot {\mathbf{G}}\_{\operatorname{hi}}      \rangle} + \\\\
-             &&  &{\langle {\mathbf{b}}\_{\operatorname{lo}} \cdot u^{-1}\_k  + u\_k \cdot {\mathbf{b}}\_{\operatorname{hi}},      {\mathbf{H}}\_{\operatorname{lo}} \cdot u\_k      + u^{-1}\_k \cdot {\mathbf{H}}\_{\operatorname{hi}} \rangle} + \\\\
-             &&  &{\langle {\mathbf{a}}\_{\operatorname{lo}} \cdot u\_k       + u^{-1}\_k \cdot {\mathbf{a}}\_{\operatorname{hi}},      {\mathbf{b}}\_{\operatorname{lo}} \cdot u^{-1}\_k + u\_k \cdot {\mathbf{b}}\_{\operatorname{hi}}      \rangle} \cdot Q
-\end{aligned}
-\\]
-Breaking down in simpler products:
-\\[
-\begin{aligned}
-    P\_{k-1} &{}={}& &{\langle {\mathbf{a}}\_{\operatorname{lo}}, {\mathbf{G}}\_{\operatorname{lo}} \rangle} + {\langle {\mathbf{a}}\_{\operatorname{hi}}, {\mathbf{G}}\_{\operatorname{hi}} \rangle} &{}+{}& u\_k^2 {\langle {\mathbf{a}}\_{\operatorname{lo}}, {\mathbf{G}}\_{\operatorname{hi}} \rangle} + u^{-2}\_k {\langle {\mathbf{a}}\_{\operatorname{hi}}, {\mathbf{G}}\_{\operatorname{lo}} \rangle} + \\\\
-       &&      &{\langle {\mathbf{b}}\_{\operatorname{lo}}, {\mathbf{H}}\_{\operatorname{lo}} \rangle} + {\langle {\mathbf{b}}\_{\operatorname{hi}}, {\mathbf{H}}\_{\operatorname{hi}} \rangle} &{}+{}& u^2\_k {\langle {\mathbf{b}}\_{\operatorname{hi}}, {\mathbf{H}}\_{\operatorname{lo}} \rangle} + u^{-2}\_k {\langle {\mathbf{b}}\_{\operatorname{lo}}, {\mathbf{H}}\_{\operatorname{hi}} \rangle} + \\\\
-       &&      &({\langle {\mathbf{a}}\_{\operatorname{lo}}, {\mathbf{b}}\_{\operatorname{lo}} \rangle} + {\langle {\mathbf{a}}\_{\operatorname{hi}}, {\mathbf{b}}\_{\operatorname{hi}} \rangle})\cdot Q &{}+{}& (u^2\_k {\langle {\mathbf{a}}\_{\operatorname{lo}}, {\mathbf{b}}\_{\operatorname{hi}} \rangle} + u^{-2}\_k {\langle {\mathbf{a}}\_{\operatorname{hi}}, {\mathbf{b}}\_{\operatorname{lo}} \rangle}) \cdot Q
-\end{aligned}
-\\]
-We now see that the left two columns in the above equation is the
-definition of \\(P\_k\\), while various cross terms on the right are
-separated from \\(P\_k\\) by an indeterminate variable \\(u\_k\\). Let’s group all
-terms with \\(u^2\_k\\) as \\(L\_k\\) and all terms with \\(u^{-2}\_k\\) as \\(R\_k\\):
-\\[
-\begin{aligned}
-    P\_{k-1} &= P\_k + u^2\_k \cdot L\_k + u^{-2}\_k \cdot R\_k\\\\
-    L\_k  &= {\langle {\mathbf{a}}\_{\operatorname{lo}}, {\mathbf{G}}\_{\operatorname{hi}} \rangle} + {\langle {\mathbf{b}}\_{\operatorname{hi}}, {\mathbf{H}}\_{\operatorname{lo}} \rangle} + {\langle {\mathbf{a}}\_{\operatorname{lo}}, {\mathbf{b}}\_{\operatorname{hi}} \rangle} \cdot Q\\\\
-    R\_k  &= {\langle {\mathbf{a}}\_{\operatorname{hi}}, {\mathbf{G}}\_{\operatorname{lo}} \rangle} + {\langle {\mathbf{b}}\_{\operatorname{lo}}, {\mathbf{H}}\_{\operatorname{hi}} \rangle} + {\langle {\mathbf{a}}\_{\operatorname{hi}}, {\mathbf{b}}\_{\operatorname{lo}} \rangle} \cdot Q
-\end{aligned}
-\\]
-If the prover commits to \\(L\_k\\) and \\(R\_k\\) before \\(u\_k\\) is randomly
-sampled, then if the statement about compressed vectors is proven to be
-true, it will follow that the original statement about uncompressed vectors
-is also true with an overwhelming probability.
-
-We can compress the resulting statement about \\(P\_{k-1}\\) using one more indeterminate
-variable \\(u\_{k-1}\\) in the same way as we used \\(u\_k\\) and arrive
-to even shorter vectors. We will continue doing so until we end up with
-vectors
-\\({\mathbf{a}}^{(0)}, {\mathbf{b}}^{(0)}, {\mathbf{G}}^{(0)}, {\mathbf{H}}^{(0)}\\),
-each containing one item, and \\(P\_0\\) containing all accumulated cross-terms at each step:
-\\[
-\begin{aligned}
-    P\_0 &= a^{(0)}\_0 G^{(0)}\_0 + b^{(0)}\_0 H^{(0)}\_0 + a^{(0)}\_0 b^{(0)}\_0 Q\\\\
-    P\_0 &= P\_k + \sum\_{j=1}^{k} \left( L\_{j} u\_{j}^{2} + u\_{j}^{-2} R\_{j} \right)
-\end{aligned}
-\\]
-
-Rewriting the above with the definitions \\(P\_k = P' = P + cwB\\) and \\(Q = wB\\) gives the
-final statement:
-\\[
-    P + c w B = a^{(0)}\_0 G^{(0)}\_0 + b^{(0)}\_0 H^{(0)}\_0 + a^{(0)}\_0 b^{(0)}\_0 wB - \sum\_{j=1}^{k} \left( L\_{j} u\_{j}^{2} + u\_{j}^{-2} R\_{j} \right)
-\\]
-
-At this point the prover can transmit two scalars \\(a^{(0)}\_0\\) and
-\\(b^{(0)}\_0\\) to the verifier, so they check the final statement directly
-by computing both sides of the equation.
-
-The resulting protocol has \\(\lg n\\) steps of compression where the prover
-sends a pair \\((L\_j,R\_j)\\) of points at each step \\(j = k\dots1\\). An
-additional and final step involves sending a pair of scalars
-\\((a^{(0)}\_0,b^{(0)}\_0)\\) and checking the final relation directly.
-
 Aggregated Range Proof
 ======================
 
 The goal of an _aggregated range proof_ is to enable a group of parties to produce proofs of their individual statements
 (individual range proofs for the corresponding value commitments), that can be aggregated in a more compact proof.
-This is more efficient due to the logarithmic size of the inner-product protocol: an aggregated range proof for \\(m\\)
+This is made efficient due to a logarithmic size of the inner-product protocol: an aggregated range proof for \\(m\\)
 values is smaller than \\(m\\) individual range proofs.
 
 The aggregation protocol is a multi-party computation protocol, involving \\(m\\) parties (one party per value) and one dealer, where the parties don't reveal their secrets to each other. The parties share their commitments with the dealer, and the dealer generates and returns challenge variables. The parties then share their proof shares with the dealer, and the dealer combines their shares to create an aggregated proof. 
 
 The Bulletproofs paper outlines two versions of multi-party computation aggregation. In the first approach, the inner-product proof is performed by the dealer, which requires sending the vectors used for the inner-product to the dealer. In the second approach, the inner-product proof is performed using multi-party computation, which sends less data but requires one round for each iteration of the inner-product protocol. We chose to implement the first approach because it requires fewer round trips between parties, which outweighed the slight message size savings of the second approach. 
 
-For more information on how the aggregation protocol works and is implemented, see the [protocol notes](../aggregated_range_proof/index.html). 
+For more information on how the aggregation protocol works and is implemented, see the [protocol notes](::range_proof). 
 
 The aggregated range proof has the same form as the individual range proof, in that the provers (the parties) still perform the same calculations to prove that \\(t(x) = \langle \mathbf{l}(x), \mathbf{r}(x) \rangle \\) and that \\(t_0, \mathbf{l}(x), \mathbf{r}(x)\\) are correct. The difference is that the challenge values are obtained from the dealer, which generates them by combining commitments from all the parties, and that the calculations of different parties are separated by different powers of the challenge scalars \\(y\\) and \\(z\\).
 
@@ -637,7 +395,6 @@ We use pythonic notation to denote slices of vectors, such that \\(\mathbf{G}\_{
 \\({\mathbf{G}\_{(j)}}\\) is party \\(j\\)'s share of the generators \\({\mathbf{G}}\\), or \\({\mathbf{G}\_{[j\cdot n : (j+1)n]}}\\), and \\({\mathbf{H}'\_{(j)}}\\) is party \\(j\\)'s share of the generators \\({\mathbf{H}'}\\), or \\({\mathbf{H}'\_{[j\cdot n : (j+1)n]}}\\).
 
 \\(z_{(j)}\\) is a scalar offset that is unique to each party \\(j\\), and is defined by \\(z_{(j)} = z^j\\). \\(\mathbf{y}^n\_{(j)}\\) is a length \\(n\\) vector offset that is unique to each party \\(j\\). It is a slice into vector \\(\mathbf{y}^{n \cdot m}\\), and is defined by \\(\mathbf{y}^n\_{(j)} = \mathbf{y}^{n \cdot m}\_{[j \cdot n : (j+1) \cdot n]} \\)
-
 
 
 Proving range statements with bit vectors
@@ -886,6 +643,3 @@ With these observations, we can simplify the combined \\(m\\)-party statement ab
   {\langle {\mathbf{l}}(x), {\mathbf{G}} \rangle} + {\langle {\mathbf{r}}(x), {\mathbf{H}'} \rangle} \stackrel{?}{=} -{\widetilde{e}} {\widetilde{B}} + A + x S - z{\langle {\mathbf{1}}, {\mathbf{G}} \rangle} + z{\langle {\mathbf{y}^{n \cdot m}}, {\mathbf{H}'} \rangle} + \sum_{j=0}^{m-1} {\langle z^{j+2} \cdot {\mathbf{2}}^n, {\mathbf{H}'}\_{[j \cdot n : (j+1) \cdot n]} \rangle} 
 \end{aligned}
 \\]
-
-
-[bulletproofs_paper]: https://eprint.iacr.org/2017/1066.pdf
