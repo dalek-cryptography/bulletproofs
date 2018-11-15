@@ -100,7 +100,7 @@ impl<'a, 'b> ConstraintSystem for ProverCS<'a, 'b> {
         (l_var, r_var, o_var)
     }
 
-    fn add_intermediate_constraint(
+    fn add_partial_constraint(
         &mut self,
         mut left: LinearCombination,
         mut right: LinearCombination,

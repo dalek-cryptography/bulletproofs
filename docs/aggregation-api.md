@@ -1,4 +1,5 @@
-The `aggregation` module contains the API for performing the aggregated multiparty computation protocol.
+The `range_proof_mpc` module contains the API for performing the aggregated multiparty computation protocol for joint range proof proving.
+
 Only the range proofs are supported, while aggregation of constraint system proofs is under development.
 
 API for the aggregated multiparty computation protocol 
