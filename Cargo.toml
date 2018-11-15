@@ -37,6 +37,6 @@ yoloproofs = []
 name = "range_proof"
 harness = false
 
-[[bench]]
-name = "r1cs"
-harness = false
+#[[bench]]
+#name = "r1cs"
+#harness = false
