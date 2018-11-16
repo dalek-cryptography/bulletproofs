@@ -10,7 +10,7 @@ diagram
 
 Leadin to shuffle gadget code
 
-```rust
+```rust,no_run
 gadget code
 ```
 
@@ -20,17 +20,17 @@ explanation of gadget code
 
 leadin to proof construction
 
-```rust
+```rust,no_run
 ```
 
 ## Verifiying a proof
 
 leadin to verify
 
-```rust
+```rust,no_run
 ```
 
 ## Using the `ShuffleProof`
 
-```rust
+```rust,no_run
 ```
