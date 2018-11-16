@@ -9,9 +9,6 @@ mod proof;
 mod prover;
 mod verifier;
 
-#[cfg(test)]
-mod tests;
-
 pub use self::constraint_system::ConstraintSystem;
 pub use self::linear_combination::{LinearCombination, Variable};
 pub use self::proof::R1CSProof;
