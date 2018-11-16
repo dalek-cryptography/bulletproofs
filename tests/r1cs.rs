@@ -17,14 +17,13 @@ struct ShuffleProof {}
 
 impl ShuffleProof {
     fn gadget<CS: ConstraintSystem>(cs: &mut CS, x: &[Variable], y: &[Variable]) {
-        let one = Scalar::one();
         let z = cs.challenge_scalar(b"shuffle challenge");
 
         assert_eq!(x.len(), y.len());
-
         let k = x.len();
+
         if k == 1 {
-            cs.constrain([(x[0], -one), (y[0], one)].iter().collect());
+            cs.constrain(y[0] - x[0]);
             return;
         }
 
@@ -47,11 +46,7 @@ impl ShuffleProof {
         });
 
         // Constrain last x mul output and last y mul output to be equal
-        cs.constrain(
-            [(first_muly_out, -one), (first_mulx_out, one)]
-                .iter()
-                .collect(),
-        );
+        cs.constrain(first_mulx_out - first_muly_out);
     }
 
     pub fn prove<'a, 'b>(
