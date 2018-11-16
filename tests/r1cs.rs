@@ -13,7 +13,7 @@ use rand::thread_rng;
 // Shuffle gadget (documented in markdown file)
 
 /// A proof-of-shuffle.
-struct ShuffleProof {}
+struct ShuffleProof(R1CSProof);
 
 impl ShuffleProof {
     fn gadget<CS: ConstraintSystem>(cs: &mut CS, x: &[Variable], y: &[Variable]) {
@@ -48,14 +48,24 @@ impl ShuffleProof {
         // Constrain last x mul output and last y mul output to be equal
         cs.constrain(first_mulx_out - first_muly_out);
     }
+}
 
+impl ShuffleProof {
+    /// Attempt to construct a proof that `output` is a permutation of `input`.
+    ///
+    /// Returns a tuple `(proof, input_commitments || output_commitments)`.
+    ///
+    /// Note: this proof isn't very useful, since the openings to the
+    /// commitments are discarded internally.  A non-example
+    /// implementation would probably want to take blindings as
+    /// inputs.
     pub fn prove<'a, 'b>(
         pc_gens: &'b PedersenGens,
         bp_gens: &'b BulletproofGens,
         transcript: &'a mut Transcript,
         input: &[Scalar],
         output: &[Scalar],
-    ) -> Result<(R1CSProof, Vec<CompressedRistretto>), R1CSError> {
+    ) -> Result<(ShuffleProof, Vec<CompressedRistretto>), R1CSError> {
         let k = input.len();
 
         // Prover makes a `ConstraintSystem` instance representing a shuffle gadget
@@ -84,14 +94,18 @@ impl ShuffleProof {
 
         // Prover generates proof
         let proof = prover_cs.prove()?;
-        Ok((proof, commitments))
-    }
 
+        Ok((ShuffleProof(proof), commitments))
+    }
+}
+
+impl ShuffleProof {
+    /// Attempt to verify a `ShuffleProof`.
     pub fn verify<'a, 'b>(
+        &self,
         pc_gens: &'b PedersenGens,
         bp_gens: &'b BulletproofGens,
         transcript: &'a mut Transcript,
-        proof: &R1CSProof,
         commitments: &Vec<CompressedRistretto>,
     ) -> Result<(), R1CSError> {
         let k = commitments.len() / 2;
@@ -105,7 +119,7 @@ impl ShuffleProof {
         ShuffleProof::gadget(&mut verifier_cs, input_vars, output_vars);
 
         // Verifier verifies proof
-        verifier_cs.verify(&proof)
+        verifier_cs.verify(&self.0)
     }
 }
 
@@ -135,14 +149,16 @@ fn kshuffle_helper(k: usize) {
 
     {
         let mut verifier_transcript = transcript.clone();
-        ShuffleProof::verify(
-            &pc_gens,
-            &bp_gens,
-            &mut verifier_transcript,
-            &proof,
-            &commitments,
-        )
-        .unwrap();
+        assert!(
+            proof
+                .verify(
+                    &pc_gens,
+                    &bp_gens,
+                    &mut verifier_transcript,
+                    &commitments,
+                )
+                .is_ok()
+        );
     }
 }
 
