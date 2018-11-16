@@ -10,156 +10,9 @@ use curve25519_dalek::scalar::Scalar;
 use merlin::Transcript;
 use rand::thread_rng;
 
-/// Constrains (a1 + a2) * (b1 + b2) = (c1 + c2)
-fn example_gadget<CS: ConstraintSystem>(
-    cs: &mut CS,
-    a1: LinearCombination,
-    a2: LinearCombination,
-    b1: LinearCombination,
-    b2: LinearCombination,
-    c1: LinearCombination,
-    c2: LinearCombination,
-) {
-    let (_, _, c_var) = cs.multiply(a1 + a2, b1 + b2);
-    cs.constrain(c1 + c2 - c_var);
-}
+// Shuffle gadget (documented in markdown file)
 
-fn blinding_helper(len: usize) -> Vec<Scalar> {
-    (0..len)
-        .map(|_| Scalar::random(&mut thread_rng()))
-        .collect()
-}
-
-fn example_gadget_roundtrip_helper(
-    a1: u64,
-    a2: u64,
-    b1: u64,
-    b2: u64,
-    c1: u64,
-    c2: u64,
-) -> Result<(), R1CSError> {
-    // Common
-    let pc_gens = PedersenGens::default();
-    let bp_gens = BulletproofGens::new(128, 1);
-
-    // Prover's scope
-    let (proof, commitments) = {
-        // 0. Construct transcript
-        let mut transcript = Transcript::new(b"R1CSExampleGadget");
-
-        // 1. Construct HL witness
-        let v: Vec<_> = [a1, a2, b1, b2, c1]
-            .iter()
-            .map(|x| Scalar::from(*x))
-            .collect();
-        let v_blinding = blinding_helper(v.len());
-
-        // 2. Construct CS
-        let (mut cs, vars, commitments) =
-            ProverCS::new(&bp_gens, &pc_gens, &mut transcript, v.clone(), v_blinding);
-
-        // 3. Add gadgets
-        example_gadget(
-            &mut cs,
-            vars[0].into(),
-            vars[1].into(),
-            vars[2].into(),
-            vars[3].into(),
-            vars[4].into(),
-            Scalar::from(c2).into(),
-        );
-
-        // 4. Prove.
-        let proof = cs.prove()?;
-
-        (proof, commitments)
-    };
-
-    // Verifier logic
-
-    // 0. Construct transcript
-    let mut transcript = Transcript::new(b"R1CSExampleGadget");
-
-    // 1. Construct CS using commitments to HL witness
-    let (mut cs, vars) = VerifierCS::new(&bp_gens, &pc_gens, &mut transcript, commitments);
-
-    // 2. Add gadgets
-    example_gadget(
-        &mut cs,
-        vars[0].into(),
-        vars[1].into(),
-        vars[2].into(),
-        vars[3].into(),
-        vars[4].into(),
-        Scalar::from(c2).into(),
-    );
-
-    // 3. Verify.
-    cs.verify(&proof).map_err(|_| R1CSError::VerificationError)
-}
-
-#[test]
-fn example_gadget_test() {
-    // (3 + 4) * (6 + 1) = (40 + 9)
-    assert!(example_gadget_roundtrip_helper(3, 4, 6, 1, 40, 9).is_ok());
-    // (3 + 4) * (6 + 1) != (40 + 10)
-    assert!(example_gadget_roundtrip_helper(3, 4, 6, 1, 40, 10).is_err());
-}
-
-// Shuffle gadget tests
-
-/* 
-K-SHUFFLE GADGET SPECIFICATION:
-
-Represents a permutation of a list of `k` scalars `{x_i}` into a list of `k` scalars `{y_i}`.
-
-Algebraically it can be expressed as a statement that for a free variable `z`, 
-the roots of the two polynomials in terms of `z` are the same up to a permutation:
-
-    ∏(x_i - z) == ∏(y_i - z)
-
-Prover can commit to blinded scalars `x_i` and `y_i` then receive a random challenge `z`, 
-and build a proof that the above relation holds.
-
-K-shuffle requires `2*(K-1)` multipliers.
-
-For K > 1:
-
-        (x_0 - z)---⊗------⊗---(y_0 - z)        // mulx[0], muly[0]
-                    |      |
-        (x_1 - z)---⊗      ⊗---(y_1 - z)        // mulx[1], muly[1]
-                    |      |
-                   ...    ...
-                    |      |
-    (x_{k-2} - z)---⊗      ⊗---(y_{k-2} - z)    // mulx[k-2], muly[k-2]
-                   /        \
-    (x_{k-1} - z)_/          \_(y_{k-1} - z)
-
-    // Connect left and right sides of the shuffle statement
-    mulx_out[0] = muly_out[0]
-
-    // For i == [0, k-3]:
-    mulx_left[i]  = x_i - z
-    mulx_right[i] = mulx_out[i+1]
-    muly_left[i]  = y_i - z
-    muly_right[i] = muly_out[i+1]
-
-    // last multipliers connect two last variables (on each side)
-    mulx_left[k-2]  = x_{k-2} - z
-    mulx_right[k-2] = x_{k-1} - z
-    muly_left[k-2]  = y_{k-2} - z
-    muly_right[k-2] = y_{k-1} - z
-
-For K = 1:
-
-    (x_0 - z)--------------(y_0 - z)
-
-    // Connect x to y directly, omitting the challenge entirely as it cancels out
-    x_0 = y_0
-*/
-
-// Make a gadget that adds constraints to a ConstraintSystem, such that the
-// y variables are constrained to be a valid shuffle of the x variables.
+/// A proof-of-shuffle.
 struct KShuffleGadget {}
 
 impl KShuffleGadget {
@@ -341,4 +194,100 @@ fn shuffle_gadget_test_24() {
 #[test]
 fn shuffle_gadget_test_42() {
     kshuffle_helper(42);
+}
+
+/// Constrains (a1 + a2) * (b1 + b2) = (c1 + c2)
+fn example_gadget<CS: ConstraintSystem>(
+    cs: &mut CS,
+    a1: LinearCombination,
+    a2: LinearCombination,
+    b1: LinearCombination,
+    b2: LinearCombination,
+    c1: LinearCombination,
+    c2: LinearCombination,
+) {
+    let (_, _, c_var) = cs.multiply(a1 + a2, b1 + b2);
+    cs.constrain(c1 + c2 - c_var);
+}
+
+fn example_gadget_roundtrip_helper(
+    a1: u64,
+    a2: u64,
+    b1: u64,
+    b2: u64,
+    c1: u64,
+    c2: u64,
+) -> Result<(), R1CSError> {
+    fn blinding_helper(len: usize) -> Vec<Scalar> {
+        (0..len)
+            .map(|_| Scalar::random(&mut thread_rng()))
+            .collect()
+    }
+
+    // Common
+    let pc_gens = PedersenGens::default();
+    let bp_gens = BulletproofGens::new(128, 1);
+
+    // Prover's scope
+    let (proof, commitments) = {
+        // 0. Construct transcript
+        let mut transcript = Transcript::new(b"R1CSExampleGadget");
+
+        // 1. Construct HL witness
+        let v: Vec<_> = [a1, a2, b1, b2, c1]
+            .iter()
+            .map(|x| Scalar::from(*x))
+            .collect();
+        let v_blinding = blinding_helper(v.len());
+
+        // 2. Construct CS
+        let (mut cs, vars, commitments) =
+            ProverCS::new(&bp_gens, &pc_gens, &mut transcript, v.clone(), v_blinding);
+
+        // 3. Add gadgets
+        example_gadget(
+            &mut cs,
+            vars[0].into(),
+            vars[1].into(),
+            vars[2].into(),
+            vars[3].into(),
+            vars[4].into(),
+            Scalar::from(c2).into(),
+        );
+
+        // 4. Prove.
+        let proof = cs.prove()?;
+
+        (proof, commitments)
+    };
+
+    // Verifier logic
+
+    // 0. Construct transcript
+    let mut transcript = Transcript::new(b"R1CSExampleGadget");
+
+    // 1. Construct CS using commitments to HL witness
+    let (mut cs, vars) = VerifierCS::new(&bp_gens, &pc_gens, &mut transcript, commitments);
+
+    // 2. Add gadgets
+    example_gadget(
+        &mut cs,
+        vars[0].into(),
+        vars[1].into(),
+        vars[2].into(),
+        vars[3].into(),
+        vars[4].into(),
+        Scalar::from(c2).into(),
+    );
+
+    // 3. Verify.
+    cs.verify(&proof).map_err(|_| R1CSError::VerificationError)
+}
+
+#[test]
+fn example_gadget_test() {
+    // (3 + 4) * (6 + 1) = (40 + 9)
+    assert!(example_gadget_roundtrip_helper(3, 4, 6, 1, 40, 9).is_ok());
+    // (3 + 4) * (6 + 1) != (40 + 10)
+    assert!(example_gadget_roundtrip_helper(3, 4, 6, 1, 40, 10).is_err());
 }
