@@ -105,7 +105,7 @@ impl ShuffleProof {
 }
 ```
 
-In this example, `fill_cs` is private function that adds constraints to the constraint system that enforce that `y` (the outputs) are a valid reordering of `x` (the inputs). 
+In this example, `ShuffleProof::gadget()` is private function that adds constraints to the constraint system that enforce that `y` (the outputs) are a valid reordering of `x` (the inputs). 
 
 First, the function gets a challenge scalar `z` by calling the `ConstraintSystem::challenge_scalar`. This challenge is generated from commitments to high-level variables that were passed to the `ConstraintSystem` when it was created. As noted in the `challenge_scalar` documentation, it is important to ensure that the challenge is sound by making sure that low-level variables are bound to the high-level variables. 
 
@@ -114,7 +114,10 @@ After a check for the lengths of `x` and `y`, the function then makes multiplier
 
 ## Constructing a proof
 
-leadin to proof construction
+The prover prepares the input and output scalar lists, as well as the generators (which are needed to make commitments and to make the proof) and a transcript (which is needed to generate challenges). The `prove` function takes returns a proof, and the commitments to the input and output scalars. 
+
+For simplicity, in this example the `prove` function does not take a list of blinding factors for the inputs and outputs, so it is not possible to make a proof for existing committed points. However, it is possible to modify the function to take in a list of blinding factors instead of generating them internally. Also, in this example the `prove` function does not return the list of blinding factors generated, so it is not possible for the prover to open the commitments in the future. This can also be easily modified.
+
 
 ```rust
 # extern crate bulletproofs;
@@ -220,7 +223,7 @@ impl ShuffleProof {
 
 ## Verifiying a proof
 
-leadin to verify
+The verifier receives a proof, and a list of committed inputs and outputs, from the prover. It passes these to the `verify` function, and receives a `Result::ok()` if the proof verified correctly and a `Result::error(R1CSError)` otherwise. The proof could fail to verify for a variety of reasons - if the original scalar outputs were not a valid reordering of the inputs, if the commitments were generated or transmitted incorrectly, or if the constraint system was built differently for the prover and verifier. 
 
 ```rust
 # extern crate bulletproofs;
@@ -352,6 +355,10 @@ impl ShuffleProof {
 ```
 
 ## Using the `ShuffleProof`
+
+Here, we use the `ShuffleProof` gadget by first constructing the common inputs to the `prove` and `verify` functions: the Pedersen and Bulletproofs generators. Next, the prover makes the other inputs to the `prove` function: the list of scalar inputs, the list of scalar outputs, and the prover transcript. The prover calls the `prove` function, and gets a proof and a list of committed points that represent the commitments to the input and output scalars.
+
+The prover passes the proof and the commitments to the verifier. The verifier then makes the other inputs to the `verify` function: the verifier transcript. Note that the starting transcript state must be the same for the prover and verifer transcript; if they are not, then the prover and verifier will receive different challenge scalars and the proof will not verify correctly. The verifier then calls the `verify` function, and gets back a `Result` representing whether or not the proof verified correctly.
 
 ```rust
 # extern crate bulletproofs;
