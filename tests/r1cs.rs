@@ -54,11 +54,6 @@ impl ShuffleProof {
     /// Attempt to construct a proof that `output` is a permutation of `input`.
     ///
     /// Returns a tuple `(proof, input_commitments || output_commitments)`.
-    ///
-    /// Note: this proof isn't very useful, since the openings to the
-    /// commitments are discarded internally.  A non-example
-    /// implementation would probably want to take blindings as
-    /// inputs.
     pub fn prove<'a, 'b>(
         pc_gens: &'b PedersenGens,
         bp_gens: &'b BulletproofGens,
@@ -71,13 +66,13 @@ impl ShuffleProof {
         transcript.commit_bytes(b"dom-sep", b"ShuffleProof");
         transcript.commit_bytes(b"k", Scalar::from(k as u64).as_bytes());
 
-        // Prover makes a `ConstraintSystem` instance representing a shuffle gadget
-        // Make v vector
+        // Collect witness assignments
         let mut v = Vec::with_capacity(2 * k);
         v.extend_from_slice(input);
         v.extend_from_slice(output);
 
-        // Make v_blinding vector using RNG from transcript
+        // Construct blinding factors using a TranscriptRng
+        // Note: a non-example implementation would want to operate on existing commitments
         let mut rng = {
             let mut builder = transcript.build_rng();
             // commit the secret values
@@ -88,15 +83,17 @@ impl ShuffleProof {
             builder.finalize(&mut thread_rng())
         };
         let v_blinding: Vec<Scalar> = (0..2 * k).map(|_| Scalar::random(&mut rng)).collect();
-        let (mut prover_cs, variables, commitments) =
+
+        // Construct a `ConstraintSystem` instance for the shuffle gadget
+        let (mut cs, variables, commitments) =
             ProverCS::new(&bp_gens, &pc_gens, transcript, v, v_blinding.clone());
 
-        // Prover allocates variables and adds constraints to the constraint system
+        // Allocate variables and add constraints to the constraint system
         let (input_vars, output_vars) = variables.split_at(k);
-        ShuffleProof::gadget(&mut prover_cs, input_vars, output_vars);
+        ShuffleProof::gadget(&mut cs, input_vars, output_vars);
 
-        // Prover generates proof
-        let proof = prover_cs.prove()?;
+        // Generate proof
+        let proof = cs.prove()?;
 
         Ok((ShuffleProof(proof), commitments))
     }
@@ -117,15 +114,15 @@ impl ShuffleProof {
         transcript.commit_bytes(b"k", Scalar::from(k as u64).as_bytes());
 
         // Build a `ConstraintSystem` instance with the public inputs
-        let (mut verifier_cs, variables) =
+        let (mut cs, variables) =
             VerifierCS::new(&bp_gens, &pc_gens, transcript, commitments.to_vec());
 
-        // Verifier allocates variables and adds constraints to the constraint system
+        // Add constraints to the constraint system
         let (input_vars, output_vars) = variables.split_at(k);
-        ShuffleProof::gadget(&mut verifier_cs, input_vars, output_vars);
+        ShuffleProof::gadget(&mut cs, input_vars, output_vars);
 
-        // Verifier verifies proof
-        verifier_cs.verify(&self.0)
+        // Verify the proof
+        cs.verify(&self.0)
     }
 }
 
