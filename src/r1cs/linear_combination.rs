@@ -19,42 +19,21 @@ pub enum Variable {
     One(),
 }
 
-/// Trait for types that can be unambiguously converted to a linear combination.
-/// Variable is converted to `(var, 1)`, scalar is converted as `(One, scalar)`,
-/// tuple `(v,w)` is converted to a single term.
-pub trait IntoLinearCombination {
-    /// Converts the type into a linear combination
-    fn into_lc(self) -> LinearCombination;
-}
-
-// Implementation of IntoLinearCombination trait for various types
-impl IntoLinearCombination for LinearCombination {
-    fn into_lc(self) -> LinearCombination {
-        self
+impl From<Variable> for LinearCombination {
+    fn from(s: S) -> LinearCombination {
+        (v, Scalar::one()).into()
     }
 }
 
-impl IntoLinearCombination for u64 {
-    fn into_lc(self) -> LinearCombination {
-        (Variable::One(), self).into_lc()
+impl<S: Into<Scalar>> From<S> for LinearCombination {
+    fn from(s: S) -> LinearCombination {
+        (Variable::One(), s).into()
     }
 }
 
-impl IntoLinearCombination for Scalar {
-    fn into_lc(self) -> LinearCombination {
-        (Variable::One(), self).into_lc()
-    }
-}
-
-impl IntoLinearCombination for Variable {
-    fn into_lc(self) -> LinearCombination {
-        (self, 1u64).into_lc()
-    }
-}
-
-impl<S: Into<Scalar>> IntoLinearCombination for (Variable, S) {
-    fn into_lc(self) -> LinearCombination {
-        iter::once((self.0, self.1.into())).collect()
+impl<S: Into<Scalar>> From<(Variable, S)> for LinearCombination {
+    fn from(term: (Variable, S)) -> LinearCombination {
+        iter::once(term).collect()
     }
 }
 
@@ -68,7 +47,7 @@ impl Neg for Variable {
     }
 }
 
-impl<L: IntoLinearCombination> Add<L> for Variable {
+impl<L: Into<LinearCombination>> Add<L> for Variable {
     type Output = LinearCombination;
 
     fn add(self, other: L) -> Self::Output {
@@ -76,7 +55,7 @@ impl<L: IntoLinearCombination> Add<L> for Variable {
     }
 }
 
-impl<L: IntoLinearCombination> Sub<L> for Variable {
+impl<L: Into<LinearCombination>> Sub<L> for Variable {
     type Output = LinearCombination;
 
     fn sub(self, other: L) -> Self::Output {
@@ -176,7 +155,7 @@ impl<'a> FromIterator<&'a (Variable, Scalar)> for LinearCombination {
 
 // Arithmetic on linear combinations
 
-impl<L: IntoLinearCombination> Add<L> for LinearCombination {
+impl<L: Into<LinearCombination>> Add<L> for LinearCombination {
     type Output = Self;
 
     fn add(mut self, rhs: L) -> Self::Output {
@@ -185,7 +164,7 @@ impl<L: IntoLinearCombination> Add<L> for LinearCombination {
     }
 }
 
-impl<L: IntoLinearCombination> Sub<L> for LinearCombination {
+impl<L: Into<LinearCombination>> Sub<L> for LinearCombination {
     type Output = Self;
 
     fn sub(mut self, rhs: L) -> Self::Output {
