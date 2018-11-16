@@ -42,32 +42,7 @@ pub struct VerifierCS<'a, 'b> {
 }
 
 impl<'a, 'b> ConstraintSystem for VerifierCS<'a, 'b> {
-    fn add_constraint(
-        &mut self,
-        mut left: LinearCombination,
-        mut right: LinearCombination,
-        mut out: LinearCombination,
-    ) -> (Variable, Variable, Variable) {
-        let var = self.num_vars;
-        self.num_vars += 1;
-
-        // Create variables for l,r,o
-        let l_var = Variable::MultiplierLeft(var);
-        let r_var = Variable::MultiplierRight(var);
-        let o_var = Variable::MultiplierOutput(var);
-
-        // Constrain l,r,o:
-        left.terms.push((l_var, -Scalar::one()));
-        right.terms.push((r_var, -Scalar::one()));
-        out.terms.push((o_var, -Scalar::one()));
-        self.add_auxiliary_constraint(left);
-        self.add_auxiliary_constraint(right);
-        self.add_auxiliary_constraint(out);
-
-        (l_var, r_var, o_var)
-    }
-
-    fn add_partial_constraint(
+    fn multiply(
         &mut self,
         mut left: LinearCombination,
         mut right: LinearCombination,
@@ -83,13 +58,28 @@ impl<'a, 'b> ConstraintSystem for VerifierCS<'a, 'b> {
         // Constrain l,r,o:
         left.terms.push((l_var, -Scalar::one()));
         right.terms.push((r_var, -Scalar::one()));
-        self.add_auxiliary_constraint(left);
-        self.add_auxiliary_constraint(right);
+        self.constrain(left);
+        self.constrain(right);
 
         (l_var, r_var, o_var)
     }
 
-    fn add_auxiliary_constraint(&mut self, lc: LinearCombination) {
+    fn allocate<F>(&mut self, _: F) -> Result<(Variable, Variable, Variable), R1CSError>
+    where
+        F: FnOnce() -> Result<(Scalar, Scalar, Scalar), R1CSError>,
+    {
+        let var = self.num_vars;
+        self.num_vars += 1;
+
+        // Create variables for l,r,o
+        let l_var = Variable::MultiplierLeft(var);
+        let r_var = Variable::MultiplierRight(var);
+        let o_var = Variable::MultiplierOutput(var);
+
+        Ok((l_var, r_var, o_var))
+    }
+
+    fn constrain(&mut self, lc: LinearCombination) {
         // TODO: check that the linear combinations are valid
         // (e.g. that variables are valid, that the linear combination
         // evals to 0 for prover, etc).
