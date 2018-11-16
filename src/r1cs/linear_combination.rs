@@ -1,7 +1,7 @@
 //! Definition of linear combinations.
 
 use curve25519_dalek::scalar::Scalar;
-use std::iter::{self, FromIterator};
+use std::iter::{FromIterator};
 use std::ops::{Add, Mul, Neg, Sub};
 
 /// Represents a variable in a constraint system.
@@ -20,20 +20,18 @@ pub enum Variable {
 }
 
 impl From<Variable> for LinearCombination {
-    fn from(s: S) -> LinearCombination {
-        (v, Scalar::one()).into()
+    fn from(v: Variable) -> LinearCombination {
+        LinearCombination {
+            terms: vec![(v, Scalar::one())],
+        }
     }
 }
 
 impl<S: Into<Scalar>> From<S> for LinearCombination {
     fn from(s: S) -> LinearCombination {
-        (Variable::One(), s).into()
-    }
-}
-
-impl<S: Into<Scalar>> From<(Variable, S)> for LinearCombination {
-    fn from(term: (Variable, S)) -> LinearCombination {
-        iter::once(term).collect()
+        LinearCombination {
+            terms: vec![(Variable::One(), s.into())],
+        }
     }
 }
 
@@ -43,7 +41,7 @@ impl Neg for Variable {
     type Output = LinearCombination;
 
     fn neg(self) -> Self::Output {
-        -self.into_lc()
+        -LinearCombination::from(self)
     }
 }
 
@@ -51,7 +49,7 @@ impl<L: Into<LinearCombination>> Add<L> for Variable {
     type Output = LinearCombination;
 
     fn add(self, other: L) -> Self::Output {
-        self.into_lc() + other.into_lc()
+        LinearCombination::from(self) + other.into()
     }
 }
 
@@ -59,7 +57,7 @@ impl<L: Into<LinearCombination>> Sub<L> for Variable {
     type Output = LinearCombination;
 
     fn sub(self, other: L) -> Self::Output {
-        self.into_lc() - other.into_lc()
+        LinearCombination::from(self) - other.into()
     }
 }
 
@@ -119,18 +117,6 @@ impl Default for LinearCombination {
     }
 }
 
-impl From<Scalar> for LinearCombination {
-    fn from(s: Scalar) -> Self {
-        iter::once((Variable::One(), s)).collect()
-    }
-}
-
-impl From<Variable> for LinearCombination {
-    fn from(v: Variable) -> Self {
-        iter::once((v, Scalar::one())).collect()
-    }
-}
-
 impl FromIterator<(Variable, Scalar)> for LinearCombination {
     fn from_iter<T>(iter: T) -> Self
     where
@@ -159,7 +145,7 @@ impl<L: Into<LinearCombination>> Add<L> for LinearCombination {
     type Output = Self;
 
     fn add(mut self, rhs: L) -> Self::Output {
-        self.terms.extend(rhs.into_lc().terms.iter().cloned());
+        self.terms.extend(rhs.into().terms.iter().cloned());
         LinearCombination { terms: self.terms }
     }
 }
@@ -169,7 +155,7 @@ impl<L: Into<LinearCombination>> Sub<L> for LinearCombination {
 
     fn sub(mut self, rhs: L) -> Self::Output {
         self.terms.extend(
-            rhs.into_lc()
+            rhs.into()
                 .terms
                 .iter()
                 .map(|(var, coeff)| (*var, -coeff)),
@@ -195,7 +181,7 @@ impl Neg for LinearCombination {
     type Output = Self;
 
     fn neg(mut self) -> Self::Output {
-        for (v, s) in self.terms.iter_mut() {
+        for (_, s) in self.terms.iter_mut() {
             *s = -*s
         }
         self
@@ -207,7 +193,7 @@ impl<S: Into<Scalar>> Mul<S> for LinearCombination {
 
     fn mul(mut self, other: S) -> Self::Output {
         let other = other.into();
-        for (v, s) in self.terms.iter_mut() {
+        for (_, s) in self.terms.iter_mut() {
             *s *= other
         }
         self
