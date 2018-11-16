@@ -66,7 +66,10 @@ impl ShuffleProof {
         input: &[Scalar],
         output: &[Scalar],
     ) -> Result<(ShuffleProof, Vec<CompressedRistretto>), R1CSError> {
+        // Apply a domain separator with the shuffle parameters to the transcript
         let k = input.len();
+        transcript.commit_bytes(b"dom-sep", b"ShuffleProof");
+        transcript.commit_bytes(b"k", Scalar::from(k as u64).as_bytes());
 
         // Prover makes a `ConstraintSystem` instance representing a shuffle gadget
         // Make v vector
@@ -108,9 +111,12 @@ impl ShuffleProof {
         transcript: &'a mut Transcript,
         commitments: &Vec<CompressedRistretto>,
     ) -> Result<(), R1CSError> {
+        // Apply a domain separator with the shuffle parameters to the transcript
         let k = commitments.len() / 2;
+        transcript.commit_bytes(b"dom-sep", b"ShuffleProof");
+        transcript.commit_bytes(b"k", Scalar::from(k as u64).as_bytes());
 
-        // Verifier makes a `ConstraintSystem` instance representing a shuffle gadget
+        // Build a `ConstraintSystem` instance with the public inputs
         let (mut verifier_cs, variables) =
             VerifierCS::new(&bp_gens, &pc_gens, transcript, commitments.to_vec());
 
@@ -130,9 +136,6 @@ fn kshuffle_helper(k: usize) {
     let pc_gens = PedersenGens::default();
     let bp_gens = BulletproofGens::new((2 * k).next_power_of_two(), 1);
 
-    let mut transcript = Transcript::new(b"ShuffleTest");
-    transcript.commit_bytes(b"k", Scalar::from(k as u64).as_bytes());
-
     let (proof, commitments) = {
         // Randomly generate inputs and outputs to kshuffle
         let mut rng = rand::thread_rng();
@@ -143,20 +146,15 @@ fn kshuffle_helper(k: usize) {
         let mut output = input.clone();
         rand::thread_rng().shuffle(&mut output);
 
-        let mut prover_transcript = transcript.clone();
+        let mut prover_transcript = Transcript::new(b"ShuffleProofTest");
         ShuffleProof::prove(&pc_gens, &bp_gens, &mut prover_transcript, &input, &output).unwrap()
     };
 
     {
-        let mut verifier_transcript = transcript.clone();
+        let mut verifier_transcript = Transcript::new(b"ShuffleProofTest");
         assert!(
             proof
-                .verify(
-                    &pc_gens,
-                    &bp_gens,
-                    &mut verifier_transcript,
-                    &commitments,
-                )
+                .verify(&pc_gens, &bp_gens, &mut verifier_transcript, &commitments,)
                 .is_ok()
         );
     }
