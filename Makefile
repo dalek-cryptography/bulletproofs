@@ -1,4 +1,4 @@
-FEATURES := 
+FEATURES := yoloproofs
 
 doc:
 	cargo rustdoc --features "$(FEATURES)" -- --html-in-header docs/assets/rustdoc-include-katex-header.html
