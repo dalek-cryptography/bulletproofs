@@ -2,7 +2,7 @@
 
 use curve25519_dalek::scalar::Scalar;
 use std::iter::{self, FromIterator};
-use std::ops::{Add, Mul, Sub, Neg};
+use std::ops::{Add, Mul, Neg, Sub};
 
 /// Represents a variable in a constraint system.
 #[derive(Copy, Clone, Debug)]
