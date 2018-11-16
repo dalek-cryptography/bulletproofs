@@ -1,7 +1,7 @@
 //! Definition of linear combinations.
 
 use curve25519_dalek::scalar::Scalar;
-use std::iter::{FromIterator};
+use std::iter::FromIterator;
 use std::ops::{Add, Mul, Neg, Sub};
 
 /// Represents a variable in a constraint system.
@@ -154,12 +154,8 @@ impl<L: Into<LinearCombination>> Sub<L> for LinearCombination {
     type Output = Self;
 
     fn sub(mut self, rhs: L) -> Self::Output {
-        self.terms.extend(
-            rhs.into()
-                .terms
-                .iter()
-                .map(|(var, coeff)| (*var, -coeff)),
-        );
+        self.terms
+            .extend(rhs.into().terms.iter().map(|(var, coeff)| (*var, -coeff)));
         LinearCombination { terms: self.terms }
     }
 }
