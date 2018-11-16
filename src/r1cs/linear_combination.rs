@@ -2,7 +2,7 @@
 
 use curve25519_dalek::scalar::Scalar;
 use std::iter::{self, FromIterator};
-use std::ops::{Add, Sub};
+use std::ops::{Add, Mul, Sub};
 
 /// Represents a variable in a constraint system.
 #[derive(Copy, Clone, Debug)]
@@ -59,6 +59,16 @@ impl Sub<Variable> for Scalar {
     }
 }
 
+impl Mul<Variable> for Scalar {
+    type Output = LinearCombination;
+
+    fn mul(self, other: Variable) -> LinearCombination {
+        LinearCombination {
+            terms: vec![(other, self)],
+        }
+    }
+}
+
 impl Add<Scalar> for Variable {
     type Output = LinearCombination;
 
@@ -75,6 +85,16 @@ impl Sub<Scalar> for Variable {
     fn sub(self, other: Scalar) -> LinearCombination {
         LinearCombination {
             terms: vec![(self, Scalar::one()), (Variable::One(), -other)],
+        }
+    }
+}
+
+impl Mul<Scalar> for Variable {
+    type Output = LinearCombination;
+
+    fn mul(self, other: Scalar) -> LinearCombination {
+        LinearCombination {
+            terms: vec![(self, other)],
         }
     }
 }
@@ -143,5 +163,31 @@ impl Sub<LinearCombination> for LinearCombination {
         self.terms
             .extend(rhs.terms.iter().map(|(var, coeff)| (*var, -coeff)));
         LinearCombination { terms: self.terms }
+    }
+}
+
+impl Mul<LinearCombination> for Scalar {
+    type Output = LinearCombination;
+
+    fn mul(self, other: LinearCombination) -> LinearCombination {
+        let out_terms = other
+            .terms
+            .into_iter()
+            .map(|(var, scalar)| (var, scalar * self))
+            .collect();
+        LinearCombination { terms: out_terms }
+    }
+}
+
+impl Mul<Scalar> for LinearCombination {
+    type Output = Self;
+
+    fn mul(self, other: Scalar) -> Self {
+        let out_terms = self
+            .terms
+            .into_iter()
+            .map(|(var, scalar)| (var, scalar * other))
+            .collect();
+        LinearCombination { terms: out_terms }
     }
 }
