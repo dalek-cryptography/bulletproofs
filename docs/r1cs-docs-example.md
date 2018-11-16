@@ -51,9 +51,58 @@ The shuffle `verify` function verifies that, given a shuffle proof and a list of
 
 Because only the prover knows the scalar values of the inputs and outputs, and the verifier only sees the (blinded) committed inputs and outputs, the verifier has no knowledge of what the underlying inputs and output values are. Therefore, the only information the verifier learns from this protocol is whether or not the committed outputs are a valid shuffle of the committed inputs - this is why it is a zero-knowledge proof.
 
+```rust
+extern crate bulletproofs;
+extern crate curve25519_dalek;
+extern crate merlin;
+extern crate rand;
 
-```rust,no_run
-gadget code (fill_cs function)
+use bulletproofs::r1cs::*;
+use bulletproofs::{BulletproofGens, PedersenGens};
+use curve25519_dalek::ristretto::CompressedRistretto;
+use curve25519_dalek::scalar::Scalar;
+use merlin::Transcript;
+use rand::thread_rng;
+
+// Shuffle gadget (documented in markdown file)
+
+/// A proof-of-shuffle.
+struct ShuffleProof(R1CSProof);
+
+impl ShuffleProof {
+    fn gadget<CS: ConstraintSystem>(cs: &mut CS, x: &[Variable], y: &[Variable]) {
+        let z = cs.challenge_scalar(b"shuffle challenge");
+
+        assert_eq!(x.len(), y.len());
+        let k = x.len();
+
+        if k == 1 {
+            cs.constrain(y[0] - x[0]);
+            return;
+        }
+
+        // Make last x multiplier for i = k-1 and k-2
+        let (_, _, last_mulx_out) = cs.multiply(x[k - 1] - z, x[k - 2] - z);
+
+        // Make multipliers for x from i == [0, k-3]
+        let first_mulx_out = (0..k - 2).rev().fold(last_mulx_out, |prev_out, i| {
+            let (_, _, o) = cs.multiply(prev_out.into(), x[i] - z);
+            o
+        });
+
+        // Make last y multiplier for i = k-1 and k-2
+        let (_, _, last_muly_out) = cs.multiply(y[k - 1] - z, y[k - 2] - z);
+
+        // Make multipliers for y from i == [0, k-3]
+        let first_muly_out = (0..k - 2).rev().fold(last_muly_out, |prev_out, i| {
+            let (_, _, o) = cs.multiply(prev_out.into(), y[i] - z);
+            o
+        });
+
+        // Constrain last x mul output and last y mul output to be equal
+        cs.constrain(first_mulx_out - first_muly_out);
+    }
+}
 ```
 
 In this example, `fill_cs` is private function that adds constraints to the constraint system that enforce that `y` (the outputs) are a valid reordering of `x` (the inputs). 
@@ -67,17 +116,408 @@ After a check for the lengths of `x` and `y`, the function then makes multiplier
 
 leadin to proof construction
 
-```rust,no_run
+```rust
+# extern crate bulletproofs;
+# extern crate curve25519_dalek;
+# extern crate merlin;
+# extern crate rand;
+# 
+# use bulletproofs::r1cs::*;
+# use bulletproofs::{BulletproofGens, PedersenGens};
+# use curve25519_dalek::ristretto::CompressedRistretto;
+# use curve25519_dalek::scalar::Scalar;
+# use merlin::Transcript;
+# use rand::thread_rng;
+# 
+# // Shuffle gadget (documented in markdown file)
+# 
+# /// A proof-of-shuffle.
+# struct ShuffleProof(R1CSProof);
+# 
+# impl ShuffleProof {
+#     fn gadget<CS: ConstraintSystem>(cs: &mut CS, x: &[Variable], y: &[Variable]) {
+#         let z = cs.challenge_scalar(b"shuffle challenge");
+# 
+#         assert_eq!(x.len(), y.len());
+#         let k = x.len();
+# 
+#         if k == 1 {
+#             cs.constrain(y[0] - x[0]);
+#             return;
+#         }
+# 
+#         // Make last x multiplier for i = k-1 and k-2
+#         let (_, _, last_mulx_out) = cs.multiply(x[k - 1] - z, x[k - 2] - z);
+# 
+#         // Make multipliers for x from i == [0, k-3]
+#         let first_mulx_out = (0..k - 2).rev().fold(last_mulx_out, |prev_out, i| {
+#             let (_, _, o) = cs.multiply(prev_out.into(), x[i] - z);
+#             o
+#         });
+# 
+#         // Make last y multiplier for i = k-1 and k-2
+#         let (_, _, last_muly_out) = cs.multiply(y[k - 1] - z, y[k - 2] - z);
+# 
+#         // Make multipliers for y from i == [0, k-3]
+#         let first_muly_out = (0..k - 2).rev().fold(last_muly_out, |prev_out, i| {
+#             let (_, _, o) = cs.multiply(prev_out.into(), y[i] - z);
+#             o
+#         });
+# 
+#         // Constrain last x mul output and last y mul output to be equal
+#         cs.constrain(first_mulx_out - first_muly_out);
+#     }
+# }
+impl ShuffleProof {
+    /// Attempt to construct a proof that `output` is a permutation of `input`.
+    ///
+    /// Returns a tuple `(proof, input_commitments || output_commitments)`.
+    pub fn prove<'a, 'b>(
+        pc_gens: &'b PedersenGens,
+        bp_gens: &'b BulletproofGens,
+        transcript: &'a mut Transcript,
+        input: &[Scalar],
+        output: &[Scalar],
+    ) -> Result<(ShuffleProof, Vec<CompressedRistretto>), R1CSError> {
+        // Apply a domain separator with the shuffle parameters to the transcript
+        let k = input.len();
+        transcript.commit_bytes(b"dom-sep", b"ShuffleProof");
+        transcript.commit_bytes(b"k", Scalar::from(k as u64).as_bytes());
+
+        // Collect witness assignments
+        let mut v = Vec::with_capacity(2 * k);
+        v.extend_from_slice(input);
+        v.extend_from_slice(output);
+
+        // Construct blinding factors using a TranscriptRng
+        // Note: a non-example implementation would want to operate on existing commitments
+        let mut rng = {
+            let mut builder = transcript.build_rng();
+            // commit the secret values
+            for &v_i in &v {
+                builder = builder.commit_witness_bytes(b"v_i", v_i.as_bytes());
+            }
+            use rand::thread_rng;
+            builder.finalize(&mut thread_rng())
+        };
+        let v_blinding: Vec<Scalar> = (0..2 * k).map(|_| Scalar::random(&mut rng)).collect();
+
+        // Construct a `ConstraintSystem` instance for the shuffle gadget
+        let (mut cs, variables, commitments) =
+            ProverCS::new(&bp_gens, &pc_gens, transcript, v, v_blinding.clone());
+
+        // Allocate variables and add constraints to the constraint system
+        let (input_vars, output_vars) = variables.split_at(k);
+        ShuffleProof::gadget(&mut cs, input_vars, output_vars);
+
+        // Generate proof
+        let proof = cs.prove()?;
+
+        Ok((ShuffleProof(proof), commitments))
+    }
+}
 ```
 
 ## Verifiying a proof
 
 leadin to verify
 
-```rust,no_run
+```rust
+# extern crate bulletproofs;
+# extern crate curve25519_dalek;
+# extern crate merlin;
+# extern crate rand;
+# 
+# use bulletproofs::r1cs::*;
+# use bulletproofs::{BulletproofGens, PedersenGens};
+# use curve25519_dalek::ristretto::CompressedRistretto;
+# use curve25519_dalek::scalar::Scalar;
+# use merlin::Transcript;
+# use rand::thread_rng;
+# 
+# // Shuffle gadget (documented in markdown file)
+# 
+# /// A proof-of-shuffle.
+# struct ShuffleProof(R1CSProof);
+# 
+# impl ShuffleProof {
+#     fn gadget<CS: ConstraintSystem>(cs: &mut CS, x: &[Variable], y: &[Variable]) {
+#         let z = cs.challenge_scalar(b"shuffle challenge");
+# 
+#         assert_eq!(x.len(), y.len());
+#         let k = x.len();
+# 
+#         if k == 1 {
+#             cs.constrain(y[0] - x[0]);
+#             return;
+#         }
+# 
+#         // Make last x multiplier for i = k-1 and k-2
+#         let (_, _, last_mulx_out) = cs.multiply(x[k - 1] - z, x[k - 2] - z);
+# 
+#         // Make multipliers for x from i == [0, k-3]
+#         let first_mulx_out = (0..k - 2).rev().fold(last_mulx_out, |prev_out, i| {
+#             let (_, _, o) = cs.multiply(prev_out.into(), x[i] - z);
+#             o
+#         });
+# 
+#         // Make last y multiplier for i = k-1 and k-2
+#         let (_, _, last_muly_out) = cs.multiply(y[k - 1] - z, y[k - 2] - z);
+# 
+#         // Make multipliers for y from i == [0, k-3]
+#         let first_muly_out = (0..k - 2).rev().fold(last_muly_out, |prev_out, i| {
+#             let (_, _, o) = cs.multiply(prev_out.into(), y[i] - z);
+#             o
+#         });
+# 
+#         // Constrain last x mul output and last y mul output to be equal
+#         cs.constrain(first_mulx_out - first_muly_out);
+#     }
+# }
+# 
+# impl ShuffleProof {
+#     /// Attempt to construct a proof that `output` is a permutation of `input`.
+#     ///
+#     /// Returns a tuple `(proof, input_commitments || output_commitments)`.
+#     pub fn prove<'a, 'b>(
+#         pc_gens: &'b PedersenGens,
+#         bp_gens: &'b BulletproofGens,
+#         transcript: &'a mut Transcript,
+#         input: &[Scalar],
+#         output: &[Scalar],
+#     ) -> Result<(ShuffleProof, Vec<CompressedRistretto>), R1CSError> {
+#         // Apply a domain separator with the shuffle parameters to the transcript
+#         let k = input.len();
+#         transcript.commit_bytes(b"dom-sep", b"ShuffleProof");
+#         transcript.commit_bytes(b"k", Scalar::from(k as u64).as_bytes());
+# 
+#         // Collect witness assignments
+#         let mut v = Vec::with_capacity(2 * k);
+#         v.extend_from_slice(input);
+#         v.extend_from_slice(output);
+# 
+#         // Construct blinding factors using a TranscriptRng
+#         // Note: a non-example implementation would want to operate on existing commitments
+#         let mut rng = {
+#             let mut builder = transcript.build_rng();
+#             // commit the secret values
+#             for &v_i in &v {
+#                 builder = builder.commit_witness_bytes(b"v_i", v_i.as_bytes());
+#             }
+#             use rand::thread_rng;
+#             builder.finalize(&mut thread_rng())
+#         };
+#         let v_blinding: Vec<Scalar> = (0..2 * k).map(|_| Scalar::random(&mut rng)).collect();
+# 
+#         // Construct a `ConstraintSystem` instance for the shuffle gadget
+#         let (mut cs, variables, commitments) =
+#             ProverCS::new(&bp_gens, &pc_gens, transcript, v, v_blinding.clone());
+# 
+#         // Allocate variables and add constraints to the constraint system
+#         let (input_vars, output_vars) = variables.split_at(k);
+#         ShuffleProof::gadget(&mut cs, input_vars, output_vars);
+# 
+#         // Generate proof
+#         let proof = cs.prove()?;
+# 
+#         Ok((ShuffleProof(proof), commitments))
+#     }
+# }
+impl ShuffleProof {
+    /// Attempt to verify a `ShuffleProof`.
+    pub fn verify<'a, 'b>(
+        &self,
+        pc_gens: &'b PedersenGens,
+        bp_gens: &'b BulletproofGens,
+        transcript: &'a mut Transcript,
+        commitments: &Vec<CompressedRistretto>,
+    ) -> Result<(), R1CSError> {
+        // Apply a domain separator with the shuffle parameters to the transcript
+        let k = commitments.len() / 2;
+        transcript.commit_bytes(b"dom-sep", b"ShuffleProof");
+        transcript.commit_bytes(b"k", Scalar::from(k as u64).as_bytes());
+
+        // Build a `ConstraintSystem` instance with the public inputs
+        let (mut cs, variables) =
+            VerifierCS::new(&bp_gens, &pc_gens, transcript, commitments.to_vec());
+
+        // Add constraints to the constraint system
+        let (input_vars, output_vars) = variables.split_at(k);
+        ShuffleProof::gadget(&mut cs, input_vars, output_vars);
+
+        // Verify the proof
+        cs.verify(&self.0)
+    }
+}
 ```
 
 ## Using the `ShuffleProof`
 
-```rust,no_run
+```rust
+# extern crate bulletproofs;
+# extern crate curve25519_dalek;
+# extern crate merlin;
+# extern crate rand;
+# 
+# use bulletproofs::r1cs::*;
+# use bulletproofs::{BulletproofGens, PedersenGens};
+# use curve25519_dalek::ristretto::CompressedRistretto;
+# use curve25519_dalek::scalar::Scalar;
+# use merlin::Transcript;
+# use rand::thread_rng;
+# 
+# // Shuffle gadget (documented in markdown file)
+# 
+# /// A proof-of-shuffle.
+# struct ShuffleProof(R1CSProof);
+# 
+# impl ShuffleProof {
+#     fn gadget<CS: ConstraintSystem>(cs: &mut CS, x: &[Variable], y: &[Variable]) {
+#         let z = cs.challenge_scalar(b"shuffle challenge");
+# 
+#         assert_eq!(x.len(), y.len());
+#         let k = x.len();
+# 
+#         if k == 1 {
+#             cs.constrain(y[0] - x[0]);
+#             return;
+#         }
+# 
+#         // Make last x multiplier for i = k-1 and k-2
+#         let (_, _, last_mulx_out) = cs.multiply(x[k - 1] - z, x[k - 2] - z);
+# 
+#         // Make multipliers for x from i == [0, k-3]
+#         let first_mulx_out = (0..k - 2).rev().fold(last_mulx_out, |prev_out, i| {
+#             let (_, _, o) = cs.multiply(prev_out.into(), x[i] - z);
+#             o
+#         });
+# 
+#         // Make last y multiplier for i = k-1 and k-2
+#         let (_, _, last_muly_out) = cs.multiply(y[k - 1] - z, y[k - 2] - z);
+# 
+#         // Make multipliers for y from i == [0, k-3]
+#         let first_muly_out = (0..k - 2).rev().fold(last_muly_out, |prev_out, i| {
+#             let (_, _, o) = cs.multiply(prev_out.into(), y[i] - z);
+#             o
+#         });
+# 
+#         // Constrain last x mul output and last y mul output to be equal
+#         cs.constrain(first_mulx_out - first_muly_out);
+#     }
+# }
+# 
+# impl ShuffleProof {
+#     /// Attempt to construct a proof that `output` is a permutation of `input`.
+#     ///
+#     /// Returns a tuple `(proof, input_commitments || output_commitments)`.
+#     pub fn prove<'a, 'b>(
+#         pc_gens: &'b PedersenGens,
+#         bp_gens: &'b BulletproofGens,
+#         transcript: &'a mut Transcript,
+#         input: &[Scalar],
+#         output: &[Scalar],
+#     ) -> Result<(ShuffleProof, Vec<CompressedRistretto>), R1CSError> {
+#         // Apply a domain separator with the shuffle parameters to the transcript
+#         let k = input.len();
+#         transcript.commit_bytes(b"dom-sep", b"ShuffleProof");
+#         transcript.commit_bytes(b"k", Scalar::from(k as u64).as_bytes());
+# 
+#         // Collect witness assignments
+#         let mut v = Vec::with_capacity(2 * k);
+#         v.extend_from_slice(input);
+#         v.extend_from_slice(output);
+# 
+#         // Construct blinding factors using a TranscriptRng
+#         // Note: a non-example implementation would want to operate on existing commitments
+#         let mut rng = {
+#             let mut builder = transcript.build_rng();
+#             // commit the secret values
+#             for &v_i in &v {
+#                 builder = builder.commit_witness_bytes(b"v_i", v_i.as_bytes());
+#             }
+#             use rand::thread_rng;
+#             builder.finalize(&mut thread_rng())
+#         };
+#         let v_blinding: Vec<Scalar> = (0..2 * k).map(|_| Scalar::random(&mut rng)).collect();
+# 
+#         // Construct a `ConstraintSystem` instance for the shuffle gadget
+#         let (mut cs, variables, commitments) =
+#             ProverCS::new(&bp_gens, &pc_gens, transcript, v, v_blinding.clone());
+# 
+#         // Allocate variables and add constraints to the constraint system
+#         let (input_vars, output_vars) = variables.split_at(k);
+#         ShuffleProof::gadget(&mut cs, input_vars, output_vars);
+# 
+#         // Generate proof
+#         let proof = cs.prove()?;
+# 
+#         Ok((ShuffleProof(proof), commitments))
+#     }
+# }
+# 
+# impl ShuffleProof {
+#     /// Attempt to verify a `ShuffleProof`.
+#     pub fn verify<'a, 'b>(
+#         &self,
+#         pc_gens: &'b PedersenGens,
+#         bp_gens: &'b BulletproofGens,
+#         transcript: &'a mut Transcript,
+#         commitments: &Vec<CompressedRistretto>,
+#     ) -> Result<(), R1CSError> {
+#         // Apply a domain separator with the shuffle parameters to the transcript
+#         let k = commitments.len() / 2;
+#         transcript.commit_bytes(b"dom-sep", b"ShuffleProof");
+#         transcript.commit_bytes(b"k", Scalar::from(k as u64).as_bytes());
+# 
+#         // Build a `ConstraintSystem` instance with the public inputs
+#         let (mut cs, variables) =
+#             VerifierCS::new(&bp_gens, &pc_gens, transcript, commitments.to_vec());
+# 
+#         // Add constraints to the constraint system
+#         let (input_vars, output_vars) = variables.split_at(k);
+#         ShuffleProof::gadget(&mut cs, input_vars, output_vars);
+# 
+#         // Verify the proof
+#         cs.verify(&self.0)
+#     }
+# }
+# fn main() {
+// Construct generators. 1024 Bulletproofs generators is enough for 512-size shuffles.
+let pc_gens = PedersenGens::default();
+let bp_gens = BulletproofGens::new(1024, 1);
+
+// Putting the prover code in its own scope means we can't
+// accidentally reuse prover data in the test.
+let (proof, commitments) = {
+    let inputs = [
+        Scalar::from(0u64),
+        Scalar::from(1u64),
+        Scalar::from(2u64),
+        Scalar::from(3u64),
+    ];
+    let outputs = [
+        Scalar::from(2u64),
+        Scalar::from(3u64),
+        Scalar::from(0u64),
+        Scalar::from(1u64),
+    ];
+
+    let mut prover_transcript = Transcript::new(b"ShuffleProofTest");
+    ShuffleProof::prove(
+        &pc_gens,
+        &bp_gens,
+        &mut prover_transcript,
+        &inputs,
+        &outputs,
+    )
+    .expect("error during proving")
+};
+
+let mut verifier_transcript = Transcript::new(b"ShuffleProofTest");
+assert!(
+    proof
+        .verify(&pc_gens, &bp_gens, &mut verifier_transcript, &commitments)
+        .is_ok()
+);
+# }
 ```
