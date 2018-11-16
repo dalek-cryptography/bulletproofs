@@ -20,7 +20,7 @@ fn example_gadget<CS: ConstraintSystem>(
     c2: LinearCombination,
 ) {
     let (_, _, c_var) = cs.multiply(a1 + a2, b1 + b2);
-    cs.constrain(c1 + c2 - c_var.into());
+    cs.constrain(c1 + c2 - c_var);
 }
 
 fn blinding_helper(len: usize) -> Vec<Scalar> {
