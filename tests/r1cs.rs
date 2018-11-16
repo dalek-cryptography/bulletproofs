@@ -1,13 +1,14 @@
-use rand::thread_rng;
+extern crate bulletproofs;
+extern crate curve25519_dalek;
+extern crate merlin;
+extern crate rand;
 
+use bulletproofs::r1cs::*;
+use bulletproofs::{BulletproofGens, PedersenGens};
 use curve25519_dalek::ristretto::CompressedRistretto;
 use curve25519_dalek::scalar::Scalar;
 use merlin::Transcript;
-
-use errors::R1CSError;
-use generators::{BulletproofGens, PedersenGens};
-
-use super::*;
+use rand::thread_rng;
 
 /// Constrains (a1 + a2) * (b1 + b2) = (c1 + c2)
 fn example_gadget<CS: ConstraintSystem>(
