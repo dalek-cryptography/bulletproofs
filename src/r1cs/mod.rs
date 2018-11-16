@@ -79,30 +79,30 @@
 //!
 //!         let k = x.len();
 //!         if k == 1 {
-//!             cs.add_auxiliary_constraint([(x[0], -one), (y[0], one)].iter().collect());
+//!             cs.constrain([(x[0], -one), (y[0], one)].iter().collect());
 //!             return;
 //!         }
 //!
 //!         // Make last x multiplier for i = k-1 and k-2
-//!         let (_, _, last_mulx_out) = cs.add_partial_constraint(x[k - 1] - z, x[k - 2] - z);
+//!         let (_, _, last_mulx_out) = cs.multiply(x[k - 1] - z, x[k - 2] - z);
 //!
 //!         // Make multipliers for x from i == [0, k-3]
 //!         let first_mulx_out = (0..k - 2).rev().fold(last_mulx_out, |prev_out, i| {
-//!             let (_, _, o) = cs.add_partial_constraint(prev_out.into(), x[i] - z);
+//!             let (_, _, o) = cs.multiply(prev_out.into(), x[i] - z);
 //!             o
 //!         });
 //!
 //!         // Make last y multiplier for i = k-1 and k-2
-//!         let (_, _, last_muly_out) = cs.add_partial_constraint(y[k - 1] - z, y[k - 2] - z);
+//!         let (_, _, last_muly_out) = cs.multiply(y[k - 1] - z, y[k - 2] - z);
 //!
 //!         // Make multipliers for y from i == [0, k-3]
 //!         let first_muly_out = (0..k - 2).rev().fold(last_muly_out, |prev_out, i| {
-//!             let (_, _, o) = cs.add_partial_constraint(prev_out.into(), y[i] - z);
+//!             let (_, _, o) = cs.multiply(prev_out.into(), y[i] - z);
 //!             o
 //!         });
 //!
-//!         // Check equality between last x mul output and last y mul output
-//!         cs.add_auxiliary_constraint(
+//!         // Constrain last x mul output and last y mul output to be equal
+//!         cs.constrain(
 //!             [(first_muly_out, -one), (first_mulx_out, one)]
 //!                 .iter()
 //!                 .collect(),

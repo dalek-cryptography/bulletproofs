@@ -104,4 +104,10 @@ pub enum R1CSError {
     /// [`R1CSProof`](::r1cs::R1CSProof) fails.
     #[fail(display = "R1CSProof did not verify correctly.")]
     VerificationError,
+
+    /// Occurs when trying to use a missing variable assignment.
+    /// Used by gadgets that build the constraint system to signal that
+    /// a variable assignment is not provided when the prover needs it.
+    #[fail(display = "Variable does not have a value assignment.")]
+    MissingAssignment,
 }
