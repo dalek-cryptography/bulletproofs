@@ -13,12 +13,12 @@ use rand::thread_rng;
 // Shuffle gadget (documented in markdown file)
 
 /// A proof-of-shuffle.
-struct KShuffleGadget {}
+struct ShuffleProof {}
 
-impl KShuffleGadget {
-    fn fill_cs<CS: ConstraintSystem>(cs: &mut CS, x: &[Variable], y: &[Variable]) {
+impl ShuffleProof {
+    fn gadget<CS: ConstraintSystem>(cs: &mut CS, x: &[Variable], y: &[Variable]) {
         let one = Scalar::one();
-        let z = cs.challenge_scalar(b"k-scalar shuffle challenge");
+        let z = cs.challenge_scalar(b"shuffle challenge");
 
         assert_eq!(x.len(), y.len());
 
@@ -85,7 +85,7 @@ impl KShuffleGadget {
 
         // Prover allocates variables and adds constraints to the constraint system
         let (input_vars, output_vars) = variables.split_at(k);
-        KShuffleGadget::fill_cs(&mut prover_cs, input_vars, output_vars);
+        ShuffleProof::gadget(&mut prover_cs, input_vars, output_vars);
 
         // Prover generates proof
         let proof = prover_cs.prove()?;
@@ -107,7 +107,7 @@ impl KShuffleGadget {
 
         // Verifier allocates variables and adds constraints to the constraint system
         let (input_vars, output_vars) = variables.split_at(k);
-        KShuffleGadget::fill_cs(&mut verifier_cs, input_vars, output_vars);
+        ShuffleProof::gadget(&mut verifier_cs, input_vars, output_vars);
 
         // Verifier verifies proof
         verifier_cs.verify(&proof)
@@ -135,12 +135,12 @@ fn kshuffle_helper(k: usize) {
         rand::thread_rng().shuffle(&mut output);
 
         let mut prover_transcript = transcript.clone();
-        KShuffleGadget::prove(&pc_gens, &bp_gens, &mut prover_transcript, &input, &output).unwrap()
+        ShuffleProof::prove(&pc_gens, &bp_gens, &mut prover_transcript, &input, &output).unwrap()
     };
 
     {
         let mut verifier_transcript = transcript.clone();
-        KShuffleGadget::verify(
+        ShuffleProof::verify(
             &pc_gens,
             &bp_gens,
             &mut verifier_transcript,
