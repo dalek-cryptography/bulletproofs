@@ -13,7 +13,7 @@ Algebraically it can be expressed as a statement that for a free variable \\(z\\
 The prover can commit to blinded scalars \\(x_i\\) and \\(y_i\\) then receive a random challenge \\(z\\),
 and build a proof that the above relation holds.
 
-K-shuffle requires `2*(K-1)` multipliers.
+K-shuffle requires \\( 2*(K-1) \\) multipliers.
 
 For `K > 1`:
 
@@ -50,7 +50,7 @@ The last multipliers connect the two last variables (on each side)
     muly_right[k-2] = y_{k-1} - z
 ```
 For `K = 1`:
-Connect x to y directly. Since there is only one permuatation of a 1-element list, we can omit the challenge entirely as it cancels out.
+Connect `x_0` to `y_0` directly. Since there is only one permuatation of a 1-element list, we can omit the challenge entirely as it cancels out.
 ```ascii,no_run
     x_0 = y_0
 ```
@@ -115,11 +115,11 @@ First, the function gets a challenge scalar \\(z\\) by calling the `ConstraintSy
 
 After a check for the lengths of \\(x\\) and \\(y\\), the function then makes
 multipliers to create polynomials in terms of the challenge scalar \\(z\\).
-It starts with the last multipliers, representing \\( (x_{k-1} - z) *
-(x_{k-2} - z) \\) and \\( (y_{k-1} - z) * (y_{k-2} - z) \\). The outputs
+It starts with the last multipliers, representing `(x_{k-1} - z) *
+(x_{k-2} - z)` and `(y_{k-1} - z) * (y_{k-2} - z)`. The outputs
 to these last multipliers than become an input to the next multiplier.
-This continues recursively until it reaches \\( x_0 \\) and \\(y_0\\).
-Then, it adds a constraint that \\( mulx_out\[0\] = muly_out\[0\] \\),
+This continues recursively until it reaches `x_0` and `y_0`.
+Then, it adds a constraint that `mulx_out[0]` = `muly_out[0]`,
 which constrains that the two polynomials in terms of challenge scalar
 \\(z\\) are equal to each other. This is true if and only if \\(y\\) is a valid
 reordering of \\(x\\).
