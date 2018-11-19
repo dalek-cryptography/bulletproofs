@@ -2,20 +2,20 @@ The rank-1 constraint system API for programmatically defining constraint system
 
 ## Building a proof-of-shuffle constraint system
 
-A shuffle is a permutation of a list of `k` scalars `{x_i}` into a list of `k` scalars `{y_i}`.
+A shuffle is a permutation of a list of \\(k\\) scalars \\(x_i\\) into a list of \\(k\\) scalars \\(y_i\\).
 
-Algebraically it can be expressed as a statement that for a free variable `z`, the roots of the two polynomials in terms of `z` are the same up to a permutation:
+Algebraically it can be expressed as a statement that for a free variable \\(z\\), the roots of the two polynomials in terms of \\(z\\) are the same up to a permutation:
 
 \\[
 \prod_i (x_i - z) = \prod_i (y_i - z)
 \\]
 
-The prover can commit to blinded scalars `x_i` and `y_i` then receive a random challenge `z`,
+The prover can commit to blinded scalars \\(x_i\\) and \\(y_i\\) then receive a random challenge \\(z\\),
 and build a proof that the above relation holds.
 
 K-shuffle requires `2*(K-1)` multipliers.
 
-For K > 1:
+For `K > 1`:
 
 ```ascii,no_run
 
@@ -32,24 +32,29 @@ For K > 1:
 ```
 
 Connect the left and right sides of the shuffle statement:
-    `mulx_out[0] = muly_out[0]`
-
-For i == [0, k-3]:
-    `mulx_left[i]  = x_i - z`
-    `mulx_right[i] = mulx_out[i+1]`
-    `muly_left[i]  = y_i - z`
-    `muly_right[i] = muly_out[i+1]`
-
+```ascii,no_run
+    mulx_out[0] = muly_out[0]
+```
+For `i == [0, k-3]`:
+```ascii,no_run
+    mulx_left[i]  = x_i - z
+    mulx_right[i] = mulx_out[i+1]
+    muly_left[i]  = y_i - z
+    muly_right[i] = muly_out[i+1]
+```
 The last multipliers connect the two last variables (on each side)
-    `mulx_left[k-2]  = x_{k-2} - z`
-    `mulx_right[k-2] = x_{k-1} - z`
-    `muly_left[k-2]  = y_{k-2} - z`
-    `muly_right[k-2] = y_{k-1} - z`
-
-For K = 1:
-Connect x to y directly, omitting the challenge entirely as it cancels out
-    `x_0 = y_0`
-
+```ascii,no_run
+    mulx_left[k-2]  = x_{k-2} - z
+    mulx_right[k-2] = x_{k-1} - z
+    muly_left[k-2]  = y_{k-2} - z
+    muly_right[k-2] = y_{k-1} - z
+```
+For `K = 1`:
+Connect x to y directly. Since there is only one permuatation of a 1-element list, we can omit the challenge entirely as it cancels out.
+```ascii,no_run
+    x_0 = y_0
+```
+Doctest for creating and verifying a shuffle proof:
 ```rust
 extern crate bulletproofs;
 extern crate curve25519_dalek;
@@ -104,11 +109,11 @@ impl ShuffleProof {
 }
 ```
 
-In this example, `ShuffleProof::gadget()` is private function that adds constraints to the constraint system that enforce that `y` (the outputs) are a valid reordering of `x` (the inputs). 
+In this example, `ShuffleProof::gadget()` is private function that adds constraints to the constraint system that enforce that \\(y\\) (the outputs) are a valid reordering of \\(x\\) (the inputs). 
 
-First, the function gets a challenge scalar `z` by calling the `ConstraintSystem::challenge_scalar`. This challenge is generated from commitments to high-level variables that were passed to the `ConstraintSystem` when it was created. As noted in the `challenge_scalar` documentation, making sure that the challenge circuit is sound requires analysis. In this example, the challenge circuit is sound because the challenge is bound to all of the shuffle inputs and outputs, since the inputs and outputs are high-level variables.
+First, the function gets a challenge scalar \\(z\\) by calling the `ConstraintSystem::challenge_scalar`. This challenge is generated from commitments to high-level variables that were passed to the `ConstraintSystem` when it was created. As noted in the `challenge_scalar` documentation, making sure that the challenge circuit is sound requires analysis. In this example, the challenge circuit is sound because the challenge is bound to all of the shuffle inputs and outputs, since the inputs and outputs are high-level variables.
 
-After a check for the lengths of `x` and `y`, the function then makes multipliers to create polynomials in terms of the challenge scalar `z`. It starts with the last multipliers, representing \\( (x_{k-1} - z) * (x_{k-2} - z) \\) and \\( (y_{k-1} - z) * (y_{k-2} - z) \\). The outputs to these last multipliers than become an input to the next multiplier. This continues recursively until it reaches \\( x_0 \\) and \\(y_0\\). Then, it adds a constraint that \\( mulx_out[0] = muly_out[0] \\), which constrains that the two polynomials in terms of challenge scalar `z` are equal to each other. This is true if and only if `y` is a valid reordering of `x`.
+After a check for the lengths of \\(x\\) and \\(y\\), the function then makes multipliers to create polynomials in terms of the challenge scalar \\(z\\). It starts with the last multipliers, representing \\( (x_{k-1} - z) * (x_{k-2} - z) \\) and \\( (y_{k-1} - z) * (y_{k-2} - z) \\). The outputs to these last multipliers than become an input to the next multiplier. This continues recursively until it reaches \\( x_0 \\) and \\(y_0\\). Then, it adds a constraint that \\( mulx_out[0] = muly_out[0] \\), which constrains that the two polynomials in terms of challenge scalar \\(z\\) are equal to each other. This is true if and only if \\(y\\) is a valid reordering of \\(x\\).
 
 
 ## Constructing a proof
