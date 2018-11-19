@@ -54,7 +54,8 @@ Connect `x_0` to `y_0` directly. Since there is only one permuatation of a 1-ele
 ```ascii,no_run
     x_0 = y_0
 ```
-Doctest for creating and verifying a shuffle proof:
+Code for creating constraints for a proof-of-shuffle constraint system:
+
 ```rust
 extern crate bulletproofs;
 extern crate curve25519_dalek;
