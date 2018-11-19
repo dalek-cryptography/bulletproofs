@@ -113,8 +113,16 @@ In this example, `ShuffleProof::gadget()` is private function that adds constrai
 
 First, the function gets a challenge scalar \\(z\\) by calling the `ConstraintSystem::challenge_scalar`. This challenge is generated from commitments to high-level variables that were passed to the `ConstraintSystem` when it was created. As noted in the `challenge_scalar` documentation, making sure that the challenge circuit is sound requires analysis. In this example, the challenge circuit is sound because the challenge is bound to all of the shuffle inputs and outputs, since the inputs and outputs are high-level variables.
 
-After a check for the lengths of \\(x\\) and \\(y\\), the function then makes multipliers to create polynomials in terms of the challenge scalar \\(z\\). It starts with the last multipliers, representing \\( (x_{k-1} - z) * (x_{k-2} - z) \\) and \\( (y_{k-1} - z) * (y_{k-2} - z) \\). The outputs to these last multipliers than become an input to the next multiplier. This continues recursively until it reaches \\( x_0 \\) and \\(y_0\\). Then, it adds a constraint that \\( mulx_out[0] = muly_out[0] \\), which constrains that the two polynomials in terms of challenge scalar \\(z\\) are equal to each other. This is true if and only if \\(y\\) is a valid reordering of \\(x\\).
-
+After a check for the lengths of \\(x\\) and \\(y\\), the function then makes
+multipliers to create polynomials in terms of the challenge scalar \\(z\\).
+It starts with the last multipliers, representing \\( (x_{k-1} - z) *
+(x_{k-2} - z) \\) and \\( (y_{k-1} - z) * (y_{k-2} - z) \\). The outputs
+to these last multipliers than become an input to the next multiplier.
+This continues recursively until it reaches \\( x_0 \\) and \\(y_0\\).
+Then, it adds a constraint that \\( mulx_out\[0\] = muly_out\[0\] \\),
+which constrains that the two polynomials in terms of challenge scalar
+\\(z\\) are equal to each other. This is true if and only if \\(y\\) is a valid
+reordering of \\(x\\).
 
 ## Constructing a proof
 
