@@ -11,20 +11,25 @@ use errors::R1CSError;
 use generators::{BulletproofGens, PedersenGens};
 use transcript::TranscriptProtocol;
 
+/// An entry point for verifying a R1CS proof.
+///
+/// The lifecycle of a `Verifier` is as follows. The verifying code
+/// provides high-level commitments one by one,
+/// `Verifier` adds them to the transcript and returns
+/// corresponding variables (which the user can organize as necessary).
+///
+/// After all variables are add, the user calls `verify` which consumes `Verifier`
+/// and provides `VerifierCS` as an argument to a closure which builds the constraint system.
+/// The `verify` method returns the complete proof.
+pub struct Verifier<'a, 'b> {
+    /// Number of high-level variables
+    m: u64,
+
+    /// Constraint system implementation
+    cs: VerifierCS<'a, 'b>,
+}
+
 /// A [`ConstraintSystem`] implementation for use by the verifier.
-///
-/// The lifecycle of a [`VerifierCS`] is as follows. The verification
-/// code assembles the commitments to the external inputs to the
-/// constraint system, then passes them, along with generators and a
-/// transcript, to [`VerifierCS::new`].  This initializes the
-/// [`VerifierCS`] and returns [`Variable`]s corresponding to the
-/// inputs.
-///
-/// The verifier can then pass the [`VerifierCS`] and the external
-/// variables to the same gadget code as the prover, constructing an
-/// identical constraint system to the one the prover built.  Finally,
-/// they pass the prover's [`R1CSProof`] to [`VerifierCS::verify`],
-/// which consumes the [`VerifierCS`] and verifies the proof.
 pub struct VerifierCS<'a, 'b> {
     bp_gens: &'b BulletproofGens,
     pc_gens: &'b PedersenGens,
@@ -91,7 +96,7 @@ impl<'a, 'b> ConstraintSystem for VerifierCS<'a, 'b> {
     }
 }
 
-impl<'a, 'b> VerifierCS<'a, 'b> {
+impl<'a, 'b> Verifier<'a, 'b> {
     /// Construct an empty constraint system with specified external
     /// input variables.
     ///
@@ -127,32 +132,70 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
         bp_gens: &'b BulletproofGens,
         pc_gens: &'b PedersenGens,
         transcript: &'a mut Transcript,
-        commitments: Vec<CompressedRistretto>,
-    ) -> (Self, Vec<Variable>) {
-        let m = commitments.len();
-        transcript.r1cs_domain_sep(m as u64);
+    ) -> Self {
+        transcript.r1cs_domain_sep();
 
-        let mut variables = Vec::with_capacity(m);
-        for (i, commitment) in commitments.iter().enumerate() {
-            // Commit the commitment to the transcript
-            transcript.commit_point(b"V", &commitment);
-
-            // Allocate and return a variable for the commitment
-            variables.push(Variable::Committed(i));
+        Verifier {
+            m: 0,
+            cs: VerifierCS {
+                bp_gens,
+                pc_gens,
+                transcript,
+                num_vars: 0,
+                V: Vec::new(),
+                constraints: Vec::new(),
+            },
         }
-
-        let cs = VerifierCS {
-            bp_gens,
-            pc_gens,
-            transcript,
-            num_vars: 0,
-            V: commitments,
-            constraints: Vec::new(),
-        };
-
-        (cs, variables)
     }
 
+    /// Creates commitment to a high-level variable and adds it to the transcript.
+    ///
+    /// # Inputs
+    ///
+    /// The `commitment` parameter is a Pedersen commitment
+    /// to the external variable for the constraint system.  All
+    /// external variables must be passed up-front, so that challenges
+    /// produced by [`ConstraintSystem::challenge_scalar`] are bound
+    /// to the external variables.
+    ///
+    /// # Returns
+    ///
+    /// Returns a pair of a Pedersen commitment (as a compressed Ristretto point),
+    /// and a [`Variable`] corresponding to it, which can be used to form constraints.
+    pub fn commit(&mut self, commitment: CompressedRistretto) -> Variable {
+        let i = self.m as usize;
+        self.m += 1;
+        self.cs.V.push(commitment);
+
+        // Add the commitment to the transcript.
+        self.cs.transcript.commit_point(b"V", &commitment);
+
+        Variable::Committed(i)
+    }
+
+    /// Consume the `Verifier`, provide the `ConstraintSystem` implementation to the closure,
+    /// and verify the proof against the resulting constraint system.
+    pub fn verify<F>(self, proof: &R1CSProof, cs_builder: F) -> Result<(), R1CSError>
+    where
+        F: FnOnce(&mut VerifierCS<'a, 'b>) -> Result<(), R1CSError>,
+    {
+        let mut cs = self.cs;
+
+        // Commit a length suffix for the number of variables.
+        // We cannot do this in advance because user can commit variables one-by-one,
+        // but this suffix provides safe disambiguation because each variable
+        // is prefixed with a separate label.
+        cs.transcript.commit_u64(b"m", self.m);
+
+        // Let the user's closure to fill in constraints.
+        cs_builder(&mut cs)?;
+
+        // Verify the proof.
+        cs.verify(proof)
+    }
+}
+
+impl<'a, 'b> VerifierCS<'a, 'b> {
     /// Use a challenge, `z`, to flatten the constraints in the
     /// constraint system into vectors used for proving and
     /// verification.

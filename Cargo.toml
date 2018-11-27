@@ -30,6 +30,7 @@ criterion = "0.2"
 bincode = "1"
 
 [features]
+default = ["yoloproofs"]
 avx2_backend = ["curve25519-dalek/avx2_backend"]
 yoloproofs = []
 
