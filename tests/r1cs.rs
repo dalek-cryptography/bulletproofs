@@ -90,10 +90,11 @@ impl ShuffleProof {
             .map(|v| prover.commit(*v, Scalar::random(&mut blinding_rng)))
             .unzip();
 
-        let proof = prover.prove(|cs| {
-            ShuffleProof::gadget(cs, &input_vars, &output_vars);
-            Ok(())
-        })?;
+        let mut cs = prover.build_constraint_system();
+
+        ShuffleProof::gadget(&mut cs, &input_vars, &output_vars);
+
+        let proof = cs.prove()?;
 
         Ok((ShuffleProof(proof), input_commitments, output_commitments))
     }
@@ -126,10 +127,11 @@ impl ShuffleProof {
             .map(|V| verifier.commit(*V))
             .collect();
 
-        verifier.verify(&self.0, |cs| {
-            ShuffleProof::gadget(cs, &input_vars, &output_vars);
-            Ok(())
-        })
+        let mut cs = verifier.build_constraint_system();
+
+        ShuffleProof::gadget(&mut cs, &input_vars, &output_vars);
+
+        cs.verify(&self.0)
     }
 }
 
@@ -254,19 +256,21 @@ fn example_gadget_roundtrip_helper(
             .map(|x| prover.commit(Scalar::from(*x), Scalar::random(&mut thread_rng())))
             .unzip();
 
-        // 3. Build a CS and make the proof
-        let proof = prover.prove(|cs| {
-            example_gadget(
-                cs,
-                vars[0].into(),
-                vars[1].into(),
-                vars[2].into(),
-                vars[3].into(),
-                vars[4].into(),
-                Scalar::from(c2).into(),
-            );
-            Ok(())
-        })?;
+        // 3. Build a CS
+        let mut cs = prover.build_constraint_system();
+
+        example_gadget(
+            &mut cs,
+            vars[0].into(),
+            vars[1].into(),
+            vars[2].into(),
+            vars[3].into(),
+            vars[4].into(),
+            Scalar::from(c2).into(),
+        );
+
+        // 4. Make a proof
+        let proof = cs.prove()?;
 
         (proof, commitments)
     };
@@ -281,21 +285,20 @@ fn example_gadget_roundtrip_helper(
     // 2. Commit high-level variables
     let vars: Vec<_> = commitments.iter().map(|V| verifier.commit(*V)).collect();
 
-    // 3. Build a CS and verify the proof
-    verifier
-        .verify(&proof, |cs| {
-            example_gadget(
-                cs,
-                vars[0].into(),
-                vars[1].into(),
-                vars[2].into(),
-                vars[3].into(),
-                vars[4].into(),
-                Scalar::from(c2).into(),
-            );
-            Ok(())
-        })
-        .map_err(|_| R1CSError::VerificationError)
+    // 3. Build a CS
+    let mut cs = verifier.build_constraint_system();
+    example_gadget(
+        &mut cs,
+        vars[0].into(),
+        vars[1].into(),
+        vars[2].into(),
+        vars[3].into(),
+        vars[4].into(),
+        Scalar::from(c2).into(),
+    );
+
+    // 4. Verify the proof
+    cs.verify(&proof).map_err(|_| R1CSError::VerificationError)
 }
 
 #[test]

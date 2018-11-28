@@ -16,11 +16,14 @@ use transcript::TranscriptProtocol;
 /// The lifecycle of a `Verifier` is as follows. The verifying code
 /// provides high-level commitments one by one,
 /// `Verifier` adds them to the transcript and returns
-/// corresponding variables (which the user can organize as necessary).
+/// the corresponding variables.
 ///
-/// After all variables are add, the user calls `verify` which consumes `Verifier`
-/// and provides `VerifierCS` as an argument to a closure which builds the constraint system.
-/// The `verify` method returns the complete proof.
+/// After all variables are committed, the verifying code calls `build_constraint_system`,
+/// which consumes `Verifier` and returns `VerifierCS`.
+/// The verifying code then allocates low-level variables and adds constraints to the `VerifierCS`.
+///
+/// When all constraints are added, the verifying code calls `verify`
+/// on the instance of the constraint system to check the proof.
 pub struct Verifier<'a, 'b> {
     /// Number of high-level variables
     m: u64,
@@ -175,23 +178,13 @@ impl<'a, 'b> Verifier<'a, 'b> {
 
     /// Consume the `Verifier`, provide the `ConstraintSystem` implementation to the closure,
     /// and verify the proof against the resulting constraint system.
-    pub fn verify<F>(self, proof: &R1CSProof, cs_builder: F) -> Result<(), R1CSError>
-    where
-        F: FnOnce(&mut VerifierCS<'a, 'b>) -> Result<(), R1CSError>,
-    {
-        let mut cs = self.cs;
-
-        // Commit a length suffix for the number of variables.
+    pub fn build_constraint_system(self) -> VerifierCS<'a, 'b> {
+        // Commit a length _suffix_ for the number of high-level variables.
         // We cannot do this in advance because user can commit variables one-by-one,
         // but this suffix provides safe disambiguation because each variable
         // is prefixed with a separate label.
-        cs.transcript.commit_u64(b"m", self.m);
-
-        // Let the user's closure to fill in constraints.
-        cs_builder(&mut cs)?;
-
-        // Verify the proof.
-        cs.verify(proof)
+        self.cs.transcript.commit_u64(b"m", self.m);
+        self.cs
     }
 }
 

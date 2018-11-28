@@ -218,10 +218,11 @@ impl ShuffleProof {
             })
             .unzip();
 
-        let proof = prover.prove(|cs| {
-            ShuffleProof::gadget(cs, &input_vars, &output_vars);
-            Ok(())
-        })?;
+        let mut cs = prover.build_constraint_system();
+
+        ShuffleProof::gadget(&mut cs, &input_vars, &output_vars);
+
+        let proof = cs.prove()?;
 
         Ok((ShuffleProof(proof), input_commitments, output_commitments))
     }
@@ -320,11 +321,12 @@ The verifier receives a proof, and a list of committed inputs and outputs, from 
 #             })
 #             .unzip();
 # 
-#         let proof = prover.prove(|cs| {
-#             ShuffleProof::gadget(cs, &input_vars, &output_vars);
-#             Ok(())
-#         })?;
-# 
+#         let mut cs = prover.build_constraint_system();
+#
+#         ShuffleProof::gadget(&mut cs, &input_vars, &output_vars);
+#
+#         let proof = cs.prove()?;
+#
 #         Ok((ShuffleProof(proof), input_commitments, output_commitments))
 #     }
 # }
@@ -353,10 +355,11 @@ impl ShuffleProof {
             verifier.commit(*commitment)
         }).collect();
 
-        verifier.verify(&self.0, |cs| {
-            ShuffleProof::gadget(cs, &input_vars, &output_vars);
-            Ok(())
-        })
+        let mut cs = verifier.build_constraint_system();
+
+        ShuffleProof::gadget(&mut cs, &input_vars, &output_vars);
+
+        cs.verify(&self.0)
     }
 }
 ```
@@ -456,11 +459,12 @@ Because only the prover knows the scalar values of the inputs and outputs, and t
 #             })
 #             .unzip();
 # 
-#         let proof = prover.prove(|cs| {
-#             ShuffleProof::gadget(cs, &input_vars, &output_vars);
-#             Ok(())
-#         })?;
-# 
+#         let mut cs = prover.build_constraint_system();
+#
+#         ShuffleProof::gadget(&mut cs, &input_vars, &output_vars);
+#
+#         let proof = cs.prove()?;
+#
 #         Ok((ShuffleProof(proof), input_commitments, output_commitments))
 #     }
 # }
@@ -488,11 +492,12 @@ Because only the prover knows the scalar values of the inputs and outputs, and t
 #         let output_vars: Vec<_> = output_commitments.iter().map(|commitment| {
 #             verifier.commit(*commitment)
 #         }).collect();
-# 
-#         verifier.verify(&self.0, |cs| {
-#             ShuffleProof::gadget(cs, &input_vars, &output_vars);
-#             Ok(())
-#         })
+#
+#         let mut cs = verifier.build_constraint_system();
+#
+#         ShuffleProof::gadget(&mut cs, &input_vars, &output_vars);
+#
+#         cs.verify(&self.0)
 #     }
 # }
 # fn main() {

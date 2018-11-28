@@ -18,11 +18,14 @@ use transcript::TranscriptProtocol;
 /// The lifecycle of a `Prover` is as follows. The proving code
 /// commits high-level variables and their blinding factors `(v, v_blinding)`,
 /// `Prover` generates commitments, adds them to the transcript and returns
-/// corresponding variables (which the user can organize as necessary).
+/// the corresponding variables.
 ///
-/// After all variables are committed, the user calls `prove` which consumes `Prover`
-/// and provides `ProverCS` as an argument to a closure which builds the constraint system.
-/// The `prove` method returns the complete proof.
+/// After all variables are committed, the proving code calls `build_constraint_system`,
+/// which consumes `Prover` and returns `ProverCS`.
+/// The proving code then allocates low-level variables and adds constraints to the `ProverCS`.
+///
+/// When all constraints are added, the proving code calls `prove`
+/// on the instance of the constraint system and receives the complete proof.
 pub struct Prover<'a, 'b> {
     /// Number of high-level variables
     m: u64,
@@ -208,23 +211,13 @@ impl<'a, 'b> Prover<'a, 'b> {
 
     /// Consume the `Prover`, provide the `ConstraintSystem` implementation to the closure,
     /// and produce a proof.
-    pub fn prove<F>(self, cs_builder: F) -> Result<R1CSProof, R1CSError>
-    where
-        F: FnOnce(&mut ProverCS<'a, 'b>) -> Result<(), R1CSError>,
-    {
-        let mut cs = self.cs;
-
-        // Commit a length suffix for the number of variables.
+    pub fn build_constraint_system(self) -> ProverCS<'a, 'b> {
+        // Commit a length _suffix_ for the number of high-level variables.
         // We cannot do this in advance because user can commit variables one-by-one,
         // but this suffix provides safe disambiguation because each variable
         // is prefixed with a separate label.
-        cs.transcript.commit_u64(b"m", self.m);
-
-        // Let the user's closure to fill in constraints.
-        cs_builder(&mut cs)?;
-
-        // Make a proof.
-        cs.prove()
+        self.cs.transcript.commit_u64(b"m", self.m);
+        self.cs
     }
 }
 

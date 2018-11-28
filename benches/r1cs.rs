@@ -144,10 +144,11 @@ impl KShuffleGadget {
             .map(|v| prover.commit(*v, Scalar::random(&mut blinding_rng)))
             .unzip();
 
-        let proof = prover.prove(|cs| {
-            Self::fill_cs(cs, &input_vars, &output_vars);
-            Ok(())
-        })?;
+        let cs = prover.build_constraint_system();
+
+        Self::fill_cs(&mut cs, &input_vars, &output_vars);
+
+        let proof = cs.prove()?;
 
         Ok((proof, input_commitments, output_commitments))
     }
@@ -177,10 +178,11 @@ impl KShuffleGadget {
             .map(|commitment| verifier.commit(*commitment))
             .collect();
 
-        verifier.verify(&proof, |cs| {
-            Self::fill_cs(cs, &input_vars, &output_vars);
-            Ok(())
-        })
+        let cs = verifier.build_constraint_system();
+
+        Self::fill_cs(&mut cs, &input_vars, &output_vars);
+
+        cs.verify(proof)
     }
 }
 
