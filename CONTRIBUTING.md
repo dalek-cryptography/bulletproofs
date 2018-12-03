@@ -10,22 +10,25 @@ of flux.
 
 Currently, the work on the `bulletproofs` crate is in two branches:
 
-* `main`, currently focused on having a production-ready implementation
-  of the rangeproof protocol;
+* `main` holds the latest released version;
 
-* `circuit`, currently focused on exploratory work around circuit
-  proofs.
+* `develop` holds ongoing development work.
 
-Changes affecting the rangeproof parts of the code should be made
-against the `main` branch.
+Pull requests should be made against `develop`, **not** `main`.
 
-Changes affecting the circuit parts of the code should be made as PRs
-against the `circuit` branch.  This allows piecewise review of the
-circuit code while it's in development, as well as allowing a complete
-review when we eventually merge it into the `main` branch.
+It's best to start a PR for every in-progress branch so that it's possible
+to track all ongoing development work.  Adding the `PTAL` (please take a 
+look) label indicates that the branch is ready for code review.
 
-The `main` branch is regularly merged into the `circuit` branch, so that
-the circuit work stays in sync.
+## Labels
+
+Labels starting with `T-` are for labeling topics (`T-api`, `T-r1cs`, etc).
+
+The `T-research` label indicates unsolved open problems.
+
+Labels starting with `P-` are for priority levels.
+
+Labels starting with `E-` are for effort estimates.
 
 ## CI
 
