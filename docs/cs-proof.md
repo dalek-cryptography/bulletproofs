@@ -246,13 +246,13 @@ If we rewrite the check as a comparison with the identity point, we get:
   
 \\[
 P' \overset ? = {\langle a \cdot \mathbf{s}, \hat{\mathbf{G}}^{+} \rangle} + {\langle b/\mathbf{s}, \hat{\mathbf{H}}^{+} \rangle} + abQ - \sum\_{j=1}^{k} \left( L\_{j} u\_{j}^{2} + u\_{j}^{-2} R\_{j} \right),
- \\]
- where
- \\[
- \begin{aligned}
-     \hat{\mathbf{G}}^{+}  &= \mathbf{G}' \hspace{0.1cm} || \hspace{0.1cm} u \cdot \mathbf{G}'' \hspace{0.1cm} || \hspace{0.1cm} u \cdot [G_n,...,G_{n^{+}-1}] \\\\
-     \hat{\mathbf{H}}^{+}  &= \mathbf{y}^{-n^{+}} \circ \big( \mathbf{H}' \hspace{0.1cm} || \hspace{0.1cm} u \cdot \mathbf{H}'' \hspace{0.1cm} || \hspace{0.1cm} u \cdot [H_n,...,H_{n^{+}-1}]\big) \\\\
- \end{aligned}
+\\]
+where
+\\[
+\begin{aligned}
+   \hat{\mathbf{G}}^{+}  &= \mathbf{G}' \hspace{0.1cm} || \hspace{0.1cm} u \cdot \mathbf{G}'' \hspace{0.1cm} || \hspace{0.1cm} u \cdot [G_n,...,G_{n^{+}-1}] \\\\
+   \hat{\mathbf{H}}^{+}  &= \mathbf{y}^{-n^{+}} \circ \big( \mathbf{H}' \hspace{0.1cm} || \hspace{0.1cm} u \cdot \mathbf{H}'' \hspace{0.1cm} || \hspace{0.1cm} u \cdot [H_n,...,H_{n^{+}-1}]\big) \\\\
+\end{aligned}
 \\]
 
 Rewriting as a comparison with the identity point and expanding \\(Q = wB\\) and \\(P' = P^{+} + t(x) wB\\) as [needed for transition to the inner-product protocol](../notes/index.html#inner-product-proof):

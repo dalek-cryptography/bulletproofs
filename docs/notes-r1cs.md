@@ -697,16 +697,6 @@ For that we will multiply the second statement by a random challenge \\(u \in {\
 \end{aligned}
 \\]
 
-
-Low-level variables are committed before challenges \\(y\\) and \\(u\\) are known, so we change the generators for the \\(\mathbf{l}(x), \mathbf{r}(x)\\):
-
-\\[
-\begin{aligned}
- \hat{\mathbf{G}} &= \mathbf{G}' || (u \cdot \mathbf{G}'') \\\\
- \hat{\mathbf{H}} &= \mathbf{y}^{-n} \circ \big( \mathbf{H}' || (u \cdot \mathbf{H}'') \big) \\\\
-\end{aligned}
-\\]
-
 The commitments to the components of \\(\mathbf{l}(x)\\) and \\(\mathbf{r}(x)\\) are then split up as follows:
 
 \\[
@@ -724,21 +714,20 @@ We can now relate the above commitments to \\({\mathbf{l}}(x)\\) and \\({\mathbf
 
 \\[
 \begin{aligned}
-{\langle {\mathbf{l}}(x), \hat{\mathbf{G}} \rangle}     &\quad &= \quad & x \cdot \big( {\langle \mathbf{a}'\_L, \mathbf{G}' \rangle} + u \cdot {\langle \mathbf{a}''\_L, \mathbf{G}'' \rangle} \big)      & \quad &+ \quad x^2 \cdot \big( {\langle \mathbf{a}'\_O, \mathbf{G}' \rangle}  +  u \cdot {\langle \mathbf{a}''\_O, \mathbf{G}'' \rangle} \big)         & \quad &+ \quad \langle \mathbf{y}^{-n} \circ (\mathbf{w}\_R' || u \cdot \mathbf{w}\_R'') \cdot x , \mathbf{G} \rangle                                                   &\quad &+\quad  x^3 \cdot \big( \langle \mathbf{s}'\_L , \mathbf{G}' \rangle + u \cdot \langle \mathbf{s}''\_L , \mathbf{G}'' \rangle \big) \\\\
-                                                 +      &\quad &  \quad &  +                                                                                                                               & \quad &  \quad \quad  +                                                                                                                                & \quad &  \quad \quad +                                                                                                                                                  &\quad & \quad  \quad +   \\\\
-{\langle {\mathbf{r}}(x), \hat{\mathbf{H}} \rangle}     &\quad &= \quad & x \cdot \big( {\langle \mathbf{a}'\_R, \mathbf{H}' \rangle} + u \cdot {\langle \mathbf{a}''\_R, \mathbf{H}'' \rangle} \big)      & \quad &- \quad \langle \mathbf{1}, \mathbf{H}' \rangle -  u \cdot \langle \mathbf{1}, \mathbf{H}'' \rangle                                             & \quad &+ \quad \langle \mathbf{y}^{-n} \circ (\mathbf{w}\_L' || u \cdot \mathbf{w}\_L'') \cdot x + (\mathbf{w}\_O' || u \cdot \mathbf{w}\_O''), \mathbf{H} \rangle      &\quad &+\quad  x^3 \cdot \big( \langle \mathbf{s}'\_R , \mathbf{H}' \rangle + u \cdot \langle \mathbf{s}''\_R , \mathbf{H}'' \rangle \big) \\\\
-                                                 +      &\quad &  \quad &  +                                                                                                                               & \quad &  \quad \quad +                                                                                                                                 & \quad &  \quad \quad +                                                                                                                                                  &\quad & \quad  \quad +   \\\\
-                     \tilde{e} \cdot \widetilde{B}      &\quad &= \quad & x \cdot \big( \tilde{a}' \cdot \widetilde{B} + u \tilde{a}'' \cdot \widetilde{B} \big)                                           & \quad &+ \quad x^2 \cdot \big( \tilde{o}' \cdot \widetilde{B} + u \cdot \tilde{o}'' \cdot \widetilde{B} \big)                                          & \quad &+ \quad 0                                                                                                                                                        &\quad &+\quad  x^3 \cdot \big( \tilde{s}' \cdot \widetilde{B} + u \tilde{s}'' \cdot \widetilde{B} \big) \\\\
-                                     \shortparallel     &\quad &  \quad & \shortparallel                                                                                                                   & \quad &  \quad \quad \shortparallel                                                                                                                    & \quad &  \quad \quad \shortparallel                                                                                                                                           &\quad & \quad  \quad \shortparallel   \\\\
-                                                        &\quad &= \quad & x \cdot \big(A_I' + u \cdot A_I'')                                                                                               & \quad &+ \quad x^2 \cdot \big(A_O' + u \cdot A_O'' \big) - \langle \mathbf{1}, \mathbf{H}' \rangle - u \cdot \langle \mathbf{1}, \mathbf{H}'' \rangle  & \quad &+ \quad W_L \cdot x + W_R \cdot x + W_O                                                                                                                          &\quad &+\quad  x^3 \cdot (S' + u \cdot S'')
+{\langle {\mathbf{l}}(x), \hat{\mathbf{G}} \rangle}     &\quad &= \quad & x \cdot \big( {\langle \mathbf{a}'\_L, \mathbf{G}' \rangle} + u \cdot {\langle \mathbf{a}''\_L, \mathbf{G}'' \rangle} \big)      & \quad &+ \quad x^2 \cdot \big( {\langle \mathbf{a}'\_O, \mathbf{G}' \rangle}  +  u \cdot {\langle \mathbf{a}''\_O, \mathbf{G}'' \rangle} \big)         & \quad &+ \quad \langle \mathbf{y}^{-n} \circ (\mathbf{w}\_R' || u \cdot \mathbf{w}\_R'') \cdot x , \mathbf{G} \rangle                                                                     &\quad &+\quad  x^3 \cdot \big( \langle \mathbf{s}'\_L , \mathbf{G}' \rangle + u \cdot \langle \mathbf{s}''\_L , \mathbf{G}'' \rangle \big) \\\\
+                                                 +      &\quad &  \quad &  +                                                                                                                               & \quad &  \quad \quad  +                                                                                                                                & \quad &  \quad \quad +                                                                                                                                                                    &\quad & \quad  \quad +   \\\\
+{\langle {\mathbf{r}}(x), \hat{\mathbf{H}} \rangle}     &\quad &= \quad & x \cdot \big( {\langle \mathbf{a}'\_R, \mathbf{H}' \rangle} + u \cdot {\langle \mathbf{a}''\_R, \mathbf{H}'' \rangle} \big)      & \quad &- \quad \langle \mathbf{1}, \mathbf{H}' \rangle -  u \cdot \langle \mathbf{1}, \mathbf{H}'' \rangle                                             & \quad &+ \quad \langle \mathbf{y}^{-n} \circ (\mathbf{w}\_L' || u \cdot \mathbf{w}\_L'') \cdot x + (\mathbf{w}\_O' || u \cdot \mathbf{w}\_O''), \mathbf{H} \rangle                        &\quad &+\quad  x^3 \cdot \big( \langle \mathbf{s}'\_R , \mathbf{H}' \rangle + u \cdot \langle \mathbf{s}''\_R , \mathbf{H}'' \rangle \big) \\\\
+                                                 +      &\quad &  \quad &  +                                                                                                                               & \quad &  \quad \quad +                                                                                                                                 & \quad &  \quad \quad +                                                                                                                                                                    &\quad & \quad  \quad +   \\\\
+                     \tilde{e} \cdot \widetilde{B}      &\quad &= \quad & x \cdot \big( \tilde{a}' \cdot \widetilde{B} + u \tilde{a}'' \cdot \widetilde{B} \big)                                           & \quad &+ \quad x^2 \cdot \big( \tilde{o}' \cdot \widetilde{B} + u \cdot \tilde{o}'' \cdot \widetilde{B} \big)                                          & \quad &+ \quad 0                                                                                                                                                                          &\quad &+\quad  x^3 \cdot \big( \tilde{s}' \cdot \widetilde{B} + u \tilde{s}'' \cdot \widetilde{B} \big) \\\\
+                                     \shortparallel     &\quad &  \quad & \shortparallel                                                                                                                   & \quad &  \quad \quad \shortparallel                                                                                                                    & \quad &  \quad \quad \shortparallel                                                                                                                                                       &\quad & \quad  \quad \shortparallel   \\\\
+                                                        &\quad &= \quad & x \cdot \big(A_I' + u \cdot A_I'')                                                                                               & \quad &+ \quad x^2 \cdot \big(A_O' + u \cdot A_O'' \big) - \langle \mathbf{1}, \mathbf{H}' \rangle - u \cdot \langle \mathbf{1}, \mathbf{H}'' \rangle  & \quad &+ \quad x \cdot \langle \mathbf{w}\_L,  \hat{\mathbf{H}} \rangle + x \cdot \langle \mathbf{w}\_R,  \hat{\mathbf{G}} \rangle + \langle \mathbf{w}\_O,  \hat{\mathbf{H}} \rangle     &\quad &+\quad  x^3 \cdot (S' + u \cdot S'')
 \end{aligned}
 \\]
-where
+with generators transmuted using challenges \\(y\\) and \\(u\\):
 \\[
 \begin{aligned}
-W_L &= \langle \mathbf{y}^{-n} \circ (\mathbf{w}'\_L || u \cdot \mathbf{w}''\_L), \mathbf{H} \rangle, \\\\
-W_R &= \langle \mathbf{y}^{-n} \circ (\mathbf{w}'\_R || u \cdot \mathbf{w}''\_R), \mathbf{G} \rangle, \\\\
-W_O &= \langle \mathbf{y}^{-n} \circ (\mathbf{w}'\_O || u \cdot \mathbf{w}''\_O), \mathbf{H} \rangle. \\\\
+\hat{\mathbf{G}} &= \mathbf{G}' || (u \cdot \mathbf{G}''), \\\\
+\hat{\mathbf{H}} &= \mathbf{y}^{-n} \circ \big( \mathbf{H}' || (u \cdot \mathbf{H}'') \big). \\\\
 \end{aligned}
 \\]
 
@@ -755,7 +744,10 @@ who uses the bottom row of the diagram to check the following statement:
 \\[
 \begin{aligned}
 {\langle {\mathbf{l}}(x), \hat{\mathbf{G}} \rangle} + {\langle {\mathbf{r}}(x), \hat{\mathbf{H}} \rangle} \stackrel{?}{=}
--{\widetilde{e}} {\widetilde{B}} + x \cdot (A_I' + u \cdot A_I'') + x^2 \cdot (A_O' + u \cdot A_O'') - \langle \mathbf{1}, \mathbf{H}' \rangle - u \cdot \langle \mathbf{1}, \mathbf{H}'' \rangle + W_L \cdot x + W_R \cdot x + W_O + x^3 \cdot (S' + u \cdot S'') \\\\
+&-{\widetilde{e}} {\widetilde{B}} + x \cdot (A_I' + u \cdot A_I'') + x^2 \cdot (A_O' + u \cdot A_O'')\\\\
+&- \langle \mathbf{1}, \mathbf{H}' \rangle - u \cdot \langle \mathbf{1}, \mathbf{H}'' \rangle +
+x \cdot \langle \mathbf{w}\_L,  \hat{\mathbf{H}} \rangle + x \cdot \langle \mathbf{w}\_R,  \hat{\mathbf{G}} \rangle + \langle \mathbf{w}\_O,  \hat{\mathbf{H}} \rangle +
+x^3 \cdot (S' + u \cdot S'') \\\\
 \end{aligned}
 \\]
 
@@ -776,7 +768,10 @@ The verifier checks the inner product proof with \\(P\\) computed using the bott
 which proves that the vectors \\(\mathbf{l}(x), \mathbf{r}(x)\\) are computed correctly:
 \\[
 \begin{aligned}
-P &= -{\widetilde{e}} {\widetilde{B}} + x \cdot (A_I' + u \cdot A_I'') + x^2 \cdot (A_O' + u \cdot A_O'') - \langle \mathbf{1}, \mathbf{H}' \rangle - u \cdot \langle \mathbf{1}, \mathbf{H}'' \rangle + W_L \cdot x + W_R \cdot x + W_O + x^3 \cdot (S' + u \cdot S'') \\\\
+P = &-{\widetilde{e}} {\widetilde{B}} + x \cdot (A_I' + u \cdot A_I'') + x^2 \cdot (A_O' + u \cdot A_O'') \\\\
+    &- \langle \mathbf{1}, \mathbf{H}' \rangle - u \cdot \langle \mathbf{1}, \mathbf{H}'' \rangle +
+    x \cdot \langle \mathbf{w}\_L,  \hat{\mathbf{H}} \rangle + x \cdot \langle \mathbf{w}\_R,  \hat{\mathbf{G}} \rangle + \langle \mathbf{w}\_O,  \hat{\mathbf{H}} \rangle +
+    x^3 \cdot (S' + u \cdot S'') \\\\
 \end{aligned}
 \\]
 
@@ -905,13 +900,24 @@ Vector polynomial \\(\mathbf{r}(x)\\) is padded with additional (negated) powers
 \end{aligned}
 \\]
 
-
-The commitments to these vector polynomials are also padded (\\(W\_{L,R,O}\\) remain unchanged because the weights are padded with zeroes):
+Transmuted generators are padded as follows:
 
 \\[
 \begin{aligned}
-  P^{+} &= -{\widetilde{e}} {\widetilde{B}} + x \cdot A_I + x^2 \cdot A_O - \langle \mathbf{1}, \mathbf{H}^{+} \rangle + W_L \cdot x + W_R \cdot x + W_O + x^3 \cdot S \\\\
-        &= P - \langle \mathbf{1}, [H_n,...,H_{n^{+}-1}] \rangle
+   \hat{\mathbf{G}}^{+}  &= \mathbf{G}' \hspace{0.1cm} || \hspace{0.1cm} u \cdot \mathbf{G}'' \hspace{0.1cm} || \hspace{0.1cm} u \cdot [G_n,...,G_{n^{+}-1}] \\\\
+   \hat{\mathbf{H}}^{+}  &= \mathbf{y}^{-n^{+}} \circ \big( \mathbf{H}' \hspace{0.1cm} || \hspace{0.1cm} u \cdot \mathbf{H}'' \hspace{0.1cm} || \hspace{0.1cm} u \cdot [H_n,...,H_{n^{+}-1}]\big) \\\\
+\end{aligned}
+\\]
+
+The commitment \\(P\\) is also padded:
+
+\\[
+\begin{aligned}
+P^{+} &=& &-{\widetilde{e}} {\widetilde{B}} + x \cdot (A_I' + u \cdot A_I'') + x^2 \cdot (A_O' + u \cdot A_O'') \\\\
+      &&  &- \langle \mathbf{1}, \mathbf{H}' \rangle - u \cdot \langle \mathbf{1}, {\mathbf{H}''}^{+} \rangle +
+          x \cdot \langle \mathbf{w}\_L || \mathbf{0},  \hat{\mathbf{H}}^{+} \rangle + x \cdot \langle \mathbf{w}\_R || \mathbf{0},  \hat{\mathbf{G}}^{+} \rangle + \langle \mathbf{w}\_O || \mathbf{0},  \hat{\mathbf{H}}^{+} \rangle +
+          x^3 \cdot (S' + u \cdot S'') \\\\
+      &=& &P - \langle u, [H_n,...,H_{n^{+}-1}] \rangle
 \end{aligned}
 \\]
 
