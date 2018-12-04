@@ -264,14 +264,10 @@ where the [definition](#proving-that-mathbflx-mathbfrx-are-correct) of \\(P^{+}\
 
 \\[
 \begin{aligned}
-  P^{+}   = -{\widetilde{e}} {\widetilde{B}} + x \cdot (A_I' + u \cdot A_I'') + x^2 \cdot (A_O' + u \cdot A_O'') - \langle \mathbf{1}, \mathbf{H}' \rangle - u \cdot \langle \mathbf{1}, \mathbf{H}'' \rangle + W_L \cdot x + W_R \cdot x + W_O + x^3 \cdot (S' + u \cdot S'')
-\end{aligned}
-\\]
-\\[
-\begin{aligned}
-W_L &= \langle \mathbf{y}^{-n} \circ (\mathbf{w}'\_L || u \cdot \mathbf{w}''\_L), \mathbf{H} \rangle, \\\\
-W_R &= \langle \mathbf{y}^{-n} \circ (\mathbf{w}'\_R || u \cdot \mathbf{w}''\_R), \mathbf{G} \rangle, \\\\
-W_O &= \langle \mathbf{y}^{-n} \circ (\mathbf{w}'\_O || u \cdot \mathbf{w}''\_O), \mathbf{H} \rangle. \\\\
+  P^{+}   = &-{\widetilde{e}} {\widetilde{B}} + x \cdot (A_I' + u \cdot A_I'') + x^2 \cdot (A_O' + u \cdot A_O'') \\\\
+            &-\langle \mathbf{1}, \mathbf{H}' \rangle - u \cdot \langle \mathbf{1}, {\mathbf{H}''} \rangle - u \cdot [H_n,...,H_{n^{+}-1}]\\\\
+            &+x \cdot \langle \mathbf{w}\_L,  \hat{\mathbf{H}} \rangle + x \cdot \langle \mathbf{w}\_R,  \hat{\mathbf{G}} \rangle + \langle \mathbf{w}\_O,  \hat{\mathbf{H}} \rangle +
+            x^3 \cdot (S' + u \cdot S'')
 \end{aligned}
 \\]
 
