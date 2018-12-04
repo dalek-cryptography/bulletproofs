@@ -264,7 +264,7 @@ where the [definition](#proving-that-mathbflx-mathbfrx-are-correct) of \\(P^{+}\
 
 \\[
 \begin{aligned}
-  P^{+}   = -{\widetilde{e}} {\widetilde{B}} + x \cdot (A_I' + u \cdot A_I'') + x^2 \cdot (A_O' + u \cdot A_O'') - \langle \mathbf{1}, \hat{\mathbf{H}}^{+} \rangle + W_L \cdot x + W_R \cdot x + W_O + x^3 \cdot (S' + u \cdot S'')
+  P^{+}   = -{\widetilde{e}} {\widetilde{B}} + x \cdot (A_I' + u \cdot A_I'') + x^2 \cdot (A_O' + u \cdot A_O'') - \langle \mathbf{1}, \mathbf{H}' \rangle - u \cdot \langle \mathbf{1}, \mathbf{H}'' \rangle + W_L \cdot x + W_R \cdot x + W_O + x^3 \cdot (S' + u \cdot S'')
 \end{aligned}
 \\]
 \\[
