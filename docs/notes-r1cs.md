@@ -761,12 +761,12 @@ who uses the bottom row of the diagram to check the following statement:
 
 
 
-Compressing vectors \\(\mathbf{l}(x)\\) and \\(\mathbf{r}(x)\\) with an inner product argument
-----------------------------------------------------------------------------------------------
+Compressing the proof with an inner product argument
+----------------------------------------------------
 
 Once the verifier has checked correctness of \\(t(x)\\), \\(\mathbf{l}(x)\\) and \\(\mathbf{r}(x)\\),
-they can directly compute the inner product to verify whether \\(t(x) \stackrel{?}{=} {\langle {\mathbf{l}}(x), {\mathbf{r}}(x) \rangle}\\).
-This, however, would require transmitting \\(2n\\) 32-byte elements representing the vectors.
+they can directly compute the inner product to check the relation \\(t(x) \stackrel{?}{=} {\langle {\mathbf{l}}(x), {\mathbf{r}}(x) \rangle}\\).
+This, however, would require transmitting \\(2n\\) 32-byte elements representing the vectors \\(\mathbf{l}(x)\\) and \\(\mathbf{r}(x)\\).
 
 To make the proof smaller, the prover will use the [inner product argument](../notes/index.html#inner-product-proof)
 to indirectly prove the inner product relation using \\(t(x)\\) and the vectors represented
