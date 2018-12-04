@@ -707,7 +707,7 @@ Low-level variables are committed before challenges \\(y\\) and \\(u\\) are know
 \end{aligned}
 \\]
 
-Lets now define the commitments over the components of \\(\mathbf{l}(x)\\) and \\(\mathbf{r}(x)\\):
+The commitments to the components of \\(\mathbf{l}(x)\\) and \\(\mathbf{r}(x)\\) are then split up as follows:
 
 \\[
 \begin{aligned}
