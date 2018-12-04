@@ -657,7 +657,7 @@ y^{-n'} \mathbf{y}^{-n''} \circ \mathbf{r}''(x) &= \mathbf{a}''\_R \cdot x + \ma
 \\]
 
 Now we need to express the statements above using independent commitments to the subvectors \\(\mathbf{a}'\_{L,R,O}\\) and \\(\mathbf{a}''\_{L,R,O}\\).
-Commitments must be independent because second subvectors are computed with the use of challenges generated _after_ the first subvectors are determined and committed.
+The commitments must be independent because second subvectors are computed with the use of challenges generated _after_ the first subvectors are determined and committed.
 
 To do that, we split vectors of generators and combine the statements in two:
 the first one in terms of the commitments to the first subvectors,
