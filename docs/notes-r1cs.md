@@ -836,22 +836,17 @@ As a result, we have to take larger slices of the vectors of generators \\(\math
 
 The low-level variables are padded with zeroes, which is equivalent to padding only the second-phase variables
 (since we pad the combined vector of all variables on the right end).
-If there are no second-phase variables, we can consider their vector to be of length 0.
+If there are no second-phase variables, we can consider their vector to be of length 0 before padding,
+but still apply padding to that vector, instead of the vector of first-phase variables.
 
-Since we do not pad first-phase variables, it is obvious that the commitments \\(A_I', A_O', S'\\) remain unchanged.
+Since we never pad first-phase variables, it is obvious that the commitments \\(A_I', A_O', S'\\) remain unchanged.
 
-Commitments to the second-phase low-level variables remain unchanged as well:
-
-\\[
-\begin{aligned}
-{A_I''}^{+} &= \widetilde{B} \cdot \tilde{a}'' + \langle {\mathbf{G}^{+}}'', {\mathbf{a}\_L^{+}}'' \rangle + \langle {\mathbf{H''}^{+}}'', {\mathbf{a}\_R^{+}}'' \rangle \\\\
-\end{aligned}
-\\]
+Commitments to the second-phase low-level variables remain unchanged since the padding scalars are zeroes:
 
 \\[
 \begin{aligned}
-{A_I''}^{+} &= \widetilde{B} \cdot \tilde{a}'' + \langle {\mathbf{G}^{+}}'', {\mathbf{a}\_L^{+}}'' \rangle + \langle {\mathbf{H''}^{+}}'', {\mathbf{a}\_R^{+}}'' \rangle \\\\
-            &= \widetilde{B} \cdot \tilde{a}'' + \langle {\mathbf{G}}'', \mathbf{a}\_L'' \rangle + \langle {\mathbf{H}}'', \mathbf{a}\_R'' \rangle +
+{A_I''}^{+} &= \widetilde{B} \cdot \tilde{a}'' + \langle {\mathbf{G}''}^{+}, {\mathbf{a}''}\_L^{+} \rangle + \langle {\mathbf{H}''}^{+}, {\mathbf{a}''}\_R^{+} \rangle \\\\
+            &= \widetilde{B} \cdot \tilde{a}'' + \langle {\mathbf{G}''}, \mathbf{a}\_L'' \rangle + \langle {\mathbf{H}''}, \mathbf{a}\_R'' \rangle +
                \langle [G_n, ..., G_{n^{+}-1}], \mathbf{0} \rangle + \langle [H_n, ..., H_{n^{+}-1}], \mathbf{0} \rangle \\\\
             &= \widetilde{B} \cdot \tilde{a}'' + \langle {\mathbf{G}}'', \mathbf{a}\_L'' \rangle + \langle {\mathbf{H}}'', \mathbf{a}\_R'' \rangle + 0 \\\\
             &= A_I'' \\\\
