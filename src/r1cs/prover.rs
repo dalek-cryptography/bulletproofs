@@ -20,7 +20,7 @@ use transcript::TranscriptProtocol;
 /// `Prover` generates commitments, adds them to the transcript and returns
 /// the corresponding variables.
 ///
-/// After all variables are committed, the proving code calls `build_constraint_system`,
+/// After all variables are committed, the proving code calls `finalize_inputs`,
 /// which consumes `Prover` and returns `ProverCS`.
 /// The proving code then allocates low-level variables and adds constraints to the `ProverCS`.
 ///
@@ -211,7 +211,7 @@ impl<'a, 'b> Prover<'a, 'b> {
 
     /// Consume the `Prover`, provide the `ConstraintSystem` implementation to the closure,
     /// and produce a proof.
-    pub fn build_constraint_system(self) -> ProverCS<'a, 'b> {
+    pub fn finalize_inputs(self) -> ProverCS<'a, 'b> {
         // Commit a length _suffix_ for the number of high-level variables.
         // We cannot do this in advance because user can commit variables one-by-one,
         // but this suffix provides safe disambiguation because each variable

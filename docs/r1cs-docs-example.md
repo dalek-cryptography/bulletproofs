@@ -218,7 +218,7 @@ impl ShuffleProof {
             })
             .unzip();
 
-        let mut cs = prover.build_constraint_system();
+        let mut cs = prover.finalize_inputs();
 
         ShuffleProof::gadget(&mut cs, &input_vars, &output_vars);
 
@@ -321,7 +321,7 @@ The verifier receives a proof, and a list of committed inputs and outputs, from 
 #             })
 #             .unzip();
 # 
-#         let mut cs = prover.build_constraint_system();
+#         let mut cs = prover.finalize_inputs();
 #
 #         ShuffleProof::gadget(&mut cs, &input_vars, &output_vars);
 #
@@ -355,7 +355,7 @@ impl ShuffleProof {
             verifier.commit(*commitment)
         }).collect();
 
-        let mut cs = verifier.build_constraint_system();
+        let mut cs = verifier.finalize_inputs();
 
         ShuffleProof::gadget(&mut cs, &input_vars, &output_vars);
 
@@ -459,7 +459,7 @@ Because only the prover knows the scalar values of the inputs and outputs, and t
 #             })
 #             .unzip();
 # 
-#         let mut cs = prover.build_constraint_system();
+#         let mut cs = prover.finalize_inputs();
 #
 #         ShuffleProof::gadget(&mut cs, &input_vars, &output_vars);
 #
@@ -493,7 +493,7 @@ Because only the prover knows the scalar values of the inputs and outputs, and t
 #             verifier.commit(*commitment)
 #         }).collect();
 #
-#         let mut cs = verifier.build_constraint_system();
+#         let mut cs = verifier.finalize_inputs();
 #
 #         ShuffleProof::gadget(&mut cs, &input_vars, &output_vars);
 #

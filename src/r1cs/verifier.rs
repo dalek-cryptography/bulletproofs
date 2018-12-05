@@ -18,7 +18,7 @@ use transcript::TranscriptProtocol;
 /// `Verifier` adds them to the transcript and returns
 /// the corresponding variables.
 ///
-/// After all variables are committed, the verifying code calls `build_constraint_system`,
+/// After all variables are committed, the verifying code calls `finalize_inputs`,
 /// which consumes `Verifier` and returns `VerifierCS`.
 /// The verifying code then allocates low-level variables and adds constraints to the `VerifierCS`.
 ///
@@ -178,7 +178,7 @@ impl<'a, 'b> Verifier<'a, 'b> {
 
     /// Consume the `Verifier`, provide the `ConstraintSystem` implementation to the closure,
     /// and verify the proof against the resulting constraint system.
-    pub fn build_constraint_system(self) -> VerifierCS<'a, 'b> {
+    pub fn finalize_inputs(self) -> VerifierCS<'a, 'b> {
         // Commit a length _suffix_ for the number of high-level variables.
         // We cannot do this in advance because user can commit variables one-by-one,
         // but this suffix provides safe disambiguation because each variable

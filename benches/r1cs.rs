@@ -144,7 +144,7 @@ impl KShuffleGadget {
             .map(|v| prover.commit(*v, Scalar::random(&mut blinding_rng)))
             .unzip();
 
-        let cs = prover.build_constraint_system();
+        let cs = prover.finalize_inputs();
 
         Self::fill_cs(&mut cs, &input_vars, &output_vars);
 
@@ -178,7 +178,7 @@ impl KShuffleGadget {
             .map(|commitment| verifier.commit(*commitment))
             .collect();
 
-        let cs = verifier.build_constraint_system();
+        let cs = verifier.finalize_inputs();
 
         Self::fill_cs(&mut cs, &input_vars, &output_vars);
 
