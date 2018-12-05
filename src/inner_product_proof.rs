@@ -444,35 +444,31 @@ mod tests {
         );
 
         let mut verifier = Transcript::new(b"innerproducttest");
-        assert!(
-            proof
-                .verify(
-                    n,
-                    &mut verifier,
-                    util::exp_iter(y_inv).take(n),
-                    &P,
-                    &Q,
-                    &G,
-                    &H
-                )
-                .is_ok()
-        );
+        assert!(proof
+            .verify(
+                n,
+                &mut verifier,
+                util::exp_iter(y_inv).take(n),
+                &P,
+                &Q,
+                &G,
+                &H
+            )
+            .is_ok());
 
         let proof = InnerProductProof::from_bytes(proof.to_bytes().as_slice()).unwrap();
         let mut verifier = Transcript::new(b"innerproducttest");
-        assert!(
-            proof
-                .verify(
-                    n,
-                    &mut verifier,
-                    util::exp_iter(y_inv).take(n),
-                    &P,
-                    &Q,
-                    &G,
-                    &H
-                )
-                .is_ok()
-        );
+        assert!(proof
+            .verify(
+                n,
+                &mut verifier,
+                util::exp_iter(y_inv).take(n),
+                &P,
+                &Q,
+                &G,
+                &H
+            )
+            .is_ok());
     }
 
     #[test]

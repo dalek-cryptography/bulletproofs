@@ -83,10 +83,7 @@ pub enum MPCError {
     WrongNumProofShares,
     /// This error occurs when one or more parties submit malformed
     /// proof shares.
-    #[fail(
-        display = "Malformed proof shares from parties {:?}",
-        bad_shares
-    )]
+    #[fail(display = "Malformed proof shares from parties {:?}", bad_shares)]
     MalformedProofShares {
         /// A vector with the indexes of the parties whose shares were malformed.
         bad_shares: Vec<usize>,

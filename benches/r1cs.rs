@@ -16,17 +16,17 @@ use merlin::Transcript;
 extern crate rand;
 use rand::Rng;
 
-/* 
+/*
 K-SHUFFLE GADGET SPECIFICATION:
 
 Represents a permutation of a list of `k` scalars `{x_i}` into a list of `k` scalars `{y_i}`.
 
-Algebraically it can be expressed as a statement that for a free variable `z`, 
+Algebraically it can be expressed as a statement that for a free variable `z`,
 the roots of the two polynomials in terms of `z` are the same up to a permutation:
 
     ∏(x_i - z) == ∏(y_i - z)
 
-Prover can commit to blinded scalars `x_i` and `y_i` then receive a random challenge `z`, 
+Prover can commit to blinded scalars `x_i` and `y_i` then receive a random challenge `z`,
 and build a proof that the above relation holds.
 
 K-shuffle requires `2*(K-1)` multipliers.
@@ -226,7 +226,7 @@ fn kshuffle_prove_17(c: &mut Criterion) {
     kshuffle_prove_helper(17, c);
 }
 
-criterion_group!{
+criterion_group! {
     name = kshuffle_prove;
     config = Criterion::default();
     targets =
@@ -290,7 +290,7 @@ fn kshuffle_verify_17(c: &mut Criterion) {
     kshuffle_verify_helper(17, c);
 }
 
-criterion_group!{
+criterion_group! {
     name = kshuffle_verify;
     config = Criterion::default();
     targets =

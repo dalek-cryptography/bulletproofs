@@ -567,11 +567,9 @@ mod tests {
             // 4. Verify with the same customization label as above
             let mut transcript = Transcript::new(b"AggregatedRangeProofTest");
 
-            assert!(
-                proof
-                    .verify_multiple(&bp_gens, &pc_gens, &mut transcript, &value_commitments, n)
-                    .is_ok()
-            );
+            assert!(proof
+                .verify_multiple(&bp_gens, &pc_gens, &mut transcript, &value_commitments, n)
+                .is_ok());
         }
     }
 
