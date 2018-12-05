@@ -276,13 +276,14 @@ impl<'a, 'b> ProverCS<'a, 'b> {
         lc.terms
             .iter()
             .map(|(var, coeff)| {
-                coeff * match var {
-                    Variable::MultiplierLeft(i) => self.a_L[*i],
-                    Variable::MultiplierRight(i) => self.a_R[*i],
-                    Variable::MultiplierOutput(i) => self.a_O[*i],
-                    Variable::Committed(i) => self.v[*i],
-                    Variable::One() => Scalar::one(),
-                }
+                coeff
+                    * match var {
+                        Variable::MultiplierLeft(i) => self.a_L[*i],
+                        Variable::MultiplierRight(i) => self.a_R[*i],
+                        Variable::MultiplierOutput(i) => self.a_O[*i],
+                        Variable::Committed(i) => self.v[*i],
+                        Variable::One() => Scalar::one(),
+                    }
             })
             .sum()
     }
