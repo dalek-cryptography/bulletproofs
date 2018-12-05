@@ -90,7 +90,7 @@ impl ShuffleProof {
             .map(|v| prover.commit(*v, Scalar::random(&mut blinding_rng)))
             .unzip();
 
-        let mut cs = prover.build_constraint_system();
+        let mut cs = prover.finalize_inputs();
 
         ShuffleProof::gadget(&mut cs, &input_vars, &output_vars);
 
@@ -127,7 +127,7 @@ impl ShuffleProof {
             .map(|V| verifier.commit(*V))
             .collect();
 
-        let mut cs = verifier.build_constraint_system();
+        let mut cs = verifier.finalize_inputs();
 
         ShuffleProof::gadget(&mut cs, &input_vars, &output_vars);
 
@@ -257,7 +257,7 @@ fn example_gadget_roundtrip_helper(
             .unzip();
 
         // 3. Build a CS
-        let mut cs = prover.build_constraint_system();
+        let mut cs = prover.finalize_inputs();
 
         example_gadget(
             &mut cs,
@@ -286,7 +286,7 @@ fn example_gadget_roundtrip_helper(
     let vars: Vec<_> = commitments.iter().map(|V| verifier.commit(*V)).collect();
 
     // 3. Build a CS
-    let mut cs = verifier.build_constraint_system();
+    let mut cs = verifier.finalize_inputs();
     example_gadget(
         &mut cs,
         vars[0].into(),
