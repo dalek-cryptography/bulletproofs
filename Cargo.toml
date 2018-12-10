@@ -36,3 +36,6 @@ avx2_backend = ["curve25519-dalek/avx2_backend"]
 name = "bulletproofs"
 harness = false
 
+[patch.crates-io]
+curve25519-dalek = {git = "https://github.com/hdevalence/curve25519-dalek", branch = "ifma" }
+criterion = {git = "https://github.com/hdevalence/criterion.rs" }
