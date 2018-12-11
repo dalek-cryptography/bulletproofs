@@ -118,7 +118,7 @@ fn verify_aggregated_rangeproof_n_64(c: &mut Criterion) {
     verify_aggregated_rangeproof_helper(64, c);
 }
 
-criterion_group!{
+criterion_group! {
     name = create_rp;
     config = Criterion::default().sample_size(10);
     targets =
@@ -128,7 +128,7 @@ criterion_group!{
     create_aggregated_rangeproof_n_64,
 }
 
-criterion_group!{
+criterion_group! {
     name = verify_rp;
     config = Criterion::default();
     targets =
