@@ -11,12 +11,11 @@ env:
   # this ensures the benchmarks build but doesn't run them on the CI server.
   - TEST_COMMAND=bench EXTRA_FLAGS='"DONTRUNBENCHMARKS"' FEATURES=''
 
-before_script:
-  - rustup component add rustfmt-preview
-
 matrix:
   include:
-  - rust: nightly
+  - rust: nightly-2018-12-04
+    before_script:
+    - rustup component add rustfmt-preview
     script:
     - cargo fmt --all -- --check
 
