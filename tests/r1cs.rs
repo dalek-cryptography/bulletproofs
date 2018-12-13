@@ -1,3 +1,4 @@
+#![allow(non_snake_case)]
 extern crate bulletproofs;
 extern crate curve25519_dalek;
 extern crate merlin;
@@ -60,42 +61,42 @@ impl ShuffleProof {
         transcript: &'a mut Transcript,
         input: &[Scalar],
         output: &[Scalar],
-    ) -> Result<(ShuffleProof, Vec<CompressedRistretto>), R1CSError> {
+    ) -> Result<
+        (
+            ShuffleProof,
+            Vec<CompressedRistretto>,
+            Vec<CompressedRistretto>,
+        ),
+        R1CSError,
+    > {
         // Apply a domain separator with the shuffle parameters to the transcript
         let k = input.len();
         transcript.commit_bytes(b"dom-sep", b"ShuffleProof");
         transcript.commit_bytes(b"k", Scalar::from(k as u64).as_bytes());
 
-        // Collect witness assignments
-        let mut v = Vec::with_capacity(2 * k);
-        v.extend_from_slice(input);
-        v.extend_from_slice(output);
+        let mut prover = Prover::new(&bp_gens, &pc_gens, transcript);
 
-        // Construct blinding factors using a TranscriptRng
-        // Note: a non-example implementation would want to operate on existing commitments
-        let mut rng = {
-            let mut builder = transcript.build_rng();
-            // commit the secret values
-            for &v_i in &v {
-                builder = builder.commit_witness_bytes(b"v_i", v_i.as_bytes());
-            }
-            use rand::thread_rng;
-            builder.finalize(&mut thread_rng())
-        };
-        let v_blinding: Vec<Scalar> = (0..2 * k).map(|_| Scalar::random(&mut rng)).collect();
+        // Construct blinding factors using an RNG.
+        // Note: a non-example implementation would want to operate on existing commitments.
+        let mut blinding_rng = rand::thread_rng();
 
-        // Construct a `ConstraintSystem` instance for the shuffle gadget
-        let (mut cs, variables, commitments) =
-            ProverCS::new(&bp_gens, &pc_gens, transcript, v, v_blinding.clone());
+        let (input_commitments, input_vars): (Vec<_>, Vec<_>) = input
+            .into_iter()
+            .map(|v| prover.commit(*v, Scalar::random(&mut blinding_rng)))
+            .unzip();
 
-        // Allocate variables and add constraints to the constraint system
-        let (input_vars, output_vars) = variables.split_at(k);
-        ShuffleProof::gadget(&mut cs, input_vars, output_vars);
+        let (output_commitments, output_vars): (Vec<_>, Vec<_>) = output
+            .into_iter()
+            .map(|v| prover.commit(*v, Scalar::random(&mut blinding_rng)))
+            .unzip();
 
-        // Generate proof
+        let mut cs = prover.finalize_inputs();
+
+        ShuffleProof::gadget(&mut cs, &input_vars, &output_vars);
+
         let proof = cs.prove()?;
 
-        Ok((ShuffleProof(proof), commitments))
+        Ok((ShuffleProof(proof), input_commitments, output_commitments))
     }
 }
 
@@ -106,22 +107,30 @@ impl ShuffleProof {
         pc_gens: &'b PedersenGens,
         bp_gens: &'b BulletproofGens,
         transcript: &'a mut Transcript,
-        commitments: &Vec<CompressedRistretto>,
+        input_commitments: &Vec<CompressedRistretto>,
+        output_commitments: &Vec<CompressedRistretto>,
     ) -> Result<(), R1CSError> {
         // Apply a domain separator with the shuffle parameters to the transcript
-        let k = commitments.len() / 2;
+        let k = input_commitments.len();
         transcript.commit_bytes(b"dom-sep", b"ShuffleProof");
         transcript.commit_bytes(b"k", Scalar::from(k as u64).as_bytes());
 
-        // Build a `ConstraintSystem` instance with the public inputs
-        let (mut cs, variables) =
-            VerifierCS::new(&bp_gens, &pc_gens, transcript, commitments.to_vec());
+        let mut verifier = Verifier::new(&bp_gens, &pc_gens, transcript);
 
-        // Add constraints to the constraint system
-        let (input_vars, output_vars) = variables.split_at(k);
-        ShuffleProof::gadget(&mut cs, input_vars, output_vars);
+        let input_vars: Vec<_> = input_commitments
+            .iter()
+            .map(|V| verifier.commit(*V))
+            .collect();
 
-        // Verify the proof
+        let output_vars: Vec<_> = output_commitments
+            .iter()
+            .map(|V| verifier.commit(*V))
+            .collect();
+
+        let mut cs = verifier.finalize_inputs();
+
+        ShuffleProof::gadget(&mut cs, &input_vars, &output_vars);
+
         cs.verify(&self.0)
     }
 }
@@ -133,7 +142,7 @@ fn kshuffle_helper(k: usize) {
     let pc_gens = PedersenGens::default();
     let bp_gens = BulletproofGens::new((2 * k).next_power_of_two(), 1);
 
-    let (proof, commitments) = {
+    let (proof, input_commitments, output_commitments) = {
         // Randomly generate inputs and outputs to kshuffle
         let mut rng = rand::thread_rng();
         let (min, max) = (0u64, std::u64::MAX);
@@ -149,11 +158,15 @@ fn kshuffle_helper(k: usize) {
 
     {
         let mut verifier_transcript = Transcript::new(b"ShuffleProofTest");
-        assert!(
-            proof
-                .verify(&pc_gens, &bp_gens, &mut verifier_transcript, &commitments,)
-                .is_ok()
-        );
+        assert!(proof
+            .verify(
+                &pc_gens,
+                &bp_gens,
+                &mut verifier_transcript,
+                &input_commitments,
+                &output_commitments
+            )
+            .is_ok());
     }
 }
 
@@ -224,33 +237,26 @@ fn example_gadget_roundtrip_helper(
     c1: u64,
     c2: u64,
 ) -> Result<(), R1CSError> {
-    fn blinding_helper(len: usize) -> Vec<Scalar> {
-        (0..len)
-            .map(|_| Scalar::random(&mut thread_rng()))
-            .collect()
-    }
-
     // Common
     let pc_gens = PedersenGens::default();
     let bp_gens = BulletproofGens::new(128, 1);
 
     // Prover's scope
     let (proof, commitments) = {
-        // 0. Construct transcript
         let mut transcript = Transcript::new(b"R1CSExampleGadget");
 
-        // 1. Construct HL witness
-        let v: Vec<_> = [a1, a2, b1, b2, c1]
-            .iter()
-            .map(|x| Scalar::from(*x))
-            .collect();
-        let v_blinding = blinding_helper(v.len());
+        // 1. Create a prover
+        let mut prover = Prover::new(&bp_gens, &pc_gens, &mut transcript);
 
-        // 2. Construct CS
-        let (mut cs, vars, commitments) =
-            ProverCS::new(&bp_gens, &pc_gens, &mut transcript, v.clone(), v_blinding);
+        // 2. Commit high-level variables
+        let (commitments, vars): (Vec<_>, Vec<_>) = [a1, a2, b1, b2, c1]
+            .into_iter()
+            .map(|x| prover.commit(Scalar::from(*x), Scalar::random(&mut thread_rng())))
+            .unzip();
 
-        // 3. Add gadgets
+        // 3. Build a CS
+        let mut cs = prover.finalize_inputs();
+
         example_gadget(
             &mut cs,
             vars[0].into(),
@@ -261,7 +267,7 @@ fn example_gadget_roundtrip_helper(
             Scalar::from(c2).into(),
         );
 
-        // 4. Prove.
+        // 4. Make a proof
         let proof = cs.prove()?;
 
         (proof, commitments)
@@ -269,13 +275,16 @@ fn example_gadget_roundtrip_helper(
 
     // Verifier logic
 
-    // 0. Construct transcript
     let mut transcript = Transcript::new(b"R1CSExampleGadget");
 
-    // 1. Construct CS using commitments to HL witness
-    let (mut cs, vars) = VerifierCS::new(&bp_gens, &pc_gens, &mut transcript, commitments);
+    // 1. Create a verifier
+    let mut verifier = Verifier::new(&bp_gens, &pc_gens, &mut transcript);
 
-    // 2. Add gadgets
+    // 2. Commit high-level variables
+    let vars: Vec<_> = commitments.iter().map(|V| verifier.commit(*V)).collect();
+
+    // 3. Build a CS
+    let mut cs = verifier.finalize_inputs();
     example_gadget(
         &mut cs,
         vars[0].into(),
@@ -286,7 +295,7 @@ fn example_gadget_roundtrip_helper(
         Scalar::from(c2).into(),
     );
 
-    // 3. Verify.
+    // 4. Verify the proof
     cs.verify(&proof).map_err(|_| R1CSError::VerificationError)
 }
 

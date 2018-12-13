@@ -13,19 +13,28 @@ use generators::{BulletproofGens, PedersenGens};
 use inner_product_proof::InnerProductProof;
 use transcript::TranscriptProtocol;
 
+/// An entry point for creating a R1CS proof.
+///
+/// The lifecycle of a `Prover` is as follows. The proving code
+/// commits high-level variables and their blinding factors `(v, v_blinding)`,
+/// `Prover` generates commitments, adds them to the transcript and returns
+/// the corresponding variables.
+///
+/// After all variables are committed, the proving code calls `finalize_inputs`,
+/// which consumes `Prover` and returns `ProverCS`.
+/// The proving code then allocates low-level variables and adds constraints to the `ProverCS`.
+///
+/// When all constraints are added, the proving code calls `prove`
+/// on the instance of the constraint system and receives the complete proof.
+pub struct Prover<'a, 'b> {
+    /// Number of high-level variables
+    m: u64,
+
+    /// Constraint system implementation
+    cs: ProverCS<'a, 'b>,
+}
+
 /// A [`ConstraintSystem`] implementation for use by the prover.
-///
-/// The lifecycle of a `ProverCS` is as follows.  The proving code
-/// assembles openings `(v, v_blinding)` to the commitments to the
-/// inputs to the constraint system, then passes them, along with
-/// generators and a transcript, to [`ProverCS::new`].  This
-/// initializes the `ProverCS` and returns [`Variable`]s corresponding
-/// to the inputs.
-///
-/// The prover can then pass the `ProverCS` and the external variables
-/// to gadget code to build the constraints, before finally calling
-/// [`ProverCS::prove`], which consumes the `ProverCS`, synthesizes
-/// the witness, and constructs the proof.
 pub struct ProverCS<'a, 'b> {
     transcript: &'a mut Transcript,
     bp_gens: &'b BulletproofGens,
@@ -126,7 +135,7 @@ impl<'a, 'b> ConstraintSystem for ProverCS<'a, 'b> {
     }
 }
 
-impl<'a, 'b> ProverCS<'a, 'b> {
+impl<'a, 'b> Prover<'a, 'b> {
     /// Construct an empty constraint system with specified external
     /// input variables.
     ///
@@ -144,8 +153,38 @@ impl<'a, 'b> ProverCS<'a, 'b> {
     /// transcript.  This ensures that the transcript cannot be
     /// altered except by the `ProverCS` before proving is complete.
     ///
+    /// # Returns
+    ///
+    /// Returns a new `Prover` instance.
+    pub fn new(
+        bp_gens: &'b BulletproofGens,
+        pc_gens: &'b PedersenGens,
+        transcript: &'a mut Transcript,
+    ) -> Self {
+        transcript.r1cs_domain_sep();
+
+        Prover {
+            m: 0,
+            cs: ProverCS {
+                pc_gens,
+                bp_gens,
+                transcript,
+                v: Vec::new(),
+                v_blinding: Vec::new(),
+                constraints: Vec::new(),
+                a_L: Vec::new(),
+                a_R: Vec::new(),
+                a_O: Vec::new(),
+            },
+        }
+    }
+
+    /// Creates commitment to a high-level variable and adds it to the transcript.
+    ///
+    /// # Inputs
+    ///
     /// The `v` and `v_blinding` parameters are openings to the
-    /// commitments to the external variables for the constraint
+    /// commitment to the external variable for the constraint
     /// system.  Passing the opening (the value together with the
     /// blinding factor) makes it possible to reference pre-existing
     /// commitments in the constraint system.  All external variables
@@ -155,55 +194,34 @@ impl<'a, 'b> ProverCS<'a, 'b> {
     ///
     /// # Returns
     ///
-    /// Returns a tuple `(cs, vars, commitments)`.
-    ///
-    /// The first element is the newly constructed constraint system.
-    ///
-    /// The second element is a list of [`Variable`]s corresponding to
-    /// the external inputs, which can be used to form constraints.
-    ///
-    /// The third element is a list of the Pedersen commitments to the
-    /// external inputs, returned for convenience.
-    pub fn new(
-        bp_gens: &'b BulletproofGens,
-        pc_gens: &'b PedersenGens,
-        transcript: &'a mut Transcript,
-        v: Vec<Scalar>,
-        v_blinding: Vec<Scalar>,
-    ) -> (Self, Vec<Variable>, Vec<CompressedRistretto>) {
-        // Check that the input lengths are consistent
-        assert_eq!(v.len(), v_blinding.len());
-        let m = v.len();
-        transcript.r1cs_domain_sep(m as u64);
+    /// Returns a pair of a Pedersen commitment (as a compressed Ristretto point),
+    /// and a [`Variable`] corresponding to it, which can be used to form constraints.
+    pub fn commit(&mut self, v: Scalar, v_blinding: Scalar) -> (CompressedRistretto, Variable) {
+        let i = self.m as usize;
+        self.m += 1;
+        self.cs.v.push(v);
+        self.cs.v_blinding.push(v_blinding);
 
-        let mut variables = Vec::with_capacity(m);
-        let mut commitments = Vec::with_capacity(m);
+        // Add the commitment to the transcript.
+        let V = self.cs.pc_gens.commit(v, v_blinding).compress();
+        self.cs.transcript.commit_point(b"V", &V);
 
-        for i in 0..m {
-            // Generate pedersen commitment and commit it to the transcript
-            let V = pc_gens.commit(v[i], v_blinding[i]).compress();
-            transcript.commit_point(b"V", &V);
-            commitments.push(V);
-
-            // Allocate and return a variable for v_i
-            variables.push(Variable::Committed(i));
-        }
-
-        let cs = ProverCS {
-            pc_gens,
-            bp_gens,
-            transcript,
-            v,
-            v_blinding,
-            constraints: vec![],
-            a_L: vec![],
-            a_R: vec![],
-            a_O: vec![],
-        };
-
-        (cs, variables, commitments)
+        (V, Variable::Committed(i))
     }
 
+    /// Consume the `Prover`, provide the `ConstraintSystem` implementation to the closure,
+    /// and produce a proof.
+    pub fn finalize_inputs(self) -> ProverCS<'a, 'b> {
+        // Commit a length _suffix_ for the number of high-level variables.
+        // We cannot do this in advance because user can commit variables one-by-one,
+        // but this suffix provides safe disambiguation because each variable
+        // is prefixed with a separate label.
+        self.cs.transcript.commit_u64(b"m", self.m);
+        self.cs
+    }
+}
+
+impl<'a, 'b> ProverCS<'a, 'b> {
     /// Use a challenge, `z`, to flatten the constraints in the
     /// constraint system into vectors used for proving and
     /// verification.
@@ -258,13 +276,14 @@ impl<'a, 'b> ProverCS<'a, 'b> {
         lc.terms
             .iter()
             .map(|(var, coeff)| {
-                coeff * match var {
-                    Variable::MultiplierLeft(i) => self.a_L[*i],
-                    Variable::MultiplierRight(i) => self.a_R[*i],
-                    Variable::MultiplierOutput(i) => self.a_O[*i],
-                    Variable::Committed(i) => self.v[*i],
-                    Variable::One() => Scalar::one(),
-                }
+                coeff
+                    * match var {
+                        Variable::MultiplierLeft(i) => self.a_L[*i],
+                        Variable::MultiplierRight(i) => self.a_R[*i],
+                        Variable::MultiplierOutput(i) => self.a_O[*i],
+                        Variable::Committed(i) => self.v[*i],
+                        Variable::One() => Scalar::one(),
+                    }
             })
             .sum()
     }

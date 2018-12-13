@@ -1,5 +1,5 @@
 extern crate bulletproofs;
-use bulletproofs::r1cs::{ConstraintSystem, ProverCS, R1CSError, R1CSProof, Variable, VerifierCS};
+use bulletproofs::r1cs::{ConstraintSystem, Prover, R1CSError, R1CSProof, Variable, Verifier};
 use bulletproofs::{BulletproofGens, PedersenGens};
 
 #[macro_use]
@@ -16,17 +16,17 @@ use merlin::Transcript;
 extern crate rand;
 use rand::Rng;
 
-/* 
+/*
 K-SHUFFLE GADGET SPECIFICATION:
 
 Represents a permutation of a list of `k` scalars `{x_i}` into a list of `k` scalars `{y_i}`.
 
-Algebraically it can be expressed as a statement that for a free variable `z`, 
+Algebraically it can be expressed as a statement that for a free variable `z`,
 the roots of the two polynomials in terms of `z` are the same up to a permutation:
 
     ∏(x_i - z) == ∏(y_i - z)
 
-Prover can commit to blinded scalars `x_i` and `y_i` then receive a random challenge `z`, 
+Prover can commit to blinded scalars `x_i` and `y_i` then receive a random challenge `z`,
 and build a proof that the above relation holds.
 
 K-shuffle requires `2*(K-1)` multipliers.
@@ -115,36 +115,42 @@ impl KShuffleGadget {
         transcript: &'a mut Transcript,
         input: &[Scalar],
         output: &[Scalar],
-    ) -> Result<(R1CSProof, Vec<CompressedRistretto>), R1CSError> {
+    ) -> Result<
+        (
+            R1CSProof,
+            Vec<CompressedRistretto>,
+            Vec<CompressedRistretto>,
+        ),
+        R1CSError,
+    > {
+        // Apply a domain separator with the shuffle parameters to the transcript
         let k = input.len();
+        transcript.commit_bytes(b"dom-sep", b"ShuffleProof");
+        transcript.commit_bytes(b"k", Scalar::from(k as u64).as_bytes());
 
-        // Prover makes a `ConstraintSystem` instance representing a shuffle gadget
-        // Make v vector
-        let mut v = Vec::with_capacity(2 * k);
-        v.extend_from_slice(input);
-        v.extend_from_slice(output);
+        let mut prover = Prover::new(&bp_gens, &pc_gens, transcript);
 
-        // Make v_blinding vector using RNG from transcript
-        let mut rng = {
-            let mut builder = transcript.build_rng();
-            // commit the secret values
-            for &v_i in &v {
-                builder = builder.commit_witness_bytes(b"v_i", v_i.as_bytes());
-            }
-            use rand::thread_rng;
-            builder.finalize(&mut thread_rng())
-        };
-        let v_blinding: Vec<Scalar> = (0..2 * k).map(|_| Scalar::random(&mut rng)).collect();
-        let (mut prover_cs, variables, commitments) =
-            ProverCS::new(&bp_gens, &pc_gens, transcript, v, v_blinding.clone());
+        // Construct blinding factors using an RNG.
+        // Note: a non-example implementation would want to operate on existing commitments.
+        let mut blinding_rng = rand::thread_rng();
 
-        // Prover allocates variables and adds constraints to the constraint system
-        let (input_vars, output_vars) = variables.split_at(k);
-        KShuffleGadget::fill_cs(&mut prover_cs, input_vars, output_vars);
+        let (input_commitments, input_vars): (Vec<_>, Vec<_>) = input
+            .into_iter()
+            .map(|v| prover.commit(*v, Scalar::random(&mut blinding_rng)))
+            .unzip();
 
-        // Prover generates proof
-        let proof = prover_cs.prove()?;
-        Ok((proof, commitments))
+        let (output_commitments, output_vars): (Vec<_>, Vec<_>) = output
+            .into_iter()
+            .map(|v| prover.commit(*v, Scalar::random(&mut blinding_rng)))
+            .unzip();
+
+        let cs = prover.finalize_inputs();
+
+        Self::fill_cs(&mut cs, &input_vars, &output_vars);
+
+        let proof = cs.prove()?;
+
+        Ok((proof, input_commitments, output_commitments))
     }
 
     pub fn verify<'a, 'b>(
@@ -152,20 +158,31 @@ impl KShuffleGadget {
         bp_gens: &'b BulletproofGens,
         transcript: &'a mut Transcript,
         proof: &R1CSProof,
-        commitments: &Vec<CompressedRistretto>,
+        input_commitments: &Vec<CompressedRistretto>,
+        output_commitments: &Vec<CompressedRistretto>,
     ) -> Result<(), R1CSError> {
-        let k = commitments.len() / 2;
+        // Apply a domain separator with the shuffle parameters to the transcript
+        let k = input_commitments.len();
+        transcript.commit_bytes(b"dom-sep", b"ShuffleProof");
+        transcript.commit_bytes(b"k", Scalar::from(k as u64).as_bytes());
 
-        // Verifier makes a `ConstraintSystem` instance representing a shuffle gadget
-        let (mut verifier_cs, variables) =
-            VerifierCS::new(&bp_gens, &pc_gens, transcript, commitments.to_vec());
+        let mut verifier = Verifier::new(&bp_gens, &pc_gens, transcript);
 
-        // Verifier allocates variables and adds constraints to the constraint system
-        let (input_vars, output_vars) = variables.split_at(k);
-        KShuffleGadget::fill_cs(&mut verifier_cs, input_vars, output_vars);
+        let input_vars: Vec<_> = input_commitments
+            .iter()
+            .map(|commitment| verifier.commit(*commitment))
+            .collect();
 
-        // Verifier verifies proof
-        verifier_cs.verify(&proof)
+        let output_vars: Vec<_> = output_commitments
+            .iter()
+            .map(|commitment| verifier.commit(*commitment))
+            .collect();
+
+        let cs = verifier.finalize_inputs();
+
+        Self::fill_cs(&mut cs, &input_vars, &output_vars);
+
+        cs.verify(proof)
     }
 }
 
@@ -209,7 +226,7 @@ fn kshuffle_prove_17(c: &mut Criterion) {
     kshuffle_prove_helper(17, c);
 }
 
-criterion_group!{
+criterion_group! {
     name = kshuffle_prove;
     config = Criterion::default();
     targets =
@@ -237,7 +254,7 @@ fn kshuffle_verify_helper(k: usize, c: &mut Criterion) {
         let pc_gens = PedersenGens::default();
         let bp_gens = BulletproofGens::new(128, 1);
         let mut prover_transcript = Transcript::new(b"ShuffleTest");
-        let (proof, commitments) =
+        let (proof, in_commitments, out_commitments) =
             KShuffleGadget::prove(&pc_gens, &bp_gens, &mut prover_transcript, &input, &output)
                 .unwrap();
 
@@ -249,7 +266,8 @@ fn kshuffle_verify_helper(k: usize, c: &mut Criterion) {
                 &bp_gens,
                 &mut verifier_transcript,
                 &proof,
-                &commitments,
+                &in_commitments,
+                &out_commitments,
             )
             .unwrap();
         })
@@ -272,7 +290,7 @@ fn kshuffle_verify_17(c: &mut Criterion) {
     kshuffle_verify_helper(17, c);
 }
 
-criterion_group!{
+criterion_group! {
     name = kshuffle_verify;
     config = Criterion::default();
     targets =
