@@ -74,11 +74,11 @@ Examples:
 * a **range proof gadget** checks that a given value is composed of a specific number of bits.
 
 
-## Uncommitted variables
+## Low-level variables
 
 Often a [gadget](#gadgets) needs a variable to connect with another gadget,
 or to implement its internal logic, without requiring a distinct [high-level variable](#variables) commitment \\(V\_i\\) for it.
-Such **uncommitted variables** are created from left and right variables \\(a\_L, a\_R\\) of additional multiplication gates.
+Such **low-level variables** are created from left and right variables \\(a\_L, a\_R\\) of additional multiplication gates.
 Output variables \\(a\_O\\) are not used for this purpose because
 they are implicitly constrained by a [multiplication gate](#multiplication-gates)
 and cannot be used as independent uncommitted variables.
@@ -105,11 +105,12 @@ represent secret values of the corresponding side of a permutation:
 Making a proof of permutation using a static gadget (without challenge values) may require
 building a [sorting network][sorting_network] that would use significantly more multiplication gates.
 
-**Important:** since challenges in the linear constraints are bound only to [high-level variables](#variables),
-using them to implement high-level protocols requires proving the soundness of the system as a _whole_.
-Individual gadgets can be proven to be sound only when they do not use such challenges.
-This caveat does not apply to the challenges used to implement the underlying proof system (\\(y, z, x, w\\)),
-as these are produced after all variables (including low-level ones) are committed.
+**Important:** challenges are bound to the [high-level variables](#variables) and the
+ committed portion of [low-level variables](#low-level-variables).
+ The remaining [low-level variables](#low-level-variables) are uncommitted and must be uniquely determined
+ by the committed variables and the challenge scalars in order for gadgets to be _locally sound_.
+ To facilitate this, the [constraint system API](../../r1cs/index.html) prevents use of challenges
+ before all freely chosen variables are committed.
 
 [sorting_network]: https://en.wikipedia.org/wiki/Sorting_network
 
@@ -541,13 +542,13 @@ To do this, notice that
 \end{aligned}
 \\]
 so that by changing generators to
-\\({\mathbf{H}}' = {\mathbf{y}}^{-n} \circ {\mathbf{H}}\\), the point which
+\\(\hat{\mathbf{H}} = {\mathbf{y}}^{-n} \circ {\mathbf{H}}\\), the point which
 is a commitment to
 \\(({\mathbf{a}}\_{L}, {\mathbf{a}}\_{R}, {\widetilde{a}})\\) with respect to
 \\(({\mathbf{G}}, {\mathbf{H}}, {\widetilde{a}})\\) is transmuted into a
 commitment to
 \\(({\mathbf{a}}\_{L}, {\mathbf{y}}^{n} \circ {\mathbf{a}}\_{R}, {\widetilde{a}})\\)
-with respect to \\(({\mathbf{G}}, {\mathbf{H}}', {\widetilde{a}})\\).
+with respect to \\(({\mathbf{G}}, \hat{\mathbf{H}}, {\widetilde{a}})\\).
 
 We define the following commitments over the components of \\({\mathbf{l}}(x)\\) and \\({\mathbf{r}}(x)\\):
 
@@ -580,7 +581,7 @@ To relate the prover’s commitments to
 \begin{aligned}
   {\langle {\mathbf{l}}(x), {\mathbf{G}} \rangle}      &\quad &= \quad & {\langle {\mathbf{a}}\_L \cdot x, {\mathbf{G}} \rangle}      & \quad &+ \quad & {\langle {\mathbf{a}}\_O \cdot x^2, {\mathbf{G}} \rangle}  & \quad &+ \quad& \langle \mathbf{y}^{-n} \circ \mathbf{w}\_R \cdot x , \mathbf{G} \rangle                     &\quad &+\quad & \langle \mathbf{s}\_L \cdot x^3 , \mathbf{G} \rangle \\\\
                                                 +      &\quad &  \quad &  +                                                           & \quad &  \quad &  +                                                         & \quad &  \quad& +                                                                                            &\quad & \quad & +   \\\\
-  {\langle {\mathbf{r}}(x), {\mathbf{H}}' \rangle}     &\quad &= \quad & \langle \mathbf{a}\_R \cdot x, {\mathbf{H}} \rangle          & \quad &+ \quad & - \langle \mathbf{1}, \mathbf{H} \rangle                   & \quad &+ \quad& \langle \mathbf{y}^{-n} \circ (\mathbf{w}\_L \cdot x + \mathbf{w}\_O), \mathbf{H} \rangle    &\quad &+\quad & \langle \mathbf{s}\_R \cdot x^3 , \mathbf{H} \rangle \\\\
+  {\langle {\mathbf{r}}(x), \hat{\mathbf{H}} \rangle}  &\quad &= \quad & \langle \mathbf{a}\_R \cdot x, {\mathbf{H}} \rangle          & \quad &+ \quad & - \langle \mathbf{1}, \mathbf{H} \rangle                   & \quad &+ \quad& \langle \mathbf{y}^{-n} \circ (\mathbf{w}\_L \cdot x + \mathbf{w}\_O), \mathbf{H} \rangle    &\quad &+\quad & \langle \mathbf{s}\_R \cdot x^3 , \mathbf{H} \rangle \\\\
                                                 +      &\quad &  \quad &  +                                                           & \quad &  \quad &  +                                                         & \quad &  \quad& +                                                                                            &\quad & \quad & +   \\\\
   \tilde{e} \cdot \widetilde{B}                        &\quad &= \quad & \tilde{a} \cdot x \cdot \widetilde{B}                        & \quad &+ \quad & \tilde{o} \cdot x^2 \cdot \widetilde{B}                    & \quad &+ \quad& 0                                                                                            &\quad &+\quad & \tilde{s} \cdot x^3 \cdot \widetilde{B} \\\\
                                     \shortparallel     &\quad &  \quad & \shortparallel                                               & \quad &  \quad & \shortparallel                                             & \quad &  \quad& \shortparallel                                                                               &\quad & \quad & \shortparallel   \\\\
@@ -605,11 +606,178 @@ to compute
 \end{aligned}
 \\]
 if the prover is honest, this is
-\\(P = {\langle {\mathbf{l}}(x), {\mathbf{G}} \rangle} + {\langle {\mathbf{r}}(x), {\mathbf{H}}' \rangle}\\),
+\\(P = {\langle {\mathbf{l}}(x), {\mathbf{G}} \rangle} + {\langle {\mathbf{r}}(x), \hat{\mathbf{H}} \rangle}\\),
 so the verifier uses \\(P\\) and \\(t(x)\\) as inputs to the [inner product protocol](../notes/index.html#inner-product-proof)
 to prove that
 \\(t(x) = {\langle {\mathbf{l}}(x), {\mathbf{r}}(x) \rangle}\\).
 
+
+
+Verifying challenge-based constraints
+-------------------------------------
+
+Some [gadgets](#gadgets) can be made more efficient if they can [sample random challenges](#gadget-as-a-challenge) when building
+a constraint system, provided certain variables are committed. For instance, a shuffle gadget
+can use just \\(2(k-1)\\) multipliers for \\(k\\) inputs and \\(k\\) outputs to implement the check 
+that two polynomials are equal up to a permutation of their roots, but it is only sound as long
+as the roots of the polynomials (the inputs/outputs to the shuffle) are fixed before the evaluation point is chosen.
+
+To faciliate this, we split the vectors of multipliers and their blinding factors in two subvectors of lengths \\(n'\\) and \\(n''\\): 
+
+\\[
+\begin{aligned}
+ n                &= n' + n''                              \\\\
+ {\mathbf{a}}\_L  &= {\mathbf{a}}\_L' || {\mathbf{a}}\_L'' \\\\
+ {\mathbf{a}}\_R  &= {\mathbf{a}}\_R' || {\mathbf{a}}\_R'' \\\\
+ {\mathbf{a}}\_O  &= {\mathbf{a}}\_O' || {\mathbf{a}}\_O'' \\\\
+ {\mathbf{s}}\_L  &= {\mathbf{s}}\_L' || {\mathbf{s}}\_L'' \\\\
+ {\mathbf{s}}\_R  &= {\mathbf{s}}\_R' || {\mathbf{s}}\_R'' \\\\
+\end{aligned}
+\\]
+
+The vectors of flattened weights are split accordingly:
+
+\\[
+\begin{aligned}
+ \mathbf{w}\_L  &= {\mathbf{w}}\_L' || {\mathbf{w}}\_L'' \\\\
+ \mathbf{w}\_R  &= {\mathbf{w}}\_R' || {\mathbf{w}}\_R'' \\\\
+ \mathbf{w}\_O  &= {\mathbf{w}}\_O' || {\mathbf{w}}\_O'' \\\\
+\end{aligned}
+\\]
+
+The statements of each slice of the vectors \\(\mathbf{l}(x), \mathbf{r}(x)\\) become:
+
+\\[
+\begin{aligned}
+                                 \mathbf{l}'(x) &= \mathbf{a}'\_L \cdot x  + \mathbf{s}\_L' \cdot x^3  +        \mathbf{y}^{-n'}  \circ \mathbf{w}\_R'  \cdot x + \mathbf{a}\_O' \cdot x^2\\\\
+                                \mathbf{l}''(x) &= \mathbf{a}''\_L \cdot x + \mathbf{s}\_L'' \cdot x^3 + y^{-n'}\mathbf{y}^{-n''} \circ \mathbf{w}\_R'' \cdot x + \mathbf{a}\_O'' \cdot x^2\\\\
+          \mathbf{y}^{-n'} \circ \mathbf{r}'(x) &= \mathbf{a}'\_R \cdot x  + \mathbf{s}\_R' \cdot x^3  +        \mathbf{y}^{-n'}  \circ \mathbf{w}\_L' \cdot x  - \mathbf{1}^{n'}  +        \mathbf{y}^{-n'}  \circ \mathbf{w}\_O'\\\\
+y^{-n'} \mathbf{y}^{-n''} \circ \mathbf{r}''(x) &= \mathbf{a}''\_R \cdot x + \mathbf{s}\_R'' \cdot x^3 + y^{-n'}\mathbf{y}^{-n''} \circ \mathbf{w}\_L'' \cdot x - \mathbf{1}^{n''} + y^{-n'}\mathbf{y}^{-n''} \circ \mathbf{w}\_O''\\\\
+\end{aligned}
+\\]
+
+Now we need to express the statements above using independent commitments to the subvectors \\(\mathbf{a}'\_{L,R,O}\\) and \\(\mathbf{a}''\_{L,R,O}\\).
+The commitments must be independent because second subvectors are computed with the use of challenges generated _after_ the first subvectors are determined and committed.
+
+To do that, we split vectors of generators and combine the statements in two:
+the first one in terms of the commitments to the first subvectors,
+and the second one in terms of the commitments to the second subvectors.
+
+\\[
+\begin{aligned}
+\mathbf{G} &= \mathbf{G}' || \mathbf{G}'' \\\\
+\mathbf{H} &= \mathbf{H}' || \mathbf{H}'' \\\\
+\end{aligned}
+\\]
+
+\\[
+\begin{aligned}
+{\langle \mathbf{l}'(x), {\mathbf{G}'} \rangle}                                   &\quad &= \quad & x \cdot {\langle \mathbf{a}'\_L, \mathbf{G}' \rangle}       & \quad &+ \quad x^2 \cdot {\langle \mathbf{a}'\_O, \mathbf{G}' \rangle}    & \quad &+ \quad \langle x \cdot \mathbf{y}^{-n'} \circ \mathbf{w}\_R', \mathbf{G}' \rangle                                 &\quad &+\quad  x^3 \cdot \langle \mathbf{s}'\_L , \mathbf{G}' \rangle \\\\
+                                                                      +           &\quad &  \quad &  +                                                          & \quad &  \quad \quad  +                                                   & \quad &  \quad \quad +                                                                                                    &\quad & \quad  \quad +   \\\\
+{\langle  \mathbf{y}^{-n'} \circ \mathbf{r}'(x), {\mathbf{H}'} \rangle}           &\quad &= \quad & x \cdot {\langle \mathbf{a}'\_R, \mathbf{H}' \rangle}       & \quad &- \quad \langle \mathbf{1}, \mathbf{H}' \rangle                    & \quad &+ \quad \langle \mathbf{y}^{-n'} \circ (x \cdot \mathbf{w}\_L'  + \mathbf{w}\_O'), \mathbf{H}' \rangle             &\quad &+\quad  x^3 \cdot \langle \mathbf{s}'\_R , \mathbf{H}' \rangle \\\\
+                                                                                  &\quad &  \quad &                                                             & \quad &  \quad \quad                                                      & \quad &  \quad \quad                                                                                                      &\quad & \quad  \quad     \\\\
+{\langle \mathbf{l}''(x), {\mathbf{G}''} \rangle}                                 &\quad &= \quad & x \cdot {\langle \mathbf{a}''\_L, \mathbf{G}'' \rangle}     & \quad &+ \quad x^2 \cdot {\langle \mathbf{a}''\_O, \mathbf{G}'' \rangle}  & \quad &+ \quad \langle x \cdot y^{-n'} \mathbf{y}^{-n''} \circ \mathbf{w}\_R'', \mathbf{G}'' \rangle                      &\quad &+\quad  x^3 \cdot \langle \mathbf{s}''\_L , \mathbf{G}'' \rangle \\\\
+                                                                            +     &\quad &  \quad &  +                                                          & \quad &  \quad \quad  +                                                   & \quad &  \quad \quad +                                                                                                    &\quad & \quad  \quad +   \\\\
+{\langle  y^{n'} \mathbf{y}^{-n''} \circ \mathbf{r}''(x), {\mathbf{H}''} \rangle} &\quad &= \quad & x \cdot {\langle \mathbf{a}''\_R, \mathbf{H}'' \rangle}     & \quad &- \quad \langle \mathbf{1}, \mathbf{H}'' \rangle                   & \quad &+ \quad \langle y^{-n'} \mathbf{y}^{-n''} \circ (x \cdot \mathbf{w}\_L''  + \mathbf{w}\_O''), \mathbf{H}'' \rangle &\quad &+\quad  x^3 \cdot \langle \mathbf{s}''\_R , \mathbf{H}'' \rangle \\\\
+\end{aligned}
+\\]
+
+We need to combine the above statements in one in order to have an expression for the complete vectors \\(\mathbf{l}(x), \mathbf{r}(x)\\).
+For that we will multiply the second statement by a random challenge \\(u \in {\mathbb Z\_{p}^{\times}}\\), and add it to the first statement.
+
+\\[
+\begin{aligned}
+{\langle \mathbf{l}'(x), {\mathbf{G}'} \rangle}                                           &\quad &= \quad & x \cdot {\langle \mathbf{a}'\_L, \mathbf{G}' \rangle}               & \quad &+ \quad x^2 \cdot {\langle \mathbf{a}'\_O, \mathbf{G}' \rangle}            & \quad &+ \quad \langle x \cdot \mathbf{y}^{-n'} \circ \mathbf{w}\_R', \mathbf{G}' \rangle                                         &\quad &+\quad  x^3 \cdot \langle \mathbf{s}'\_L , \mathbf{G}' \rangle \\\\
+                                                                      +                   &\quad &  \quad &  +                                                                  & \quad &  \quad \quad  +                                                           & \quad &  \quad \quad +                                                                                                            &\quad & \quad  \quad +   \\\\
+{\langle  \mathbf{y}^{-n'} \circ \mathbf{r}'(x), {\mathbf{H}'} \rangle}                   &\quad &= \quad & x \cdot {\langle \mathbf{a}'\_R, \mathbf{H}' \rangle}               & \quad &- \quad \langle \mathbf{1}, \mathbf{H}' \rangle                            & \quad &+ \quad \langle \mathbf{y}^{-n'} \circ (x \cdot \mathbf{w}\_L'  + \mathbf{w}\_O'), \mathbf{H}' \rangle                     &\quad &+\quad  x^3 \cdot \langle \mathbf{s}'\_R , \mathbf{H}' \rangle \\\\
+                                                                      +                   &\quad &  \quad &  +                                                                  & \quad &  \quad \quad  +                                                           & \quad &  \quad \quad +                                                                                                            &\quad & \quad  \quad     \\\\
+{\langle u \cdot \mathbf{l}''(x), {\mathbf{G}''} \rangle}                                 &\quad &= \quad & u \cdot x \cdot {\langle \mathbf{a}''\_L, \mathbf{G}'' \rangle}     & \quad &+ \quad u \cdot x^2 \cdot {\langle \mathbf{a}''\_O, \mathbf{G}'' \rangle}  & \quad &+ \quad u \cdot \langle x \cdot y^{-n'} \mathbf{y}^{-n''} \circ \mathbf{w}\_R'', \mathbf{G}'' \rangle                      &\quad &+\quad  u \cdot x^3 \cdot \langle \mathbf{s}''\_L , \mathbf{G}'' \rangle \\\\
+                                                                      +                   &\quad &  \quad &  +                                                                  & \quad &  \quad \quad  +                                                           & \quad &  \quad \quad +                                                                                                            &\quad & \quad  \quad +   \\\\
+{\langle u \cdot  y^{n'} \mathbf{y}^{-n''} \circ \mathbf{r}''(x), {\mathbf{H}''} \rangle} &\quad &= \quad & u \cdot x \cdot {\langle \mathbf{a}''\_R, \mathbf{H}'' \rangle}     & \quad &- \quad u \cdot \langle \mathbf{1}, \mathbf{H}'' \rangle                   & \quad &+ \quad u \cdot \langle y^{-n'} \mathbf{y}^{-n''} \circ (x \cdot \mathbf{w}\_L''  + \mathbf{w}\_O''), \mathbf{H}'' \rangle &\quad &+\quad  u \cdot x^3 \cdot \langle \mathbf{s}''\_R , \mathbf{H}'' \rangle \\\\
+\end{aligned}
+\\]
+
+The commitments to the components of \\(\mathbf{l}(x)\\) and \\(\mathbf{r}(x)\\) are then split up as follows:
+
+\\[
+\begin{aligned}
+  A_I'  &= \langle \mathbf{G}'  , \mathbf{a}\_L'  \rangle + \langle \mathbf{H}', \mathbf{a}\_R' \rangle + \widetilde{B} \cdot \tilde{a}'  \\\\
+  A_I'' &= \langle \mathbf{G}'' , \mathbf{a}\_L'' \rangle + \langle \mathbf{H}'', \mathbf{a}\_R'' \rangle + \widetilde{B} \cdot \tilde{a}'' \\\\
+  A_O'  &= \langle \mathbf{G}'  , \mathbf{a}\_O'  \rangle + \widetilde{B} \cdot \tilde{o}'  \\\\
+  A_O'' &= \langle \mathbf{G}'' , \mathbf{a}\_O'' \rangle + \widetilde{B} \cdot \tilde{o}'' \\\\
+  S'    &= \langle \mathbf{G}'  , \mathbf{s}\_L'  \rangle + \langle \mathbf{H}', \mathbf{s}\_R' \rangle + \widetilde{B} \cdot \tilde{s}'  \\\\
+  S''   &= \langle \mathbf{G}'' , \mathbf{s}\_L'' \rangle + \langle \mathbf{H}'', \mathbf{s}\_R'' \rangle + \widetilde{B} \cdot \tilde{s}'' \\\\
+\end{aligned}
+\\]
+
+We can now relate the above commitments to \\({\mathbf{l}}(x)\\) and \\({\mathbf{r}}(x)\\) using a new diagram:
+
+\\[
+\begin{aligned}
+{\langle {\mathbf{l}}(x), \hat{\mathbf{G}} \rangle}     &\quad &= \quad & x \cdot \big( {\langle \mathbf{a}'\_L, \mathbf{G}' \rangle} + u \cdot {\langle \mathbf{a}''\_L, \mathbf{G}'' \rangle} \big)      & \quad &+ \quad x^2 \cdot \big( {\langle \mathbf{a}'\_O, \mathbf{G}' \rangle}  +  u \cdot {\langle \mathbf{a}''\_O, \mathbf{G}'' \rangle} \big)         & \quad &+ \quad \langle \mathbf{y}^{-n} \circ (\mathbf{w}\_R' || u \cdot \mathbf{w}\_R'') \cdot x , \mathbf{G} \rangle                                                                     &\quad &+\quad  x^3 \cdot \big( \langle \mathbf{s}'\_L , \mathbf{G}' \rangle + u \cdot \langle \mathbf{s}''\_L , \mathbf{G}'' \rangle \big) \\\\
+                                                 +      &\quad &  \quad &  +                                                                                                                               & \quad &  \quad \quad  +                                                                                                                                & \quad &  \quad \quad +                                                                                                                                                                    &\quad & \quad  \quad +   \\\\
+{\langle {\mathbf{r}}(x), \hat{\mathbf{H}} \rangle}     &\quad &= \quad & x \cdot \big( {\langle \mathbf{a}'\_R, \mathbf{H}' \rangle} + u \cdot {\langle \mathbf{a}''\_R, \mathbf{H}'' \rangle} \big)      & \quad &- \quad \langle \mathbf{1}, \mathbf{H}' \rangle -  u \cdot \langle \mathbf{1}, \mathbf{H}'' \rangle                                             & \quad &+ \quad \langle \mathbf{y}^{-n} \circ (\mathbf{w}\_L' || u \cdot \mathbf{w}\_L'') \cdot x + (\mathbf{w}\_O' || u \cdot \mathbf{w}\_O''), \mathbf{H} \rangle                        &\quad &+\quad  x^3 \cdot \big( \langle \mathbf{s}'\_R , \mathbf{H}' \rangle + u \cdot \langle \mathbf{s}''\_R , \mathbf{H}'' \rangle \big) \\\\
+                                                 +      &\quad &  \quad &  +                                                                                                                               & \quad &  \quad \quad +                                                                                                                                 & \quad &  \quad \quad +                                                                                                                                                                    &\quad & \quad  \quad +   \\\\
+                     \tilde{e} \cdot \widetilde{B}      &\quad &= \quad & x \cdot \big( \tilde{a}' \cdot \widetilde{B} + u \tilde{a}'' \cdot \widetilde{B} \big)                                           & \quad &+ \quad x^2 \cdot \big( \tilde{o}' \cdot \widetilde{B} + u \cdot \tilde{o}'' \cdot \widetilde{B} \big)                                          & \quad &+ \quad 0                                                                                                                                                                          &\quad &+\quad  x^3 \cdot \big( \tilde{s}' \cdot \widetilde{B} + u \tilde{s}'' \cdot \widetilde{B} \big) \\\\
+                                     \shortparallel     &\quad &  \quad & \shortparallel                                                                                                                   & \quad &  \quad \quad \shortparallel                                                                                                                    & \quad &  \quad \quad \shortparallel                                                                                                                                                       &\quad & \quad  \quad \shortparallel   \\\\
+                                                        &\quad &= \quad & x \cdot \big(A_I' + u \cdot A_I'')                                                                                               & \quad &+ \quad x^2 \cdot \big(A_O' + u \cdot A_O'' \big) - \langle \mathbf{1}, \mathbf{H}' \rangle - u \cdot \langle \mathbf{1}, \mathbf{H}'' \rangle  & \quad &+ \quad x \cdot \langle \mathbf{w}\_L,  \hat{\mathbf{H}} \rangle + x \cdot \langle \mathbf{w}\_R,  \hat{\mathbf{G}} \rangle + \langle \mathbf{w}\_O,  \hat{\mathbf{H}} \rangle     &\quad &+\quad  x^3 \cdot (S' + u \cdot S'')
+\end{aligned}
+\\]
+with generators transmuted using challenges \\(y\\) and \\(u\\):
+\\[
+\begin{aligned}
+\hat{\mathbf{G}} &= \mathbf{G}' || (u \cdot \mathbf{G}''), \\\\
+\hat{\mathbf{H}} &= \mathbf{y}^{-n} \circ \big( \mathbf{H}' || (u \cdot \mathbf{H}'') \big). \\\\
+\end{aligned}
+\\]
+
+The sum of each column is a vector Pedersen commitment with left and right halves from the first and second rows respectively
+and blinding factor from the third row.
+The sum of all of the columns is a vector
+Pedersen commitment to \\({\mathbf{l}}(x)\\) and \\({\mathbf{r}}(x)\\) with
+synthetic blinding factor \\(\widetilde{e} = (\tilde{a}' + u \tilde{a}'') \cdot x + (\tilde{o}' + u \tilde{o}'') \cdot x^2 + (\tilde{s}' + u \tilde{s}'') \cdot x^3\\).
+
+To convince the verifier that \\(\mathbf{l}(x)\\) and \\(\mathbf{r}(x)\\) are computed correctly,
+the prover can send the evaluations \\(\mathbf{l}(x), \mathbf{r}(x)\\) along with \\(\tilde{e}\\) to the verifier,
+who uses the bottom row of the diagram to check the following statement:
+
+\\[
+\begin{aligned}
+{\langle {\mathbf{l}}(x), \hat{\mathbf{G}} \rangle} + {\langle {\mathbf{r}}(x), \hat{\mathbf{H}} \rangle} \stackrel{?}{=}
+&-{\widetilde{e}} {\widetilde{B}} + x \cdot (A_I' + u \cdot A_I'') + x^2 \cdot (A_O' + u \cdot A_O'')\\\\
+&- \langle \mathbf{1}, \mathbf{H}' \rangle - u \cdot \langle \mathbf{1}, \mathbf{H}'' \rangle +
+x \cdot \langle \mathbf{w}\_L,  \hat{\mathbf{H}} \rangle + x \cdot \langle \mathbf{w}\_R,  \hat{\mathbf{G}} \rangle + \langle \mathbf{w}\_O,  \hat{\mathbf{H}} \rangle +
+x^3 \cdot (S' + u \cdot S'') \\\\
+\end{aligned}
+\\]
+
+
+
+Compressing the proof with an inner product argument
+----------------------------------------------------
+
+Once the verifier has checked correctness of \\(t(x)\\), \\(\mathbf{l}(x)\\) and \\(\mathbf{r}(x)\\),
+they can directly compute the inner product to check the relation \\(t(x) \stackrel{?}{=} {\langle {\mathbf{l}}(x), {\mathbf{r}}(x) \rangle}\\).
+This, however, would require transmitting \\(2n\\) 32-byte elements representing the vectors \\(\mathbf{l}(x)\\) and \\(\mathbf{r}(x)\\).
+
+To make the proof smaller, the prover will use the [inner product argument](../notes/index.html#inner-product-proof)
+to indirectly prove the inner product relation using \\(t(x)\\) and the vectors represented
+by a commitment \\(P = {\langle {\mathbf{l}}(x), \hat{\mathbf{G}} \rangle} + {\langle {\mathbf{r}}(x), \hat{\mathbf{H}} \rangle}\\).
+
+The verifier checks the inner product proof with \\(P\\) computed using the bottom row of the diagram,
+which proves that the vectors \\(\mathbf{l}(x), \mathbf{r}(x)\\) are computed correctly:
+\\[
+\begin{aligned}
+P = &-{\widetilde{e}} {\widetilde{B}} + x \cdot (A_I' + u \cdot A_I'') + x^2 \cdot (A_O' + u \cdot A_O'') \\\\
+    &- \langle \mathbf{1}, \mathbf{H}' \rangle - u \cdot \langle \mathbf{1}, \mathbf{H}'' \rangle +
+    x \cdot \langle \mathbf{w}\_L,  \hat{\mathbf{H}} \rangle + x \cdot \langle \mathbf{w}\_R,  \hat{\mathbf{G}} \rangle + \langle \mathbf{w}\_O,  \hat{\mathbf{H}} \rangle +
+    x^3 \cdot (S' + u \cdot S'') \\\\
+\end{aligned}
+\\]
+
+If the inner product proof with such \\(P\\) is correct, the verifier is convinced of two facts:
+that \\(t(x) = {\langle {\mathbf{l}}(x), {\mathbf{r}}(x) \rangle}\\), and
+\\(\mathbf{l}(x), \mathbf{r}(x)\\) are correct.
 
 Padding \\(\mathbf{l}(x)\\) and \\(\mathbf{r}(x)\\) for the inner product proof
 -------------------------------------------------------------------------------
@@ -661,25 +829,31 @@ As a result, we have to take larger slices of the vectors of generators \\(\math
 \end{aligned}
 \\]
 
-The low-level variables are padded with zeroes, so their commitments remain unchanged:
+The low-level variables are padded with zeroes, which is equivalent to padding only the second-phase variables
+(since we pad the combined vector of all variables on the right end).
+If there are no second-phase variables, we can consider their vector to be of length 0 before padding,
+but still apply padding to that vector, instead of the vector of first-phase variables.
+
+Since we never pad first-phase variables, it is obvious that the commitments \\(A_I', A_O', S'\\) remain unchanged.
+
+Commitments to the second-phase low-level variables remain unchanged since the padding scalars are zeroes:
 
 \\[
 \begin{aligned}
-A_I^{+} &= \widetilde{B} \cdot \tilde{a} + \langle \mathbf{G}^{+}, \mathbf{a}\_L^{+} \rangle + \langle \mathbf{H}^{+}, \mathbf{a}\_R^{+} \rangle \\\\
-        &= \widetilde{B} \cdot \tilde{a} + \langle \mathbf{G}, \mathbf{a}\_L \rangle + \langle \mathbf{H}, \mathbf{a}\_R \rangle +
-           \langle [G_n, ..., G_{n^{+}-1}], \mathbf{0} \rangle + \langle [H_n, ..., H_{n^{+}-1}], \mathbf{0} \rangle \\\\
-    &= \widetilde{B} \cdot \tilde{a} + \langle \mathbf{G}, \mathbf{a}\_L \rangle + \langle \mathbf{H}, \mathbf{a}\_R \rangle + 
-       0 \\\\
-        &= A_I \\\\
+{A_I''}^{+} &= \widetilde{B} \cdot \tilde{a}'' + \langle {\mathbf{G}''}^{+}, {\mathbf{a}''}\_L^{+} \rangle + \langle {\mathbf{H}''}^{+}, {\mathbf{a}''}\_R^{+} \rangle \\\\
+            &= \widetilde{B} \cdot \tilde{a}'' + \langle {\mathbf{G}''}, \mathbf{a}\_L'' \rangle + \langle {\mathbf{H}''}, \mathbf{a}\_R'' \rangle +
+               \langle [G_n, ..., G_{n^{+}-1}], \mathbf{0} \rangle + \langle [H_n, ..., H_{n^{+}-1}], \mathbf{0} \rangle \\\\
+            &= \widetilde{B} \cdot \tilde{a}'' + \langle {\mathbf{G}}'', \mathbf{a}\_L'' \rangle + \langle {\mathbf{H}}'', \mathbf{a}\_R'' \rangle + 0 \\\\
+            &= A_I'' \\\\
 \end{aligned}
 \\]
 
-Similarly, \\(A_O\\) and \\(S\\) are unchanged:
+Similarly, \\(A_O''\\) and \\(S''\\) are unchanged:
 
 \\[
 \begin{aligned}
-A_O^{+} &= A_O \\\\
-S^{+}   &= S
+{A_O''}^{+} &= A_O'' \\\\
+{S''}^{+}   &= S''
 \end{aligned}
 \\]
 
@@ -726,13 +900,24 @@ Vector polynomial \\(\mathbf{r}(x)\\) is padded with additional (negated) powers
 \end{aligned}
 \\]
 
-
-The commitments to these vector polynomials are also padded (\\(W\_{L,R,O}\\) remain unchanged because the weights are padded with zeroes):
+Transmuted generators are padded as follows:
 
 \\[
 \begin{aligned}
-  P^{+} &= -{\widetilde{e}} {\widetilde{B}} + x \cdot A_I + x^2 \cdot A_O - \langle \mathbf{1}, \mathbf{H}^{+} \rangle + W_L \cdot x + W_R \cdot x + W_O + x^3 \cdot S \\\\
-        &= P - \langle \mathbf{1}, [H_n,...,H_{n^{+}-1}] \rangle
+   \hat{\mathbf{G}}^{+}  &= \mathbf{G}' \hspace{0.1cm} || \hspace{0.1cm} u \cdot \mathbf{G}'' \hspace{0.1cm} || \hspace{0.1cm} u \cdot [G_n,...,G_{n^{+}-1}] \\\\
+   \hat{\mathbf{H}}^{+}  &= \mathbf{y}^{-n^{+}} \circ \big( \mathbf{H}' \hspace{0.1cm} || \hspace{0.1cm} u \cdot \mathbf{H}'' \hspace{0.1cm} || \hspace{0.1cm} u \cdot [H_n,...,H_{n^{+}-1}]\big) \\\\
+\end{aligned}
+\\]
+
+The commitment \\(P\\) is also padded:
+
+\\[
+\begin{aligned}
+P^{+} &=& &-{\widetilde{e}} {\widetilde{B}} + x \cdot (A_I' + u \cdot A_I'') + x^2 \cdot (A_O' + u \cdot A_O'') \\\\
+      &&  &- \langle \mathbf{1}, \mathbf{H}' \rangle - u \cdot \langle \mathbf{1}, {\mathbf{H}''}^{+} \rangle +
+          x \cdot \langle \mathbf{w}\_L || \mathbf{0},  \hat{\mathbf{H}}^{+} \rangle + x \cdot \langle \mathbf{w}\_R || \mathbf{0},  \hat{\mathbf{G}}^{+} \rangle + \langle \mathbf{w}\_O || \mathbf{0},  \hat{\mathbf{H}}^{+} \rangle +
+          x^3 \cdot (S' + u \cdot S'') \\\\
+      &=& &P - \langle u, [H_n,...,H_{n^{+}-1}] \rangle
 \end{aligned}
 \\]
 
