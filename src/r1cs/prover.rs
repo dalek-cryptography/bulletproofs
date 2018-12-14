@@ -321,9 +321,14 @@ impl<'a, 'b> Prover<'a, 'b> {
         self.transcript.commit_u64(b"m", self.v.len() as u64);
 
         // Process deferred constraints
-        for callback in self.deferred_constraints.drain(..) {
-            callback(&mut RandomizingProver{prover:self})?;
+        // Note: the wrapper could've used &mut instead of ownership, but horrors of specifying
+        // lifetime relations between that mutable borrow and <'a,'b> parameters are too frightening.
+        let mut callbacks = mem::replace(&mut self.deferred_constraints, Vec::new());
+        let mut wrapped_self = RandomizingProver{prover:self};
+        for callback in callbacks.drain(..) {
+            callback(&mut wrapped_self)?;
         }
+        self = wrapped_self.prover;
 
         // 0. Pad zeros to the next power of two (or do that implicitly when creating vectors)
 

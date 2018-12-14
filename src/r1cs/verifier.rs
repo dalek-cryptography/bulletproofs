@@ -279,9 +279,12 @@ impl<'a, 'b> Verifier<'a, 'b> {
         self.transcript.commit_u64(b"m", self.V.len() as u64);
 
         // Process deferred constraints
-        for callback in self.deferred_constraints.drain(..) {
-            callback(&mut RandomizingVerifier{verifier:self})?;
+        let mut callbacks = mem::replace(&mut self.deferred_constraints, Vec::new());
+        let mut wrapped_self = RandomizingVerifier{verifier:self};
+        for callback in callbacks.drain(..) {
+            callback(&mut wrapped_self)?;
         }
+        self = wrapped_self.verifier;
 
         // If the number of multiplications is not 0 or a power of 2, then pad the circuit.
         let n = self.num_vars;
