@@ -13,6 +13,14 @@ use generators::{BulletproofGens, PedersenGens};
 use transcript::TranscriptProtocol;
 
 /// A [`ConstraintSystem`] implementation for use by the verifier.
+///
+/// The verifier adds high-level variable commitments to the transcript,
+/// allocates low-level variables and creates constraints in terms of these
+/// high-level variables and low-level variables.
+///
+/// When all constraints are added, the verifying code calls `verify`
+/// which consumes the `Verifier` instance, samples random challenges
+/// that instantiate the randomized constraints, and verifies the proof.
 pub struct Verifier<'a, 'b> {
     bp_gens: &'b BulletproofGens,
     pc_gens: &'b PedersenGens,
@@ -86,7 +94,7 @@ impl<'a, 'b> ConstraintSystem for Verifier<'a, 'b> {
         self.constraints.push(lc);
     }
 
-    fn randomized_constraints<F>(
+    fn specify_randomized_constraints<F>(
         &mut self,
         label: &'static [u8],
         callback: F,

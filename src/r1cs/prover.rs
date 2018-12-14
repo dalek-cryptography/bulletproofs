@@ -129,7 +129,7 @@ impl<'a, 'b> ConstraintSystem for Prover<'a, 'b> {
         self.constraints.push(lc);
     }
 
-    fn randomized_constraints<F>(
+    fn specify_randomized_constraints<F>(
         &mut self,
         label: &'static [u8],
         callback: F,
