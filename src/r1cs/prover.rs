@@ -1,6 +1,7 @@
 #![allow(non_snake_case)]
 
 use clear_on_drop::clear::Clear;
+use core::mem;
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::MultiscalarMul;
@@ -13,29 +14,16 @@ use generators::{BulletproofGens, PedersenGens};
 use inner_product_proof::InnerProductProof;
 use transcript::TranscriptProtocol;
 
-/// An entry point for creating a R1CS proof.
+/// A [`ConstraintSystem`] implementation for use by the prover.
 ///
-/// The lifecycle of a `Prover` is as follows. The proving code
-/// commits high-level variables and their blinding factors `(v, v_blinding)`,
-/// `Prover` generates commitments, adds them to the transcript and returns
-/// the corresponding variables.
-///
-/// After all variables are committed, the proving code calls `finalize_inputs`,
-/// which consumes `Prover` and returns `ProverCS`.
-/// The proving code then allocates low-level variables and adds constraints to the `ProverCS`.
+/// The prover commits high-level variables and their blinding factors `(v, v_blinding)`,
+/// allocates low-level variables and creates constraints in terms of these
+/// high-level variables and low-level variables.
 ///
 /// When all constraints are added, the proving code calls `prove`
-/// on the instance of the constraint system and receives the complete proof.
+/// which consumes the `Prover` instance, samples random challenges
+/// that instantiate the randomized constraints, and creates a complete proof.
 pub struct Prover<'a, 'b> {
-    /// Number of high-level variables
-    m: u64,
-
-    /// Constraint system implementation
-    cs: ProverCS<'a, 'b>,
-}
-
-/// A [`ConstraintSystem`] implementation for use by the prover.
-pub struct ProverCS<'a, 'b> {
     transcript: &'a mut Transcript,
     bp_gens: &'b BulletproofGens,
     pc_gens: &'b PedersenGens,
@@ -51,10 +39,21 @@ pub struct ProverCS<'a, 'b> {
     v: Vec<Scalar>,
     /// High-level witness data (blinding openings to V commitments)
     v_blinding: Vec<Scalar>,
+
+    /// This list holds closures that will be called in the second phase of the protocol,
+    /// when non-randomized variables are committed.
+    /// After that, the option will flip to None and additional calls to `randomize_constraints`
+    /// will invoke closures immediately.
+    deferred_constraints: Option<
+        Vec<(
+            &'static [u8],
+            Box<Fn(&mut Prover<'a, 'b>, Scalar) -> Result<(), R1CSError>>,
+        )>,
+    >,
 }
 
 /// Overwrite secrets with null bytes when they go out of scope.
-impl<'a, 'b> Drop for ProverCS<'a, 'b> {
+impl<'a, 'b> Drop for Prover<'a, 'b> {
     fn drop(&mut self) {
         self.v.clear();
         self.v_blinding.clear();
@@ -77,7 +76,7 @@ impl<'a, 'b> Drop for ProverCS<'a, 'b> {
     }
 }
 
-impl<'a, 'b> ConstraintSystem for ProverCS<'a, 'b> {
+impl<'a, 'b> ConstraintSystem for Prover<'a, 'b> {
     fn multiply(
         &mut self,
         mut left: LinearCombination,
@@ -130,8 +129,24 @@ impl<'a, 'b> ConstraintSystem for ProverCS<'a, 'b> {
         self.constraints.push(lc);
     }
 
-    fn challenge_scalar(&mut self, label: &'static [u8]) -> Scalar {
-        self.transcript.challenge_scalar(label)
+    fn randomized_constraints<F>(
+        &mut self,
+        label: &'static [u8],
+        callback: F,
+    ) -> Result<(), R1CSError>
+    where
+        F: 'static + Fn(&mut Self, Scalar) -> Result<(), R1CSError>,
+    {
+        match self.deferred_constraints {
+            Some(ref mut list) => {
+                list.push((label, Box::new(callback)));
+                return Ok(());
+            }
+            None => {}
+        }
+
+        let challenge = self.transcript.challenge_scalar(label);
+        callback(self, challenge)
     }
 }
 
@@ -164,18 +179,16 @@ impl<'a, 'b> Prover<'a, 'b> {
         transcript.r1cs_domain_sep();
 
         Prover {
-            m: 0,
-            cs: ProverCS {
-                pc_gens,
-                bp_gens,
-                transcript,
-                v: Vec::new(),
-                v_blinding: Vec::new(),
-                constraints: Vec::new(),
-                a_L: Vec::new(),
-                a_R: Vec::new(),
-                a_O: Vec::new(),
-            },
+            pc_gens,
+            bp_gens,
+            transcript,
+            v: Vec::new(),
+            v_blinding: Vec::new(),
+            constraints: Vec::new(),
+            a_L: Vec::new(),
+            a_R: Vec::new(),
+            a_O: Vec::new(),
+            deferred_constraints: Some(Vec::new()),
         }
     }
 
@@ -197,31 +210,17 @@ impl<'a, 'b> Prover<'a, 'b> {
     /// Returns a pair of a Pedersen commitment (as a compressed Ristretto point),
     /// and a [`Variable`] corresponding to it, which can be used to form constraints.
     pub fn commit(&mut self, v: Scalar, v_blinding: Scalar) -> (CompressedRistretto, Variable) {
-        let i = self.m as usize;
-        self.m += 1;
-        self.cs.v.push(v);
-        self.cs.v_blinding.push(v_blinding);
+        let i = self.v.len();
+        self.v.push(v);
+        self.v_blinding.push(v_blinding);
 
         // Add the commitment to the transcript.
-        let V = self.cs.pc_gens.commit(v, v_blinding).compress();
-        self.cs.transcript.commit_point(b"V", &V);
+        let V = self.pc_gens.commit(v, v_blinding).compress();
+        self.transcript.commit_point(b"V", &V);
 
         (V, Variable::Committed(i))
     }
 
-    /// Consume the `Prover`, provide the `ConstraintSystem` implementation to the closure,
-    /// and produce a proof.
-    pub fn finalize_inputs(self) -> ProverCS<'a, 'b> {
-        // Commit a length _suffix_ for the number of high-level variables.
-        // We cannot do this in advance because user can commit variables one-by-one,
-        // but this suffix provides safe disambiguation because each variable
-        // is prefixed with a separate label.
-        self.cs.transcript.commit_u64(b"m", self.m);
-        self.cs
-    }
-}
-
-impl<'a, 'b> ProverCS<'a, 'b> {
     /// Use a challenge, `z`, to flatten the constraints in the
     /// constraint system into vectors used for proving and
     /// verification.
@@ -292,6 +291,19 @@ impl<'a, 'b> ProverCS<'a, 'b> {
     pub fn prove(mut self) -> Result<R1CSProof, R1CSError> {
         use std::iter;
         use util;
+
+        // Commit a length _suffix_ for the number of high-level variables.
+        // We cannot do this in advance because user can commit variables one-by-one,
+        // but this suffix provides safe disambiguation because each variable
+        // is prefixed with a separate label.
+        self.transcript.commit_u64(b"m", self.v.len() as u64);
+
+        // Process deferred constraints
+        let list = mem::replace(&mut self.deferred_constraints, None).unwrap_or_else(|| Vec::new());
+        for (label, callback) in list.into_iter() {
+            let challenge = self.transcript.challenge_scalar(label);
+            callback(&mut self, challenge)?;
+        }
 
         // 0. Pad zeros to the next power of two (or do that implicitly when creating vectors)
 

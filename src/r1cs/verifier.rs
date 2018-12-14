@@ -1,5 +1,6 @@
 #![allow(non_snake_case)]
 
+use core::mem;
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::VartimeMultiscalarMul;
@@ -11,33 +12,13 @@ use errors::R1CSError;
 use generators::{BulletproofGens, PedersenGens};
 use transcript::TranscriptProtocol;
 
-/// An entry point for verifying a R1CS proof.
-///
-/// The lifecycle of a `Verifier` is as follows. The verifying code
-/// provides high-level commitments one by one,
-/// `Verifier` adds them to the transcript and returns
-/// the corresponding variables.
-///
-/// After all variables are committed, the verifying code calls `finalize_inputs`,
-/// which consumes `Verifier` and returns `VerifierCS`.
-/// The verifying code then allocates low-level variables and adds constraints to the `VerifierCS`.
-///
-/// When all constraints are added, the verifying code calls `verify`
-/// on the instance of the constraint system to check the proof.
-pub struct Verifier<'a, 'b> {
-    /// Number of high-level variables
-    m: u64,
-
-    /// Constraint system implementation
-    cs: VerifierCS<'a, 'b>,
-}
-
 /// A [`ConstraintSystem`] implementation for use by the verifier.
-pub struct VerifierCS<'a, 'b> {
+pub struct Verifier<'a, 'b> {
     bp_gens: &'b BulletproofGens,
     pc_gens: &'b PedersenGens,
     transcript: &'a mut Transcript,
     constraints: Vec<LinearCombination>,
+
     /// Records the number of low-level variables allocated in the
     /// constraint system.
     ///
@@ -47,9 +28,20 @@ pub struct VerifierCS<'a, 'b> {
     /// variable assignments.
     num_vars: usize,
     V: Vec<CompressedRistretto>,
+
+    /// This list holds closures that will be called in the second phase of the protocol,
+    /// when non-randomized variables are committed.
+    /// After that, the option will flip to None and additional calls to `randomize_constraints`
+    /// will invoke closures immediately.
+    deferred_constraints: Option<
+        Vec<(
+            &'static [u8],
+            Box<Fn(&mut Verifier<'a, 'b>, Scalar) -> Result<(), R1CSError>>,
+        )>,
+    >,
 }
 
-impl<'a, 'b> ConstraintSystem for VerifierCS<'a, 'b> {
+impl<'a, 'b> ConstraintSystem for Verifier<'a, 'b> {
     fn multiply(
         &mut self,
         mut left: LinearCombination,
@@ -94,8 +86,24 @@ impl<'a, 'b> ConstraintSystem for VerifierCS<'a, 'b> {
         self.constraints.push(lc);
     }
 
-    fn challenge_scalar(&mut self, label: &'static [u8]) -> Scalar {
-        self.transcript.challenge_scalar(label)
+    fn randomized_constraints<F>(
+        &mut self,
+        label: &'static [u8],
+        callback: F,
+    ) -> Result<(), R1CSError>
+    where
+        F: 'static + Fn(&mut Self, Scalar) -> Result<(), R1CSError>,
+    {
+        match self.deferred_constraints {
+            Some(ref mut list) => {
+                list.push((label, Box::new(callback)));
+                return Ok(());
+            }
+            None => {}
+        }
+
+        let challenge = self.transcript.challenge_scalar(label);
+        callback(self, challenge)
     }
 }
 
@@ -139,15 +147,13 @@ impl<'a, 'b> Verifier<'a, 'b> {
         transcript.r1cs_domain_sep();
 
         Verifier {
-            m: 0,
-            cs: VerifierCS {
-                bp_gens,
-                pc_gens,
-                transcript,
-                num_vars: 0,
-                V: Vec::new(),
-                constraints: Vec::new(),
-            },
+            bp_gens,
+            pc_gens,
+            transcript,
+            num_vars: 0,
+            V: Vec::new(),
+            constraints: Vec::new(),
+            deferred_constraints: Some(Vec::new()),
         }
     }
 
@@ -166,29 +172,15 @@ impl<'a, 'b> Verifier<'a, 'b> {
     /// Returns a pair of a Pedersen commitment (as a compressed Ristretto point),
     /// and a [`Variable`] corresponding to it, which can be used to form constraints.
     pub fn commit(&mut self, commitment: CompressedRistretto) -> Variable {
-        let i = self.m as usize;
-        self.m += 1;
-        self.cs.V.push(commitment);
+        let i = self.V.len();
+        self.V.push(commitment);
 
         // Add the commitment to the transcript.
-        self.cs.transcript.commit_point(b"V", &commitment);
+        self.transcript.commit_point(b"V", &commitment);
 
         Variable::Committed(i)
     }
 
-    /// Consume the `Verifier`, provide the `ConstraintSystem` implementation to the closure,
-    /// and verify the proof against the resulting constraint system.
-    pub fn finalize_inputs(self) -> VerifierCS<'a, 'b> {
-        // Commit a length _suffix_ for the number of high-level variables.
-        // We cannot do this in advance because user can commit variables one-by-one,
-        // but this suffix provides safe disambiguation because each variable
-        // is prefixed with a separate label.
-        self.cs.transcript.commit_u64(b"m", self.m);
-        self.cs
-    }
-}
-
-impl<'a, 'b> VerifierCS<'a, 'b> {
     /// Use a challenge, `z`, to flatten the constraints in the
     /// constraint system into vectors used for proving and
     /// verification.
@@ -246,6 +238,19 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
 
     /// Consume this `VerifierCS` and attempt to verify the supplied `proof`.
     pub fn verify(mut self, proof: &R1CSProof) -> Result<(), R1CSError> {
+        // Commit a length _suffix_ for the number of high-level variables.
+        // We cannot do this in advance because user can commit variables one-by-one,
+        // but this suffix provides safe disambiguation because each variable
+        // is prefixed with a separate label.
+        self.transcript.commit_u64(b"m", self.V.len() as u64);
+
+        // Process deferred constraints
+        let list = mem::replace(&mut self.deferred_constraints, None).unwrap_or_else(|| Vec::new());
+        for (label, callback) in list.into_iter() {
+            let challenge = self.transcript.challenge_scalar(label);
+            callback(&mut self, challenge)?;
+        }
+
         // If the number of multiplications is not 0 or a power of 2, then pad the circuit.
         let n = self.num_vars;
         let padded_n = self.num_vars.next_power_of_two();

@@ -53,19 +53,17 @@ pub trait ConstraintSystem {
     /// ```
     fn constrain(&mut self, lc: LinearCombination);
 
-    /// Obtain a challenge scalar bound to the assignments of all of
-    /// the externally committed wires.
+    /// Randomize the constraints using a randomly sampled challenge scalar
+    /// bound to the assignments of the non-randomized variables.
     ///
-    /// This allows the prover to select a challenge circuit from a
-    /// family of circuits parameterized by challenge scalars.
-    ///
-    /// # Warning
-    ///
-    /// The challenge scalars are bound only to the externally
-    /// committed wires (high-level witness variables), and not to the
-    /// assignments to all wires (low-level witness variables).  In
-    /// the same way that it is the user's responsibility to ensure
-    /// that the constraints are sound, it is **also** the user's
-    /// responsibility to ensure that each challenge circuit is sound.
-    fn challenge_scalar(&mut self, label: &'static [u8]) -> Scalar;
+    /// If the CS is not yet committed, the call returns `Ok()` and saves a callback
+    /// for later, when the constraint system’s low-level variables are committed.
+    /// If the CS is already committed, the callback is invoked immediately.
+    fn randomized_constraints<F>(
+        &mut self,
+        label: &'static [u8],
+        callback: F,
+    ) -> Result<(), R1CSError>
+    where
+        F: 'static + Fn(&mut Self, Scalar) -> Result<(), R1CSError>;
 }
