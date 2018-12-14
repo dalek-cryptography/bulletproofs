@@ -45,12 +45,17 @@ pub struct Verifier<'a, 'b> {
 }
 
 /// Verifier in the randomizing phase.
-pub struct RandomizingVerifier<'a,'b> {
-    verifier: Verifier<'a,'b>
+/// Note: this type is exported because it is used to specify the associated type
+/// in the public impl of a trait `ConstraintSystem`, which boils down to allowing compiler to
+/// monomorphize the closures for the proving and verifying code.
+/// However, this type cannot be instantiated by the user and therefore can only be used within
+/// the callback provided to `specify_randomized_constraints`.
+pub struct RandomizingVerifier<'a, 'b> {
+    verifier: Verifier<'a, 'b>,
 }
 
 impl<'a, 'b> ConstraintSystem for Verifier<'a, 'b> {
-    type RandomizedCS = RandomizingVerifier<'a,'b>;
+    type RandomizedCS = RandomizingVerifier<'a, 'b>;
 
     fn multiply(
         &mut self,
@@ -96,9 +101,9 @@ impl<'a, 'b> ConstraintSystem for Verifier<'a, 'b> {
         self.constraints.push(lc);
     }
 
-
     fn specify_randomized_constraints<F>(&mut self, callback: F) -> Result<(), R1CSError>
-    where for<'r> F: 'static + Fn(&'r mut Self::RandomizedCS) -> Result<(), R1CSError>
+    where
+        for<'r> F: 'static + Fn(&'r mut Self::RandomizedCS) -> Result<(), R1CSError>,
     {
         self.deferred_constraints.push(Box::new(callback));
         Ok(())
@@ -110,8 +115,8 @@ impl<'a, 'b> ConstraintSystem for RandomizingVerifier<'a, 'b> {
 
     fn multiply(
         &mut self,
-        mut left: LinearCombination,
-        mut right: LinearCombination,
+        left: LinearCombination,
+        right: LinearCombination,
     ) -> (Variable, Variable, Variable) {
         self.verifier.multiply(left, right)
     }
@@ -128,12 +133,12 @@ impl<'a, 'b> ConstraintSystem for RandomizingVerifier<'a, 'b> {
     }
 
     fn specify_randomized_constraints<F>(&mut self, callback: F) -> Result<(), R1CSError>
-    where for<'r> F: 'static + Fn(&'r mut Self::RandomizedCS) -> Result<(), R1CSError>
+    where
+        for<'r> F: 'static + Fn(&'r mut Self::RandomizedCS) -> Result<(), R1CSError>,
     {
         callback(self)
     }
 }
-
 
 impl<'a, 'b> RandomizedConstraintSystem for RandomizingVerifier<'a, 'b> {
     fn challenge_scalar(&mut self, label: &'static [u8]) -> Scalar {
@@ -280,7 +285,7 @@ impl<'a, 'b> Verifier<'a, 'b> {
 
         // Process deferred constraints
         let mut callbacks = mem::replace(&mut self.deferred_constraints, Vec::new());
-        let mut wrapped_self = RandomizingVerifier{verifier:self};
+        let mut wrapped_self = RandomizingVerifier { verifier: self };
         for callback in callbacks.drain(..) {
             callback(&mut wrapped_self)?;
         }

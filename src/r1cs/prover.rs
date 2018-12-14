@@ -46,8 +46,13 @@ pub struct Prover<'a, 'b> {
 }
 
 /// Prover in the randomizing phase.
-pub struct RandomizingProver<'a,'b> {
-    prover: Prover<'a,'b>
+/// Note: this type is exported because it is used to specify the associated type
+/// in the public impl of a trait `ConstraintSystem`, which boils down to allowing compiler to
+/// monomorphize the closures for the proving and verifying code.
+/// However, this type cannot be instantiated by the user and therefore can only be used within
+/// the callback provided to `specify_randomized_constraints`.
+pub struct RandomizingProver<'a, 'b> {
+    prover: Prover<'a, 'b>,
 }
 
 /// Overwrite secrets with null bytes when they go out of scope.
@@ -130,7 +135,8 @@ impl<'a, 'b> ConstraintSystem for Prover<'a, 'b> {
     }
 
     fn specify_randomized_constraints<F>(&mut self, callback: F) -> Result<(), R1CSError>
-    where for<'r> F: 'static + Fn(&'r mut Self::RandomizedCS) -> Result<(), R1CSError>
+    where
+        for<'r> F: 'static + Fn(&'r mut Self::RandomizedCS) -> Result<(), R1CSError>,
     {
         self.deferred_constraints.push(Box::new(callback));
         Ok(())
@@ -142,8 +148,8 @@ impl<'a, 'b> ConstraintSystem for RandomizingProver<'a, 'b> {
 
     fn multiply(
         &mut self,
-        mut left: LinearCombination,
-        mut right: LinearCombination,
+        left: LinearCombination,
+        right: LinearCombination,
     ) -> (Variable, Variable, Variable) {
         self.prover.multiply(left, right)
     }
@@ -160,7 +166,8 @@ impl<'a, 'b> ConstraintSystem for RandomizingProver<'a, 'b> {
     }
 
     fn specify_randomized_constraints<F>(&mut self, callback: F) -> Result<(), R1CSError>
-    where for<'r> F: 'static + Fn(&'r mut Self::RandomizedCS) -> Result<(), R1CSError>
+    where
+        for<'r> F: 'static + Fn(&'r mut Self::RandomizedCS) -> Result<(), R1CSError>,
     {
         callback(self)
     }
@@ -324,7 +331,7 @@ impl<'a, 'b> Prover<'a, 'b> {
         // Note: the wrapper could've used &mut instead of ownership, but horrors of specifying
         // lifetime relations between that mutable borrow and <'a,'b> parameters are too frightening.
         let mut callbacks = mem::replace(&mut self.deferred_constraints, Vec::new());
-        let mut wrapped_self = RandomizingProver{prover:self};
+        let mut wrapped_self = RandomizingProver { prover: self };
         for callback in callbacks.drain(..) {
             callback(&mut wrapped_self)?;
         }

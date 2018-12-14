@@ -85,7 +85,9 @@ impl ShuffleProof {
             return Ok(());
         }
 
-        cs.specify_randomized_constraints(b"shuffle challenge", move |cs, z| {
+        cs.specify_randomized_constraints(move |cs| {
+            let z = cs.challenge_scalar(b"shuffle challenge");
+
             // Make last x multiplier for i = k-1 and k-2
             let (_, _, last_mulx_out) = cs.multiply(x[k - 1] - z, x[k - 2] - z);
 
@@ -164,7 +166,10 @@ For simplicity, in this example the `prove` function does not take a list of bli
 #             return Ok(());
 #         }
 #
-#         cs.specify_randomized_constraints(b"shuffle challenge", move |cs, z| {
+#         cs.specify_randomized_constraints(move |cs| {
+#
+#             let z = cs.challenge_scalar(b"shuffle challenge");
+#
 #             // Make last x multiplier for i = k-1 and k-2
 #             let (_, _, last_mulx_out) = cs.multiply(x[k - 1] - z, x[k - 2] - z);
 # 
@@ -268,7 +273,10 @@ The verifier receives a proof, and a list of committed inputs and outputs, from 
 #             return Ok(());
 #         }
 #
-#         cs.specify_randomized_constraints(b"shuffle challenge", move |cs, z| {
+#         cs.specify_randomized_constraints(move |cs| {
+#
+#             let z = cs.challenge_scalar(b"shuffle challenge");
+
 #             // Make last x multiplier for i = k-1 and k-2
 #             let (_, _, last_mulx_out) = cs.multiply(x[k - 1] - z, x[k - 2] - z);
 # 
@@ -405,7 +413,10 @@ Because only the prover knows the scalar values of the inputs and outputs, and t
 #             return Ok(());
 #         }
 #
-#         cs.specify_randomized_constraints(b"shuffle challenge", move |cs, z| {
+#         cs.specify_randomized_constraints(move |cs| {
+#
+#             let z = cs.challenge_scalar(b"shuffle challenge");
+
 #             // Make last x multiplier for i = k-1 and k-2
 #             let (_, _, last_mulx_out) = cs.multiply(x[k - 1] - z, x[k - 2] - z);
 # 
