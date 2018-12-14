@@ -7,7 +7,7 @@ use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::MultiscalarMul;
 use merlin::Transcript;
 
-use super::{ConstraintSystem, LinearCombination, R1CSProof, Variable};
+use super::{ConstraintSystem, LinearCombination, R1CSProof, RandomizedConstraintSystem, Variable};
 
 use errors::R1CSError;
 use generators::{BulletproofGens, PedersenGens};
@@ -42,14 +42,12 @@ pub struct Prover<'a, 'b> {
 
     /// This list holds closures that will be called in the second phase of the protocol,
     /// when non-randomized variables are committed.
-    /// After that, the option will flip to None and additional calls to `randomize_constraints`
-    /// will invoke closures immediately.
-    deferred_constraints: Option<
-        Vec<(
-            &'static [u8],
-            Box<Fn(&mut Prover<'a, 'b>, Scalar) -> Result<(), R1CSError>>,
-        )>,
-    >,
+    deferred_constraints: Vec<Box<Fn(&mut RandomizingProver<'a, 'b>) -> Result<(), R1CSError>>>,
+}
+
+/// Prover in the randomizing phase.
+pub struct RandomizingProver<'a,'b> {
+    prover: Prover<'a,'b>
 }
 
 /// Overwrite secrets with null bytes when they go out of scope.
@@ -77,6 +75,8 @@ impl<'a, 'b> Drop for Prover<'a, 'b> {
 }
 
 impl<'a, 'b> ConstraintSystem for Prover<'a, 'b> {
+    type RandomizedCS = RandomizingProver<'a, 'b>;
+
     fn multiply(
         &mut self,
         mut left: LinearCombination,
@@ -129,24 +129,46 @@ impl<'a, 'b> ConstraintSystem for Prover<'a, 'b> {
         self.constraints.push(lc);
     }
 
-    fn specify_randomized_constraints<F>(
-        &mut self,
-        label: &'static [u8],
-        callback: F,
-    ) -> Result<(), R1CSError>
-    where
-        F: 'static + Fn(&mut Self, Scalar) -> Result<(), R1CSError>,
+    fn specify_randomized_constraints<F>(&mut self, callback: F) -> Result<(), R1CSError>
+    where for<'r> F: 'static + Fn(&'r mut Self::RandomizedCS) -> Result<(), R1CSError>
     {
-        match self.deferred_constraints {
-            Some(ref mut list) => {
-                list.push((label, Box::new(callback)));
-                Ok(())
-            }
-            None => {
-                let challenge = self.transcript.challenge_scalar(label);
-                callback(self, challenge)
-            }
-        }
+        self.deferred_constraints.push(Box::new(callback));
+        Ok(())
+    }
+}
+
+impl<'a, 'b> ConstraintSystem for RandomizingProver<'a, 'b> {
+    type RandomizedCS = Self;
+
+    fn multiply(
+        &mut self,
+        mut left: LinearCombination,
+        mut right: LinearCombination,
+    ) -> (Variable, Variable, Variable) {
+        self.prover.multiply(left, right)
+    }
+
+    fn allocate<F>(&mut self, assign_fn: F) -> Result<(Variable, Variable, Variable), R1CSError>
+    where
+        F: FnOnce() -> Result<(Scalar, Scalar, Scalar), R1CSError>,
+    {
+        self.prover.allocate(assign_fn)
+    }
+
+    fn constrain(&mut self, lc: LinearCombination) {
+        self.prover.constrain(lc)
+    }
+
+    fn specify_randomized_constraints<F>(&mut self, callback: F) -> Result<(), R1CSError>
+    where for<'r> F: 'static + Fn(&'r mut Self::RandomizedCS) -> Result<(), R1CSError>
+    {
+        callback(self)
+    }
+}
+
+impl<'a, 'b> RandomizedConstraintSystem for RandomizingProver<'a, 'b> {
+    fn challenge_scalar(&mut self, label: &'static [u8]) -> Scalar {
+        self.prover.transcript.challenge_scalar(label)
     }
 }
 
@@ -188,7 +210,7 @@ impl<'a, 'b> Prover<'a, 'b> {
             a_L: Vec::new(),
             a_R: Vec::new(),
             a_O: Vec::new(),
-            deferred_constraints: Some(Vec::new()),
+            deferred_constraints: Vec::new(),
         }
     }
 
@@ -299,10 +321,8 @@ impl<'a, 'b> Prover<'a, 'b> {
         self.transcript.commit_u64(b"m", self.v.len() as u64);
 
         // Process deferred constraints
-        let list = mem::replace(&mut self.deferred_constraints, None).unwrap_or_else(|| Vec::new());
-        for (label, callback) in list.into_iter() {
-            let challenge = self.transcript.challenge_scalar(label);
-            callback(&mut self, challenge)?;
+        for callback in self.deferred_constraints.drain(..) {
+            callback(&mut RandomizingProver{prover:self})?;
         }
 
         // 0. Pad zeros to the next power of two (or do that implicitly when creating vectors)
