@@ -96,7 +96,7 @@ impl ShuffleProof {
             .map(|v| prover.commit(*v, Scalar::random(&mut blinding_rng)))
             .unzip();
 
-        ShuffleProof::gadget(&mut prover, input_vars, output_vars);
+        ShuffleProof::gadget(&mut prover, input_vars, output_vars)?;
 
         let proof = prover.prove()?;
 
@@ -131,7 +131,7 @@ impl ShuffleProof {
             .map(|V| verifier.commit(*V))
             .collect();
 
-        ShuffleProof::gadget(&mut verifier, input_vars, output_vars);
+        ShuffleProof::gadget(&mut verifier, input_vars, output_vars)?;
 
         verifier.verify(&self.0)
     }
