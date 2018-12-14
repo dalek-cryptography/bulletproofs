@@ -140,13 +140,13 @@ impl<'a, 'b> ConstraintSystem for Prover<'a, 'b> {
         match self.deferred_constraints {
             Some(ref mut list) => {
                 list.push((label, Box::new(callback)));
-                return Ok(());
+                Ok(())
             }
-            None => {}
+            None => {
+                let challenge = self.transcript.challenge_scalar(label);
+                callback(self, challenge)
+            }
         }
-
-        let challenge = self.transcript.challenge_scalar(label);
-        callback(self, challenge)
     }
 }
 
