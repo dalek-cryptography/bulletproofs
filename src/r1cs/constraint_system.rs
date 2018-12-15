@@ -17,7 +17,6 @@ use curve25519_dalek::scalar::Scalar;
 /// verifier share the logic for specifying constraints.
 pub trait ConstraintSystem {
     /// Represents a concrete type for the CS in a randomization phase.
-    /// Both prover and verifer implement both traits, so this type equals Self.
     type RandomizedCS: RandomizedConstraintSystem;
 
     /// Allocate and constrain multiplication variables.
@@ -84,8 +83,8 @@ pub trait ConstraintSystem {
 /// Represents a constraint system in the second phase:
 /// when the challenges can be sampled to create randomized constraints.
 ///
-/// Note: this trait is a sub-trait of ConstraintSystem in order to allow composing gadgets:
-/// e.g. a shuffle gadget can be used from both phases.
+/// Note: this trait also includes `ConstraintSystem` trait
+/// in order to allow composition of gadgets: e.g. a shuffle gadget can be used in both phases.
 pub trait RandomizedConstraintSystem: ConstraintSystem {
     /// Generates a challenge scalar.
     ///
