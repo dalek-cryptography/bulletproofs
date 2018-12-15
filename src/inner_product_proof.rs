@@ -394,7 +394,7 @@ pub fn inner_product(a: &[Scalar], b: &[Scalar]) -> Scalar {
 mod tests {
     use super::*;
 
-    use rand::OsRng;
+    use rand::rngs::OsRng;
     use sha3::Sha3_512;
     use util;
 

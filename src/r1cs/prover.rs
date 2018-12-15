@@ -46,6 +46,7 @@ pub struct Prover<'a, 'b> {
 }
 
 /// Prover in the randomizing phase.
+///
 /// Note: this type is exported because it is used to specify the associated type
 /// in the public impl of a trait `ConstraintSystem`, which boils down to allowing compiler to
 /// monomorphize the closures for the proving and verifying code.
@@ -316,6 +317,20 @@ impl<'a, 'b> Prover<'a, 'b> {
             .sum()
     }
 
+    /// Calls all remembered callbacks with an API that
+    /// allows generating challenge scalars.
+    fn create_randomized_constraints(mut self) -> Result<Self, R1CSError> {
+        // Note: the wrapper could've used &mut instead of ownership,
+        // but specifying lifetimes for boxed closures is not going to be nice,
+        // so we move the self into wrapper and then move it back out afterwards.
+        let mut callbacks = mem::replace(&mut self.deferred_constraints, Vec::new());
+        let mut wrapped_self = RandomizingProver { prover: self };
+        for callback in callbacks.drain(..) {
+            callback(&mut wrapped_self)?;
+        }
+        Ok(wrapped_self.prover)
+    }
+
     /// Consume this `ConstraintSystem` to produce a proof.
     pub fn prove(mut self) -> Result<R1CSProof, R1CSError> {
         use std::iter;
@@ -327,15 +342,8 @@ impl<'a, 'b> Prover<'a, 'b> {
         // is prefixed with a separate label.
         self.transcript.commit_u64(b"m", self.v.len() as u64);
 
-        // Process deferred constraints
-        // Note: the wrapper could've used &mut instead of ownership, but horrors of specifying
-        // lifetime relations between that mutable borrow and <'a,'b> parameters are too frightening.
-        let mut callbacks = mem::replace(&mut self.deferred_constraints, Vec::new());
-        let mut wrapped_self = RandomizingProver { prover: self };
-        for callback in callbacks.drain(..) {
-            callback(&mut wrapped_self)?;
-        }
-        self = wrapped_self.prover;
+        // Process the remaining constraints.
+        self = self.create_randomized_constraints()?;
 
         // 0. Pad zeros to the next power of two (or do that implicitly when creating vectors)
 

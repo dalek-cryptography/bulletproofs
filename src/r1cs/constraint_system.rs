@@ -65,6 +65,17 @@ pub trait ConstraintSystem {
     ///
     /// If the constraint system’s low-level variables are committed already,
     /// the callback is invoked immediately and its result is return from this method.
+    ///
+    /// ### Usage
+    ///
+    /// Inside the closure you can generate one or more challenges using `challenge_scalar` method.
+    ///
+    /// ```text
+    /// cs.specify_randomized_constraints(move |cs| {
+    ///     let z = cs.challenge_scalar(b"some challenge");
+    ///     // ...
+    /// })
+    /// ```
     fn specify_randomized_constraints<F>(&mut self, callback: F) -> Result<(), R1CSError>
     where
         for<'r> F: 'static + Fn(&'r mut Self::RandomizedCS) -> Result<(), R1CSError>;
@@ -77,5 +88,20 @@ pub trait ConstraintSystem {
 /// e.g. a shuffle gadget can be used from both phases.
 pub trait RandomizedConstraintSystem: ConstraintSystem {
     /// Generates a challenge scalar.
+    ///
+    /// ### Usage
+    ///
+    /// This method is available only within the scope of a closure provided
+    /// to `specify_randomized_constraints`, which implements
+    /// the "randomization" phase of the protocol.
+    ///
+    /// Arbitrary number of challenges can be generated with additional calls.
+    ///
+    /// ```text
+    /// cs.specify_randomized_constraints(move |cs| {
+    ///     let z = cs.challenge_scalar(b"some challenge");
+    ///     // ...
+    /// })
+    /// ```
     fn challenge_scalar(&mut self, label: &'static [u8]) -> Scalar;
 }

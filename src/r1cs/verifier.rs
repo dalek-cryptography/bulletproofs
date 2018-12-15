@@ -45,6 +45,7 @@ pub struct Verifier<'a, 'b> {
 }
 
 /// Verifier in the randomizing phase.
+///
 /// Note: this type is exported because it is used to specify the associated type
 /// in the public impl of a trait `ConstraintSystem`, which boils down to allowing compiler to
 /// monomorphize the closures for the proving and verifying code.
@@ -275,6 +276,20 @@ impl<'a, 'b> Verifier<'a, 'b> {
         (wL, wR, wO, wV, wc)
     }
 
+    /// Calls all remembered callbacks with an API that
+    /// allows generating challenge scalars.
+    fn create_randomized_constraints(mut self) -> Result<Self, R1CSError> {
+        // Note: the wrapper could've used &mut instead of ownership,
+        // but specifying lifetimes for boxed closures is not going to be nice,
+        // so we move the self into wrapper and then move it back out afterwards.
+        let mut callbacks = mem::replace(&mut self.deferred_constraints, Vec::new());
+        let mut wrapped_self = RandomizingVerifier { verifier: self };
+        for callback in callbacks.drain(..) {
+            callback(&mut wrapped_self)?;
+        }
+        Ok(wrapped_self.verifier)
+    }
+
     /// Consume this `VerifierCS` and attempt to verify the supplied `proof`.
     pub fn verify(mut self, proof: &R1CSProof) -> Result<(), R1CSError> {
         // Commit a length _suffix_ for the number of high-level variables.
@@ -283,13 +298,8 @@ impl<'a, 'b> Verifier<'a, 'b> {
         // is prefixed with a separate label.
         self.transcript.commit_u64(b"m", self.V.len() as u64);
 
-        // Process deferred constraints
-        let mut callbacks = mem::replace(&mut self.deferred_constraints, Vec::new());
-        let mut wrapped_self = RandomizingVerifier { verifier: self };
-        for callback in callbacks.drain(..) {
-            callback(&mut wrapped_self)?;
-        }
-        self = wrapped_self.verifier;
+        // Process the remaining constraints.
+        self = self.create_randomized_constraints()?;
 
         // If the number of multiplications is not 0 or a power of 2, then pad the circuit.
         let n = self.num_vars;
