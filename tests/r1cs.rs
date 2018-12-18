@@ -55,7 +55,8 @@ impl ShuffleProof {
             cs.constrain(first_mulx_out - first_muly_out);
 
             Ok(())
-        })
+        });
+        Ok(())
     }
 }
 
