@@ -57,13 +57,8 @@ pub trait ConstraintSystem {
     fn constrain(&mut self, lc: LinearCombination);
 
     /// Specify additional variables and constraints randomized using a challenge scalar
-    /// bound to the assignments of the non-randomized variables.
-    ///
-    /// If the constraint system’s low-level variables have not been committed yet,
-    /// the call returns `Ok()` and saves a callback until later.
-    ///
-    /// If the constraint system’s low-level variables are committed already,
-    /// the callback is invoked immediately and its result is return from this method.
+    /// bound to the assignments of the non-randomized variables. The callback is called
+    /// after the first-phase low-level variables have been committed.
     ///
     /// ### Usage
     ///
