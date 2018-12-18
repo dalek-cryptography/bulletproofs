@@ -110,5 +110,8 @@ pub enum R1CSError {
 
     /// Occurs when a gadget receives an inconsistent input.
     #[fail(display = "Gadget error: {:?}", description)]
-    GadgetError { description: String },
+    GadgetError {
+        /// The description of the reasons for the error.
+        description: String
+    },
 }
