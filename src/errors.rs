@@ -112,6 +112,6 @@ pub enum R1CSError {
     #[fail(display = "Gadget error: {:?}", description)]
     GadgetError {
         /// The description of the reasons for the error.
-        description: String
+        description: String,
     },
 }
