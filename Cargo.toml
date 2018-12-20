@@ -1,6 +1,6 @@
 [package]
 name = "bulletproofs"
-version = "1.0.0-pre.0"
+version = "1.0.0"
 authors = ["Cathie Yun <cathie@chain.com>", 
            "Henry de Valence <hdevalence@hdevalence.ca>",
            "Oleg Andreev <oleganza@gmail.com>"]
