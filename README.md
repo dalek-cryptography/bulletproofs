@@ -88,7 +88,13 @@ section below for details on how to run them all.
 
 ## Example
 
+The following example shows how to create and verify a 32-bit rangeproof.
+
 ```rust
+# // The #-commented lines are hidden in Rustdoc but not in raw
+# // markdown rendering, and contain boilerplate code so that the
+# // code in the README.md is actually run as part of the test suite.
+#
 # extern crate rand;
 # use rand::thread_rng;
 #
@@ -142,8 +148,8 @@ assert!(
 
 ## Tests and Benchmarks
 
-Run tests with `cargo test`.
-Run benchmarks with `cargo bench`. This crate uses [criterion.rs][criterion] for benchmarks. 
+Run tests with `cargo test`.  Run benchmarks with `cargo bench`.  This crate
+uses [criterion.rs][criterion] for benchmarks. 
 
 ## Features
 
