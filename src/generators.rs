@@ -266,7 +266,6 @@ impl<'a> BulletproofGensShare<'a> {
 
 #[cfg(test)]
 mod tests {
-    extern crate hex;
     use super::*;
 
     #[test]
