@@ -21,8 +21,8 @@ pub enum ProofError {
     /// proof with non-power-of-two aggregation size.
     #[fail(display = "Invalid aggregation size, m must be a power of 2.")]
     InvalidAggregation,
-    /// This error occurs when the generators are of the wrong length.
-    #[fail(display = "Invalid generators length, must be equal to n.")]
+    /// This error occurs when there are insufficient generators for the proof.
+    #[fail(display = "Invalid generators size, too few generators for proof")]
     InvalidGeneratorsLength,
     /// This error results from an internal error during proving.
     ///
@@ -66,8 +66,8 @@ pub enum MPCError {
     /// proof with non-power-of-two aggregation size.
     #[fail(display = "Invalid aggregation size, m must be a power of 2")]
     InvalidAggregation,
-    /// This error occurs when the generators are of the wrong length.
-    #[fail(display = "Invalid generators length, must be equal to n.")]
+    /// This error occurs when there are insufficient generators for the proof.
+    #[fail(display = "Invalid generators size, too few generators for proof")]
     InvalidGeneratorsLength,
     /// This error occurs when the dealer is given the wrong number of
     /// value commitments.
@@ -83,12 +83,28 @@ pub enum MPCError {
     WrongNumProofShares,
     /// This error occurs when one or more parties submit malformed
     /// proof shares.
-    #[fail(
-        display = "Malformed proof shares from parties {:?}",
-        bad_shares
-    )]
+    #[fail(display = "Malformed proof shares from parties {:?}", bad_shares)]
     MalformedProofShares {
         /// A vector with the indexes of the parties whose shares were malformed.
         bad_shares: Vec<usize>,
     },
+}
+
+/// Represents an error during the proving or verifying of a constraint system.
+#[cfg(feature = "yoloproofs")]
+#[derive(Fail, Copy, Clone, Debug, Eq, PartialEq)]
+pub enum R1CSError {
+    /// Occurs when there are insufficient generators for the proof.
+    #[fail(display = "Invalid generators size, too few generators for proof")]
+    InvalidGeneratorsLength,
+    /// Occurs when verification of an
+    /// [`R1CSProof`](::r1cs::R1CSProof) fails.
+    #[fail(display = "R1CSProof did not verify correctly.")]
+    VerificationError,
+
+    /// Occurs when trying to use a missing variable assignment.
+    /// Used by gadgets that build the constraint system to signal that
+    /// a variable assignment is not provided when the prover needs it.
+    #[fail(display = "Variable does not have a value assignment.")]
+    MissingAssignment,
 }

@@ -12,16 +12,16 @@ keywords = ["cryptography", "ristretto", "zero-knowledge", "bulletproofs"]
 description = "A pure-Rust implementation of Bulletproofs using Ristretto"
 
 [dependencies]
-curve25519-dalek = { version = "1.0.0-pre.0", features = ["serde"] }
-subtle = "2.0.0-pre.0"
+curve25519-dalek = { version = "1", features = ["serde"] }
+subtle = "2"
 sha3 = "0.8"
 digest = "0.8"
-rand = "0.5"
+rand = "0.6"
 byteorder = "1"
 serde = "1"
 serde_derive = "1"
 failure = "0.1"
-merlin = "1.0.0-pre.0"
+merlin = "1"
 clear_on_drop = "0.2"
 
 [dev-dependencies]
@@ -31,8 +31,17 @@ bincode = "1"
 
 [features]
 avx2_backend = ["curve25519-dalek/avx2_backend"]
+yoloproofs = []
 
 [[bench]]
-name = "bulletproofs"
+name = "range_proof"
 harness = false
 
+[[bench]]
+name = "r1cs"
+harness = false
+required-features = ["yoloproofs"]
+
+[[test]]
+name = "r1cs"
+required-features = ["yoloproofs"]
