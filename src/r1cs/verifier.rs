@@ -137,8 +137,7 @@ impl<'a, 'b> ConstraintSystem for RandomizingVerifier<'a, 'b> {
     where
         for<'r> F: 'static + Fn(&'r mut Self::RandomizedCS) -> Result<(), R1CSError>,
     {
-        self.verifier.deferred_constraints.push(Box::new(callback));
-        Ok(())
+        callback(self)
     }
 }
 
@@ -279,27 +278,14 @@ impl<'a, 'b> Verifier<'a, 'b> {
 
     /// Calls all remembered callbacks with an API that
     /// allows generating challenge scalars.
-    fn create_randomized_constraints(self) -> Result<Self, R1CSError> {
+    fn create_randomized_constraints(mut self) -> Result<Self, R1CSError> {
         // Note: the wrapper could've used &mut instead of ownership,
         // but specifying lifetimes for boxed closures is not going to be nice,
         // so we move the self into wrapper and then move it back out afterwards.
+        let mut callbacks = mem::replace(&mut self.deferred_constraints, Vec::new());
         let mut wrapped_self = RandomizingVerifier { verifier: self };
-
-        // Callbacks can add more deferred callbacks, so we'll need to do multiple passes.
-        loop {
-            let mut callbacks = mem::replace(
-                &mut wrapped_self.verifier.deferred_constraints, 
-                Vec::new()
-            );
-            
-            for callback in callbacks.drain(..) {
-                callback(&mut wrapped_self)?;
-            }
-
-            // No more callbacks were added - we can exit the loop.
-            if wrapped_self.verifier.deferred_constraints.len() == 0 {
-                break;
-            }
+        for callback in callbacks.drain(..) {
+            callback(&mut wrapped_self)?;
         }
         Ok(wrapped_self.verifier)
     }
