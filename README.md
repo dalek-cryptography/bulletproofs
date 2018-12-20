@@ -66,10 +66,10 @@ the library's [internal documentation][doc_internal]:
 
 ## Comparative Performance
 
-The following table gives comparative timings for proving and
-verification of a 64-bit rangeproof on an i7-7800X with Turbo Boost
-disabled.  Times are in microseconds (lower is better), with the
-relative speed compared to the fastest implementation.
+The following table gives comparative timings for proving and verification of a
+64-bit rangeproof on an Intel Skylake-X i7-7800X (@3.5GHz, Turbo Boost
+disabled).  Times are in microseconds (lower is better), with the relative
+speed compared to the fastest implementation.
 
 | Implementation | Group            | Proving (μs) |       rel | Verification (μs) |       rel |
 |----------------|------------------|-------------:|----------:|------------------:|----------:|
@@ -79,8 +79,12 @@ relative speed compared to the fastest implementation.
 | libsecp-endo   | secp256k1        |        16800 | **2.30x** |              2080 | **2.00x** |
 | Monero         | ed25519 (unsafe) |        53300 | **7.30x** |              4810 | **4.63x** |
 
+Use of the `curve25519-dalek` IFMA backend gives another 1.5x speedup on a
+Cannonlake i3-8121U, increasing the verification speedup **3x** over libsecp
+and **7x** over Monero, but these processors are not yet generally available.
+
 This crate also contains other benchmarks; see the *Tests and Benchmarks*
-section below for details.
+section below for details on how to run them all.
 
 ## Example
 
