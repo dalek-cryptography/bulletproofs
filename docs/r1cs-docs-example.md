@@ -110,8 +110,7 @@ impl ShuffleProof {
             cs.constrain(first_mulx_out - first_muly_out);
 
             Ok(())
-        });
-        Ok(())
+        })
     }
 }
 ```
@@ -193,8 +192,7 @@ For simplicity, in this example the `prove` function does not take a list of bli
 #             cs.constrain(first_mulx_out - first_muly_out);
 #
 #             Ok(())
-#         });
-#         Ok(())
+#         })
 #     }
 # }
  
@@ -301,8 +299,7 @@ The verifier receives a proof, and a list of committed inputs and outputs, from 
 #             cs.constrain(first_mulx_out - first_muly_out);
 #
 #             Ok(())
-#         });
-#         Ok(())
+#         })
 #     }
 # }
 # 
@@ -442,8 +439,7 @@ Because only the prover knows the scalar values of the inputs and outputs, and t
 #             cs.constrain(first_mulx_out - first_muly_out);
 #
 #             Ok(())
-#         });
-#         Ok(())
+#         })
 #     }
 # }
 # 

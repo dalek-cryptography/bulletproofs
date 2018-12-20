@@ -135,11 +135,12 @@ impl<'a, 'b> ConstraintSystem for Prover<'a, 'b> {
         self.constraints.push(lc);
     }
 
-    fn specify_randomized_constraints<F>(&mut self, callback: F)
+    fn specify_randomized_constraints<F>(&mut self, callback: F) -> Result<(), R1CSError>
     where
         for<'r> F: 'static + Fn(&'r mut Self::RandomizedCS) -> Result<(), R1CSError>,
     {
         self.deferred_constraints.push(Box::new(callback));
+        Ok(())
     }
 }
 
@@ -165,11 +166,12 @@ impl<'a, 'b> ConstraintSystem for RandomizingProver<'a, 'b> {
         self.prover.constrain(lc)
     }
 
-    fn specify_randomized_constraints<F>(&mut self, callback: F)
+    fn specify_randomized_constraints<F>(&mut self, callback: F) -> Result<(), R1CSError>
     where
         for<'r> F: 'static + Fn(&'r mut Self::RandomizedCS) -> Result<(), R1CSError>,
     {
         self.prover.deferred_constraints.push(Box::new(callback));
+        Ok(())
     }
 }
 
@@ -326,9 +328,11 @@ impl<'a, 'b> Prover<'a, 'b> {
 
         // Callbacks can add more deferred callbacks, so we'll need to do multiple passes.
         loop {
-            let mut callbacks =
-                mem::replace(&mut wrapped_self.prover.deferred_constraints, Vec::new());
-
+            let mut callbacks = mem::replace(
+                &mut wrapped_self.prover.deferred_constraints, 
+                Vec::new()
+            );
+            
             for callback in callbacks.drain(..) {
                 callback(&mut wrapped_self)?;
             }

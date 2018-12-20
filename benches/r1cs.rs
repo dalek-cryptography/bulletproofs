@@ -117,8 +117,7 @@ impl KShuffleGadget {
             );
 
             Ok(())
-        });
-        Ok(())
+        })
     }
 
     pub fn prove<'a, 'b>(
