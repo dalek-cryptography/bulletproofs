@@ -24,12 +24,18 @@ use inner_product_proof::InnerProductProof;
 #[derive(Clone, Debug)]
 #[allow(non_snake_case)]
 pub struct R1CSProof {
-    /// Commitment to the values of input wires
-    pub(super) A_I: CompressedRistretto,
-    /// Commitment to the values of output wires
-    pub(super) A_O: CompressedRistretto,
-    /// Commitment to the blinding factors
-    pub(super) S: CompressedRistretto,
+    /// Commitment to the values of input wires in the first phase.
+    pub(super) A_I1: CompressedRistretto,
+    /// Commitment to the values of output wires in the first phase.
+    pub(super) A_O1: CompressedRistretto,
+    /// Commitment to the blinding factors in the first phase.
+    pub(super) S1: CompressedRistretto,
+    /// Commitment to the values of input wires in the second phase.
+    pub(super) A_I2: CompressedRistretto,
+    /// Commitment to the values of output wires in the second phase.
+    pub(super) A_O2: CompressedRistretto,
+    /// Commitment to the blinding factors in the second phase.
+    pub(super) S2: CompressedRistretto,
     /// Commitment to the \\(t_1\\) coefficient of \\( t(x) \\)
     pub(super) T_1: CompressedRistretto,
     /// Commitment to the \\(t_3\\) coefficient of \\( t(x) \\)

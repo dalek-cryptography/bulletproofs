@@ -298,11 +298,17 @@ impl<'a, 'b> Verifier<'a, 'b> {
         // is prefixed with a separate label.
         self.transcript.commit_u64(b"m", self.V.len() as u64);
 
+        let n1 = self.num_vars;
+        self.transcript.commit_point(b"A_I1", &proof.A_I1);
+        self.transcript.commit_point(b"A_O1", &proof.A_O1);
+        self.transcript.commit_point(b"S1", &proof.S1);
+
         // Process the remaining constraints.
         self = self.create_randomized_constraints()?;
 
         // If the number of multiplications is not 0 or a power of 2, then pad the circuit.
         let n = self.num_vars;
+        let n2 = n - n1;
         let padded_n = self.num_vars.next_power_of_two();
         let pad = padded_n - n;
 
@@ -316,9 +322,9 @@ impl<'a, 'b> Verifier<'a, 'b> {
         // We are performing a single-party circuit proof, so party index is 0.
         let gens = self.bp_gens.share(0);
 
-        self.transcript.commit_point(b"A_I", &proof.A_I);
-        self.transcript.commit_point(b"A_O", &proof.A_O);
-        self.transcript.commit_point(b"S", &proof.S);
+        self.transcript.commit_point(b"A_I2", &proof.A_I2);
+        self.transcript.commit_point(b"A_O2", &proof.A_O2);
+        self.transcript.commit_point(b"S2", &proof.S2);
 
         let y = self.transcript.challenge_scalar(b"y");
         let z = self.transcript.challenge_scalar(b"z");
@@ -329,6 +335,7 @@ impl<'a, 'b> Verifier<'a, 'b> {
         self.transcript.commit_point(b"T_5", &proof.T_5);
         self.transcript.commit_point(b"T_6", &proof.T_6);
 
+        let u = self.transcript.challenge_scalar(b"u");
         let x = self.transcript.challenge_scalar(b"x");
 
         self.transcript.commit_scalar(b"t_x", &proof.t_x);
@@ -363,19 +370,28 @@ impl<'a, 'b> Verifier<'a, 'b> {
 
         let delta = inner_product(&yneg_wR[0..n], &wL);
 
+        let u_for_g = iter::repeat(Scalar::one())
+            .take(n1)
+            .chain(iter::repeat(u).take(n2 + pad));
+        let u_for_h = iter::repeat(Scalar::one())
+            .take(n1)
+            .chain(iter::repeat(u).take(n2 + pad));
+
         // define parameters for P check
         let g_scalars = yneg_wR
             .iter()
+            .zip(u_for_g)
             .zip(s.iter().take(padded_n))
-            .map(|(yneg_wRi, s_i)| x * yneg_wRi - a * s_i);
+            .map(|((yneg_wRi, u_or_1), s_i)| u_or_1 * (x * yneg_wRi - a * s_i));
 
         let h_scalars = y_inv_vec
             .iter()
+            .zip(u_for_h)
             .zip(s.iter().rev().take(padded_n))
             .zip(wL.into_iter().chain(iter::repeat(Scalar::zero()).take(pad)))
             .zip(wO.into_iter().chain(iter::repeat(Scalar::zero()).take(pad)))
-            .map(|(((y_inv_i, s_i_inv), wLi), wOi)| {
-                y_inv_i * (x * wLi + wOi - b * s_i_inv) - Scalar::one()
+            .map(|((((y_inv_i, u_or_1), s_i_inv), wLi), wOi)| {
+                u_or_1 * (y_inv_i * (x * wLi + wOi - b * s_i_inv) - Scalar::one())
             });
 
         // Create a `TranscriptRng` from the transcript. The verifier
@@ -394,9 +410,12 @@ impl<'a, 'b> Verifier<'a, 'b> {
         let T_points = [proof.T_1, proof.T_3, proof.T_4, proof.T_5, proof.T_6];
 
         let mega_check = RistrettoPoint::optional_multiscalar_mul(
-            iter::once(x) // A_I
-                .chain(iter::once(xx)) // A_O
-                .chain(iter::once(xxx)) // S
+            iter::once(x) // A_I1
+                .chain(iter::once(xx)) // A_O1
+                .chain(iter::once(xxx)) // S1
+                .chain(iter::once(u * x)) // A_I2
+                .chain(iter::once(u * xx)) // A_O2
+                .chain(iter::once(u * xxx)) // S2
                 .chain(wV.iter().map(|wVi| wVi * rxx)) // V
                 .chain(T_scalars.iter().cloned()) // T_points
                 .chain(iter::once(
@@ -407,9 +426,12 @@ impl<'a, 'b> Verifier<'a, 'b> {
                 .chain(h_scalars) // H
                 .chain(u_sq.iter().cloned()) // ipp_proof.L_vec
                 .chain(u_inv_sq.iter().cloned()), // ipp_proof.R_vec
-            iter::once(proof.A_I.decompress())
-                .chain(iter::once(proof.A_O.decompress()))
-                .chain(iter::once(proof.S.decompress()))
+            iter::once(proof.A_I1.decompress())
+                .chain(iter::once(proof.A_O1.decompress()))
+                .chain(iter::once(proof.S1.decompress()))
+                .chain(iter::once(proof.A_I2.decompress()))
+                .chain(iter::once(proof.A_O2.decompress()))
+                .chain(iter::once(proof.S2.decompress()))
                 .chain(self.V.iter().map(|V_i| V_i.decompress()))
                 .chain(T_points.iter().map(|T_i| T_i.decompress()))
                 .chain(iter::once(Some(self.pc_gens.B)))
