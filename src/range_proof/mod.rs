@@ -45,7 +45,7 @@ pub mod party;
 /// # Note
 ///
 /// For proving, these functions run the multiparty aggregation
-/// protocol locally.  That API is exposed in the [`aggregation`](::aggregation)
+/// protocol locally.  That API is exposed in the [`aggregation`](::range_proof_mpc)
 /// module and can be used to perform online aggregation between
 /// parties without revealing secret values to each other.
 #[derive(Clone, Debug)]
@@ -222,7 +222,8 @@ impl RangeProof {
             .map(|(j, p)| {
                 p.assign_position(j)
                     .expect("We already checked the parameters, so this should never happen")
-            }).unzip();
+            })
+            .unzip();
 
         let value_commitments: Vec<_> = bit_commitments.iter().map(|c| c.V_j).collect();
 
@@ -358,7 +359,8 @@ impl RangeProof {
                 .chain(bp_gens.G(n, m).map(|&x| Some(x)))
                 .chain(bp_gens.H(n, m).map(|&x| Some(x)))
                 .chain(value_commitments.iter().map(|V| V.decompress())),
-        ).ok_or_else(|| ProofError::VerificationError)?;
+        )
+        .ok_or_else(|| ProofError::VerificationError)?;
 
         if mega_check.is_identity() {
             Ok(())
@@ -550,7 +552,8 @@ mod tests {
                 &values,
                 &blindings,
                 n,
-            ).unwrap();
+            )
+            .unwrap();
 
             // 2. Return serialized proof and value commitments
             (bincode::serialize(&proof).unwrap(), value_commitments)
@@ -564,11 +567,9 @@ mod tests {
             // 4. Verify with the same customization label as above
             let mut transcript = Transcript::new(b"AggregatedRangeProofTest");
 
-            assert!(
-                proof
-                    .verify_multiple(&bp_gens, &pc_gens, &mut transcript, &value_commitments, n)
-                    .is_ok()
-            );
+            assert!(proof
+                .verify_multiple(&bp_gens, &pc_gens, &mut transcript, &value_commitments, n)
+                .is_ok());
         }
     }
 

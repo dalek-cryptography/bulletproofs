@@ -28,14 +28,21 @@ This library provides implementations of:
   
 * A programmable constraint system API for expressing rank-1
   constraint systems, and proving and verifying proofs of arbitrary
-  statements (under development in the `circuit` branch);
+  statements (unstable, under development with the `yoloproofs` feature);
   
-* Online multi-party computation for aggregated circuit proofs
+* Online multi-party computation for aggregated constraint system proofs
   (planned future work).
-  
+
 These proofs are implemented using [Merlin transcripts][doc_merlin],
 allowing them to be arbitrarily composed with other proofs without
 implementation changes.
+
+The development roadmap can be found in the
+[Milestones][gh_milestones] section of the [Github repo][gh_repo].
+
+The constraint system API is provided **FOR EXPERIMENTS ONLY**, and must be
+enabled by specifying the `yoloproofs` feature.  It is not covered by semver
+compatibility and is **SUBJECT TO CHANGE WITHOUT NOTICE**.
 
 ## Documentation
   
@@ -48,9 +55,9 @@ the library's [internal documentation][doc_internal]:
 * how [the range proof protocol works][rp_notes];
 * how [the inner product proof protocol works][ipp_notes];
 * how [the aggregation protocol works][agg_notes];
-* how the Bulletproof circuit proofs work (under development);
+* how the Bulletproof constraint system proofs work (under development);
 * how the constraint system reduction works (under development);
-* how the aggregated circuit proofs work (future work).
+* how the aggregated constraint system proofs work (future work).
 
 ## Comparative Performance
 
@@ -69,12 +76,6 @@ relative speed compared to the fastest implementation.
 
 This crate also contains other benchmarks; see the *Tests and Benchmarks*
 section below for details.
-
-## WARNING
-
-This code is still research-quality.  It is not (yet) suitable for
-deployment.  The development roadmap can be found in the
-[Milestones][gh_milestones] section of the [Github repo][gh_repo].
 
 ## Example
 
@@ -136,6 +137,10 @@ Run tests with `cargo test`.
 Run benchmarks with `cargo bench`. This crate uses [criterion.rs][criterion] for benchmarks. 
 
 ## Features
+
+The `yoloproofs` feature enables support for rank-1 constraint system proofs.
+It is **UNSTABLE AND UNSUITABLE FOR DEPLOYMENT**, and **PROVIDED FOR TESTING
+ONLY**.
 
 The `avx2_backend` feature enables `curve25519-dalek`'s AVX2 backend,
 which implements curve arithmetic using [parallel
