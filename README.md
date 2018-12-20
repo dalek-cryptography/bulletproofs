@@ -42,7 +42,12 @@ The development roadmap can be found in the
 
 The constraint system API is provided **FOR EXPERIMENTS ONLY**, and must be
 enabled by specifying the `yoloproofs` feature.  It is not covered by semver
-compatibility and is **SUBJECT TO CHANGE WITHOUT NOTICE**.
+compatibility and is **SUBJECT TO CHANGE WITHOUT NOTICE**.  
+
+Currently, the `yoloproofs` feature is disabled in the published version of the
+crate, so it can only be used by specifying a git dependency on the `develop`
+branch.  This means that it is not possible to publish a crate using the R1CS
+API, because it is **FOR EXPERIMENTS ONLY**.
 
 ## Documentation
   
