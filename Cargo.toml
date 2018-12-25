@@ -1,7 +1,7 @@
 [package]
 name = "bulletproofs"
-version = "1.0.0-pre.0"
-authors = ["Cathie Yun <cathie@chain.com>", 
+version = "1.0.1"
+authors = ["Cathie Yun <cathieyun@gmail.com>", 
            "Henry de Valence <hdevalence@hdevalence.ca>",
            "Oleg Andreev <oleganza@gmail.com>"]
 readme = "README.md"
@@ -28,10 +28,18 @@ clear_on_drop = "0.2"
 hex = "0.3"
 criterion = "0.2"
 bincode = "1"
+rand_chacha = "0.1"
 
 [features]
 avx2_backend = ["curve25519-dalek/avx2_backend"]
 yoloproofs = []
+
+[[test]]
+name = "range_proof"
+
+[[test]]
+name = "r1cs"
+required-features = ["yoloproofs"]
 
 [[bench]]
 name = "range_proof"
@@ -40,8 +48,4 @@ harness = false
 [[bench]]
 name = "r1cs"
 harness = false
-required-features = ["yoloproofs"]
-
-[[test]]
-name = "r1cs"
 required-features = ["yoloproofs"]

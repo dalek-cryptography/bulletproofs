@@ -409,12 +409,11 @@ pub fn inner_product(a: &[Scalar], b: &[Scalar]) -> Scalar {
 mod tests {
     use super::*;
 
-    use rand::rngs::OsRng;
     use sha3::Sha3_512;
     use util;
 
     fn test_helper_create(n: usize) {
-        let mut rng = OsRng::new().unwrap();
+        let mut rng = rand::thread_rng();
 
         use generators::BulletproofGens;
         let bp_gens = BulletproofGens::new(n, 1);
