@@ -83,7 +83,7 @@ impl InnerProductProof {
 
             let L = RistrettoPoint::vartime_multiscalar_mul(
                 a_L.iter()
-                    .zip(G_factors[0..n].into_iter())
+                    .zip(G_factors[n..2 * n].into_iter())
                     .map(|(a_L_i, g)| a_L_i * g)
                     .chain(
                         b_R.iter()
@@ -97,7 +97,7 @@ impl InnerProductProof {
 
             let R = RistrettoPoint::vartime_multiscalar_mul(
                 a_R.iter()
-                    .zip(G_factors[n..2 * n].into_iter())
+                    .zip(G_factors[0..n].into_iter())
                     .map(|(a_R_i, g)| a_R_i * g)
                     .chain(
                         b_L.iter()
