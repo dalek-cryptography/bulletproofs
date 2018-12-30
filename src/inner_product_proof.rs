@@ -85,9 +85,11 @@ impl InnerProductProof {
                         b_R.iter()
                             .zip(Hprime_factors[0..n].into_iter())
                             .map(|(b_R_i, y_i)| b_R_i * y_i),
-                    ).chain(iter::once(c_L)),
+                    )
+                    .chain(iter::once(c_L)),
                 G_R.iter().chain(H_L.iter()).chain(iter::once(Q)),
-            ).compress();
+            )
+            .compress();
 
             let R = RistrettoPoint::vartime_multiscalar_mul(
                 a_R.iter()
@@ -96,9 +98,11 @@ impl InnerProductProof {
                         b_L.iter()
                             .zip(Hprime_factors[n..2 * n].into_iter())
                             .map(|(b_L_i, y_i)| b_L_i * y_i),
-                    ).chain(iter::once(c_R)),
+                    )
+                    .chain(iter::once(c_R)),
                 G_L.iter().chain(H_R.iter()).chain(iter::once(Q)),
-            ).compress();
+            )
+            .compress();
 
             L_vec.push(L);
             R_vec.push(R);
@@ -138,12 +142,14 @@ impl InnerProductProof {
             let L = RistrettoPoint::vartime_multiscalar_mul(
                 a_L.iter().chain(b_R.iter()).chain(iter::once(&c_L)),
                 G_R.iter().chain(H_L.iter()).chain(iter::once(Q)),
-            ).compress();
+            )
+            .compress();
 
             let R = RistrettoPoint::vartime_multiscalar_mul(
                 a_R.iter().chain(b_L.iter()).chain(iter::once(&c_R)),
                 G_L.iter().chain(H_R.iter()).chain(iter::once(Q)),
-            ).compress();
+            )
+            .compress();
 
             L_vec.push(L);
             R_vec.push(R);
@@ -256,7 +262,7 @@ impl InnerProductProof {
     {
         let (u_sq, u_inv_sq, s) = self.verification_scalars(n, transcript)?;
 
-        let a_times_s = s.iter().map(|s_i| self.a * s_i);
+        let a_times_s = s.iter().map(|s_i| self.a * s_i).take(G.len());
 
         // 1/s[i] is s[!i], and !i runs from n-1 to 0 as i runs from 0 to n-1
         let inv_s = s.iter().rev();
@@ -388,12 +394,11 @@ pub fn inner_product(a: &[Scalar], b: &[Scalar]) -> Scalar {
 mod tests {
     use super::*;
 
-    use rand::OsRng;
     use sha3::Sha3_512;
     use util;
 
     fn test_helper_create(n: usize) {
-        let mut rng = OsRng::new().unwrap();
+        let mut rng = rand::thread_rng();
 
         use generators::BulletproofGens;
         let bp_gens = BulletproofGens::new(n, 1);
@@ -438,19 +443,31 @@ mod tests {
         );
 
         let mut verifier = Transcript::new(b"innerproducttest");
-        assert!(
-            proof
-                .verify(n, &mut verifier, util::exp_iter(y_inv), &P, &Q, &G, &H)
-                .is_ok()
-        );
+        assert!(proof
+            .verify(
+                n,
+                &mut verifier,
+                util::exp_iter(y_inv).take(n),
+                &P,
+                &Q,
+                &G,
+                &H
+            )
+            .is_ok());
 
         let proof = InnerProductProof::from_bytes(proof.to_bytes().as_slice()).unwrap();
         let mut verifier = Transcript::new(b"innerproducttest");
-        assert!(
-            proof
-                .verify(n, &mut verifier, util::exp_iter(y_inv), &P, &Q, &G, &H)
-                .is_ok()
-        );
+        assert!(proof
+            .verify(
+                n,
+                &mut verifier,
+                util::exp_iter(y_inv).take(n),
+                &P,
+                &Q,
+                &G,
+                &H
+            )
+            .is_ok());
     }
 
     #[test]

@@ -156,7 +156,8 @@ impl BulletproofGens {
                     GeneratorsChain::new(&label)
                         .take(gens_capacity)
                         .collect::<Vec<_>>()
-                }).collect(),
+                })
+                .collect(),
             H_vec: (0..party_capacity)
                 .map(|i| {
                     let party_index = i as u32;
@@ -166,7 +167,8 @@ impl BulletproofGens {
                     GeneratorsChain::new(&label)
                         .take(gens_capacity)
                         .collect::<Vec<_>>()
-                }).collect(),
+                })
+                .collect(),
         }
     }
 
@@ -264,7 +266,6 @@ impl<'a> BulletproofGensShare<'a> {
 
 #[cfg(test)]
 mod tests {
-    extern crate hex;
     use super::*;
 
     #[test]

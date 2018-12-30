@@ -28,14 +28,26 @@ This library provides implementations of:
   
 * A programmable constraint system API for expressing rank-1
   constraint systems, and proving and verifying proofs of arbitrary
-  statements (under development in the `circuit` branch);
+  statements (unstable, under development with the `yoloproofs` feature);
   
-* Online multi-party computation for aggregated circuit proofs
+* Online multi-party computation for aggregated constraint system proofs
   (planned future work).
-  
+
 These proofs are implemented using [Merlin transcripts][doc_merlin],
 allowing them to be arbitrarily composed with other proofs without
 implementation changes.
+
+The development roadmap can be found in the
+[Milestones][gh_milestones] section of the [Github repo][gh_repo].
+
+The constraint system API is provided **FOR EXPERIMENTS ONLY**, and must be
+enabled by specifying the `yoloproofs` feature.  It is not covered by semver
+compatibility and is **SUBJECT TO CHANGE WITHOUT NOTICE**.  
+
+Currently, the `yoloproofs` feature is disabled in the published version of the
+crate, so it can only be used by specifying a git dependency on the `develop`
+branch.  This means that it is not possible to publish a crate using the R1CS
+API, because it is **FOR EXPERIMENTS ONLY**.
 
 ## Documentation
   
@@ -48,16 +60,16 @@ the library's [internal documentation][doc_internal]:
 * how [the range proof protocol works][rp_notes];
 * how [the inner product proof protocol works][ipp_notes];
 * how [the aggregation protocol works][agg_notes];
-* how the Bulletproof circuit proofs work (under development);
+* how the Bulletproof constraint system proofs work (under development);
 * how the constraint system reduction works (under development);
-* how the aggregated circuit proofs work (future work).
+* how the aggregated constraint system proofs work (future work).
 
 ## Comparative Performance
 
-The following table gives comparative timings for proving and
-verification of a 64-bit rangeproof on an i7-7800X with Turbo Boost
-disabled.  Times are in microseconds (lower is better), with the
-relative speed compared to the fastest implementation.
+The following table gives comparative timings for proving and verification of a
+64-bit rangeproof on an Intel Skylake-X i7-7800X (@3.5GHz, Turbo Boost
+disabled).  Times are in microseconds (lower is better), with the relative
+speed compared to the fastest implementation.
 
 | Implementation | Group            | Proving (μs) |       rel | Verification (μs) |       rel |
 |----------------|------------------|-------------:|----------:|------------------:|----------:|
@@ -67,18 +79,22 @@ relative speed compared to the fastest implementation.
 | libsecp-endo   | secp256k1        |        16800 | **2.30x** |              2080 | **2.00x** |
 | Monero         | ed25519 (unsafe) |        53300 | **7.30x** |              4810 | **4.63x** |
 
+Use of the `curve25519-dalek` IFMA backend gives another 1.5x speedup on a
+Cannonlake i3-8121U, increasing the verification speedup **3x** over libsecp
+and **7x** over Monero, but these processors are not yet generally available.
+
 This crate also contains other benchmarks; see the *Tests and Benchmarks*
-section below for details.
-
-## WARNING
-
-This code is still research-quality.  It is not (yet) suitable for
-deployment.  The development roadmap can be found in the
-[Milestones][gh_milestones] section of the [Github repo][gh_repo].
+section below for details on how to run them all.
 
 ## Example
 
+The following example shows how to create and verify a 32-bit rangeproof.
+
 ```rust
+# // The #-commented lines are hidden in Rustdoc but not in raw
+# // markdown rendering, and contain boilerplate code so that the
+# // code in the README.md is actually run as part of the test suite.
+#
 # extern crate rand;
 # use rand::thread_rng;
 #
@@ -132,10 +148,14 @@ assert!(
 
 ## Tests and Benchmarks
 
-Run tests with `cargo test`.
-Run benchmarks with `cargo bench`. This crate uses [criterion.rs][criterion] for benchmarks. 
+Run tests with `cargo test`.  Run benchmarks with `cargo bench`.  This crate
+uses [criterion.rs][criterion] for benchmarks. 
 
 ## Features
+
+The `yoloproofs` feature enables support for rank-1 constraint system proofs.
+It is **UNSTABLE AND UNSUITABLE FOR DEPLOYMENT**, and **PROVIDED FOR TESTING
+ONLY**.
 
 The `avx2_backend` feature enables `curve25519-dalek`'s AVX2 backend,
 which implements curve arithmetic using [parallel

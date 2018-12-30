@@ -8,8 +8,30 @@ use inner_product_proof::inner_product;
 /// Represents a degree-1 vector polynomial \\(\mathbf{a} + \mathbf{b} \cdot x\\).
 pub struct VecPoly1(pub Vec<Scalar>, pub Vec<Scalar>);
 
+/// Represents a degree-3 vector polynomial
+/// \\(\mathbf{a} + \mathbf{b} \cdot x + \mathbf{c} \cdot x^2 + \mathbf{d} \cdot x^3 \\).
+#[cfg(feature = "yoloproofs")]
+pub struct VecPoly3(
+    pub Vec<Scalar>,
+    pub Vec<Scalar>,
+    pub Vec<Scalar>,
+    pub Vec<Scalar>,
+);
+
 /// Represents a degree-2 scalar polynomial \\(a + b \cdot x + c \cdot x^2\\)
 pub struct Poly2(pub Scalar, pub Scalar, pub Scalar);
+
+/// Represents a degree-6 scalar polynomial, without the zeroth degree
+/// \\(a \cdot x + b \cdot x^2 + c \cdot x^3 + d \cdot x^4 + e \cdot x^5 + f \cdot x^6\\)
+#[cfg(feature = "yoloproofs")]
+pub struct Poly6 {
+    pub t1: Scalar,
+    pub t2: Scalar,
+    pub t3: Scalar,
+    pub t4: Scalar,
+    pub t5: Scalar,
+    pub t6: Scalar,
+}
 
 /// Provides an iterator over the powers of a `Scalar`.
 ///
@@ -82,9 +104,61 @@ impl VecPoly1 {
     }
 }
 
+#[cfg(feature = "yoloproofs")]
+impl VecPoly3 {
+    pub fn zero(n: usize) -> Self {
+        VecPoly3(
+            vec![Scalar::zero(); n],
+            vec![Scalar::zero(); n],
+            vec![Scalar::zero(); n],
+            vec![Scalar::zero(); n],
+        )
+    }
+
+    /// Compute an inner product of `lhs`, `rhs` which have the property that:
+    /// - `lhs.0` is zero;
+    /// - `rhs.2` is zero;
+    /// This is the case in the constraint system proof.
+    pub fn special_inner_product(lhs: &Self, rhs: &Self) -> Poly6 {
+        // TODO: make checks that l_poly.0 and r_poly.2 are zero.
+
+        let t1 = inner_product(&lhs.1, &rhs.0);
+        let t2 = inner_product(&lhs.1, &rhs.1) + inner_product(&lhs.2, &rhs.0);
+        let t3 = inner_product(&lhs.2, &rhs.1) + inner_product(&lhs.3, &rhs.0);
+        let t4 = inner_product(&lhs.1, &rhs.3) + inner_product(&lhs.3, &rhs.1);
+        let t5 = inner_product(&lhs.2, &rhs.3);
+        let t6 = inner_product(&lhs.3, &rhs.3);
+
+        Poly6 {
+            t1,
+            t2,
+            t3,
+            t4,
+            t5,
+            t6,
+        }
+    }
+
+    pub fn eval(&self, x: Scalar) -> Vec<Scalar> {
+        let n = self.0.len();
+        let mut out = vec![Scalar::zero(); n];
+        for i in 0..n {
+            out[i] += self.0[i] + x * (self.1[i] + x * (self.2[i] + x * self.3[i]));
+        }
+        out
+    }
+}
+
 impl Poly2 {
     pub fn eval(&self, x: Scalar) -> Scalar {
         self.0 + x * (self.1 + x * self.2)
+    }
+}
+
+#[cfg(feature = "yoloproofs")]
+impl Poly6 {
+    pub fn eval(&self, x: Scalar) -> Scalar {
+        x * (self.t1 + x * (self.t2 + x * (self.t3 + x * (self.t4 + x * (self.t5 + x * self.t6)))))
     }
 }
 
@@ -104,6 +178,36 @@ impl Drop for Poly2 {
         self.0.clear();
         self.1.clear();
         self.2.clear();
+    }
+}
+
+#[cfg(feature = "yoloproofs")]
+impl Drop for VecPoly3 {
+    fn drop(&mut self) {
+        for e in self.0.iter_mut() {
+            e.clear();
+        }
+        for e in self.1.iter_mut() {
+            e.clear();
+        }
+        for e in self.2.iter_mut() {
+            e.clear();
+        }
+        for e in self.3.iter_mut() {
+            e.clear();
+        }
+    }
+}
+
+#[cfg(feature = "yoloproofs")]
+impl Drop for Poly6 {
+    fn drop(&mut self) {
+        self.t1.clear();
+        self.t2.clear();
+        self.t3.clear();
+        self.t4.clear();
+        self.t5.clear();
+        self.t6.clear();
     }
 }
 
