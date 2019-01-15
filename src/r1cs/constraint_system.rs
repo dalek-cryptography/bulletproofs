@@ -77,7 +77,7 @@ pub trait ConstraintSystem {
     /// ```
     fn specify_randomized_constraints<F>(&mut self, callback: F) -> Result<(), R1CSError>
     where
-        for<'r> F: 'static + Fn(&'r mut Self::RandomizedCS) -> Result<(), R1CSError>;
+        F: Fn(&mut Self::RandomizedCS) -> Result<(), R1CSError>;
 }
 
 /// Represents a constraint system in the second phase:
