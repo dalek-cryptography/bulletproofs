@@ -9,7 +9,7 @@ mod proof;
 mod prover;
 mod verifier;
 
-pub use self::constraint_system::ConstraintSystem;
+pub use self::constraint_system::{ConstraintSystem, RandomizedConstraintSystem};
 pub use self::linear_combination::{LinearCombination, Variable};
 pub use self::proof::R1CSProof;
 pub use self::prover::Prover;

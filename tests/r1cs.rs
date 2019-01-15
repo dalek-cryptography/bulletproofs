@@ -17,37 +17,45 @@ use rand::thread_rng;
 struct ShuffleProof(R1CSProof);
 
 impl ShuffleProof {
-    fn gadget<CS: ConstraintSystem>(cs: &mut CS, x: &[Variable], y: &[Variable]) {
-        let z = cs.challenge_scalar(b"shuffle challenge");
-
+    fn gadget<CS: ConstraintSystem>(
+        cs: &mut CS,
+        x: Vec<Variable>,
+        y: Vec<Variable>,
+    ) -> Result<(), R1CSError> {
         assert_eq!(x.len(), y.len());
         let k = x.len();
 
         if k == 1 {
             cs.constrain(y[0] - x[0]);
-            return;
+            return Ok(());
         }
 
-        // Make last x multiplier for i = k-1 and k-2
-        let (_, _, last_mulx_out) = cs.multiply(x[k - 1] - z, x[k - 2] - z);
+        cs.specify_randomized_constraints(move |cs| {
+            let z = cs.challenge_scalar(b"shuffle challenge");
 
-        // Make multipliers for x from i == [0, k-3]
-        let first_mulx_out = (0..k - 2).rev().fold(last_mulx_out, |prev_out, i| {
-            let (_, _, o) = cs.multiply(prev_out.into(), x[i] - z);
-            o
-        });
+            // Make last x multiplier for i = k-1 and k-2
+            let (_, _, last_mulx_out) = cs.multiply(x[k - 1] - z, x[k - 2] - z);
 
-        // Make last y multiplier for i = k-1 and k-2
-        let (_, _, last_muly_out) = cs.multiply(y[k - 1] - z, y[k - 2] - z);
+            // Make multipliers for x from i == [0, k-3]
+            let first_mulx_out = (0..k - 2).rev().fold(last_mulx_out, |prev_out, i| {
+                let (_, _, o) = cs.multiply(prev_out.into(), x[i] - z);
+                o
+            });
 
-        // Make multipliers for y from i == [0, k-3]
-        let first_muly_out = (0..k - 2).rev().fold(last_muly_out, |prev_out, i| {
-            let (_, _, o) = cs.multiply(prev_out.into(), y[i] - z);
-            o
-        });
+            // Make last y multiplier for i = k-1 and k-2
+            let (_, _, last_muly_out) = cs.multiply(y[k - 1] - z, y[k - 2] - z);
 
-        // Constrain last x mul output and last y mul output to be equal
-        cs.constrain(first_mulx_out - first_muly_out);
+            // Make multipliers for y from i == [0, k-3]
+            let first_muly_out = (0..k - 2).rev().fold(last_muly_out, |prev_out, i| {
+                let (_, _, o) = cs.multiply(prev_out.into(), y[i] - z);
+                o
+            });
+
+            // Constrain last x mul output and last y mul output to be equal
+            cs.constrain(first_mulx_out - first_muly_out);
+
+            Ok(())
+        })
     }
 }
 
@@ -90,11 +98,9 @@ impl ShuffleProof {
             .map(|v| prover.commit(*v, Scalar::random(&mut blinding_rng)))
             .unzip();
 
-        let mut cs = prover.finalize_inputs();
+        ShuffleProof::gadget(&mut prover, input_vars, output_vars)?;
 
-        ShuffleProof::gadget(&mut cs, &input_vars, &output_vars);
-
-        let proof = cs.prove()?;
+        let proof = prover.prove()?;
 
         Ok((ShuffleProof(proof), input_commitments, output_commitments))
     }
@@ -127,11 +133,9 @@ impl ShuffleProof {
             .map(|V| verifier.commit(*V))
             .collect();
 
-        let mut cs = verifier.finalize_inputs();
+        ShuffleProof::gadget(&mut verifier, input_vars, output_vars)?;
 
-        ShuffleProof::gadget(&mut cs, &input_vars, &output_vars);
-
-        cs.verify(&self.0)
+        verifier.verify(&self.0)
     }
 }
 
@@ -255,10 +259,8 @@ fn example_gadget_roundtrip_helper(
             .unzip();
 
         // 3. Build a CS
-        let mut cs = prover.finalize_inputs();
-
         example_gadget(
-            &mut cs,
+            &mut prover,
             vars[0].into(),
             vars[1].into(),
             vars[2].into(),
@@ -268,7 +270,7 @@ fn example_gadget_roundtrip_helper(
         );
 
         // 4. Make a proof
-        let proof = cs.prove()?;
+        let proof = prover.prove()?;
 
         (proof, commitments)
     };
@@ -284,9 +286,8 @@ fn example_gadget_roundtrip_helper(
     let vars: Vec<_> = commitments.iter().map(|V| verifier.commit(*V)).collect();
 
     // 3. Build a CS
-    let mut cs = verifier.finalize_inputs();
     example_gadget(
-        &mut cs,
+        &mut verifier,
         vars[0].into(),
         vars[1].into(),
         vars[2].into(),
@@ -296,7 +297,9 @@ fn example_gadget_roundtrip_helper(
     );
 
     // 4. Verify the proof
-    cs.verify(&proof).map_err(|_| R1CSError::VerificationError)
+    verifier
+        .verify(&proof)
+        .map_err(|_| R1CSError::VerificationError)
 }
 
 #[test]

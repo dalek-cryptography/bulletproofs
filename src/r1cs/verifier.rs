@@ -1,43 +1,32 @@
 #![allow(non_snake_case)]
 
+use core::mem;
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::VartimeMultiscalarMul;
 use merlin::Transcript;
 
-use super::{ConstraintSystem, LinearCombination, R1CSProof, Variable};
+use super::{ConstraintSystem, LinearCombination, R1CSProof, RandomizedConstraintSystem, Variable};
 
 use errors::R1CSError;
 use generators::{BulletproofGens, PedersenGens};
 use transcript::TranscriptProtocol;
 
-/// An entry point for verifying a R1CS proof.
+/// A [`ConstraintSystem`] implementation for use by the verifier.
 ///
-/// The lifecycle of a `Verifier` is as follows. The verifying code
-/// provides high-level commitments one by one,
-/// `Verifier` adds them to the transcript and returns
-/// the corresponding variables.
-///
-/// After all variables are committed, the verifying code calls `finalize_inputs`,
-/// which consumes `Verifier` and returns `VerifierCS`.
-/// The verifying code then allocates low-level variables and adds constraints to the `VerifierCS`.
+/// The verifier adds high-level variable commitments to the transcript,
+/// allocates low-level variables and creates constraints in terms of these
+/// high-level variables and low-level variables.
 ///
 /// When all constraints are added, the verifying code calls `verify`
-/// on the instance of the constraint system to check the proof.
+/// which consumes the `Verifier` instance, samples random challenges
+/// that instantiate the randomized constraints, and verifies the proof.
 pub struct Verifier<'a, 'b> {
-    /// Number of high-level variables
-    m: u64,
-
-    /// Constraint system implementation
-    cs: VerifierCS<'a, 'b>,
-}
-
-/// A [`ConstraintSystem`] implementation for use by the verifier.
-pub struct VerifierCS<'a, 'b> {
     bp_gens: &'b BulletproofGens,
     pc_gens: &'b PedersenGens,
     transcript: &'a mut Transcript,
     constraints: Vec<LinearCombination>,
+
     /// Records the number of low-level variables allocated in the
     /// constraint system.
     ///
@@ -47,9 +36,28 @@ pub struct VerifierCS<'a, 'b> {
     /// variable assignments.
     num_vars: usize,
     V: Vec<CompressedRistretto>,
+
+    /// This list holds closures that will be called in the second phase of the protocol,
+    /// when non-randomized variables are committed.
+    /// After that, the option will flip to None and additional calls to `randomize_constraints`
+    /// will invoke closures immediately.
+    deferred_constraints: Vec<Box<Fn(&mut RandomizingVerifier<'a, 'b>) -> Result<(), R1CSError>>>,
 }
 
-impl<'a, 'b> ConstraintSystem for VerifierCS<'a, 'b> {
+/// Verifier in the randomizing phase.
+///
+/// Note: this type is exported because it is used to specify the associated type
+/// in the public impl of a trait `ConstraintSystem`, which boils down to allowing compiler to
+/// monomorphize the closures for the proving and verifying code.
+/// However, this type cannot be instantiated by the user and therefore can only be used within
+/// the callback provided to `specify_randomized_constraints`.
+pub struct RandomizingVerifier<'a, 'b> {
+    verifier: Verifier<'a, 'b>,
+}
+
+impl<'a, 'b> ConstraintSystem for Verifier<'a, 'b> {
+    type RandomizedCS = RandomizingVerifier<'a, 'b>;
+
     fn multiply(
         &mut self,
         mut left: LinearCombination,
@@ -94,8 +102,48 @@ impl<'a, 'b> ConstraintSystem for VerifierCS<'a, 'b> {
         self.constraints.push(lc);
     }
 
+    fn specify_randomized_constraints<F>(&mut self, callback: F) -> Result<(), R1CSError>
+    where
+        F: 'static + Fn(&mut Self::RandomizedCS) -> Result<(), R1CSError>,
+    {
+        self.deferred_constraints.push(Box::new(callback));
+        Ok(())
+    }
+}
+
+impl<'a, 'b> ConstraintSystem for RandomizingVerifier<'a, 'b> {
+    type RandomizedCS = Self;
+
+    fn multiply(
+        &mut self,
+        left: LinearCombination,
+        right: LinearCombination,
+    ) -> (Variable, Variable, Variable) {
+        self.verifier.multiply(left, right)
+    }
+
+    fn allocate<F>(&mut self, assign_fn: F) -> Result<(Variable, Variable, Variable), R1CSError>
+    where
+        F: FnOnce() -> Result<(Scalar, Scalar, Scalar), R1CSError>,
+    {
+        self.verifier.allocate(assign_fn)
+    }
+
+    fn constrain(&mut self, lc: LinearCombination) {
+        self.verifier.constrain(lc)
+    }
+
+    fn specify_randomized_constraints<F>(&mut self, callback: F) -> Result<(), R1CSError>
+    where
+        F: 'static + Fn(&mut Self::RandomizedCS) -> Result<(), R1CSError>,
+    {
+        callback(self)
+    }
+}
+
+impl<'a, 'b> RandomizedConstraintSystem for RandomizingVerifier<'a, 'b> {
     fn challenge_scalar(&mut self, label: &'static [u8]) -> Scalar {
-        self.transcript.challenge_scalar(label)
+        self.verifier.transcript.challenge_scalar(label)
     }
 }
 
@@ -139,15 +187,13 @@ impl<'a, 'b> Verifier<'a, 'b> {
         transcript.r1cs_domain_sep();
 
         Verifier {
-            m: 0,
-            cs: VerifierCS {
-                bp_gens,
-                pc_gens,
-                transcript,
-                num_vars: 0,
-                V: Vec::new(),
-                constraints: Vec::new(),
-            },
+            bp_gens,
+            pc_gens,
+            transcript,
+            num_vars: 0,
+            V: Vec::new(),
+            constraints: Vec::new(),
+            deferred_constraints: Vec::new(),
         }
     }
 
@@ -166,29 +212,15 @@ impl<'a, 'b> Verifier<'a, 'b> {
     /// Returns a pair of a Pedersen commitment (as a compressed Ristretto point),
     /// and a [`Variable`] corresponding to it, which can be used to form constraints.
     pub fn commit(&mut self, commitment: CompressedRistretto) -> Variable {
-        let i = self.m as usize;
-        self.m += 1;
-        self.cs.V.push(commitment);
+        let i = self.V.len();
+        self.V.push(commitment);
 
         // Add the commitment to the transcript.
-        self.cs.transcript.commit_point(b"V", &commitment);
+        self.transcript.commit_point(b"V", &commitment);
 
         Variable::Committed(i)
     }
 
-    /// Consume the `Verifier`, provide the `ConstraintSystem` implementation to the closure,
-    /// and verify the proof against the resulting constraint system.
-    pub fn finalize_inputs(self) -> VerifierCS<'a, 'b> {
-        // Commit a length _suffix_ for the number of high-level variables.
-        // We cannot do this in advance because user can commit variables one-by-one,
-        // but this suffix provides safe disambiguation because each variable
-        // is prefixed with a separate label.
-        self.cs.transcript.commit_u64(b"m", self.m);
-        self.cs
-    }
-}
-
-impl<'a, 'b> VerifierCS<'a, 'b> {
     /// Use a challenge, `z`, to flatten the constraints in the
     /// constraint system into vectors used for proving and
     /// verification.
@@ -244,10 +276,39 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
         (wL, wR, wO, wV, wc)
     }
 
+    /// Calls all remembered callbacks with an API that
+    /// allows generating challenge scalars.
+    fn create_randomized_constraints(mut self) -> Result<Self, R1CSError> {
+        // Note: the wrapper could've used &mut instead of ownership,
+        // but specifying lifetimes for boxed closures is not going to be nice,
+        // so we move the self into wrapper and then move it back out afterwards.
+        let mut callbacks = mem::replace(&mut self.deferred_constraints, Vec::new());
+        let mut wrapped_self = RandomizingVerifier { verifier: self };
+        for callback in callbacks.drain(..) {
+            callback(&mut wrapped_self)?;
+        }
+        Ok(wrapped_self.verifier)
+    }
+
     /// Consume this `VerifierCS` and attempt to verify the supplied `proof`.
     pub fn verify(mut self, proof: &R1CSProof) -> Result<(), R1CSError> {
+        // Commit a length _suffix_ for the number of high-level variables.
+        // We cannot do this in advance because user can commit variables one-by-one,
+        // but this suffix provides safe disambiguation because each variable
+        // is prefixed with a separate label.
+        self.transcript.commit_u64(b"m", self.V.len() as u64);
+
+        let n1 = self.num_vars;
+        self.transcript.commit_point(b"A_I1", &proof.A_I1);
+        self.transcript.commit_point(b"A_O1", &proof.A_O1);
+        self.transcript.commit_point(b"S1", &proof.S1);
+
+        // Process the remaining constraints.
+        self = self.create_randomized_constraints()?;
+
         // If the number of multiplications is not 0 or a power of 2, then pad the circuit.
         let n = self.num_vars;
+        let n2 = n - n1;
         let padded_n = self.num_vars.next_power_of_two();
         let pad = padded_n - n;
 
@@ -261,9 +322,9 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
         // We are performing a single-party circuit proof, so party index is 0.
         let gens = self.bp_gens.share(0);
 
-        self.transcript.commit_point(b"A_I", &proof.A_I);
-        self.transcript.commit_point(b"A_O", &proof.A_O);
-        self.transcript.commit_point(b"S", &proof.S);
+        self.transcript.commit_point(b"A_I2", &proof.A_I2);
+        self.transcript.commit_point(b"A_O2", &proof.A_O2);
+        self.transcript.commit_point(b"S2", &proof.S2);
 
         let y = self.transcript.challenge_scalar(b"y");
         let z = self.transcript.challenge_scalar(b"z");
@@ -274,6 +335,7 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
         self.transcript.commit_point(b"T_5", &proof.T_5);
         self.transcript.commit_point(b"T_6", &proof.T_6);
 
+        let u = self.transcript.challenge_scalar(b"u");
         let x = self.transcript.challenge_scalar(b"x");
 
         self.transcript.commit_scalar(b"t_x", &proof.t_x);
@@ -308,19 +370,28 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
 
         let delta = inner_product(&yneg_wR[0..n], &wL);
 
+        let u_for_g = iter::repeat(Scalar::one())
+            .take(n1)
+            .chain(iter::repeat(u).take(n2 + pad));
+        let u_for_h = iter::repeat(Scalar::one())
+            .take(n1)
+            .chain(iter::repeat(u).take(n2 + pad));
+
         // define parameters for P check
         let g_scalars = yneg_wR
             .iter()
+            .zip(u_for_g)
             .zip(s.iter().take(padded_n))
-            .map(|(yneg_wRi, s_i)| x * yneg_wRi - a * s_i);
+            .map(|((yneg_wRi, u_or_1), s_i)| u_or_1 * (x * yneg_wRi - a * s_i));
 
         let h_scalars = y_inv_vec
             .iter()
+            .zip(u_for_h)
             .zip(s.iter().rev().take(padded_n))
             .zip(wL.into_iter().chain(iter::repeat(Scalar::zero()).take(pad)))
             .zip(wO.into_iter().chain(iter::repeat(Scalar::zero()).take(pad)))
-            .map(|(((y_inv_i, s_i_inv), wLi), wOi)| {
-                y_inv_i * (x * wLi + wOi - b * s_i_inv) - Scalar::one()
+            .map(|((((y_inv_i, u_or_1), s_i_inv), wLi), wOi)| {
+                u_or_1 * (y_inv_i * (x * wLi + wOi - b * s_i_inv) - Scalar::one())
             });
 
         // Create a `TranscriptRng` from the transcript. The verifier
@@ -339,9 +410,12 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
         let T_points = [proof.T_1, proof.T_3, proof.T_4, proof.T_5, proof.T_6];
 
         let mega_check = RistrettoPoint::optional_multiscalar_mul(
-            iter::once(x) // A_I
-                .chain(iter::once(xx)) // A_O
-                .chain(iter::once(xxx)) // S
+            iter::once(x) // A_I1
+                .chain(iter::once(xx)) // A_O1
+                .chain(iter::once(xxx)) // S1
+                .chain(iter::once(u * x)) // A_I2
+                .chain(iter::once(u * xx)) // A_O2
+                .chain(iter::once(u * xxx)) // S2
                 .chain(wV.iter().map(|wVi| wVi * rxx)) // V
                 .chain(T_scalars.iter().cloned()) // T_points
                 .chain(iter::once(
@@ -352,9 +426,12 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
                 .chain(h_scalars) // H
                 .chain(u_sq.iter().cloned()) // ipp_proof.L_vec
                 .chain(u_inv_sq.iter().cloned()), // ipp_proof.R_vec
-            iter::once(proof.A_I.decompress())
-                .chain(iter::once(proof.A_O.decompress()))
-                .chain(iter::once(proof.S.decompress()))
+            iter::once(proof.A_I1.decompress())
+                .chain(iter::once(proof.A_O1.decompress()))
+                .chain(iter::once(proof.S1.decompress()))
+                .chain(iter::once(proof.A_I2.decompress()))
+                .chain(iter::once(proof.A_O2.decompress()))
+                .chain(iter::once(proof.S2.decompress()))
                 .chain(self.V.iter().map(|V_i| V_i.decompress()))
                 .chain(T_points.iter().map(|T_i| T_i.decompress()))
                 .chain(iter::once(Some(self.pc_gens.B)))
