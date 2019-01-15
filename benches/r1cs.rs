@@ -1,5 +1,7 @@
 extern crate bulletproofs;
-use bulletproofs::r1cs::{ConstraintSystem, Prover, R1CSError, R1CSProof, Variable, Verifier};
+use bulletproofs::r1cs::{
+    ConstraintSystem, Prover, R1CSError, R1CSProof, RandomizedConstraintSystem, Variable, Verifier,
+};
 use bulletproofs::{BulletproofGens, PedersenGens};
 
 #[macro_use]
@@ -71,42 +73,51 @@ For K = 1:
 struct KShuffleGadget {}
 
 impl KShuffleGadget {
-    fn fill_cs<CS: ConstraintSystem>(cs: &mut CS, x: &[Variable], y: &[Variable]) {
+    fn fill_cs<CS: ConstraintSystem>(
+        cs: &mut CS,
+        x: Vec<Variable>,
+        y: Vec<Variable>,
+    ) -> Result<(), R1CSError> {
         let one = Scalar::one();
-        let z = cs.challenge_scalar(b"k-scalar shuffle challenge");
 
         assert_eq!(x.len(), y.len());
 
         let k = x.len();
         if k == 1 {
             cs.constrain([(x[0], -one), (y[0], one)].iter().collect());
-            return;
+            return Ok(());
         }
 
-        // Make last x multiplier for i = k-1 and k-2
-        let (_, _, last_mulx_out) = cs.multiply(x[k - 1] - z, x[k - 2] - z);
+        cs.specify_randomized_constraints(move |cs| {
+            let z = cs.challenge_scalar(b"shuffle challenge");
 
-        // Make multipliers for x from i == [0, k-3]
-        let first_mulx_out = (0..k - 2).rev().fold(last_mulx_out, |prev_out, i| {
-            let (_, _, o) = cs.multiply(prev_out.into(), x[i] - z);
-            o
-        });
+            // Make last x multiplier for i = k-1 and k-2
+            let (_, _, last_mulx_out) = cs.multiply(x[k - 1] - z, x[k - 2] - z);
 
-        // Make last y multiplier for i = k-1 and k-2
-        let (_, _, last_muly_out) = cs.multiply(y[k - 1] - z, y[k - 2] - z);
+            // Make multipliers for x from i == [0, k-3]
+            let first_mulx_out = (0..k - 2).rev().fold(last_mulx_out, |prev_out, i| {
+                let (_, _, o) = cs.multiply(prev_out.into(), x[i] - z);
+                o
+            });
 
-        // Make multipliers for y from i == [0, k-3]
-        let first_muly_out = (0..k - 2).rev().fold(last_muly_out, |prev_out, i| {
-            let (_, _, o) = cs.multiply(prev_out.into(), y[i] - z);
-            o
-        });
+            // Make last y multiplier for i = k-1 and k-2
+            let (_, _, last_muly_out) = cs.multiply(y[k - 1] - z, y[k - 2] - z);
 
-        // Constrain last x mul output and last y mul output to be equal
-        cs.constrain(
-            [(first_muly_out, -one), (first_mulx_out, one)]
-                .iter()
-                .collect(),
-        );
+            // Make multipliers for y from i == [0, k-3]
+            let first_muly_out = (0..k - 2).rev().fold(last_muly_out, |prev_out, i| {
+                let (_, _, o) = cs.multiply(prev_out.into(), y[i] - z);
+                o
+            });
+
+            // Constrain last x mul output and last y mul output to be equal
+            cs.constrain(
+                [(first_muly_out, -one), (first_mulx_out, one)]
+                    .iter()
+                    .collect(),
+            );
+
+            Ok(())
+        })
     }
 
     pub fn prove<'a, 'b>(
@@ -144,11 +155,8 @@ impl KShuffleGadget {
             .map(|v| prover.commit(*v, Scalar::random(&mut blinding_rng)))
             .unzip();
 
-        let mut cs = prover.finalize_inputs();
-
-        Self::fill_cs(&mut cs, &input_vars, &output_vars);
-
-        let proof = cs.prove()?;
+        Self::fill_cs(&mut prover, input_vars, output_vars)?;
+        let proof = prover.prove()?;
 
         Ok((proof, input_commitments, output_commitments))
     }
@@ -178,11 +186,8 @@ impl KShuffleGadget {
             .map(|commitment| verifier.commit(*commitment))
             .collect();
 
-        let mut cs = verifier.finalize_inputs();
-
-        Self::fill_cs(&mut cs, &input_vars, &output_vars);
-
-        cs.verify(proof)
+        Self::fill_cs(&mut verifier, input_vars, output_vars)?;
+        verifier.verify(proof)
     }
 }
 

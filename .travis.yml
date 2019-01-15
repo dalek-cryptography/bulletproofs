@@ -2,7 +2,7 @@ language: rust
 cache: cargo
 
 rust:
-  - nightly
+  - nightly-2018-12-31
 
 env:
   - TEST_COMMAND=test EXTRA_FLAGS='' FEATURES=''
@@ -12,8 +12,9 @@ env:
   - TEST_COMMAND=bench EXTRA_FLAGS='"DONTRUNBENCHMARKS"' FEATURES=''
 
 matrix:
+  fast_finish: true
   include:
-  - rust: nightly-2018-12-04
+  - rust: nightly-2018-12-31
     before_script:
     - rustup component add rustfmt-preview
     script:

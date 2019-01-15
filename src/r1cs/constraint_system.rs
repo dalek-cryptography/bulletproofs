@@ -16,6 +16,9 @@ use curve25519_dalek::scalar::Scalar;
 /// using the `ConstraintSystem` trait, so that the prover and
 /// verifier share the logic for specifying constraints.
 pub trait ConstraintSystem {
+    /// Represents a concrete type for the CS in a randomization phase.
+    type RandomizedCS: RandomizedConstraintSystem;
+
     /// Allocate and constrain multiplication variables.
     ///
     /// Allocate variables `left`, `right`, and `out`
@@ -53,19 +56,51 @@ pub trait ConstraintSystem {
     /// ```
     fn constrain(&mut self, lc: LinearCombination);
 
-    /// Obtain a challenge scalar bound to the assignments of all of
-    /// the externally committed wires.
+    /// Specify additional variables and constraints randomized using a challenge scalar
+    /// bound to the assignments of the non-randomized variables.
     ///
-    /// This allows the prover to select a challenge circuit from a
-    /// family of circuits parameterized by challenge scalars.
+    /// If the constraint system’s low-level variables have not been committed yet,
+    /// the call returns `Ok()` and saves a callback until later.
     ///
-    /// # Warning
+    /// If the constraint system’s low-level variables are committed already,
+    /// the callback is invoked immediately and its result is return from this method.
     ///
-    /// The challenge scalars are bound only to the externally
-    /// committed wires (high-level witness variables), and not to the
-    /// assignments to all wires (low-level witness variables).  In
-    /// the same way that it is the user's responsibility to ensure
-    /// that the constraints are sound, it is **also** the user's
-    /// responsibility to ensure that each challenge circuit is sound.
+    /// ### Usage
+    ///
+    /// Inside the closure you can generate one or more challenges using `challenge_scalar` method.
+    ///
+    /// ```text
+    /// cs.specify_randomized_constraints(move |cs| {
+    ///     let z = cs.challenge_scalar(b"some challenge");
+    ///     // ...
+    /// })
+    /// ```
+    fn specify_randomized_constraints<F>(&mut self, callback: F) -> Result<(), R1CSError>
+    where
+        F: 'static + Fn(&mut Self::RandomizedCS) -> Result<(), R1CSError>;
+}
+
+/// Represents a constraint system in the second phase:
+/// when the challenges can be sampled to create randomized constraints.
+///
+/// Note: this trait also includes `ConstraintSystem` trait
+/// in order to allow composition of gadgets: e.g. a shuffle gadget can be used in both phases.
+pub trait RandomizedConstraintSystem: ConstraintSystem {
+    /// Generates a challenge scalar.
+    ///
+    /// ### Usage
+    ///
+    /// This method is available only within the scope of a closure provided
+    /// to `specify_randomized_constraints`, which implements
+    /// the "randomization" phase of the protocol.
+    ///
+    /// Arbitrary number of challenges can be generated with additional calls.
+    ///
+    /// ```text
+    /// cs.specify_randomized_constraints(move |cs| {
+    ///     let z = cs.challenge_scalar(b"some challenge");
+    ///     // ...
+    /// })
+    /// ```
     fn challenge_scalar(&mut self, label: &'static [u8]) -> Scalar;
 }
