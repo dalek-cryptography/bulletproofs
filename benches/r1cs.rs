@@ -144,7 +144,7 @@ impl KShuffleGadget {
             .map(|v| prover.commit(*v, Scalar::random(&mut blinding_rng)))
             .unzip();
 
-        let cs = prover.finalize_inputs();
+        let mut cs = prover.finalize_inputs();
 
         Self::fill_cs(&mut cs, &input_vars, &output_vars);
 
@@ -178,7 +178,7 @@ impl KShuffleGadget {
             .map(|commitment| verifier.commit(*commitment))
             .collect();
 
-        let cs = verifier.finalize_inputs();
+        let mut cs = verifier.finalize_inputs();
 
         Self::fill_cs(&mut cs, &input_vars, &output_vars);
 
@@ -186,119 +186,83 @@ impl KShuffleGadget {
     }
 }
 
-fn kshuffle_prove_helper(k: usize, c: &mut Criterion) {
-    let label = format!("{}-shuffle proof creation", k);
+fn bench_kshuffle_prove(c: &mut Criterion) {
+    c.bench_function_over_inputs(
+        "k-shuffle proof creation",
+        move |b, k| {
+            // Generate inputs and outputs to kshuffle
+            let mut rng = rand::thread_rng();
+            let (min, max) = (0u64, std::u64::MAX);
+            let input: Vec<Scalar> = (0..*k)
+                .map(|_| Scalar::from(rng.gen_range(min, max)))
+                .collect();
+            let mut output = input.clone();
+            rand::thread_rng().shuffle(&mut output);
 
-    c.bench_function(&label, move |b| {
-        // Generate inputs and outputs to kshuffle
-        let mut rng = rand::thread_rng();
-        let (min, max) = (0u64, std::u64::MAX);
-        let input: Vec<Scalar> = (0..k)
-            .map(|_| Scalar::from(rng.gen_range(min, max)))
-            .collect();
-        let mut output = input.clone();
-        rand::thread_rng().shuffle(&mut output);
-
-        // Make kshuffle proof
-        let pc_gens = PedersenGens::default();
-        let bp_gens = BulletproofGens::new(128, 1);
-        b.iter(|| {
-            let mut prover_transcript = Transcript::new(b"ShuffleTest");
-            KShuffleGadget::prove(&pc_gens, &bp_gens, &mut prover_transcript, &input, &output)
-                .unwrap();
-        })
-    });
-}
-
-fn kshuffle_prove_8(c: &mut Criterion) {
-    kshuffle_prove_helper(8, c);
-}
-fn kshuffle_prove_16(c: &mut Criterion) {
-    kshuffle_prove_helper(16, c);
-}
-fn kshuffle_prove_32(c: &mut Criterion) {
-    kshuffle_prove_helper(32, c);
-}
-fn kshuffle_prove_64(c: &mut Criterion) {
-    kshuffle_prove_helper(64, c);
-}
-fn kshuffle_prove_17(c: &mut Criterion) {
-    kshuffle_prove_helper(17, c);
+            // Make kshuffle proof
+            let pc_gens = PedersenGens::default();
+            let bp_gens = BulletproofGens::new(128, 1);
+            b.iter(|| {
+                let mut prover_transcript = Transcript::new(b"ShuffleTest");
+                KShuffleGadget::prove(&pc_gens, &bp_gens, &mut prover_transcript, &input, &output)
+                    .unwrap();
+            })
+        },
+        vec![8, 16, 32, 64, 17],
+    );
 }
 
 criterion_group! {
     name = kshuffle_prove;
     config = Criterion::default();
     targets =
-    kshuffle_prove_8,
-    kshuffle_prove_16,
-    kshuffle_prove_32,
-    kshuffle_prove_64,
-    kshuffle_prove_17,
+    bench_kshuffle_prove,
 }
 
-fn kshuffle_verify_helper(k: usize, c: &mut Criterion) {
-    let label = format!("{}-shuffle proof verification", k);
+fn bench_kshuffle_verify(c: &mut Criterion) {
+    c.bench_function_over_inputs(
+        "k-shuffle proof verification",
+        move |b, k| {
+            // Generate inputs and outputs to kshuffle
+            let mut rng = rand::thread_rng();
+            let (min, max) = (0u64, std::u64::MAX);
+            let input: Vec<Scalar> = (0..*k)
+                .map(|_| Scalar::from(rng.gen_range(min, max)))
+                .collect();
+            let mut output = input.clone();
+            rand::thread_rng().shuffle(&mut output);
 
-    c.bench_function(&label, move |b| {
-        // Generate inputs and outputs to kshuffle
-        let mut rng = rand::thread_rng();
-        let (min, max) = (0u64, std::u64::MAX);
-        let input: Vec<Scalar> = (0..k)
-            .map(|_| Scalar::from(rng.gen_range(min, max)))
-            .collect();
-        let mut output = input.clone();
-        rand::thread_rng().shuffle(&mut output);
+            // Make kshuffle proof
+            let pc_gens = PedersenGens::default();
+            let bp_gens = BulletproofGens::new(128, 1);
+            let mut prover_transcript = Transcript::new(b"ShuffleTest");
+            let (proof, in_commitments, out_commitments) =
+                KShuffleGadget::prove(&pc_gens, &bp_gens, &mut prover_transcript, &input, &output)
+                    .unwrap();
 
-        // Make kshuffle proof
-        let pc_gens = PedersenGens::default();
-        let bp_gens = BulletproofGens::new(128, 1);
-        let mut prover_transcript = Transcript::new(b"ShuffleTest");
-        let (proof, in_commitments, out_commitments) =
-            KShuffleGadget::prove(&pc_gens, &bp_gens, &mut prover_transcript, &input, &output)
+            // Verify kshuffle proof
+            b.iter(|| {
+                let mut verifier_transcript = Transcript::new(b"ShuffleTest");
+                KShuffleGadget::verify(
+                    &pc_gens,
+                    &bp_gens,
+                    &mut verifier_transcript,
+                    &proof,
+                    &in_commitments,
+                    &out_commitments,
+                )
                 .unwrap();
-
-        // Verify kshuffle proof
-        b.iter(|| {
-            let mut verifier_transcript = Transcript::new(b"ShuffleTest");
-            KShuffleGadget::verify(
-                &pc_gens,
-                &bp_gens,
-                &mut verifier_transcript,
-                &proof,
-                &in_commitments,
-                &out_commitments,
-            )
-            .unwrap();
-        })
-    });
-}
-
-fn kshuffle_verify_8(c: &mut Criterion) {
-    kshuffle_verify_helper(8, c);
-}
-fn kshuffle_verify_16(c: &mut Criterion) {
-    kshuffle_verify_helper(16, c);
-}
-fn kshuffle_verify_32(c: &mut Criterion) {
-    kshuffle_verify_helper(32, c);
-}
-fn kshuffle_verify_64(c: &mut Criterion) {
-    kshuffle_verify_helper(64, c);
-}
-fn kshuffle_verify_17(c: &mut Criterion) {
-    kshuffle_verify_helper(17, c);
+            })
+        },
+        vec![8, 16, 32, 64, 17],
+    );
 }
 
 criterion_group! {
     name = kshuffle_verify;
     config = Criterion::default();
     targets =
-    kshuffle_verify_8,
-    kshuffle_verify_16,
-    kshuffle_verify_32,
-    kshuffle_verify_64,
-    kshuffle_verify_17,
+    bench_kshuffle_verify,
 }
 
 criterion_main!(kshuffle_prove, kshuffle_verify);
