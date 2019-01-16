@@ -280,7 +280,7 @@ Rearrange \\(\langle \mathbf{a}\_L \circ \mathbf{a}\_R, \mathbf{y}^n \rangle\\) 
 \\[
 w\_c + \langle \mathbf{w}\_V, \mathbf{v} \rangle
 =
-\langle \mathbf{a}\_L \circ \mathbf{a}\_R, \mathbf{y}^n \rangle +
+\langle \mathbf{a}\_L, \mathbf{y}^n \circ \mathbf{a}\_R \rangle + 
 \langle \mathbf{a}\_L, \mathbf{w}\_L                    \rangle +
 \langle \mathbf{a}\_O, -\mathbf{y}^n + \mathbf{w}\_O    \rangle +
 \langle \mathbf{a}\_R, \mathbf{w}\_R                    \rangle
