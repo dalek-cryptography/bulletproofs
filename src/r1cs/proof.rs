@@ -1,9 +1,15 @@
+#![allow(non_snake_case)]
 //! Definition of the proof struct.
 
 use curve25519_dalek::ristretto::CompressedRistretto;
 use curve25519_dalek::scalar::Scalar;
 
+use errors::R1CSError;
 use inner_product_proof::InnerProductProof;
+use util;
+
+use serde::de::Visitor;
+use serde::{self, Deserialize, Deserializer, Serialize, Serializer};
 
 /// A proof of some statement specified by a
 /// [`ConstraintSystem`](::r1cs::ConstraintSystem).
@@ -55,4 +61,136 @@ pub struct R1CSProof {
     pub(super) e_blinding: Scalar,
     /// Proof data for the inner-product argument.
     pub(super) ipp_proof: InnerProductProof,
+}
+
+impl R1CSProof {
+    /// Serializes the proof into a byte array of \\(16 + 2k\\) 32-byte elements,
+    /// where \\(k=\lceil \log_2(n) \rceil\\) and \\(n\\) is the number of multiplication gates.
+    ///
+    /// # Layout
+    ///
+    /// The layout of the r1cs proof encoding is:
+    ///
+    /// * eleven compressed Ristretto points \\(A_{I1},A_{O1},S_1,A_{I2},A_{O2},S_2,T_1,...,T_6\\),
+    /// * three scalars \\(t_x, \tilde{t}_x, \tilde{e}\\),
+    /// * \\(k\\) pairs of compressed Ristretto points \\(L_0,R_0\dots,L_{k-1},R_{k-1}\\),
+    /// * two scalars \\(a, b\\).
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut buf = Vec::with_capacity(self.serialized_size());
+        buf.extend_from_slice(self.A_I1.as_bytes());
+        buf.extend_from_slice(self.A_O1.as_bytes());
+        buf.extend_from_slice(self.S1.as_bytes());
+        buf.extend_from_slice(self.A_I2.as_bytes());
+        buf.extend_from_slice(self.A_O2.as_bytes());
+        buf.extend_from_slice(self.S2.as_bytes());
+        buf.extend_from_slice(self.T_1.as_bytes());
+        buf.extend_from_slice(self.T_3.as_bytes());
+        buf.extend_from_slice(self.T_4.as_bytes());
+        buf.extend_from_slice(self.T_5.as_bytes());
+        buf.extend_from_slice(self.T_6.as_bytes());
+        buf.extend_from_slice(self.t_x.as_bytes());
+        buf.extend_from_slice(self.t_x_blinding.as_bytes());
+        buf.extend_from_slice(self.e_blinding.as_bytes());
+        // XXX this costs an extra alloc
+        buf.extend_from_slice(self.ipp_proof.to_bytes().as_slice());
+        buf
+    }
+
+    /// Returns the size in bytes required to serialize the `R1CSProof`.
+    pub fn serialized_size(&self) -> usize {
+        // 14 elements + the ipp
+        14 * 32 + self.ipp_proof.serialized_size()
+    }
+
+    /// Deserializes the proof from a byte slice.
+    ///
+    /// Returns an error if the byte slice cannot be parsed into a `R1CSProof`.
+    pub fn from_bytes(mut slice: &[u8]) -> Result<R1CSProof, R1CSError> {
+        if slice.len() % 32 != 0 {
+            return Err(R1CSError::FormatError);
+        }
+        if slice.len() < 14 * 32 {
+            return Err(R1CSError::FormatError);
+        }
+
+        // This macro takes care of counting bytes in the slice
+        macro_rules! read32 {
+            () => {{
+                let tmp = util::read32(slice);
+                slice = &slice[32..];
+                tmp
+            }};
+        }
+
+        let A_I1 = CompressedRistretto(read32!());
+        let A_O1 = CompressedRistretto(read32!());
+        let S1 = CompressedRistretto(read32!());
+        let A_I2 = CompressedRistretto(read32!());
+        let A_O2 = CompressedRistretto(read32!());
+        let S2 = CompressedRistretto(read32!());
+        let T_1 = CompressedRistretto(read32!());
+        let T_3 = CompressedRistretto(read32!());
+        let T_4 = CompressedRistretto(read32!());
+        let T_5 = CompressedRistretto(read32!());
+        let T_6 = CompressedRistretto(read32!());
+        let t_x = Scalar::from_canonical_bytes(read32!()).ok_or(R1CSError::FormatError)?;
+        let t_x_blinding = Scalar::from_canonical_bytes(read32!()).ok_or(R1CSError::FormatError)?;
+        let e_blinding = Scalar::from_canonical_bytes(read32!()).ok_or(R1CSError::FormatError)?;
+
+        // XXX: IPPProof from_bytes gives ProofError.
+        let ipp_proof = InnerProductProof::from_bytes(slice).map_err(|_| R1CSError::FormatError)?;
+
+        Ok(R1CSProof {
+            A_I1,
+            A_O1,
+            S1,
+            A_I2,
+            A_O2,
+            S2,
+            T_1,
+            T_3,
+            T_4,
+            T_5,
+            T_6,
+            t_x,
+            t_x_blinding,
+            e_blinding,
+            ipp_proof,
+        })
+    }
+}
+
+impl Serialize for R1CSProof {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_bytes(&self.to_bytes()[..])
+    }
+}
+
+impl<'de> Deserialize<'de> for R1CSProof {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct R1CSProofVisitor;
+
+        impl<'de> Visitor<'de> for R1CSProofVisitor {
+            type Value = R1CSProof;
+
+            fn expecting(&self, formatter: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
+                formatter.write_str("a valid R1CSProof")
+            }
+
+            fn visit_bytes<E>(self, v: &[u8]) -> Result<R1CSProof, E>
+            where
+                E: serde::de::Error,
+            {
+                R1CSProof::from_bytes(v).map_err(serde::de::Error::custom)
+            }
+        }
+
+        deserializer.deserialize_bytes(R1CSProofVisitor)
+    }
 }
