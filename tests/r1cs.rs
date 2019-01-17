@@ -233,50 +233,53 @@ fn example_gadget<CS: ConstraintSystem>(
     cs.constrain(c1 + c2 - c_var);
 }
 
-fn example_gadget_roundtrip_helper(
+// Prover's scope
+fn example_gadget_proof(
+    pc_gens: &PedersenGens,
+    bp_gens: &BulletproofGens,
     a1: u64,
     a2: u64,
     b1: u64,
     b2: u64,
     c1: u64,
     c2: u64,
+) -> Result<(R1CSProof, Vec<CompressedRistretto>), R1CSError> {
+    let mut transcript = Transcript::new(b"R1CSExampleGadget");
+
+    // 1. Create a prover
+    let mut prover = Prover::new(bp_gens, pc_gens, &mut transcript);
+
+    // 2. Commit high-level variables
+    let (commitments, vars): (Vec<_>, Vec<_>) = [a1, a2, b1, b2, c1]
+        .into_iter()
+        .map(|x| prover.commit(Scalar::from(*x), Scalar::random(&mut thread_rng())))
+        .unzip();
+
+    // 3. Build a CS
+    example_gadget(
+        &mut prover,
+        vars[0].into(),
+        vars[1].into(),
+        vars[2].into(),
+        vars[3].into(),
+        vars[4].into(),
+        Scalar::from(c2).into(),
+    );
+
+    // 4. Make a proof
+    let proof = prover.prove()?;
+
+    Ok((proof, commitments))
+}
+
+// Verifier logic
+fn example_gadget_verify(
+    pc_gens: &PedersenGens,
+    bp_gens: &BulletproofGens,
+    c2: u64,
+    proof: R1CSProof,
+    commitments: Vec<CompressedRistretto>,
 ) -> Result<(), R1CSError> {
-    // Common
-    let pc_gens = PedersenGens::default();
-    let bp_gens = BulletproofGens::new(128, 1);
-
-    // Prover's scope
-    let (proof, commitments) = {
-        let mut transcript = Transcript::new(b"R1CSExampleGadget");
-
-        // 1. Create a prover
-        let mut prover = Prover::new(&bp_gens, &pc_gens, &mut transcript);
-
-        // 2. Commit high-level variables
-        let (commitments, vars): (Vec<_>, Vec<_>) = [a1, a2, b1, b2, c1]
-            .into_iter()
-            .map(|x| prover.commit(Scalar::from(*x), Scalar::random(&mut thread_rng())))
-            .unzip();
-
-        // 3. Build a CS
-        example_gadget(
-            &mut prover,
-            vars[0].into(),
-            vars[1].into(),
-            vars[2].into(),
-            vars[3].into(),
-            vars[4].into(),
-            Scalar::from(c2).into(),
-        );
-
-        // 4. Make a proof
-        let proof = prover.prove()?;
-
-        (proof, commitments)
-    };
-
-    // Verifier logic
-
     let mut transcript = Transcript::new(b"R1CSExampleGadget");
 
     // 1. Create a verifier
@@ -302,10 +305,56 @@ fn example_gadget_roundtrip_helper(
         .map_err(|_| R1CSError::VerificationError)
 }
 
+fn example_gadget_roundtrip_helper(
+    a1: u64,
+    a2: u64,
+    b1: u64,
+    b2: u64,
+    c1: u64,
+    c2: u64,
+) -> Result<(), R1CSError> {
+    // Common
+    let pc_gens = PedersenGens::default();
+    let bp_gens = BulletproofGens::new(128, 1);
+
+    let (proof, commitments) = example_gadget_proof(&pc_gens, &bp_gens, a1, a2, b1, b2, c1, c2)?;
+
+    example_gadget_verify(&pc_gens, &bp_gens, c2, proof, commitments)
+}
+
+fn example_gadget_roundtrip_serialization_helper(
+    a1: u64,
+    a2: u64,
+    b1: u64,
+    b2: u64,
+    c1: u64,
+    c2: u64,
+) -> Result<(), R1CSError> {
+    // Common
+    let pc_gens = PedersenGens::default();
+    let bp_gens = BulletproofGens::new(128, 1);
+
+    let (proof, commitments) = example_gadget_proof(&pc_gens, &bp_gens, a1, a2, b1, b2, c1, c2)?;
+
+    let proof = proof.to_bytes();
+
+    let proof = R1CSProof::from_bytes(&proof)?;
+
+    example_gadget_verify(&pc_gens, &bp_gens, c2, proof, commitments)
+}
+
 #[test]
 fn example_gadget_test() {
     // (3 + 4) * (6 + 1) = (40 + 9)
     assert!(example_gadget_roundtrip_helper(3, 4, 6, 1, 40, 9).is_ok());
     // (3 + 4) * (6 + 1) != (40 + 10)
     assert!(example_gadget_roundtrip_helper(3, 4, 6, 1, 40, 10).is_err());
+}
+
+#[test]
+fn example_gadget_serialization_test() {
+    // (3 + 4) * (6 + 1) = (40 + 9)
+    assert!(example_gadget_roundtrip_serialization_helper(3, 4, 6, 1, 40, 9).is_ok());
+    // (3 + 4) * (6 + 1) != (40 + 10)
+    assert!(example_gadget_roundtrip_serialization_helper(3, 4, 6, 1, 40, 10).is_err());
 }
