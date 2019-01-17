@@ -12,8 +12,6 @@ pub trait TranscriptProtocol {
     fn innerproduct_domain_sep(&mut self, n: u64);
     /// Commit a domain separator for a constraint system.
     fn r1cs_domain_sep(&mut self);
-    /// Commit a 64-bit integer.
-    fn commit_u64(&mut self, label: &'static [u8], n: u64);
     /// Commit a `scalar` with the given `label`.
     fn commit_scalar(&mut self, label: &'static [u8], scalar: &Scalar);
     /// Commit a `point` with the given `label`.
@@ -42,10 +40,6 @@ impl TranscriptProtocol for Transcript {
 
     fn r1cs_domain_sep(&mut self) {
         self.commit_bytes(b"dom-sep", b"r1cs v1");
-    }
-
-    fn commit_u64(&mut self, label: &'static [u8], n: u64) {
-        self.commit_bytes(label, &le_u64(n));
     }
 
     fn commit_scalar(&mut self, label: &'static [u8], scalar: &Scalar) {
