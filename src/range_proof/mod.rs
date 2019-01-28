@@ -287,18 +287,19 @@ impl RangeProof {
         transcript.rangeproof_domain_sep(n as u64, m as u64);
 
         for V in value_commitments.iter() {
-            transcript.commit_point(b"V", V);
+            transcript.validate_and_commit_point(b"V", V)?;
         }
-        transcript.commit_point(b"A", &self.A);
-        transcript.commit_point(b"S", &self.S);
+
+        transcript.validate_and_commit_point(b"A", &self.A)?;
+        transcript.validate_and_commit_point(b"S", &self.S)?;
 
         let y = transcript.challenge_scalar(b"y");
         let z = transcript.challenge_scalar(b"z");
         let zz = z * z;
         let minus_z = -z;
 
-        transcript.commit_point(b"T_1", &self.T_1);
-        transcript.commit_point(b"T_2", &self.T_2);
+        transcript.validate_and_commit_point(b"T_1", &self.T_1)?;
+        transcript.validate_and_commit_point(b"T_2", &self.T_2)?;
 
         let x = transcript.challenge_scalar(b"x");
 

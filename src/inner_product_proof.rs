@@ -205,8 +205,8 @@ impl InnerProductProof {
 
         let mut challenges = Vec::with_capacity(lg_n);
         for (L, R) in self.L_vec.iter().zip(self.R_vec.iter()) {
-            transcript.commit_point(b"L", L);
-            transcript.commit_point(b"R", R);
+            transcript.validate_and_commit_point(b"L", L)?;
+            transcript.validate_and_commit_point(b"R", R)?;
             challenges.push(transcript.challenge_scalar(b"u"));
         }
 
