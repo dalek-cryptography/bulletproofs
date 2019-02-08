@@ -373,9 +373,7 @@ impl<'a, 'b> Verifier<'a, 'b> {
         let u_for_g = iter::repeat(Scalar::one())
             .take(n1)
             .chain(iter::repeat(u).take(n2 + pad));
-        let u_for_h = iter::repeat(Scalar::one())
-            .take(n1)
-            .chain(iter::repeat(u).take(n2 + pad));
+        let u_for_h = u_for_g.clone();
 
         // define parameters for P check
         let g_scalars = yneg_wR
