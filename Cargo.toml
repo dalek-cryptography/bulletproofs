@@ -47,6 +47,10 @@ name = "range_proof"
 harness = false
 
 [[bench]]
+name = "generators"
+harness = false
+
+[[bench]]
 name = "r1cs"
 harness = false
 required-features = ["yoloproofs"]
