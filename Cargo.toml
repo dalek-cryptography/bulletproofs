@@ -32,8 +32,7 @@ rand_chacha = "0.1"
 
 [features]
 avx2_backend = ["curve25519-dalek/avx2_backend"]
-# Disable the yoloproofs feature for the released crate, so that it's not possible for someone to publish a crate using R1CS proofs yet.
-# yoloproofs = []
+yoloproofs = []
 
 [[test]]
 name = "range_proof"
