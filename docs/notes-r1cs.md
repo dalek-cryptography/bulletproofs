@@ -430,7 +430,7 @@ which represent the left and right sides of the input to the inner-product equat
 \end{aligned}
 \\]
 
-When we take the inner product of \\({\mathbf{l}}(x)\\) and \\({\mathbf{l}}(x)\\), we get:
+When we take the inner product of \\({\mathbf{l}}(x)\\) and \\({\mathbf{r}}(x)\\), we get:
 
 \\[
 \begin{aligned}
