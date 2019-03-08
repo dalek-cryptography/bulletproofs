@@ -302,6 +302,9 @@ impl<'a, 'b> Verifier<'a, 'b> {
     /// Calls all remembered callbacks with an API that
     /// allows generating challenge scalars.
     fn create_randomized_constraints(mut self) -> Result<Self, R1CSError> {
+        // Clear the pending multiplier (if any) because it was committed into A_L/A_R/S.
+        self.pending_multiplier = None;
+
         // Note: the wrapper could've used &mut instead of ownership,
         // but specifying lifetimes for boxed closures is not going to be nice,
         // so we move the self into wrapper and then move it back out afterwards.

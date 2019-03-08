@@ -350,6 +350,9 @@ impl<'a, 'b> Prover<'a, 'b> {
     /// Calls all remembered callbacks with an API that
     /// allows generating challenge scalars.
     fn create_randomized_constraints(mut self) -> Result<Self, R1CSError> {
+        // Clear the pending multiplier (if any) because it was committed into A_L/A_R/S.
+        self.pending_multiplier = None;
+
         // Note: the wrapper could've used &mut instead of ownership,
         // but specifying lifetimes for boxed closures is not going to be nice,
         // so we move the self into wrapper and then move it back out afterwards.
@@ -414,8 +417,6 @@ impl<'a, 'b> Prover<'a, 'b> {
         let mut s_L1: Vec<Scalar> = (0..n1).map(|_| Scalar::random(&mut rng)).collect();
         let mut s_R1: Vec<Scalar> = (0..n1).map(|_| Scalar::random(&mut rng)).collect();
 
-        self.pending_multiplier = None;
-
         // A_I = <a_L, G> + <a_R, H> + i_blinding * B_blinding
         let A_I1 = RistrettoPoint::multiscalar_mul(
             iter::once(&i_blinding1)
@@ -472,8 +473,6 @@ impl<'a, 'b> Prover<'a, 'b> {
 
         let mut s_L2: Vec<Scalar> = (0..n2).map(|_| Scalar::random(&mut rng)).collect();
         let mut s_R2: Vec<Scalar> = (0..n2).map(|_| Scalar::random(&mut rng)).collect();
-
-        self.pending_multiplier = None;
 
         // A_I = <a_L, G> + <a_R, H> + i_blinding * B_blinding
         let A_I2 = RistrettoPoint::multiscalar_mul(
