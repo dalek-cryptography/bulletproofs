@@ -83,10 +83,7 @@ impl<'a, 'b> ConstraintSystem for Verifier<'a, 'b> {
         (l_var, r_var, o_var)
     }
 
-    fn allocate<F>(&mut self, _: F) -> Result<Variable, R1CSError>
-    where
-        F: FnOnce() -> Result<Scalar, R1CSError>,
-    {
+    fn allocate(&mut self, _: Option<Scalar>) -> Result<Variable, R1CSError> {
         match self.pending_multiplier {
             None => {
                 let i = self.num_vars;
@@ -101,10 +98,10 @@ impl<'a, 'b> ConstraintSystem for Verifier<'a, 'b> {
         }
     }
 
-    fn allocate_multiplier<F>(&mut self, _: F) -> Result<(Variable, Variable, Variable), R1CSError>
-    where
-        F: FnOnce() -> Result<(Scalar, Scalar, Scalar), R1CSError>,
-    {
+    fn allocate_multiplier(
+        &mut self,
+        _: Option<(Scalar, Scalar)>,
+    ) -> Result<(Variable, Variable, Variable), R1CSError> {
         let var = self.num_vars;
         self.num_vars += 1;
 
@@ -143,21 +140,15 @@ impl<'a, 'b> ConstraintSystem for RandomizingVerifier<'a, 'b> {
         self.verifier.multiply(left, right)
     }
 
-    fn allocate<F>(&mut self, assign_fn: F) -> Result<Variable, R1CSError>
-    where
-        F: FnOnce() -> Result<Scalar, R1CSError>,
-    {
-        self.verifier.allocate(assign_fn)
+    fn allocate(&mut self, assignment: Option<Scalar>) -> Result<Variable, R1CSError> {
+        self.verifier.allocate(assignment)
     }
 
-    fn allocate_multiplier<F>(
+    fn allocate_multiplier(
         &mut self,
-        assign_fn: F,
-    ) -> Result<(Variable, Variable, Variable), R1CSError>
-    where
-        F: FnOnce() -> Result<(Scalar, Scalar, Scalar), R1CSError>,
-    {
-        self.verifier.allocate_multiplier(assign_fn)
+        input_assignments: Option<(Scalar, Scalar)>,
+    ) -> Result<(Variable, Variable, Variable), R1CSError> {
+        self.verifier.allocate_multiplier(input_assignments)
     }
 
     fn constrain(&mut self, lc: LinearCombination) {

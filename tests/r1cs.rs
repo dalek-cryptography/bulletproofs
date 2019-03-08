@@ -371,11 +371,10 @@ pub fn range_proof<CS: ConstraintSystem>(
     let mut exp_2 = Scalar::one();
     for i in 0..n {
         // Create low-level variables and add them to constraints
-        let (a, b, o) = cs.allocate_multiplier(|| {
-            let q = v_assignment.ok_or(R1CSError::MissingAssignment)?;
+        let (a, b, o) = cs.allocate_multiplier(v_assignment.map(|q| {
             let bit: u64 = (q >> i) & 1;
-            Ok(((1 - bit).into(), bit.into(), Scalar::zero()))
-        })?;
+            ((1 - bit).into(), bit.into())
+        }))?;
 
         // Enforce a * b = 0, so one of (a,b) is zero
         cs.constrain(o.into());

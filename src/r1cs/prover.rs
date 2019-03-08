@@ -114,11 +114,8 @@ impl<'a, 'b> ConstraintSystem for Prover<'a, 'b> {
         (l_var, r_var, o_var)
     }
 
-    fn allocate<F>(&mut self, assign_fn: F) -> Result<Variable, R1CSError>
-    where
-        F: FnOnce() -> Result<Scalar, R1CSError>,
-    {
-        let scalar = assign_fn()?;
+    fn allocate(&mut self, assignment: Option<Scalar>) -> Result<Variable, R1CSError> {
+        let scalar = assignment.ok_or(R1CSError::MissingAssignment)?;
 
         match self.pending_multiplier {
             None => {
@@ -138,14 +135,12 @@ impl<'a, 'b> ConstraintSystem for Prover<'a, 'b> {
         }
     }
 
-    fn allocate_multiplier<F>(
+    fn allocate_multiplier(
         &mut self,
-        assign_fn: F,
-    ) -> Result<(Variable, Variable, Variable), R1CSError>
-    where
-        F: FnOnce() -> Result<(Scalar, Scalar, Scalar), R1CSError>,
-    {
-        let (l, r, o) = assign_fn()?;
+        input_assignments: Option<(Scalar, Scalar)>,
+    ) -> Result<(Variable, Variable, Variable), R1CSError> {
+        let (l, r) = input_assignments.ok_or(R1CSError::MissingAssignment)?;
+        let o = l * r;
 
         // Create variables for l,r,o ...
         let l_var = Variable::MultiplierLeft(self.a_L.len());
@@ -185,21 +180,15 @@ impl<'a, 'b> ConstraintSystem for RandomizingProver<'a, 'b> {
         self.prover.multiply(left, right)
     }
 
-    fn allocate<F>(&mut self, assign_fn: F) -> Result<Variable, R1CSError>
-    where
-        F: FnOnce() -> Result<Scalar, R1CSError>,
-    {
-        self.prover.allocate(assign_fn)
+    fn allocate(&mut self, assignment: Option<Scalar>) -> Result<Variable, R1CSError> {
+        self.prover.allocate(assignment)
     }
 
-    fn allocate_multiplier<F>(
+    fn allocate_multiplier(
         &mut self,
-        assign_fn: F,
-    ) -> Result<(Variable, Variable, Variable), R1CSError>
-    where
-        F: FnOnce() -> Result<(Scalar, Scalar, Scalar), R1CSError>,
-    {
-        self.prover.allocate_multiplier(assign_fn)
+        input_assignments: Option<(Scalar, Scalar)>,
+    ) -> Result<(Variable, Variable, Variable), R1CSError> {
+        self.prover.allocate_multiplier(input_assignments)
     }
 
     fn constrain(&mut self, lc: LinearCombination) {
