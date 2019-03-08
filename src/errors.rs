@@ -97,6 +97,9 @@ pub enum R1CSError {
     /// Occurs when there are insufficient generators for the proof.
     #[fail(display = "Invalid generators size, too few generators for proof")]
     InvalidGeneratorsLength,
+    /// This error occurs when the proof encoding is malformed.
+    #[fail(display = "Proof data could not be parsed.")]
+    FormatError,
     /// Occurs when verification of an
     /// [`R1CSProof`](::r1cs::R1CSProof) fails.
     #[fail(display = "R1CSProof did not verify correctly.")]
