@@ -43,6 +43,9 @@ pub struct Prover<'a, 'b> {
     /// This list holds closures that will be called in the second phase of the protocol,
     /// when non-randomized variables are committed.
     deferred_constraints: Vec<Box<Fn(&mut RandomizingProver<'a, 'b>) -> Result<(), R1CSError>>>,
+
+    /// Index of a pending multiplier that's not fully assigned yet.
+    pending_multiplier: Option<usize>
 }
 
 /// Prover in the randomizing phase.
@@ -111,7 +114,31 @@ impl<'a, 'b> ConstraintSystem for Prover<'a, 'b> {
         (l_var, r_var, o_var)
     }
 
-    fn allocate<F>(&mut self, assign_fn: F) -> Result<(Variable, Variable, Variable), R1CSError>
+    fn allocate<F>(&mut self, assign_fn: F) -> Result<Variable, R1CSError>
+    where
+        F: FnOnce() -> Result<Scalar, R1CSError>,
+    {
+        let scalar = assign_fn()?;
+
+        match self.pending_multiplier {
+            None => {
+                let i = self.a_L.len();
+                self.pending_multiplier = Some(i);
+                self.a_L.push(scalar);
+                self.a_R.push(Scalar::zero());
+                self.a_O.push(Scalar::zero());
+                Ok(Variable::MultiplierLeft(i))
+            },
+            Some(i) => {
+                self.pending_multiplier = None;
+                self.a_R[i] = scalar;
+                self.a_O[i] = self.a_L[i] * self.a_R[i];
+                Ok(Variable::MultiplierRight(i))
+            }
+        }
+    }
+
+    fn allocate_multiplier<F>(&mut self, assign_fn: F) -> Result<(Variable, Variable, Variable), R1CSError>
     where
         F: FnOnce() -> Result<(Scalar, Scalar, Scalar), R1CSError>,
     {
@@ -153,6 +180,13 @@ impl<'a, 'b> ConstraintSystem for RandomizingProver<'a, 'b> {
         right: LinearCombination,
     ) -> (Variable, Variable, Variable) {
         self.prover.multiply(left, right)
+    }
+
+    fn allocate<F>(&mut self, assign_fn: F) -> Result<Variable, R1CSError>
+    where
+        F: FnOnce() -> Result<Scalar, R1CSError>
+    {
+        self.prover.allocate(assign_fn)
     }
 
     fn allocate_multiplier<F>(&mut self, assign_fn: F) -> Result<(Variable, Variable, Variable), R1CSError>
@@ -384,6 +418,8 @@ impl<'a, 'b> Prover<'a, 'b> {
         let mut s_L1: Vec<Scalar> = (0..n1).map(|_| Scalar::random(&mut rng)).collect();
         let mut s_R1: Vec<Scalar> = (0..n1).map(|_| Scalar::random(&mut rng)).collect();
 
+        self.pending_multiplier = None;
+
         // A_I = <a_L, G> + <a_R, H> + i_blinding * B_blinding
         let A_I1 = RistrettoPoint::multiscalar_mul(
             iter::once(&i_blinding1)
@@ -440,6 +476,8 @@ impl<'a, 'b> Prover<'a, 'b> {
 
         let mut s_L2: Vec<Scalar> = (0..n2).map(|_| Scalar::random(&mut rng)).collect();
         let mut s_R2: Vec<Scalar> = (0..n2).map(|_| Scalar::random(&mut rng)).collect();
+
+        self.pending_multiplier = None;
 
         // A_I = <a_L, G> + <a_R, H> + i_blinding * B_blinding
         let A_I2 = RistrettoPoint::multiscalar_mul(

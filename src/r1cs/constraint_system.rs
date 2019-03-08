@@ -39,6 +39,20 @@ pub trait ConstraintSystem {
         right: LinearCombination,
     ) -> (Variable, Variable, Variable);
 
+    /// Allocate a single variable.
+    ///
+    /// This either allocates a new multiplier and returns it’s `left` variable,
+    /// or returns a `right` variable of a multiplier previously allocated by this method.
+    /// The output of a multiplier is assigned on a even call, when `right` is assigned.
+    ///
+    /// When CS is committed at the end of the first or second phase, the half-assigned multiplier
+    /// has the `right` assigned to zero and all its variables committed.
+    ///
+    /// Returns unconstrained `Variable` for use in further constraints.
+    fn allocate<F>(&mut self, assign_fn: F) -> Result<Variable, R1CSError>
+    where
+        F: FnOnce() -> Result<Scalar, R1CSError>;
+
     /// Allocate variables `left`, `right`, and `out`
     /// with the implicit constraint that
     /// ```text
