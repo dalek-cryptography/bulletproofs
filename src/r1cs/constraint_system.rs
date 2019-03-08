@@ -46,7 +46,7 @@ pub trait ConstraintSystem {
     /// ```
     ///
     /// Returns `(left, right, out)` for use in further constraints.
-    fn allocate<F>(&mut self, assign_fn: F) -> Result<(Variable, Variable, Variable), R1CSError>
+    fn allocate_multiplier<F>(&mut self, assign_fn: F) -> Result<(Variable, Variable, Variable), R1CSError>
     where
         F: FnOnce() -> Result<(Scalar, Scalar, Scalar), R1CSError>;
 

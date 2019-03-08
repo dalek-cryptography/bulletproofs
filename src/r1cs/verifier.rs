@@ -122,11 +122,11 @@ impl<'a, 'b> ConstraintSystem for RandomizingVerifier<'a, 'b> {
         self.verifier.multiply(left, right)
     }
 
-    fn allocate<F>(&mut self, assign_fn: F) -> Result<(Variable, Variable, Variable), R1CSError>
+    fn allocate_multiplier<F>(&mut self, assign_fn: F) -> Result<(Variable, Variable, Variable), R1CSError>
     where
         F: FnOnce() -> Result<(Scalar, Scalar, Scalar), R1CSError>,
     {
-        self.verifier.allocate(assign_fn)
+        self.verifier.allocate_multiplier(assign_fn)
     }
 
     fn constrain(&mut self, lc: LinearCombination) {

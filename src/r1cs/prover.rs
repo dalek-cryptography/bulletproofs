@@ -155,11 +155,11 @@ impl<'a, 'b> ConstraintSystem for RandomizingProver<'a, 'b> {
         self.prover.multiply(left, right)
     }
 
-    fn allocate<F>(&mut self, assign_fn: F) -> Result<(Variable, Variable, Variable), R1CSError>
+    fn allocate_multiplier<F>(&mut self, assign_fn: F) -> Result<(Variable, Variable, Variable), R1CSError>
     where
         F: FnOnce() -> Result<(Scalar, Scalar, Scalar), R1CSError>,
     {
-        self.prover.allocate(assign_fn)
+        self.prover.allocate_multiplier(assign_fn)
     }
 
     fn constrain(&mut self, lc: LinearCombination) {
