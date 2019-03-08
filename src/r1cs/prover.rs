@@ -45,7 +45,7 @@ pub struct Prover<'a, 'b> {
     deferred_constraints: Vec<Box<Fn(&mut RandomizingProver<'a, 'b>) -> Result<(), R1CSError>>>,
 
     /// Index of a pending multiplier that's not fully assigned yet.
-    pending_multiplier: Option<usize>
+    pending_multiplier: Option<usize>,
 }
 
 /// Prover in the randomizing phase.
@@ -128,7 +128,7 @@ impl<'a, 'b> ConstraintSystem for Prover<'a, 'b> {
                 self.a_R.push(Scalar::zero());
                 self.a_O.push(Scalar::zero());
                 Ok(Variable::MultiplierLeft(i))
-            },
+            }
             Some(i) => {
                 self.pending_multiplier = None;
                 self.a_R[i] = scalar;
@@ -138,7 +138,10 @@ impl<'a, 'b> ConstraintSystem for Prover<'a, 'b> {
         }
     }
 
-    fn allocate_multiplier<F>(&mut self, assign_fn: F) -> Result<(Variable, Variable, Variable), R1CSError>
+    fn allocate_multiplier<F>(
+        &mut self,
+        assign_fn: F,
+    ) -> Result<(Variable, Variable, Variable), R1CSError>
     where
         F: FnOnce() -> Result<(Scalar, Scalar, Scalar), R1CSError>,
     {
@@ -184,12 +187,15 @@ impl<'a, 'b> ConstraintSystem for RandomizingProver<'a, 'b> {
 
     fn allocate<F>(&mut self, assign_fn: F) -> Result<Variable, R1CSError>
     where
-        F: FnOnce() -> Result<Scalar, R1CSError>
+        F: FnOnce() -> Result<Scalar, R1CSError>,
     {
         self.prover.allocate(assign_fn)
     }
 
-    fn allocate_multiplier<F>(&mut self, assign_fn: F) -> Result<(Variable, Variable, Variable), R1CSError>
+    fn allocate_multiplier<F>(
+        &mut self,
+        assign_fn: F,
+    ) -> Result<(Variable, Variable, Variable), R1CSError>
     where
         F: FnOnce() -> Result<(Scalar, Scalar, Scalar), R1CSError>,
     {
@@ -253,6 +259,7 @@ impl<'a, 'b> Prover<'a, 'b> {
             a_R: Vec::new(),
             a_O: Vec::new(),
             deferred_constraints: Vec::new(),
+            pending_multiplier: None,
         }
     }
 

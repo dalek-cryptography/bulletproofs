@@ -44,7 +44,7 @@ pub struct Verifier<'a, 'b> {
     deferred_constraints: Vec<Box<Fn(&mut RandomizingVerifier<'a, 'b>) -> Result<(), R1CSError>>>,
 
     /// Index of a pending multiplier that's not fully assigned yet.
-    pending_multiplier: Option<usize>
+    pending_multiplier: Option<usize>,
 }
 
 /// Verifier in the randomizing phase.
@@ -83,7 +83,7 @@ impl<'a, 'b> ConstraintSystem for Verifier<'a, 'b> {
         (l_var, r_var, o_var)
     }
 
-    fn allocate<F>(&mut self, assign_fn: F) -> Result<Variable, R1CSError>
+    fn allocate<F>(&mut self, _: F) -> Result<Variable, R1CSError>
     where
         F: FnOnce() -> Result<Scalar, R1CSError>,
     {
@@ -93,7 +93,7 @@ impl<'a, 'b> ConstraintSystem for Verifier<'a, 'b> {
                 self.num_vars += 1;
                 self.pending_multiplier = Some(i);
                 Ok(Variable::MultiplierLeft(i))
-            },
+            }
             Some(i) => {
                 self.pending_multiplier = None;
                 Ok(Variable::MultiplierRight(i))
@@ -145,12 +145,15 @@ impl<'a, 'b> ConstraintSystem for RandomizingVerifier<'a, 'b> {
 
     fn allocate<F>(&mut self, assign_fn: F) -> Result<Variable, R1CSError>
     where
-        F: FnOnce() -> Result<Scalar, R1CSError>
+        F: FnOnce() -> Result<Scalar, R1CSError>,
     {
         self.verifier.allocate(assign_fn)
     }
 
-    fn allocate_multiplier<F>(&mut self, assign_fn: F) -> Result<(Variable, Variable, Variable), R1CSError>
+    fn allocate_multiplier<F>(
+        &mut self,
+        assign_fn: F,
+    ) -> Result<(Variable, Variable, Variable), R1CSError>
     where
         F: FnOnce() -> Result<(Scalar, Scalar, Scalar), R1CSError>,
     {
@@ -222,6 +225,7 @@ impl<'a, 'b> Verifier<'a, 'b> {
             V: Vec::new(),
             constraints: Vec::new(),
             deferred_constraints: Vec::new(),
+            pending_multiplier: None,
         }
     }
 
