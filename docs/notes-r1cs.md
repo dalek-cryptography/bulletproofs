@@ -430,7 +430,7 @@ which represent the left and right sides of the input to the inner-product equat
 \end{aligned}
 \\]
 
-When we take the inner product of \\({\mathbf{l}}(x)\\) and \\({\mathbf{l}}(x)\\), we get:
+When we take the inner product of \\({\mathbf{l}}(x)\\) and \\({\mathbf{r}}(x)\\), we get:
 
 \\[
 \begin{aligned}
@@ -473,8 +473,8 @@ We define \\(\mathbf{V}\\) as the vector of Pedersen commitments to \\(\mathbf{v
 
 \\[
 \begin{aligned}
-V_j &= B \cdot v_j + \widetilde{B} \cdot \tilde{v}\_j \quad \forall j \in [1, m] \\\\
-T_i &= B \cdot t_i + \widetilde{B} \cdot \tilde{t}\_i \quad \forall i \in [1, 3, 4, 5, 6] \\\\
+V_j &= v_j \cdot B + \tilde{v}\_j \cdot \widetilde{B} \quad \forall j \in [1, m] \\\\
+T_i &= t_i \cdot B +  \tilde{t}\_i \cdot \widetilde{B} \quad \forall i \in [1, 3, 4, 5, 6] \\\\
 \end{aligned}
 \\]
 
