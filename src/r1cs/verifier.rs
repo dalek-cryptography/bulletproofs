@@ -22,7 +22,6 @@ use transcript::TranscriptProtocol;
 /// which consumes the `Verifier` instance, samples random challenges
 /// that instantiate the randomized constraints, and verifies the proof.
 pub struct Verifier<'a, 'b> {
-    bp_gens: &'b BulletproofGens,
     pc_gens: &'b PedersenGens,
     transcript: &'a mut Transcript,
     constraints: Vec<LinearCombination>,
@@ -201,15 +200,10 @@ impl<'a, 'b> Verifier<'a, 'b> {
     ///
     /// The second element is a list of [`Variable`]s corresponding to
     /// the external inputs, which can be used to form constraints.
-    pub fn new(
-        bp_gens: &'b BulletproofGens,
-        pc_gens: &'b PedersenGens,
-        transcript: &'a mut Transcript,
-    ) -> Self {
+    pub fn new(pc_gens: &'b PedersenGens, transcript: &'a mut Transcript) -> Self {
         transcript.r1cs_domain_sep();
 
         Verifier {
-            bp_gens,
             pc_gens,
             transcript,
             num_vars: 0,
@@ -317,7 +311,11 @@ impl<'a, 'b> Verifier<'a, 'b> {
     }
 
     /// Consume this `VerifierCS` and attempt to verify the supplied `proof`.
-    pub fn verify(mut self, proof: &R1CSProof) -> Result<(), R1CSError> {
+    pub fn verify(
+        mut self,
+        proof: &R1CSProof,
+        bp_gens: &'b BulletproofGens,
+    ) -> Result<(), R1CSError> {
         // Commit a length _suffix_ for the number of high-level variables.
         // We cannot do this in advance because user can commit variables one-by-one,
         // but this suffix provides safe disambiguation because each variable
@@ -342,11 +340,11 @@ impl<'a, 'b> Verifier<'a, 'b> {
         use std::iter;
         use util;
 
-        if self.bp_gens.gens_capacity < padded_n {
+        if bp_gens.gens_capacity < padded_n {
             return Err(R1CSError::InvalidGeneratorsLength);
         }
         // We are performing a single-party circuit proof, so party index is 0.
-        let gens = self.bp_gens.share(0);
+        let gens = bp_gens.share(0);
 
         self.transcript.commit_point(b"A_I2", &proof.A_I2);
         self.transcript.commit_point(b"A_O2", &proof.A_O2);

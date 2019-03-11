@@ -25,7 +25,6 @@ use transcript::TranscriptProtocol;
 /// that instantiate the randomized constraints, and creates a complete proof.
 pub struct Prover<'a, 'b> {
     transcript: &'a mut Transcript,
-    bp_gens: &'b BulletproofGens,
     pc_gens: &'b PedersenGens,
     /// The constraints accumulated so far.
     constraints: Vec<LinearCombination>,
@@ -230,16 +229,11 @@ impl<'a, 'b> Prover<'a, 'b> {
     /// # Returns
     ///
     /// Returns a new `Prover` instance.
-    pub fn new(
-        bp_gens: &'b BulletproofGens,
-        pc_gens: &'b PedersenGens,
-        transcript: &'a mut Transcript,
-    ) -> Self {
+    pub fn new(pc_gens: &'b PedersenGens, transcript: &'a mut Transcript) -> Self {
         transcript.r1cs_domain_sep();
 
         Prover {
             pc_gens,
-            bp_gens,
             transcript,
             v: Vec::new(),
             v_blinding: Vec::new(),
@@ -365,7 +359,7 @@ impl<'a, 'b> Prover<'a, 'b> {
     }
 
     /// Consume this `ConstraintSystem` to produce a proof.
-    pub fn prove(mut self) -> Result<R1CSProof, R1CSError> {
+    pub fn prove(mut self, bp_gens: &BulletproofGens) -> Result<R1CSProof, R1CSError> {
         use std::iter;
         use util;
 
@@ -403,12 +397,12 @@ impl<'a, 'b> Prover<'a, 'b> {
         // Commit to the first-phase low-level witness variables.
         let n1 = self.a_L.len();
 
-        if self.bp_gens.gens_capacity < n1 {
+        if bp_gens.gens_capacity < n1 {
             return Err(R1CSError::InvalidGeneratorsLength);
         }
 
         // We are performing a single-party circuit proof, so party index is 0.
-        let gens = self.bp_gens.share(0);
+        let gens = bp_gens.share(0);
 
         let i_blinding1 = Scalar::random(&mut rng);
         let o_blinding1 = Scalar::random(&mut rng);
@@ -461,7 +455,7 @@ impl<'a, 'b> Prover<'a, 'b> {
         let padded_n = self.a_L.len().next_power_of_two();
         let pad = padded_n - n;
 
-        if self.bp_gens.gens_capacity < padded_n {
+        if bp_gens.gens_capacity < padded_n {
             return Err(R1CSError::InvalidGeneratorsLength);
         }
 
