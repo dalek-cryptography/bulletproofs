@@ -39,6 +39,18 @@ pub trait ConstraintSystem {
         right: LinearCombination,
     ) -> (Variable, Variable, Variable);
 
+    /// Allocate a single variable.
+    ///
+    /// This either allocates a new multiplier and returns its `left` variable,
+    /// or returns a `right` variable of a multiplier previously allocated by this method.
+    /// The output of a multiplier is assigned on a even call, when `right` is assigned.
+    ///
+    /// When CS is committed at the end of the first or second phase, the half-assigned multiplier
+    /// has the `right` assigned to zero and all its variables committed.
+    ///
+    /// Returns unconstrained `Variable` for use in further constraints.
+    fn allocate(&mut self, assignment: Option<Scalar>) -> Result<Variable, R1CSError>;
+
     /// Allocate variables `left`, `right`, and `out`
     /// with the implicit constraint that
     /// ```text
@@ -46,9 +58,10 @@ pub trait ConstraintSystem {
     /// ```
     ///
     /// Returns `(left, right, out)` for use in further constraints.
-    fn allocate<F>(&mut self, assign_fn: F) -> Result<(Variable, Variable, Variable), R1CSError>
-    where
-        F: FnOnce() -> Result<(Scalar, Scalar, Scalar), R1CSError>;
+    fn allocate_multiplier(
+        &mut self,
+        input_assignments: Option<(Scalar, Scalar)>,
+    ) -> Result<(Variable, Variable, Variable), R1CSError>;
 
     /// Enforce the explicit constraint that
     /// ```text

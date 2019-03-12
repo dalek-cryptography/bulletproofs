@@ -43,6 +43,9 @@ pub struct Prover<'a, 'b> {
     /// This list holds closures that will be called in the second phase of the protocol,
     /// when non-randomized variables are committed.
     deferred_constraints: Vec<Box<Fn(&mut RandomizingProver<'a, 'b>) -> Result<(), R1CSError>>>,
+
+    /// Index of a pending multiplier that's not fully assigned yet.
+    pending_multiplier: Option<usize>,
 }
 
 /// Prover in the randomizing phase.
@@ -111,11 +114,33 @@ impl<'a, 'b> ConstraintSystem for Prover<'a, 'b> {
         (l_var, r_var, o_var)
     }
 
-    fn allocate<F>(&mut self, assign_fn: F) -> Result<(Variable, Variable, Variable), R1CSError>
-    where
-        F: FnOnce() -> Result<(Scalar, Scalar, Scalar), R1CSError>,
-    {
-        let (l, r, o) = assign_fn()?;
+    fn allocate(&mut self, assignment: Option<Scalar>) -> Result<Variable, R1CSError> {
+        let scalar = assignment.ok_or(R1CSError::MissingAssignment)?;
+
+        match self.pending_multiplier {
+            None => {
+                let i = self.a_L.len();
+                self.pending_multiplier = Some(i);
+                self.a_L.push(scalar);
+                self.a_R.push(Scalar::zero());
+                self.a_O.push(Scalar::zero());
+                Ok(Variable::MultiplierLeft(i))
+            }
+            Some(i) => {
+                self.pending_multiplier = None;
+                self.a_R[i] = scalar;
+                self.a_O[i] = self.a_L[i] * self.a_R[i];
+                Ok(Variable::MultiplierRight(i))
+            }
+        }
+    }
+
+    fn allocate_multiplier(
+        &mut self,
+        input_assignments: Option<(Scalar, Scalar)>,
+    ) -> Result<(Variable, Variable, Variable), R1CSError> {
+        let (l, r) = input_assignments.ok_or(R1CSError::MissingAssignment)?;
+        let o = l * r;
 
         // Create variables for l,r,o ...
         let l_var = Variable::MultiplierLeft(self.a_L.len());
@@ -155,11 +180,15 @@ impl<'a, 'b> ConstraintSystem for RandomizingProver<'a, 'b> {
         self.prover.multiply(left, right)
     }
 
-    fn allocate<F>(&mut self, assign_fn: F) -> Result<(Variable, Variable, Variable), R1CSError>
-    where
-        F: FnOnce() -> Result<(Scalar, Scalar, Scalar), R1CSError>,
-    {
-        self.prover.allocate(assign_fn)
+    fn allocate(&mut self, assignment: Option<Scalar>) -> Result<Variable, R1CSError> {
+        self.prover.allocate(assignment)
+    }
+
+    fn allocate_multiplier(
+        &mut self,
+        input_assignments: Option<(Scalar, Scalar)>,
+    ) -> Result<(Variable, Variable, Variable), R1CSError> {
+        self.prover.allocate_multiplier(input_assignments)
     }
 
     fn constrain(&mut self, lc: LinearCombination) {
@@ -219,6 +248,7 @@ impl<'a, 'b> Prover<'a, 'b> {
             a_R: Vec::new(),
             a_O: Vec::new(),
             deferred_constraints: Vec::new(),
+            pending_multiplier: None,
         }
     }
 
@@ -320,6 +350,9 @@ impl<'a, 'b> Prover<'a, 'b> {
     /// Calls all remembered callbacks with an API that
     /// allows generating challenge scalars.
     fn create_randomized_constraints(mut self) -> Result<Self, R1CSError> {
+        // Clear the pending multiplier (if any) because it was committed into A_L/A_R/S.
+        self.pending_multiplier = None;
+
         // Note: the wrapper could've used &mut instead of ownership,
         // but specifying lifetimes for boxed closures is not going to be nice,
         // so we move the self into wrapper and then move it back out afterwards.

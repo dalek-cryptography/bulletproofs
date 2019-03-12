@@ -42,6 +42,9 @@ pub struct Verifier<'a, 'b> {
     /// After that, the option will flip to None and additional calls to `randomize_constraints`
     /// will invoke closures immediately.
     deferred_constraints: Vec<Box<Fn(&mut RandomizingVerifier<'a, 'b>) -> Result<(), R1CSError>>>,
+
+    /// Index of a pending multiplier that's not fully assigned yet.
+    pending_multiplier: Option<usize>,
 }
 
 /// Verifier in the randomizing phase.
@@ -80,10 +83,25 @@ impl<'a, 'b> ConstraintSystem for Verifier<'a, 'b> {
         (l_var, r_var, o_var)
     }
 
-    fn allocate<F>(&mut self, _: F) -> Result<(Variable, Variable, Variable), R1CSError>
-    where
-        F: FnOnce() -> Result<(Scalar, Scalar, Scalar), R1CSError>,
-    {
+    fn allocate(&mut self, _: Option<Scalar>) -> Result<Variable, R1CSError> {
+        match self.pending_multiplier {
+            None => {
+                let i = self.num_vars;
+                self.num_vars += 1;
+                self.pending_multiplier = Some(i);
+                Ok(Variable::MultiplierLeft(i))
+            }
+            Some(i) => {
+                self.pending_multiplier = None;
+                Ok(Variable::MultiplierRight(i))
+            }
+        }
+    }
+
+    fn allocate_multiplier(
+        &mut self,
+        _: Option<(Scalar, Scalar)>,
+    ) -> Result<(Variable, Variable, Variable), R1CSError> {
         let var = self.num_vars;
         self.num_vars += 1;
 
@@ -122,11 +140,15 @@ impl<'a, 'b> ConstraintSystem for RandomizingVerifier<'a, 'b> {
         self.verifier.multiply(left, right)
     }
 
-    fn allocate<F>(&mut self, assign_fn: F) -> Result<(Variable, Variable, Variable), R1CSError>
-    where
-        F: FnOnce() -> Result<(Scalar, Scalar, Scalar), R1CSError>,
-    {
-        self.verifier.allocate(assign_fn)
+    fn allocate(&mut self, assignment: Option<Scalar>) -> Result<Variable, R1CSError> {
+        self.verifier.allocate(assignment)
+    }
+
+    fn allocate_multiplier(
+        &mut self,
+        input_assignments: Option<(Scalar, Scalar)>,
+    ) -> Result<(Variable, Variable, Variable), R1CSError> {
+        self.verifier.allocate_multiplier(input_assignments)
     }
 
     fn constrain(&mut self, lc: LinearCombination) {
@@ -194,6 +216,7 @@ impl<'a, 'b> Verifier<'a, 'b> {
             V: Vec::new(),
             constraints: Vec::new(),
             deferred_constraints: Vec::new(),
+            pending_multiplier: None,
         }
     }
 
@@ -279,6 +302,9 @@ impl<'a, 'b> Verifier<'a, 'b> {
     /// Calls all remembered callbacks with an API that
     /// allows generating challenge scalars.
     fn create_randomized_constraints(mut self) -> Result<Self, R1CSError> {
+        // Clear the pending multiplier (if any) because it was committed into A_L/A_R/S.
+        self.pending_multiplier = None;
+
         // Note: the wrapper could've used &mut instead of ownership,
         // but specifying lifetimes for boxed closures is not going to be nice,
         // so we move the self into wrapper and then move it back out afterwards.
