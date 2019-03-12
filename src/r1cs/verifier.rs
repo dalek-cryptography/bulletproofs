@@ -310,6 +310,13 @@ impl<'a, 'b> Verifier<'a, 'b> {
         Ok(wrapped_self.verifier)
     }
 
+    /// Returns a required capacity for BulletproofGens.
+    pub fn required_capacity(&self) -> usize {
+        // XXX this does not include multipliers allocated after randomization,
+        // which is only available inside the `verify()` method when it's too late.
+        self.num_vars
+    }
+
     /// Consume this `VerifierCS` and attempt to verify the supplied `proof`.
     pub fn verify(
         mut self,
