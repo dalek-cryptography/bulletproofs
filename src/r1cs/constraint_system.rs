@@ -41,7 +41,7 @@ pub trait ConstraintSystem {
 
     /// Allocate a single variable.
     ///
-    /// This either allocates a new multiplier and returns it’s `left` variable,
+    /// This either allocates a new multiplier and returns its `left` variable,
     /// or returns a `right` variable of a multiplier previously allocated by this method.
     /// The output of a multiplier is assigned on a even call, when `right` is assigned.
     ///
