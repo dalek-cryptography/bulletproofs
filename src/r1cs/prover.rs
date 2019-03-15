@@ -358,11 +358,6 @@ impl<'a, 'b> Prover<'a, 'b> {
         Ok(wrapped_self.prover)
     }
 
-    /// Returns a required capacity for BulletproofGens.
-    pub fn required_capacity(&self) -> usize {
-        self.a_L.len()
-    }
-
     /// Consume this `ConstraintSystem` to produce a proof.
     pub fn prove(mut self, bp_gens: &BulletproofGens) -> Result<R1CSProof, R1CSError> {
         use std::iter;
