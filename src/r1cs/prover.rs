@@ -358,8 +358,14 @@ impl<'a, 'b> Prover<'a, 'b> {
         // so we move the self into wrapper and then move it back out afterwards.
         let mut callbacks = mem::replace(&mut self.deferred_constraints, Vec::new());
         let mut wrapped_self = RandomizingProver { prover: self };
-        for callback in callbacks.drain(..) {
-            callback(&mut wrapped_self)?;
+        if callbacks.len() == 0 {
+            self.transcript.r1cs_1phase_domain_sep();
+        } else {
+            self.transcript.r1cs_2phase_domain_sep();
+
+            for callback in callbacks.drain(..) {
+                callback(&mut wrapped_self)?;
+            }
         }
         Ok(wrapped_self.prover)
     }
@@ -467,41 +473,61 @@ impl<'a, 'b> Prover<'a, 'b> {
 
         // Commit to the second-phase low-level witness variables
 
-        let i_blinding2 = Scalar::random(&mut rng);
-        let o_blinding2 = Scalar::random(&mut rng);
-        let s_blinding2 = Scalar::random(&mut rng);
+        let has_2nd_phase = (n2 > 0);
+
+        let (i_blinding2, o_blinding2, s_blinding2) = if has_2nd_phase {
+            (
+                Scalar::random(&mut rng),
+                Scalar::random(&mut rng),
+                Scalar::random(&mut rng),
+            )
+        } else {
+            (Scalar::zero(), Scalar::zero(), Scalar::zero())
+        };
 
         let mut s_L2: Vec<Scalar> = (0..n2).map(|_| Scalar::random(&mut rng)).collect();
         let mut s_R2: Vec<Scalar> = (0..n2).map(|_| Scalar::random(&mut rng)).collect();
 
-        // A_I = <a_L, G> + <a_R, H> + i_blinding * B_blinding
-        let A_I2 = RistrettoPoint::multiscalar_mul(
-            iter::once(&i_blinding2)
-                .chain(self.a_L.iter().skip(n1))
-                .chain(self.a_R.iter().skip(n1)),
-            iter::once(&self.pc_gens.B_blinding)
-                .chain(gens.G(n).skip(n1))
-                .chain(gens.H(n).skip(n1)),
-        )
-        .compress();
-
-        // A_O = <a_O, G> + o_blinding * B_blinding
-        let A_O2 = RistrettoPoint::multiscalar_mul(
-            iter::once(&o_blinding2).chain(self.a_O.iter().skip(n1)),
-            iter::once(&self.pc_gens.B_blinding).chain(gens.G(n).skip(n1)),
-        )
-        .compress();
-
-        // S = <s_L, G> + <s_R, H> + s_blinding * B_blinding
-        let S2 = RistrettoPoint::multiscalar_mul(
-            iter::once(&s_blinding2)
-                .chain(s_L2.iter())
-                .chain(s_R2.iter()),
-            iter::once(&self.pc_gens.B_blinding)
-                .chain(gens.G(n).skip(n1))
-                .chain(gens.H(n).skip(n1)),
-        )
-        .compress();
+        let (A_I2, A_O2, S2) = if has_2nd_phase {
+            (
+                // A_I = <a_L, G> + <a_R, H> + i_blinding * B_blinding
+                RistrettoPoint::multiscalar_mul(
+                    iter::once(&i_blinding2)
+                        .chain(self.a_L.iter().skip(n1))
+                        .chain(self.a_R.iter().skip(n1)),
+                    iter::once(&self.pc_gens.B_blinding)
+                        .chain(gens.G(n).skip(n1))
+                        .chain(gens.H(n).skip(n1)),
+                )
+                .compress(),
+                // A_O = <a_O, G> + o_blinding * B_blinding
+                RistrettoPoint::multiscalar_mul(
+                    iter::once(&o_blinding2).chain(self.a_O.iter().skip(n1)),
+                    iter::once(&self.pc_gens.B_blinding).chain(gens.G(n).skip(n1)),
+                )
+                .compress(),
+                // S = <s_L, G> + <s_R, H> + s_blinding * B_blinding
+                S2 = RistrettoPoint::multiscalar_mul(
+                    iter::once(&s_blinding2)
+                        .chain(s_L2.iter())
+                        .chain(s_R2.iter()),
+                    iter::once(&self.pc_gens.B_blinding)
+                        .chain(gens.G(n).skip(n1))
+                        .chain(gens.H(n).skip(n1)),
+                )
+                .compress(),
+            )
+        } else {
+            // Since we are using zero blinding factors and
+            // there are no variables to commit,
+            // the commitments _must_ be identity points,
+            // so we can hardcode them saving 3 mults+compressions.
+            (
+                CompressedRistretto::identity(),
+                CompressedRistretto::identity(),
+                CompressedRistretto::identity(),
+            )
+        };
 
         self.transcript.commit_point(b"A_I2", &A_I2);
         self.transcript.commit_point(b"A_O2", &A_O2);

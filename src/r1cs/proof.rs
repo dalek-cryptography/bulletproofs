@@ -80,9 +80,14 @@ impl R1CSProof {
         buf.extend_from_slice(self.A_I1.as_bytes());
         buf.extend_from_slice(self.A_O1.as_bytes());
         buf.extend_from_slice(self.S1.as_bytes());
-        buf.extend_from_slice(self.A_I2.as_bytes());
-        buf.extend_from_slice(self.A_O2.as_bytes());
-        buf.extend_from_slice(self.S2.as_bytes());
+        if self.A_I2.is_identity() && self.A_O2.is_identity() && self.S2.is_identity() {
+            // Do not serialize second-phase commitments:
+            // challenge-based constraints were not used.
+        } else {
+            buf.extend_from_slice(self.A_I2.as_bytes());
+            buf.extend_from_slice(self.A_O2.as_bytes());
+            buf.extend_from_slice(self.S2.as_bytes());
+        }
         buf.extend_from_slice(self.T_1.as_bytes());
         buf.extend_from_slice(self.T_3.as_bytes());
         buf.extend_from_slice(self.T_4.as_bytes());
@@ -109,7 +114,18 @@ impl R1CSProof {
         if slice.len() % 32 != 0 {
             return Err(R1CSError::FormatError);
         }
-        if slice.len() < 14 * 32 {
+        // number of 32-byte elements in a r1cs proof:
+        // (a) 14 + 2 + 2*lg(n) - with second-phase commitments
+        // (b) 11 + 2 + 2*lg(n) - without second-phase commitments
+        let (used_second_phase, minlength) = if (slice.len() / 32) % 2 == 0 {
+            // even number - we have second-phase commitments
+            (true, 14 * 32)
+        } else {
+            // odd number - we don't have second-phase commitments
+            (false, 11 * 32)
+        };
+
+        if slice.len() < minlength {
             return Err(R1CSError::FormatError);
         }
 
@@ -125,9 +141,19 @@ impl R1CSProof {
         let A_I1 = CompressedRistretto(read32!());
         let A_O1 = CompressedRistretto(read32!());
         let S1 = CompressedRistretto(read32!());
-        let A_I2 = CompressedRistretto(read32!());
-        let A_O2 = CompressedRistretto(read32!());
-        let S2 = CompressedRistretto(read32!());
+        let (A_I2, A_O2, S2) = if used_second_phase {
+            (
+                CompressedRistretto(read32!()),
+                CompressedRistretto(read32!()),
+                CompressedRistretto(read32!()),
+            )
+        } else {
+            (
+                CompressedRistretto::identity(),
+                CompressedRistretto::identity(),
+                CompressedRistretto::identity(),
+            )
+        };
         let T_1 = CompressedRistretto(read32!());
         let T_3 = CompressedRistretto(read32!());
         let T_4 = CompressedRistretto(read32!());

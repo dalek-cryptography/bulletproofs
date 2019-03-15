@@ -310,8 +310,14 @@ impl<'a, 'b> Verifier<'a, 'b> {
         // so we move the self into wrapper and then move it back out afterwards.
         let mut callbacks = mem::replace(&mut self.deferred_constraints, Vec::new());
         let mut wrapped_self = RandomizingVerifier { verifier: self };
-        for callback in callbacks.drain(..) {
-            callback(&mut wrapped_self)?;
+        if callbacks.len() == 0 {
+            self.transcript.r1cs_1phase_domain_sep();
+        } else {
+            self.transcript.r1cs_2phase_domain_sep();
+
+            for callback in callbacks.drain(..) {
+                callback(&mut wrapped_self)?;
+            }
         }
         Ok(wrapped_self.verifier)
     }
