@@ -4,7 +4,7 @@ use clear_on_drop::clear::Clear;
 use core::mem;
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
-use curve25519_dalek::traits::MultiscalarMul;
+use curve25519_dalek::traits::{MultiscalarMul,Identity};
 use merlin::Transcript;
 
 use super::{ConstraintSystem, LinearCombination, R1CSProof, RandomizedConstraintSystem, Variable};
@@ -353,21 +353,21 @@ impl<'a, 'b> Prover<'a, 'b> {
         // Clear the pending multiplier (if any) because it was committed into A_L/A_R/S.
         self.pending_multiplier = None;
 
-        // Note: the wrapper could've used &mut instead of ownership,
-        // but specifying lifetimes for boxed closures is not going to be nice,
-        // so we move the self into wrapper and then move it back out afterwards.
-        let mut callbacks = mem::replace(&mut self.deferred_constraints, Vec::new());
-        let mut wrapped_self = RandomizingProver { prover: self };
-        if callbacks.len() == 0 {
+        if self.deferred_constraints.len() == 0 {
             self.transcript.r1cs_1phase_domain_sep();
+            Ok(self)
         } else {
             self.transcript.r1cs_2phase_domain_sep();
-
+            // Note: the wrapper could've used &mut instead of ownership,
+            // but specifying lifetimes for boxed closures is not going to be nice,
+            // so we move the self into wrapper and then move it back out afterwards.
+            let mut callbacks = mem::replace(&mut self.deferred_constraints, Vec::new());
+            let mut wrapped_self = RandomizingProver { prover: self };
             for callback in callbacks.drain(..) {
                 callback(&mut wrapped_self)?;
             }
+            Ok(wrapped_self.prover)
         }
-        Ok(wrapped_self.prover)
     }
 
     /// Consume this `ConstraintSystem` to produce a proof.
@@ -473,7 +473,7 @@ impl<'a, 'b> Prover<'a, 'b> {
 
         // Commit to the second-phase low-level witness variables
 
-        let has_2nd_phase = (n2 > 0);
+        let has_2nd_phase = n2 > 0;
 
         let (i_blinding2, o_blinding2, s_blinding2) = if has_2nd_phase {
             (
@@ -507,7 +507,7 @@ impl<'a, 'b> Prover<'a, 'b> {
                 )
                 .compress(),
                 // S = <s_L, G> + <s_R, H> + s_blinding * B_blinding
-                S2 = RistrettoPoint::multiscalar_mul(
+                RistrettoPoint::multiscalar_mul(
                     iter::once(&s_blinding2)
                         .chain(s_L2.iter())
                         .chain(s_R2.iter()),
