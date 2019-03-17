@@ -65,14 +65,15 @@ pub struct R1CSProof {
 }
 
 impl R1CSProof {
-    /// Serializes the proof into a byte array of \\(16 + 2k\\) 32-byte elements,
+    /// Serializes the proof into a byte array of \\((13 or 16) + 2k\\) 32-byte elements,
     /// where \\(k=\lceil \log_2(n) \rceil\\) and \\(n\\) is the number of multiplication gates.
     ///
     /// # Layout
     ///
     /// The layout of the r1cs proof encoding is:
     ///
-    /// * eleven compressed Ristretto points \\(A_{I1},A_{O1},S_1,A_{I2},A_{O2},S_2,T_1,...,T_6\\),
+    /// * 8 or 11 compressed Ristretto points \\(A_{I1},A_{O1},S_1,(A_{I2},A_{O2},S_2),T_1,...,T_6\\)
+    ///   (\\(A_{I2},A_{O2},S_2\\) are skipped if there were no multipliers added in the randomized phase),
     /// * three scalars \\(t_x, \tilde{t}_x, \tilde{e}\\),
     /// * \\(k\\) pairs of compressed Ristretto points \\(L_0,R_0\dots,L_{k-1},R_{k-1}\\),
     /// * two scalars \\(a, b\\).
