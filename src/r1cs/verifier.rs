@@ -6,9 +6,9 @@ use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::VartimeMultiscalarMul;
 use merlin::Transcript;
 
-use super::{ConstraintSystem, LinearCombination, R1CSProof, RandomizedConstraintSystem, Variable};
+use super::{ConstraintSystem, LinearCombination, Proof, RandomizedConstraintSystem, Variable};
 
-use errors::R1CSError;
+use errors::Error;
 use generators::{BulletproofGens, PedersenGens};
 use transcript::TranscriptProtocol;
 
@@ -41,7 +41,7 @@ pub struct Verifier<'a, 'b> {
     /// when non-randomized variables are committed.
     /// After that, the option will flip to None and additional calls to `randomize_constraints`
     /// will invoke closures immediately.
-    deferred_constraints: Vec<Box<Fn(&mut RandomizingVerifier<'a, 'b>) -> Result<(), R1CSError>>>,
+    deferred_constraints: Vec<Box<Fn(&mut RandomizingVerifier<'a, 'b>) -> Result<(), Error>>>,
 
     /// Index of a pending multiplier that's not fully assigned yet.
     pending_multiplier: Option<usize>,
@@ -83,7 +83,7 @@ impl<'a, 'b> ConstraintSystem for Verifier<'a, 'b> {
         (l_var, r_var, o_var)
     }
 
-    fn allocate(&mut self, _: Option<Scalar>) -> Result<Variable, R1CSError> {
+    fn allocate(&mut self, _: Option<Scalar>) -> Result<Variable, Error> {
         match self.pending_multiplier {
             None => {
                 let i = self.num_vars;
@@ -101,7 +101,7 @@ impl<'a, 'b> ConstraintSystem for Verifier<'a, 'b> {
     fn allocate_multiplier(
         &mut self,
         _: Option<(Scalar, Scalar)>,
-    ) -> Result<(Variable, Variable, Variable), R1CSError> {
+    ) -> Result<(Variable, Variable, Variable), Error> {
         let var = self.num_vars;
         self.num_vars += 1;
 
@@ -120,9 +120,9 @@ impl<'a, 'b> ConstraintSystem for Verifier<'a, 'b> {
         self.constraints.push(lc);
     }
 
-    fn specify_randomized_constraints<F>(&mut self, callback: F) -> Result<(), R1CSError>
+    fn specify_randomized_constraints<F>(&mut self, callback: F) -> Result<(), Error>
     where
-        F: 'static + Fn(&mut Self::RandomizedCS) -> Result<(), R1CSError>,
+        F: 'static + Fn(&mut Self::RandomizedCS) -> Result<(), Error>,
     {
         self.deferred_constraints.push(Box::new(callback));
         Ok(())
@@ -140,14 +140,14 @@ impl<'a, 'b> ConstraintSystem for RandomizingVerifier<'a, 'b> {
         self.verifier.multiply(left, right)
     }
 
-    fn allocate(&mut self, assignment: Option<Scalar>) -> Result<Variable, R1CSError> {
+    fn allocate(&mut self, assignment: Option<Scalar>) -> Result<Variable, Error> {
         self.verifier.allocate(assignment)
     }
 
     fn allocate_multiplier(
         &mut self,
         input_assignments: Option<(Scalar, Scalar)>,
-    ) -> Result<(Variable, Variable, Variable), R1CSError> {
+    ) -> Result<(Variable, Variable, Variable), Error> {
         self.verifier.allocate_multiplier(input_assignments)
     }
 
@@ -155,9 +155,9 @@ impl<'a, 'b> ConstraintSystem for RandomizingVerifier<'a, 'b> {
         self.verifier.constrain(lc)
     }
 
-    fn specify_randomized_constraints<F>(&mut self, callback: F) -> Result<(), R1CSError>
+    fn specify_randomized_constraints<F>(&mut self, callback: F) -> Result<(), Error>
     where
-        F: 'static + Fn(&mut Self::RandomizedCS) -> Result<(), R1CSError>,
+        F: 'static + Fn(&mut Self::RandomizedCS) -> Result<(), Error>,
     {
         callback(self)
     }
@@ -301,7 +301,7 @@ impl<'a, 'b> Verifier<'a, 'b> {
 
     /// Calls all remembered callbacks with an API that
     /// allows generating challenge scalars.
-    fn create_randomized_constraints(mut self) -> Result<Self, R1CSError> {
+    fn create_randomized_constraints(mut self) -> Result<Self, Error> {
         // Clear the pending multiplier (if any) because it was committed into A_L/A_R/S.
         self.pending_multiplier = None;
 
@@ -317,7 +317,7 @@ impl<'a, 'b> Verifier<'a, 'b> {
     }
 
     /// Consume this `VerifierCS` and attempt to verify the supplied `proof`.
-    pub fn verify(mut self, proof: &R1CSProof) -> Result<(), R1CSError> {
+    pub fn verify(mut self, proof: &Proof) -> Result<(), Error> {
         // Commit a length _suffix_ for the number of high-level variables.
         // We cannot do this in advance because user can commit variables one-by-one,
         // but this suffix provides safe disambiguation because each variable
@@ -343,7 +343,7 @@ impl<'a, 'b> Verifier<'a, 'b> {
         use util;
 
         if self.bp_gens.gens_capacity < padded_n {
-            return Err(R1CSError::InvalidGeneratorsLength);
+            return Err(Error::InvalidGeneratorsLength);
         }
         // We are performing a single-party circuit proof, so party index is 0.
         let gens = self.bp_gens.share(0);
@@ -378,7 +378,7 @@ impl<'a, 'b> Verifier<'a, 'b> {
         let (u_sq, u_inv_sq, s) = proof
             .ipp_proof
             .verification_scalars(padded_n, self.transcript)
-            .map_err(|_| R1CSError::VerificationError)?;
+            .map_err(|_| Error::VerificationError)?;
 
         let a = proof.ipp_proof.a;
         let b = proof.ipp_proof.b;
@@ -465,12 +465,12 @@ impl<'a, 'b> Verifier<'a, 'b> {
                 .chain(proof.ipp_proof.L_vec.iter().map(|L_i| L_i.decompress()))
                 .chain(proof.ipp_proof.R_vec.iter().map(|R_i| R_i.decompress())),
         )
-        .ok_or_else(|| R1CSError::VerificationError)?;
+        .ok_or_else(|| Error::VerificationError)?;
 
         use curve25519_dalek::traits::IsIdentity;
 
         if !mega_check.is_identity() {
-            return Err(R1CSError::VerificationError);
+            return Err(Error::VerificationError);
         }
 
         Ok(())

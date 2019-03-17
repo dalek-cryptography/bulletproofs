@@ -72,10 +72,10 @@ use rand::thread_rng;
 // Shuffle gadget (documented in markdown file)
 
 /// A proof-of-shuffle.
-struct ShuffleProof(R1CSProof);
+struct ShuffleProof(Proof);
 
 impl ShuffleProof {
-    fn gadget<CS: ConstraintSystem>(cs: &mut CS, x: Vec<Variable>, y: Vec<Variable>) -> Result<(),R1CSError> {
+    fn gadget<CS: ConstraintSystem>(cs: &mut CS, x: Vec<Variable>, y: Vec<Variable>) -> Result<(),Error> {
 
         assert_eq!(x.len(), y.len());
         let k = x.len();
@@ -153,10 +153,10 @@ For simplicity, in this example the `prove` function does not take a list of bli
 # // Shuffle gadget (documented in markdown file)
 # 
 # /// A proof-of-shuffle.
-# struct ShuffleProof(R1CSProof);
+# struct ShuffleProof(Proof);
 # 
 # impl ShuffleProof {
-#     fn gadget<CS: ConstraintSystem>(cs: &mut CS, x: Vec<Variable>, y: Vec<Variable>) -> Result<(),R1CSError> {
+#     fn gadget<CS: ConstraintSystem>(cs: &mut CS, x: Vec<Variable>, y: Vec<Variable>) -> Result<(),Error> {
 # 
 #         assert_eq!(x.len(), y.len());
 #         let k = x.len();
@@ -206,7 +206,7 @@ impl ShuffleProof {
         transcript: &'a mut Transcript,
         input: &[Scalar],
         output: &[Scalar],
-    ) -> Result<(ShuffleProof, Vec<CompressedRistretto>, Vec<CompressedRistretto>), R1CSError> {
+    ) -> Result<(ShuffleProof, Vec<CompressedRistretto>, Vec<CompressedRistretto>), Error> {
         // Apply a domain separator with the shuffle parameters to the transcript
         let k = input.len();
         transcript.commit_bytes(b"dom-sep", b"ShuffleProof");
@@ -241,7 +241,7 @@ impl ShuffleProof {
 
 ## Verifiying a proof
 
-The verifier receives a proof, and a list of committed inputs and outputs, from the prover. It passes these to the `verify` function, which verifies that, given a shuffle proof and a list of committed inputs and outputs, the outputs are a valid reordering of the inputs. The verifier receives a `Result::ok()` if the proof verified correctly and a `Result::error(R1CSError)` otherwise.
+The verifier receives a proof, and a list of committed inputs and outputs, from the prover. It passes these to the `verify` function, which verifies that, given a shuffle proof and a list of committed inputs and outputs, the outputs are a valid reordering of the inputs. The verifier receives a `Result::ok()` if the proof verified correctly and a `Result::error(Error)` otherwise.
 
 
 ```rust
@@ -260,10 +260,10 @@ The verifier receives a proof, and a list of committed inputs and outputs, from 
 # // Shuffle gadget (documented in markdown file)
 # 
 # /// A proof-of-shuffle.
-# struct ShuffleProof(R1CSProof);
+# struct ShuffleProof(Proof);
 # 
 # impl ShuffleProof {
-#     fn gadget<CS: ConstraintSystem>(cs: &mut CS, x: Vec<Variable>, y: Vec<Variable>) -> Result<(),R1CSError> {
+#     fn gadget<CS: ConstraintSystem>(cs: &mut CS, x: Vec<Variable>, y: Vec<Variable>) -> Result<(),Error> {
 # 
 #         assert_eq!(x.len(), y.len());
 #         let k = x.len();
@@ -313,7 +313,7 @@ The verifier receives a proof, and a list of committed inputs and outputs, from 
 #         transcript: &'a mut Transcript,
 #         input: &[Scalar],
 #         output: &[Scalar],
-#     ) -> Result<(ShuffleProof, Vec<CompressedRistretto>, Vec<CompressedRistretto>), R1CSError> {
+#     ) -> Result<(ShuffleProof, Vec<CompressedRistretto>, Vec<CompressedRistretto>), Error> {
 #         // Apply a domain separator with the shuffle parameters to the transcript
 #         let k = input.len();
 #         transcript.commit_bytes(b"dom-sep", b"ShuffleProof");
@@ -353,7 +353,7 @@ impl ShuffleProof {
         transcript: &'a mut Transcript,
         input_commitments: &Vec<CompressedRistretto>,
         output_commitments: &Vec<CompressedRistretto>,
-    ) -> Result<(), R1CSError> {
+    ) -> Result<(), Error> {
         // Apply a domain separator with the shuffle parameters to the transcript
         let k = input_commitments.len();
         transcript.commit_bytes(b"dom-sep", b"ShuffleProof");
@@ -400,10 +400,10 @@ Because only the prover knows the scalar values of the inputs and outputs, and t
 # // Shuffle gadget (documented in markdown file)
 # 
 # /// A proof-of-shuffle.
-# struct ShuffleProof(R1CSProof);
+# struct ShuffleProof(Proof);
 # 
 # impl ShuffleProof {
-#     fn gadget<CS: ConstraintSystem>(cs: &mut CS, x: Vec<Variable>, y: Vec<Variable>) -> Result<(),R1CSError> {
+#     fn gadget<CS: ConstraintSystem>(cs: &mut CS, x: Vec<Variable>, y: Vec<Variable>) -> Result<(),Error> {
 # 
 #         assert_eq!(x.len(), y.len());
 #         let k = x.len();
@@ -453,7 +453,7 @@ Because only the prover knows the scalar values of the inputs and outputs, and t
 #         transcript: &'a mut Transcript,
 #         input: &[Scalar],
 #         output: &[Scalar],
-#     ) -> Result<(ShuffleProof, Vec<CompressedRistretto>, Vec<CompressedRistretto>), R1CSError> {
+#     ) -> Result<(ShuffleProof, Vec<CompressedRistretto>, Vec<CompressedRistretto>), Error> {
 #         // Apply a domain separator with the shuffle parameters to the transcript
 #         let k = input.len();
 #         transcript.commit_bytes(b"dom-sep", b"ShuffleProof");
@@ -493,7 +493,7 @@ Because only the prover knows the scalar values of the inputs and outputs, and t
 #         transcript: &'a mut Transcript,
 #         input_commitments: &Vec<CompressedRistretto>,
 #         output_commitments: &Vec<CompressedRistretto>,
-#     ) -> Result<(), R1CSError> {
+#     ) -> Result<(), Error> {
 #         // Apply a domain separator with the shuffle parameters to the transcript
 #         let k = input_commitments.len();
 #         transcript.commit_bytes(b"dom-sep", b"ShuffleProof");

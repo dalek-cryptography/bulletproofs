@@ -4,7 +4,7 @@
 use curve25519_dalek::ristretto::CompressedRistretto;
 use curve25519_dalek::scalar::Scalar;
 
-use errors::R1CSError;
+use errors::Error;
 use inner_product_proof::InnerProductProof;
 use util;
 
@@ -16,12 +16,12 @@ use serde::{self, Deserialize, Deserializer, Serialize, Serializer};
 ///
 /// Statements are specified by writing gadget functions which add
 /// constraints to a [`ConstraintSystem`](::r1cs::ConstraintSystem)
-/// implementation.  To construct an [`R1CSProof`], a prover constructs
+/// implementation.  To construct an [`Proof`], a prover constructs
 /// a [`ProverCS`](::r1cs::ProverCS), then passes it to gadget
 /// functions to build the constraint system, then consumes the
 /// constraint system using
 /// [`ProverCS::prove`](::r1cs::ProverCS::prove) to produce an
-/// [`R1CSProof`].  To verify an [`R1CSProof`], a verifier constructs a
+/// [`Proof`].  To verify an [`Proof`], a verifier constructs a
 /// [`VerifierCS`](::r1cs::VerifierCS), then passes it to the same
 /// gadget functions to (re)build the constraint system, then consumes
 /// the constraint system using
@@ -29,7 +29,7 @@ use serde::{self, Deserialize, Deserializer, Serialize, Serializer};
 /// proof.
 #[derive(Clone, Debug)]
 #[allow(non_snake_case)]
-pub struct R1CSProof {
+pub struct Proof {
     /// Commitment to the values of input wires in the first phase.
     pub(super) A_I1: CompressedRistretto,
     /// Commitment to the values of output wires in the first phase.
@@ -63,7 +63,7 @@ pub struct R1CSProof {
     pub(super) ipp_proof: InnerProductProof,
 }
 
-impl R1CSProof {
+impl Proof {
     /// Serializes the proof into a byte array of \\(16 + 2k\\) 32-byte elements,
     /// where \\(k=\lceil \log_2(n) \rceil\\) and \\(n\\) is the number of multiplication gates.
     ///
@@ -96,7 +96,7 @@ impl R1CSProof {
         buf
     }
 
-    /// Returns the size in bytes required to serialize the `R1CSProof`.
+    /// Returns the size in bytes required to serialize the `Proof`.
     pub fn serialized_size(&self) -> usize {
         // 14 elements + the ipp
         14 * 32 + self.ipp_proof.serialized_size()
@@ -104,13 +104,13 @@ impl R1CSProof {
 
     /// Deserializes the proof from a byte slice.
     ///
-    /// Returns an error if the byte slice cannot be parsed into a `R1CSProof`.
-    pub fn from_bytes(mut slice: &[u8]) -> Result<R1CSProof, R1CSError> {
+    /// Returns an error if the byte slice cannot be parsed into a `Proof`.
+    pub fn from_bytes(mut slice: &[u8]) -> Result<Proof, Error> {
         if slice.len() % 32 != 0 {
-            return Err(R1CSError::FormatError);
+            return Err(Error::FormatError);
         }
         if slice.len() < 14 * 32 {
-            return Err(R1CSError::FormatError);
+            return Err(Error::FormatError);
         }
 
         // This macro takes care of counting bytes in the slice
@@ -133,14 +133,14 @@ impl R1CSProof {
         let T_4 = CompressedRistretto(read32!());
         let T_5 = CompressedRistretto(read32!());
         let T_6 = CompressedRistretto(read32!());
-        let t_x = Scalar::from_canonical_bytes(read32!()).ok_or(R1CSError::FormatError)?;
-        let t_x_blinding = Scalar::from_canonical_bytes(read32!()).ok_or(R1CSError::FormatError)?;
-        let e_blinding = Scalar::from_canonical_bytes(read32!()).ok_or(R1CSError::FormatError)?;
+        let t_x = Scalar::from_canonical_bytes(read32!()).ok_or(Error::FormatError)?;
+        let t_x_blinding = Scalar::from_canonical_bytes(read32!()).ok_or(Error::FormatError)?;
+        let e_blinding = Scalar::from_canonical_bytes(read32!()).ok_or(Error::FormatError)?;
 
         // XXX: IPPProof from_bytes gives ProofError.
-        let ipp_proof = InnerProductProof::from_bytes(slice).map_err(|_| R1CSError::FormatError)?;
+        let ipp_proof = InnerProductProof::from_bytes(slice).map_err(|_| Error::FormatError)?;
 
-        Ok(R1CSProof {
+        Ok(Proof {
             A_I1,
             A_O1,
             S1,
@@ -160,7 +160,7 @@ impl R1CSProof {
     }
 }
 
-impl Serialize for R1CSProof {
+impl Serialize for Proof {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -169,28 +169,28 @@ impl Serialize for R1CSProof {
     }
 }
 
-impl<'de> Deserialize<'de> for R1CSProof {
+impl<'de> Deserialize<'de> for Proof {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
-        struct R1CSProofVisitor;
+        struct ProofVisitor;
 
-        impl<'de> Visitor<'de> for R1CSProofVisitor {
-            type Value = R1CSProof;
+        impl<'de> Visitor<'de> for ProofVisitor {
+            type Value = Proof;
 
             fn expecting(&self, formatter: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
-                formatter.write_str("a valid R1CSProof")
+                formatter.write_str("a valid Proof")
             }
 
-            fn visit_bytes<E>(self, v: &[u8]) -> Result<R1CSProof, E>
+            fn visit_bytes<E>(self, v: &[u8]) -> Result<Proof, E>
             where
                 E: serde::de::Error,
             {
-                R1CSProof::from_bytes(v).map_err(serde::de::Error::custom)
+                Proof::from_bytes(v).map_err(serde::de::Error::custom)
             }
         }
 
-        deserializer.deserialize_bytes(R1CSProofVisitor)
+        deserializer.deserialize_bytes(ProofVisitor)
     }
 }

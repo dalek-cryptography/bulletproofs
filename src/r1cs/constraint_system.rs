@@ -1,12 +1,12 @@
 //! Definition of the constraint system trait.
 
-use super::{LinearCombination, R1CSError, Variable};
+use super::{LinearCombination, Error, Variable};
 use curve25519_dalek::scalar::Scalar;
 
 /// The interface for a constraint system, abstracting over the prover
 /// and verifier's roles.
 ///
-/// Statements to be proved by an [`R1CSProof`](::r1cs::R1CSProof) are specified by
+/// Statements to be proved by an [`Proof`](::r1cs::Proof) are specified by
 /// programmatically constructing constraints.  These constraints need
 /// to be identical between the prover and verifier, since the prover
 /// and verifier need to construct the same statement.
@@ -49,7 +49,7 @@ pub trait ConstraintSystem {
     /// has the `right` assigned to zero and all its variables committed.
     ///
     /// Returns unconstrained `Variable` for use in further constraints.
-    fn allocate(&mut self, assignment: Option<Scalar>) -> Result<Variable, R1CSError>;
+    fn allocate(&mut self, assignment: Option<Scalar>) -> Result<Variable, Error>;
 
     /// Allocate variables `left`, `right`, and `out`
     /// with the implicit constraint that
@@ -61,7 +61,7 @@ pub trait ConstraintSystem {
     fn allocate_multiplier(
         &mut self,
         input_assignments: Option<(Scalar, Scalar)>,
-    ) -> Result<(Variable, Variable, Variable), R1CSError>;
+    ) -> Result<(Variable, Variable, Variable), Error>;
 
     /// Enforce the explicit constraint that
     /// ```text
@@ -88,9 +88,9 @@ pub trait ConstraintSystem {
     ///     // ...
     /// })
     /// ```
-    fn specify_randomized_constraints<F>(&mut self, callback: F) -> Result<(), R1CSError>
+    fn specify_randomized_constraints<F>(&mut self, callback: F) -> Result<(), Error>
     where
-        F: 'static + Fn(&mut Self::RandomizedCS) -> Result<(), R1CSError>;
+        F: 'static + Fn(&mut Self::RandomizedCS) -> Result<(), Error>;
 }
 
 /// Represents a constraint system in the second phase:

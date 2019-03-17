@@ -14,14 +14,14 @@ use rand::thread_rng;
 // Shuffle gadget (documented in markdown file)
 
 /// A proof-of-shuffle.
-struct ShuffleProof(R1CSProof);
+struct ShuffleProof(Proof);
 
 impl ShuffleProof {
     fn gadget<CS: ConstraintSystem>(
         cs: &mut CS,
         x: Vec<Variable>,
         y: Vec<Variable>,
-    ) -> Result<(), R1CSError> {
+    ) -> Result<(), Error> {
         assert_eq!(x.len(), y.len());
         let k = x.len();
 
@@ -75,7 +75,7 @@ impl ShuffleProof {
             Vec<CompressedRistretto>,
             Vec<CompressedRistretto>,
         ),
-        R1CSError,
+        Error,
     > {
         // Apply a domain separator with the shuffle parameters to the transcript
         let k = input.len();
@@ -115,7 +115,7 @@ impl ShuffleProof {
         transcript: &'a mut Transcript,
         input_commitments: &Vec<CompressedRistretto>,
         output_commitments: &Vec<CompressedRistretto>,
-    ) -> Result<(), R1CSError> {
+    ) -> Result<(), Error> {
         // Apply a domain separator with the shuffle parameters to the transcript
         let k = input_commitments.len();
         transcript.commit_bytes(b"dom-sep", b"ShuffleProof");
@@ -243,7 +243,7 @@ fn example_gadget_proof(
     b2: u64,
     c1: u64,
     c2: u64,
-) -> Result<(R1CSProof, Vec<CompressedRistretto>), R1CSError> {
+) -> Result<(Proof, Vec<CompressedRistretto>), Error> {
     let mut transcript = Transcript::new(b"R1CSExampleGadget");
 
     // 1. Create a prover
@@ -277,9 +277,9 @@ fn example_gadget_verify(
     pc_gens: &PedersenGens,
     bp_gens: &BulletproofGens,
     c2: u64,
-    proof: R1CSProof,
+    proof: Proof,
     commitments: Vec<CompressedRistretto>,
-) -> Result<(), R1CSError> {
+) -> Result<(), Error> {
     let mut transcript = Transcript::new(b"R1CSExampleGadget");
 
     // 1. Create a verifier
@@ -302,7 +302,7 @@ fn example_gadget_verify(
     // 4. Verify the proof
     verifier
         .verify(&proof)
-        .map_err(|_| R1CSError::VerificationError)
+        .map_err(|_| Error::VerificationError)
 }
 
 fn example_gadget_roundtrip_helper(
@@ -312,7 +312,7 @@ fn example_gadget_roundtrip_helper(
     b2: u64,
     c1: u64,
     c2: u64,
-) -> Result<(), R1CSError> {
+) -> Result<(), Error> {
     // Common
     let pc_gens = PedersenGens::default();
     let bp_gens = BulletproofGens::new(128, 1);
@@ -329,7 +329,7 @@ fn example_gadget_roundtrip_serialization_helper(
     b2: u64,
     c1: u64,
     c2: u64,
-) -> Result<(), R1CSError> {
+) -> Result<(), Error> {
     // Common
     let pc_gens = PedersenGens::default();
     let bp_gens = BulletproofGens::new(128, 1);
@@ -338,7 +338,7 @@ fn example_gadget_roundtrip_serialization_helper(
 
     let proof = proof.to_bytes();
 
-    let proof = R1CSProof::from_bytes(&proof)?;
+    let proof = Proof::from_bytes(&proof)?;
 
     example_gadget_verify(&pc_gens, &bp_gens, c2, proof, commitments)
 }
@@ -367,7 +367,7 @@ pub fn range_proof<CS: ConstraintSystem>(
     mut v: LinearCombination,
     v_assignment: Option<u64>,
     n: usize,
-) -> Result<(), R1CSError> {
+) -> Result<(), Error> {
     let mut exp_2 = Scalar::one();
     for i in 0..n {
         // Create low-level variables and add them to constraints
@@ -414,7 +414,7 @@ fn range_proof_gadget() {
     }
 }
 
-fn range_proof_helper(v_val: u64, n: usize) -> Result<(), R1CSError> {
+fn range_proof_helper(v_val: u64, n: usize) -> Result<(), Error> {
     // Common
     let pc_gens = PedersenGens::default();
     let bp_gens = BulletproofGens::new(128, 1);

@@ -93,7 +93,7 @@ pub enum MPCError {
 /// Represents an error during the proving or verifying of a constraint system.
 #[cfg(feature = "yoloproofs")]
 #[derive(Fail, Clone, Debug, Eq, PartialEq)]
-pub enum R1CSError {
+pub enum Error {
     /// Occurs when there are insufficient generators for the proof.
     #[fail(display = "Invalid generators size, too few generators for proof")]
     InvalidGeneratorsLength,
@@ -101,8 +101,8 @@ pub enum R1CSError {
     #[fail(display = "Proof data could not be parsed.")]
     FormatError,
     /// Occurs when verification of an
-    /// [`R1CSProof`](::r1cs::R1CSProof) fails.
-    #[fail(display = "R1CSProof did not verify correctly.")]
+    /// [`Proof`](::r1cs::Proof) fails.
+    #[fail(display = "Proof did not verify correctly.")]
     VerificationError,
 
     /// Occurs when trying to use a missing variable assignment.

@@ -7,9 +7,9 @@ use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::MultiscalarMul;
 use merlin::Transcript;
 
-use super::{ConstraintSystem, LinearCombination, R1CSProof, RandomizedConstraintSystem, Variable};
+use super::{ConstraintSystem, LinearCombination, Proof, RandomizedConstraintSystem, Variable};
 
-use errors::R1CSError;
+use errors::Error;
 use generators::{BulletproofGens, PedersenGens};
 use inner_product_proof::InnerProductProof;
 use transcript::TranscriptProtocol;
@@ -42,7 +42,7 @@ pub struct Prover<'a, 'b> {
 
     /// This list holds closures that will be called in the second phase of the protocol,
     /// when non-randomized variables are committed.
-    deferred_constraints: Vec<Box<Fn(&mut RandomizingProver<'a, 'b>) -> Result<(), R1CSError>>>,
+    deferred_constraints: Vec<Box<Fn(&mut RandomizingProver<'a, 'b>) -> Result<(), Error>>>,
 
     /// Index of a pending multiplier that's not fully assigned yet.
     pending_multiplier: Option<usize>,
@@ -114,8 +114,8 @@ impl<'a, 'b> ConstraintSystem for Prover<'a, 'b> {
         (l_var, r_var, o_var)
     }
 
-    fn allocate(&mut self, assignment: Option<Scalar>) -> Result<Variable, R1CSError> {
-        let scalar = assignment.ok_or(R1CSError::MissingAssignment)?;
+    fn allocate(&mut self, assignment: Option<Scalar>) -> Result<Variable, Error> {
+        let scalar = assignment.ok_or(Error::MissingAssignment)?;
 
         match self.pending_multiplier {
             None => {
@@ -138,8 +138,8 @@ impl<'a, 'b> ConstraintSystem for Prover<'a, 'b> {
     fn allocate_multiplier(
         &mut self,
         input_assignments: Option<(Scalar, Scalar)>,
-    ) -> Result<(Variable, Variable, Variable), R1CSError> {
-        let (l, r) = input_assignments.ok_or(R1CSError::MissingAssignment)?;
+    ) -> Result<(Variable, Variable, Variable), Error> {
+        let (l, r) = input_assignments.ok_or(Error::MissingAssignment)?;
         let o = l * r;
 
         // Create variables for l,r,o ...
@@ -160,9 +160,9 @@ impl<'a, 'b> ConstraintSystem for Prover<'a, 'b> {
         self.constraints.push(lc);
     }
 
-    fn specify_randomized_constraints<F>(&mut self, callback: F) -> Result<(), R1CSError>
+    fn specify_randomized_constraints<F>(&mut self, callback: F) -> Result<(), Error>
     where
-        F: 'static + Fn(&mut Self::RandomizedCS) -> Result<(), R1CSError>,
+        F: 'static + Fn(&mut Self::RandomizedCS) -> Result<(), Error>,
     {
         self.deferred_constraints.push(Box::new(callback));
         Ok(())
@@ -180,14 +180,14 @@ impl<'a, 'b> ConstraintSystem for RandomizingProver<'a, 'b> {
         self.prover.multiply(left, right)
     }
 
-    fn allocate(&mut self, assignment: Option<Scalar>) -> Result<Variable, R1CSError> {
+    fn allocate(&mut self, assignment: Option<Scalar>) -> Result<Variable, Error> {
         self.prover.allocate(assignment)
     }
 
     fn allocate_multiplier(
         &mut self,
         input_assignments: Option<(Scalar, Scalar)>,
-    ) -> Result<(Variable, Variable, Variable), R1CSError> {
+    ) -> Result<(Variable, Variable, Variable), Error> {
         self.prover.allocate_multiplier(input_assignments)
     }
 
@@ -195,9 +195,9 @@ impl<'a, 'b> ConstraintSystem for RandomizingProver<'a, 'b> {
         self.prover.constrain(lc)
     }
 
-    fn specify_randomized_constraints<F>(&mut self, callback: F) -> Result<(), R1CSError>
+    fn specify_randomized_constraints<F>(&mut self, callback: F) -> Result<(), Error>
     where
-        F: 'static + Fn(&mut Self::RandomizedCS) -> Result<(), R1CSError>,
+        F: 'static + Fn(&mut Self::RandomizedCS) -> Result<(), Error>,
     {
         callback(self)
     }
@@ -349,7 +349,7 @@ impl<'a, 'b> Prover<'a, 'b> {
 
     /// Calls all remembered callbacks with an API that
     /// allows generating challenge scalars.
-    fn create_randomized_constraints(mut self) -> Result<Self, R1CSError> {
+    fn create_randomized_constraints(mut self) -> Result<Self, Error> {
         // Clear the pending multiplier (if any) because it was committed into A_L/A_R/S.
         self.pending_multiplier = None;
 
@@ -365,7 +365,7 @@ impl<'a, 'b> Prover<'a, 'b> {
     }
 
     /// Consume this `ConstraintSystem` to produce a proof.
-    pub fn prove(mut self) -> Result<R1CSProof, R1CSError> {
+    pub fn prove(mut self) -> Result<Proof, Error> {
         use std::iter;
         use util;
 
@@ -404,7 +404,7 @@ impl<'a, 'b> Prover<'a, 'b> {
         let n1 = self.a_L.len();
 
         if self.bp_gens.gens_capacity < n1 {
-            return Err(R1CSError::InvalidGeneratorsLength);
+            return Err(Error::InvalidGeneratorsLength);
         }
 
         // We are performing a single-party circuit proof, so party index is 0.
@@ -462,7 +462,7 @@ impl<'a, 'b> Prover<'a, 'b> {
         let pad = padded_n - n;
 
         if self.bp_gens.gens_capacity < padded_n {
-            return Err(R1CSError::InvalidGeneratorsLength);
+            return Err(Error::InvalidGeneratorsLength);
         }
 
         // Commit to the second-phase low-level witness variables
@@ -646,7 +646,7 @@ impl<'a, 'b> Prover<'a, 'b> {
             scalar.clear();
         }
 
-        Ok(R1CSProof {
+        Ok(Proof {
             A_I1,
             A_O1,
             S1,

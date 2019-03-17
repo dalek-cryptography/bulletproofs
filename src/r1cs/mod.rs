@@ -11,8 +11,8 @@ mod verifier;
 
 pub use self::constraint_system::{ConstraintSystem, RandomizedConstraintSystem};
 pub use self::linear_combination::{LinearCombination, Variable};
-pub use self::proof::R1CSProof;
+pub use self::proof::Proof;
 pub use self::prover::Prover;
 pub use self::verifier::Verifier;
 
-pub use errors::R1CSError;
+pub use errors::Error;
