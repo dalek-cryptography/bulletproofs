@@ -1,6 +1,6 @@
 //! Definition of the constraint system trait.
 
-use super::{LinearCombination, Error, Variable};
+use super::{Error, LinearCombination, Variable};
 use curve25519_dalek::scalar::Scalar;
 
 /// The interface for a constraint system, abstracting over the prover

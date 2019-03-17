@@ -1,6 +1,6 @@
 extern crate bulletproofs;
 use bulletproofs::r1cs::{
-    ConstraintSystem, Prover, Error, Proof, RandomizedConstraintSystem, Variable, Verifier,
+    ConstraintSystem, Error, Proof, Prover, RandomizedConstraintSystem, Variable, Verifier,
 };
 use bulletproofs::{BulletproofGens, PedersenGens};
 
@@ -126,14 +126,7 @@ impl KShuffleGadget {
         transcript: &'a mut Transcript,
         input: &[Scalar],
         output: &[Scalar],
-    ) -> Result<
-        (
-            Proof,
-            Vec<CompressedRistretto>,
-            Vec<CompressedRistretto>,
-        ),
-        Error,
-    > {
+    ) -> Result<(Proof, Vec<CompressedRistretto>, Vec<CompressedRistretto>), Error> {
         // Apply a domain separator with the shuffle parameters to the transcript
         let k = input.len();
         transcript.commit_bytes(b"dom-sep", b"ShuffleProof");
