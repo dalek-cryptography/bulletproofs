@@ -3,7 +3,7 @@
 
 use curve25519_dalek::ristretto::CompressedRistretto;
 use curve25519_dalek::scalar::Scalar;
-use curve25519_dalek::traits::{IsIdentity,Identity};
+use curve25519_dalek::traits::{Identity, IsIdentity};
 
 use errors::R1CSError;
 use inner_product_proof::InnerProductProof;

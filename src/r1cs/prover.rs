@@ -4,7 +4,7 @@ use clear_on_drop::clear::Clear;
 use core::mem;
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
-use curve25519_dalek::traits::{MultiscalarMul,Identity};
+use curve25519_dalek::traits::{Identity, MultiscalarMul};
 use merlin::Transcript;
 
 use super::{ConstraintSystem, LinearCombination, R1CSProof, RandomizedConstraintSystem, Variable};
