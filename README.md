@@ -145,6 +145,15 @@ assert!(
 );
 # }
 ```
+## Building
+
+To compile successfully, you will need to have nightly Rust installed, rather than stable.
+
+You can install nightly Rust with rustup:
+
+```text
+rustup default nightly
+```
 
 ## Tests and Benchmarks
 
