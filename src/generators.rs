@@ -181,6 +181,32 @@ impl BulletproofGens {
         }
     }
 
+    /// Precomputes additional generators and increases the capacity.
+    pub fn add_gens(&mut self, add_gens: usize) {
+        use byteorder::{ByteOrder, LittleEndian};
+
+        for i in 0..self.party_capacity {
+            let party_index = i as u32;
+            let mut label = [b'G', 0, 0, 0, 0];
+            LittleEndian::write_u32(&mut label[1..5], party_index);
+            self.G_vec[i].append(
+                &mut GeneratorsChain::new(&label)
+                    .skip(self.gens_capacity)
+                    .take(add_gens)
+                    .collect::<Vec<_>>(),
+            );
+
+            label[0] = b'H';
+            self.H_vec[i].append(
+                &mut GeneratorsChain::new(&label)
+                    .skip(self.gens_capacity)
+                    .take(add_gens)
+                    .collect::<Vec<_>>(),
+            );
+        }
+        self.gens_capacity = self.gens_capacity + add_gens;
+    }
+
     /// Return an iterator over the aggregation of the parties' G generators with given size `n`.
     pub(crate) fn G(&self, n: usize, m: usize) -> impl Iterator<Item = &RistrettoPoint> {
         AggregatedGensIter {
@@ -293,6 +319,38 @@ mod tests {
 
             assert_eq!(agg_G, flat_G);
             assert_eq!(agg_H, flat_H);
+        };
+
+        helper(64, 8);
+        helper(64, 4);
+        helper(64, 2);
+        helper(64, 1);
+        helper(32, 8);
+        helper(32, 4);
+        helper(32, 2);
+        helper(32, 1);
+        helper(16, 8);
+        helper(16, 4);
+        helper(16, 2);
+        helper(16, 1);
+    }
+
+    #[test]
+    fn add_gens_matches() {
+        let gens = BulletproofGens::new(64, 8);
+
+        let mut gen_resized = BulletproofGens::new(32, 8);
+        gen_resized.add_gens(32);
+
+        let helper = |n: usize, m: usize| {
+            let gens_G: Vec<RistrettoPoint> = gens.G(n, m).cloned().collect();
+            let gens_H: Vec<RistrettoPoint> = gens.H(n, m).cloned().collect();
+
+            let resized_G: Vec<RistrettoPoint> = gen_resized.G(n, m).cloned().collect();
+            let resized_H: Vec<RistrettoPoint> = gen_resized.H(n, m).cloned().collect();
+
+            assert_eq!(gens_G, resized_G);
+            assert_eq!(gens_H, resized_H);
         };
 
         helper(64, 8);
