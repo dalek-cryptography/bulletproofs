@@ -57,6 +57,8 @@ struct GeneratorsChain {
     reader: Sha3XofReader,
 }
 
+struct GeneratedPoint([u8; 64]);
+
 impl GeneratorsChain {
     /// Creates a chain of generators, determined by the hash of `label`.
     fn new(label: &[u8]) -> Self {
@@ -77,16 +79,22 @@ impl Default for GeneratorsChain {
 }
 
 impl Iterator for GeneratorsChain {
-    type Item = RistrettoPoint;
+    type Item = GeneratedPoint;
 
     fn next(&mut self) -> Option<Self::Item> {
         let mut uniform_bytes = [0u8; 64];
         self.reader.read(&mut uniform_bytes);
 
-        Some(RistrettoPoint::from_uniform_bytes(&uniform_bytes))
+        Some(GeneratedPoint(uniform_bytes))
     }
     fn size_hint(&self) -> (usize, Option<usize>) {
         (usize::max_value(), None)
+    }
+}
+
+impl Into<RistrettoPoint> for GeneratedPoint {
+    fn into(self) -> RistrettoPoint {
+        RistrettoPoint::from_uniform_bytes(&self.0)
     }
 }
 
@@ -155,7 +163,8 @@ impl BulletproofGens {
 
                     GeneratorsChain::new(&label)
                         .take(gens_capacity)
-                        .collect::<Vec<_>>()
+                        .map(|p| p.into())
+                        .collect::<Vec<RistrettoPoint>>()
                 })
                 .collect(),
             H_vec: (0..party_capacity)
@@ -166,7 +175,8 @@ impl BulletproofGens {
 
                     GeneratorsChain::new(&label)
                         .take(gens_capacity)
-                        .collect::<Vec<_>>()
+                        .map(|p| p.into())
+                        .collect::<Vec<RistrettoPoint>>()
                 })
                 .collect(),
         }
@@ -181,9 +191,14 @@ impl BulletproofGens {
         }
     }
 
-    /// Precomputes additional generators and increases the capacity.
-    pub fn add_gens(&mut self, add_gens: usize) {
+    /// Increases the generators' capacity to the amount specified.
+    /// If less than or equal to the current capacity, does nothing.
+    pub fn increase_capacity(&mut self, new_capacity: usize) {
         use byteorder::{ByteOrder, LittleEndian};
+
+        if self.gens_capacity >= new_capacity {
+            return;
+        }
 
         for i in 0..self.party_capacity {
             let party_index = i as u32;
@@ -192,19 +207,21 @@ impl BulletproofGens {
             self.G_vec[i].append(
                 &mut GeneratorsChain::new(&label)
                     .skip(self.gens_capacity)
-                    .take(add_gens)
-                    .collect::<Vec<_>>(),
+                    .take(new_capacity - self.gens_capacity)
+                    .map(|p| p.into())
+                    .collect::<Vec<RistrettoPoint>>(),
             );
 
             label[0] = b'H';
             self.H_vec[i].append(
                 &mut GeneratorsChain::new(&label)
                     .skip(self.gens_capacity)
-                    .take(add_gens)
-                    .collect::<Vec<_>>(),
+                    .take(new_capacity - self.gens_capacity)
+                    .map(|p| p.into())
+                    .collect::<Vec<RistrettoPoint>>(),
             );
         }
-        self.gens_capacity = self.gens_capacity + add_gens;
+        self.gens_capacity = new_capacity;
     }
 
     /// Return an iterator over the aggregation of the parties' G generators with given size `n`.
@@ -340,7 +357,7 @@ mod tests {
         let gens = BulletproofGens::new(64, 8);
 
         let mut gen_resized = BulletproofGens::new(32, 8);
-        gen_resized.add_gens(32);
+        gen_resized.increase_capacity(64);
 
         let helper = |n: usize, m: usize| {
             let gens_G: Vec<RistrettoPoint> = gens.G(n, m).cloned().collect();
