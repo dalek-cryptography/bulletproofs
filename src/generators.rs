@@ -57,8 +57,6 @@ struct GeneratorsChain {
     reader: Sha3XofReader,
 }
 
-struct GeneratedPoint([u8; 64]);
-
 impl GeneratorsChain {
     /// Creates a chain of generators, determined by the hash of `label`.
     fn new(label: &[u8]) -> Self {
@@ -89,23 +87,17 @@ impl Default for GeneratorsChain {
 }
 
 impl Iterator for GeneratorsChain {
-    type Item = GeneratedPoint;
+    type Item = RistrettoPoint;
 
     fn next(&mut self) -> Option<Self::Item> {
         let mut uniform_bytes = [0u8; 64];
         self.reader.read(&mut uniform_bytes);
 
-        Some(GeneratedPoint(uniform_bytes))
+        Some(RistrettoPoint::from_uniform_bytes(&uniform_bytes))
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
         (usize::max_value(), None)
-    }
-}
-
-impl Into<RistrettoPoint> for GeneratedPoint {
-    fn into(self) -> RistrettoPoint {
-        RistrettoPoint::from_uniform_bytes(&self.0)
     }
 }
 
@@ -174,8 +166,7 @@ impl BulletproofGens {
 
                     GeneratorsChain::new(&label)
                         .take(gens_capacity)
-                        .map(|p| p.into())
-                        .collect::<Vec<RistrettoPoint>>()
+                        .collect::<Vec<_>>()
                 })
                 .collect(),
             H_vec: (0..party_capacity)
@@ -186,8 +177,7 @@ impl BulletproofGens {
 
                     GeneratorsChain::new(&label)
                         .take(gens_capacity)
-                        .map(|p| p.into())
-                        .collect::<Vec<RistrettoPoint>>()
+                        .collect::<Vec<_>>()
                 })
                 .collect(),
         }
@@ -219,8 +209,7 @@ impl BulletproofGens {
                 &mut GeneratorsChain::new(&label)
                     .fast_forward(self.gens_capacity)
                     .take(new_capacity - self.gens_capacity)
-                    .map(|p| p.into())
-                    .collect::<Vec<RistrettoPoint>>(),
+                    .collect::<Vec<_>>(),
             );
 
             label[0] = b'H';
@@ -228,8 +217,7 @@ impl BulletproofGens {
                 &mut GeneratorsChain::new(&label)
                     .fast_forward(self.gens_capacity)
                     .take(new_capacity - self.gens_capacity)
-                    .map(|p| p.into())
-                    .collect::<Vec<RistrettoPoint>>(),
+                    .collect::<Vec<_>>(),
             );
         }
         self.gens_capacity = new_capacity;
