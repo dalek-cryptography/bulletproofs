@@ -70,6 +70,16 @@ impl GeneratorsChain {
             reader: shake.xof_result(),
         }
     }
+
+    /// Advances the reader n times, squeezing and discarding
+    /// the result.
+    fn fast_forward(&mut self, n: usize) -> &mut Self {
+        for _ in 0..n {
+            let mut buf = [0u8; 64];
+            self.reader.read(&mut buf);
+        }
+        self
+    }
 }
 
 impl Default for GeneratorsChain {
@@ -87,6 +97,7 @@ impl Iterator for GeneratorsChain {
 
         Some(GeneratedPoint(uniform_bytes))
     }
+
     fn size_hint(&self) -> (usize, Option<usize>) {
         (usize::max_value(), None)
     }
@@ -206,7 +217,7 @@ impl BulletproofGens {
             LittleEndian::write_u32(&mut label[1..5], party_index);
             self.G_vec[i].append(
                 &mut GeneratorsChain::new(&label)
-                    .skip(self.gens_capacity)
+                    .fast_forward(self.gens_capacity)
                     .take(new_capacity - self.gens_capacity)
                     .map(|p| p.into())
                     .collect::<Vec<RistrettoPoint>>(),
@@ -215,7 +226,7 @@ impl BulletproofGens {
             label[0] = b'H';
             self.H_vec[i].append(
                 &mut GeneratorsChain::new(&label)
-                    .skip(self.gens_capacity)
+                    .fast_forward(self.gens_capacity)
                     .take(new_capacity - self.gens_capacity)
                     .map(|p| p.into())
                     .collect::<Vec<RistrettoPoint>>(),
