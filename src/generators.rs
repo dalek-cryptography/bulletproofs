@@ -154,12 +154,12 @@ impl BulletproofGens {
     ///    produce an aggregated proof.
     pub fn new(gens_capacity: usize, party_capacity: usize) -> Self {
         let mut gens = BulletproofGens {
-            gens_capacity,
+            gens_capacity: 0,
             party_capacity,
             G_vec: (0..party_capacity).map(|_| Vec::new()).collect(),
             H_vec: (0..party_capacity).map(|_| Vec::new()).collect(),
         };
-        gens.compute_generators(0, gens_capacity);
+        gens.increase_capacity(gens_capacity);
         gens
     }
 
@@ -175,28 +175,30 @@ impl BulletproofGens {
     /// Increases the generators' capacity to the amount specified.
     /// If less than or equal to the current capacity, does nothing.
     pub fn increase_capacity(&mut self, new_capacity: usize) {
+        use byteorder::{ByteOrder, LittleEndian};
+
         if self.gens_capacity >= new_capacity {
             return;
         }
-
-        self.compute_generators(self.gens_capacity, new_capacity - self.gens_capacity);
-        self.gens_capacity = new_capacity;
-    }
-
-    /// Computes a given number of  G and H generators, taking in a
-    /// number of generators to initially skip.
-    fn compute_generators(&mut self, skip: usize, take: usize) {
-        use byteorder::{ByteOrder, LittleEndian};
 
         for i in 0..self.party_capacity {
             let party_index = i as u32;
             let mut label = [b'G', 0, 0, 0, 0];
             LittleEndian::write_u32(&mut label[1..5], party_index);
-            self.G_vec[i].extend(&mut GeneratorsChain::new(&label).fast_forward(skip).take(take));
+            self.G_vec[i].extend(
+                &mut GeneratorsChain::new(&label)
+                    .fast_forward(self.gens_capacity)
+                    .take(new_capacity - self.gens_capacity),
+            );
 
             label[0] = b'H';
-            self.H_vec[i].extend(&mut GeneratorsChain::new(&label).fast_forward(skip).take(take));
+            self.H_vec[i].extend(
+                &mut GeneratorsChain::new(&label)
+                    .fast_forward(self.gens_capacity)
+                    .take(new_capacity - self.gens_capacity),
+            );
         }
+        self.gens_capacity = new_capacity;
     }
 
     /// Return an iterator over the aggregation of the parties' G generators with given size `n`.
