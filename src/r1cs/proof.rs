@@ -68,7 +68,7 @@ pub struct R1CSProof {
 }
 
 impl R1CSProof {
-    /// Serializes the proof into a byte array of \\((13 or 16) + 2k\\) 32-byte elements,
+    /// Serializes the proof into a byte array of 1 version byte + \\((13 or 16) + 2k\\) 32-byte elements,
     /// where \\(k=\lceil \log_2(n) \rceil\\) and \\(n\\) is the number of multiplication gates.
     ///
     /// # Layout
