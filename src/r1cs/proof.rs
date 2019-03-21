@@ -160,17 +160,17 @@ impl R1CSProof {
         let A_I1 = CompressedRistretto(read32!());
         let A_O1 = CompressedRistretto(read32!());
         let S1 = CompressedRistretto(read32!());
-        let (A_I2, A_O2, S2) = if version == TWO_PHASE_COMMITMENTS {
+        let (A_I2, A_O2, S2) = if version == ONE_PHASE_COMMITMENTS {
             (
-                CompressedRistretto(read32!()),
-                CompressedRistretto(read32!()),
-                CompressedRistretto(read32!()),
+                CompressedRistretto::identity(),
+                CompressedRistretto::identity(),
+                CompressedRistretto::identity(),
             )
         } else {
             (
-                CompressedRistretto::identity(),
-                CompressedRistretto::identity(),
-                CompressedRistretto::identity(),
+                CompressedRistretto(read32!()),
+                CompressedRistretto(read32!()),
+                CompressedRistretto(read32!()),
             )
         };
         let T_1 = CompressedRistretto(read32!());
