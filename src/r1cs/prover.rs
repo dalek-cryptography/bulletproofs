@@ -473,9 +473,9 @@ impl<'a, 'b> Prover<'a, 'b> {
 
         // Commit to the second-phase low-level witness variables
 
-        let has_2nd_phase = n2 > 0;
+        let has_2nd_phase_commitments = n2 > 0;
 
-        let (i_blinding2, o_blinding2, s_blinding2) = if has_2nd_phase {
+        let (i_blinding2, o_blinding2, s_blinding2) = if has_2nd_phase_commitments {
             (
                 Scalar::random(&mut rng),
                 Scalar::random(&mut rng),
@@ -488,7 +488,7 @@ impl<'a, 'b> Prover<'a, 'b> {
         let mut s_L2: Vec<Scalar> = (0..n2).map(|_| Scalar::random(&mut rng)).collect();
         let mut s_R2: Vec<Scalar> = (0..n2).map(|_| Scalar::random(&mut rng)).collect();
 
-        let (A_I2, A_O2, S2) = if has_2nd_phase {
+        let (A_I2, A_O2, S2) = if has_2nd_phase_commitments {
             (
                 // A_I = <a_L, G> + <a_R, H> + i_blinding * B_blinding
                 RistrettoPoint::multiscalar_mul(
