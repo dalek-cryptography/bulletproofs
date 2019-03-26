@@ -68,6 +68,16 @@ impl GeneratorsChain {
             reader: shake.xof_result(),
         }
     }
+
+    /// Advances the reader n times, squeezing and discarding
+    /// the result.
+    fn fast_forward(mut self, n: usize) -> Self {
+        for _ in 0..n {
+            let mut buf = [0u8; 64];
+            self.reader.read(&mut buf);
+        }
+        self
+    }
 }
 
 impl Default for GeneratorsChain {
@@ -85,6 +95,7 @@ impl Iterator for GeneratorsChain {
 
         Some(RistrettoPoint::from_uniform_bytes(&uniform_bytes))
     }
+
     fn size_hint(&self) -> (usize, Option<usize>) {
         (usize::max_value(), None)
     }
@@ -142,34 +153,14 @@ impl BulletproofGens {
     /// * `party_capacity` is the maximum number of parties that can
     ///    produce an aggregated proof.
     pub fn new(gens_capacity: usize, party_capacity: usize) -> Self {
-        use byteorder::{ByteOrder, LittleEndian};
-
-        BulletproofGens {
-            gens_capacity,
+        let mut gens = BulletproofGens {
+            gens_capacity: 0,
             party_capacity,
-            G_vec: (0..party_capacity)
-                .map(|i| {
-                    let party_index = i as u32;
-                    let mut label = [b'G', 0, 0, 0, 0];
-                    LittleEndian::write_u32(&mut label[1..5], party_index);
-
-                    GeneratorsChain::new(&label)
-                        .take(gens_capacity)
-                        .collect::<Vec<_>>()
-                })
-                .collect(),
-            H_vec: (0..party_capacity)
-                .map(|i| {
-                    let party_index = i as u32;
-                    let mut label = [b'H', 0, 0, 0, 0];
-                    LittleEndian::write_u32(&mut label[1..5], party_index);
-
-                    GeneratorsChain::new(&label)
-                        .take(gens_capacity)
-                        .collect::<Vec<_>>()
-                })
-                .collect(),
-        }
+            G_vec: (0..party_capacity).map(|_| Vec::new()).collect(),
+            H_vec: (0..party_capacity).map(|_| Vec::new()).collect(),
+        };
+        gens.increase_capacity(gens_capacity);
+        gens
     }
 
     /// Returns j-th share of generators, with an appropriate
@@ -179,6 +170,35 @@ impl BulletproofGens {
             gens: &self,
             share: j,
         }
+    }
+
+    /// Increases the generators' capacity to the amount specified.
+    /// If less than or equal to the current capacity, does nothing.
+    pub fn increase_capacity(&mut self, new_capacity: usize) {
+        use byteorder::{ByteOrder, LittleEndian};
+
+        if self.gens_capacity >= new_capacity {
+            return;
+        }
+
+        for i in 0..self.party_capacity {
+            let party_index = i as u32;
+            let mut label = [b'G', 0, 0, 0, 0];
+            LittleEndian::write_u32(&mut label[1..5], party_index);
+            self.G_vec[i].extend(
+                &mut GeneratorsChain::new(&label)
+                    .fast_forward(self.gens_capacity)
+                    .take(new_capacity - self.gens_capacity),
+            );
+
+            label[0] = b'H';
+            self.H_vec[i].extend(
+                &mut GeneratorsChain::new(&label)
+                    .fast_forward(self.gens_capacity)
+                    .take(new_capacity - self.gens_capacity),
+            );
+        }
+        self.gens_capacity = new_capacity;
     }
 
     /// Return an iterator over the aggregation of the parties' G generators with given size `n`.
@@ -307,5 +327,28 @@ mod tests {
         helper(16, 4);
         helper(16, 2);
         helper(16, 1);
+    }
+
+    #[test]
+    fn resizing_small_gens_matches_creating_bigger_gens() {
+        let gens = BulletproofGens::new(64, 8);
+
+        let mut gen_resized = BulletproofGens::new(32, 8);
+        gen_resized.increase_capacity(64);
+
+        let helper = |n: usize, m: usize| {
+            let gens_G: Vec<RistrettoPoint> = gens.G(n, m).cloned().collect();
+            let gens_H: Vec<RistrettoPoint> = gens.H(n, m).cloned().collect();
+
+            let resized_G: Vec<RistrettoPoint> = gen_resized.G(n, m).cloned().collect();
+            let resized_H: Vec<RistrettoPoint> = gen_resized.H(n, m).cloned().collect();
+
+            assert_eq!(gens_G, resized_G);
+            assert_eq!(gens_H, resized_H);
+        };
+
+        helper(64, 8);
+        helper(32, 8);
+        helper(16, 8);
     }
 }
