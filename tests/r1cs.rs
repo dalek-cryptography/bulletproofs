@@ -459,3 +459,56 @@ fn range_proof_helper(v_val: u64, n: usize) -> Result<(), R1CSError> {
     // Verifier verifies proof
     Ok(verifier.verify(&proof, &pc_gens, &bp_gens)?)
 }
+
+fn prover_capacity_resize_helper<F>(
+    capacity: usize,
+    resize_fn: F,
+) -> Result<(R1CSProof, CompressedRistretto), R1CSError>
+where
+    F: FnMut(usize, &mut BulletproofGens),
+{
+    // Common
+    let pc_gens = PedersenGens::default();
+    let mut bp_gens = BulletproofGens::new(capacity, 1);
+
+    // Prover makes a `ConstraintSystem` instance representing a range proof gadget
+    let mut prover_transcript = Transcript::new(b"RangeProofTest");
+    let mut rng = rand::thread_rng();
+
+    let mut prover = Prover::new(&pc_gens, &mut prover_transcript);
+
+    let (com, var) = prover.commit(10u64.into(), Scalar::random(&mut rng));
+    assert!(range_proof(&mut prover, var.into(), Some(10u64), 32).is_ok());
+
+    let proof = prover.prove(&mut bp_gens, resize_fn)?;
+    Ok((proof, com))
+}
+
+#[test]
+fn prover_capacity_resize() {
+    assert!(prover_capacity_resize_helper(128, |_, _| ()).is_ok());
+    assert!(prover_capacity_resize_helper(0, |_, _| ()).is_err());
+    assert!(
+        prover_capacity_resize_helper(0, |capacity, gens| gens.increase_capacity(capacity)).is_ok()
+    );
+
+    let (proof, com) =
+        prover_capacity_resize_helper(64, |capacity, gens| gens.increase_capacity(capacity))
+            .unwrap();
+
+    // Construct verifier generators
+    let pc_gens = PedersenGens::default();
+    let mut bp_gens = BulletproofGens::new(128, 1);
+
+    // Verifier makes a `ConstraintSystem` instance representing a merge gadget
+    let mut verifier_transcript = Transcript::new(b"RangeProofTest");
+    let mut verifier = Verifier::new(&mut verifier_transcript);
+
+    let var = verifier.commit(com);
+
+    // Verifier adds constraints to the constraint system
+    assert!(range_proof(&mut verifier, var.into(), None, 32).is_ok());
+
+    // Verifier verifies proof
+    assert!(verifier.verify(&proof, &pc_gens, &bp_gens).is_ok());
+}
