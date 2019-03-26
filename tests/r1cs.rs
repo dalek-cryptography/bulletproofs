@@ -82,7 +82,7 @@ impl ShuffleProof {
         transcript.commit_bytes(b"dom-sep", b"ShuffleProof");
         transcript.commit_bytes(b"k", Scalar::from(k as u64).as_bytes());
 
-        let mut prover = Prover::new(&bp_gens, &pc_gens, transcript);
+        let mut prover = Prover::new(&pc_gens, transcript);
 
         // Construct blinding factors using an RNG.
         // Note: a non-example implementation would want to operate on existing commitments.
@@ -100,7 +100,7 @@ impl ShuffleProof {
 
         ShuffleProof::gadget(&mut prover, input_vars, output_vars)?;
 
-        let proof = prover.prove()?;
+        let proof = prover.prove(&bp_gens)?;
 
         Ok((ShuffleProof(proof), input_commitments, output_commitments))
     }
@@ -121,7 +121,7 @@ impl ShuffleProof {
         transcript.commit_bytes(b"dom-sep", b"ShuffleProof");
         transcript.commit_bytes(b"k", Scalar::from(k as u64).as_bytes());
 
-        let mut verifier = Verifier::new(&bp_gens, &pc_gens, transcript);
+        let mut verifier = Verifier::new(transcript);
 
         let input_vars: Vec<_> = input_commitments
             .iter()
@@ -135,7 +135,7 @@ impl ShuffleProof {
 
         ShuffleProof::gadget(&mut verifier, input_vars, output_vars)?;
 
-        verifier.verify(&self.0)
+        verifier.verify(&self.0, &pc_gens, &bp_gens)
     }
 }
 
@@ -247,7 +247,7 @@ fn example_gadget_proof(
     let mut transcript = Transcript::new(b"R1CSExampleGadget");
 
     // 1. Create a prover
-    let mut prover = Prover::new(bp_gens, pc_gens, &mut transcript);
+    let mut prover = Prover::new(pc_gens, &mut transcript);
 
     // 2. Commit high-level variables
     let (commitments, vars): (Vec<_>, Vec<_>) = [a1, a2, b1, b2, c1]
@@ -267,7 +267,7 @@ fn example_gadget_proof(
     );
 
     // 4. Make a proof
-    let proof = prover.prove()?;
+    let proof = prover.prove(bp_gens)?;
 
     Ok((proof, commitments))
 }
@@ -283,7 +283,7 @@ fn example_gadget_verify(
     let mut transcript = Transcript::new(b"R1CSExampleGadget");
 
     // 1. Create a verifier
-    let mut verifier = Verifier::new(&bp_gens, &pc_gens, &mut transcript);
+    let mut verifier = Verifier::new(&mut transcript);
 
     // 2. Commit high-level variables
     let vars: Vec<_> = commitments.iter().map(|V| verifier.commit(*V)).collect();
@@ -301,7 +301,7 @@ fn example_gadget_verify(
 
     // 4. Verify the proof
     verifier
-        .verify(&proof)
+        .verify(&proof, &pc_gens, &bp_gens)
         .map_err(|_| R1CSError::VerificationError)
 }
 
@@ -425,19 +425,19 @@ fn range_proof_helper(v_val: u64, n: usize) -> Result<(), R1CSError> {
         let mut prover_transcript = Transcript::new(b"RangeProofTest");
         let mut rng = rand::thread_rng();
 
-        let mut prover = Prover::new(&bp_gens, &pc_gens, &mut prover_transcript);
+        let mut prover = Prover::new(&pc_gens, &mut prover_transcript);
 
         let (com, var) = prover.commit(v_val.into(), Scalar::random(&mut rng));
         assert!(range_proof(&mut prover, var.into(), Some(v_val), n).is_ok());
 
-        let proof = prover.prove()?;
+        let proof = prover.prove(&bp_gens)?;
 
         (proof, com)
     };
 
     // Verifier makes a `ConstraintSystem` instance representing a merge gadget
     let mut verifier_transcript = Transcript::new(b"RangeProofTest");
-    let mut verifier = Verifier::new(&bp_gens, &pc_gens, &mut verifier_transcript);
+    let mut verifier = Verifier::new(&mut verifier_transcript);
 
     let var = verifier.commit(commitment);
 
@@ -445,5 +445,5 @@ fn range_proof_helper(v_val: u64, n: usize) -> Result<(), R1CSError> {
     assert!(range_proof(&mut verifier, var.into(), None, n).is_ok());
 
     // Verifier verifies proof
-    Ok(verifier.verify(&proof)?)
+    Ok(verifier.verify(&proof, &pc_gens, &bp_gens)?)
 }

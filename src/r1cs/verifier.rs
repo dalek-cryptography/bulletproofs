@@ -21,10 +21,8 @@ use transcript::TranscriptProtocol;
 /// When all constraints are added, the verifying code calls `verify`
 /// which consumes the `Verifier` instance, samples random challenges
 /// that instantiate the randomized constraints, and verifies the proof.
-pub struct Verifier<'a, 'b> {
-    bp_gens: &'b BulletproofGens,
-    pc_gens: &'b PedersenGens,
-    transcript: &'a mut Transcript,
+pub struct Verifier<'t> {
+    transcript: &'t mut Transcript,
     constraints: Vec<LinearCombination>,
 
     /// Records the number of low-level variables allocated in the
@@ -41,7 +39,7 @@ pub struct Verifier<'a, 'b> {
     /// when non-randomized variables are committed.
     /// After that, the option will flip to None and additional calls to `randomize_constraints`
     /// will invoke closures immediately.
-    deferred_constraints: Vec<Box<Fn(&mut RandomizingVerifier<'a, 'b>) -> Result<(), R1CSError>>>,
+    deferred_constraints: Vec<Box<Fn(&mut RandomizingVerifier<'t>) -> Result<(), R1CSError>>>,
 
     /// Index of a pending multiplier that's not fully assigned yet.
     pending_multiplier: Option<usize>,
@@ -54,12 +52,12 @@ pub struct Verifier<'a, 'b> {
 /// monomorphize the closures for the proving and verifying code.
 /// However, this type cannot be instantiated by the user and therefore can only be used within
 /// the callback provided to `specify_randomized_constraints`.
-pub struct RandomizingVerifier<'a, 'b> {
-    verifier: Verifier<'a, 'b>,
+pub struct RandomizingVerifier<'t> {
+    verifier: Verifier<'t>,
 }
 
-impl<'a, 'b> ConstraintSystem for Verifier<'a, 'b> {
-    type RandomizedCS = RandomizingVerifier<'a, 'b>;
+impl<'t> ConstraintSystem for Verifier<'t> {
+    type RandomizedCS = RandomizingVerifier<'t>;
 
     fn multiply(
         &mut self,
@@ -129,7 +127,7 @@ impl<'a, 'b> ConstraintSystem for Verifier<'a, 'b> {
     }
 }
 
-impl<'a, 'b> ConstraintSystem for RandomizingVerifier<'a, 'b> {
+impl<'t> ConstraintSystem for RandomizingVerifier<'t> {
     type RandomizedCS = Self;
 
     fn multiply(
@@ -163,23 +161,17 @@ impl<'a, 'b> ConstraintSystem for RandomizingVerifier<'a, 'b> {
     }
 }
 
-impl<'a, 'b> RandomizedConstraintSystem for RandomizingVerifier<'a, 'b> {
+impl<'t> RandomizedConstraintSystem for RandomizingVerifier<'t> {
     fn challenge_scalar(&mut self, label: &'static [u8]) -> Scalar {
         self.verifier.transcript.challenge_scalar(label)
     }
 }
 
-impl<'a, 'b> Verifier<'a, 'b> {
+impl<'t> Verifier<'t> {
     /// Construct an empty constraint system with specified external
     /// input variables.
     ///
     /// # Inputs
-    ///
-    /// The `bp_gens` and `pc_gens` are generators for Bulletproofs
-    /// and for the Pedersen commitments, respectively.  The
-    /// [`BulletproofGens`] should have `gens_capacity` greater than
-    /// the number of multiplication constraints that will eventually
-    /// be added into the constraint system.
     ///
     /// The `transcript` parameter is a Merlin proof transcript.  The
     /// `VerifierCS` holds onto the `&mut Transcript` until it consumes
@@ -201,16 +193,10 @@ impl<'a, 'b> Verifier<'a, 'b> {
     ///
     /// The second element is a list of [`Variable`]s corresponding to
     /// the external inputs, which can be used to form constraints.
-    pub fn new(
-        bp_gens: &'b BulletproofGens,
-        pc_gens: &'b PedersenGens,
-        transcript: &'a mut Transcript,
-    ) -> Self {
+    pub fn new(transcript: &'t mut Transcript) -> Self {
         transcript.r1cs_domain_sep();
 
         Verifier {
-            bp_gens,
-            pc_gens,
             transcript,
             num_vars: 0,
             V: Vec::new(),
@@ -323,7 +309,17 @@ impl<'a, 'b> Verifier<'a, 'b> {
     }
 
     /// Consume this `VerifierCS` and attempt to verify the supplied `proof`.
-    pub fn verify(mut self, proof: &R1CSProof) -> Result<(), R1CSError> {
+    /// The `pc_gens` and `bp_gens` are generators for Pedersen commitments and
+    /// Bulletproofs vector commitments, respectively.  The
+    /// [`BulletproofGens`] should have `gens_capacity` greater than
+    /// the number of multiplication constraints that will eventually
+    /// be added into the constraint system.
+    pub fn verify(
+        mut self,
+        proof: &R1CSProof,
+        pc_gens: &PedersenGens,
+        bp_gens: &BulletproofGens,
+    ) -> Result<(), R1CSError> {
         // Commit a length _suffix_ for the number of high-level variables.
         // We cannot do this in advance because user can commit variables one-by-one,
         // but this suffix provides safe disambiguation because each variable
@@ -348,11 +344,11 @@ impl<'a, 'b> Verifier<'a, 'b> {
         use std::iter;
         use util;
 
-        if self.bp_gens.gens_capacity < padded_n {
+        if bp_gens.gens_capacity < padded_n {
             return Err(R1CSError::InvalidGeneratorsLength);
         }
         // We are performing a single-party circuit proof, so party index is 0.
-        let gens = self.bp_gens.share(0);
+        let gens = bp_gens.share(0);
 
         self.transcript.commit_point(b"A_I2", &proof.A_I2);
         self.transcript.commit_point(b"A_O2", &proof.A_O2);
@@ -464,8 +460,8 @@ impl<'a, 'b> Verifier<'a, 'b> {
                 .chain(iter::once(proof.S2.decompress()))
                 .chain(self.V.iter().map(|V_i| V_i.decompress()))
                 .chain(T_points.iter().map(|T_i| T_i.decompress()))
-                .chain(iter::once(Some(self.pc_gens.B)))
-                .chain(iter::once(Some(self.pc_gens.B_blinding)))
+                .chain(iter::once(Some(pc_gens.B)))
+                .chain(iter::once(Some(pc_gens.B_blinding)))
                 .chain(gens.G(padded_n).map(|&G_i| Some(G_i)))
                 .chain(gens.H(padded_n).map(|&H_i| Some(H_i)))
                 .chain(proof.ipp_proof.L_vec.iter().map(|L_i| L_i.decompress()))

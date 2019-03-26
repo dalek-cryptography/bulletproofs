@@ -139,7 +139,7 @@ impl KShuffleGadget {
         transcript.commit_bytes(b"dom-sep", b"ShuffleProof");
         transcript.commit_bytes(b"k", Scalar::from(k as u64).as_bytes());
 
-        let mut prover = Prover::new(&bp_gens, &pc_gens, transcript);
+        let mut prover = Prover::new(&pc_gens, transcript);
 
         // Construct blinding factors using an RNG.
         // Note: a non-example implementation would want to operate on existing commitments.
@@ -156,7 +156,7 @@ impl KShuffleGadget {
             .unzip();
 
         Self::fill_cs(&mut prover, input_vars, output_vars)?;
-        let proof = prover.prove()?;
+        let proof = prover.prove(&bp_gens)?;
 
         Ok((proof, input_commitments, output_commitments))
     }
@@ -174,7 +174,7 @@ impl KShuffleGadget {
         transcript.commit_bytes(b"dom-sep", b"ShuffleProof");
         transcript.commit_bytes(b"k", Scalar::from(k as u64).as_bytes());
 
-        let mut verifier = Verifier::new(&bp_gens, &pc_gens, transcript);
+        let mut verifier = Verifier::new(transcript);
 
         let input_vars: Vec<_> = input_commitments
             .iter()
@@ -187,7 +187,7 @@ impl KShuffleGadget {
             .collect();
 
         Self::fill_cs(&mut verifier, input_vars, output_vars)?;
-        verifier.verify(proof)
+        verifier.verify(proof, &pc_gens, &bp_gens)
     }
 }
 

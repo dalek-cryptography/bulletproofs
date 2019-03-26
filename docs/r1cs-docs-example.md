@@ -212,7 +212,7 @@ impl ShuffleProof {
         transcript.commit_bytes(b"dom-sep", b"ShuffleProof");
         transcript.commit_bytes(b"k", Scalar::from(k as u64).as_bytes());
 
-        let mut prover = Prover::new(&bp_gens, &pc_gens, transcript);
+        let mut prover = Prover::new(&pc_gens, transcript);
 
         // Construct blinding factors using an RNG.
         // Note: a non-example implementation would want to operate on existing commitments.
@@ -232,7 +232,7 @@ impl ShuffleProof {
 
         ShuffleProof::gadget(&mut prover, input_vars, output_vars)?;
 
-        let proof = prover.prove()?;
+        let proof = prover.prove(&bp_gens)?;
 
         Ok((ShuffleProof(proof), input_commitments, output_commitments))
     }
@@ -319,7 +319,7 @@ The verifier receives a proof, and a list of committed inputs and outputs, from 
 #         transcript.commit_bytes(b"dom-sep", b"ShuffleProof");
 #         transcript.commit_bytes(b"k", Scalar::from(k as u64).as_bytes());
 # 
-#         let mut prover = Prover::new(&bp_gens, &pc_gens, transcript);
+#         let mut prover = Prover::new(&pc_gens, transcript);
 # 
 #         // Construct blinding factors using an RNG.
 #         // Note: a non-example implementation would want to operate on existing commitments.
@@ -339,7 +339,7 @@ The verifier receives a proof, and a list of committed inputs and outputs, from 
 #
 #         ShuffleProof::gadget(&mut prover, input_vars, output_vars)?;
 #
-#         let proof = prover.prove()?;
+#         let proof = prover.prove(&bp_gens)?;
 #
 #         Ok((ShuffleProof(proof), input_commitments, output_commitments))
 #     }
@@ -359,7 +359,7 @@ impl ShuffleProof {
         transcript.commit_bytes(b"dom-sep", b"ShuffleProof");
         transcript.commit_bytes(b"k", Scalar::from(k as u64).as_bytes());
 
-        let mut verifier = Verifier::new(&bp_gens, &pc_gens, transcript);
+        let mut verifier = Verifier::new(transcript);
 
         let input_vars: Vec<_> = input_commitments.iter().map(|commitment| {
             verifier.commit(*commitment)
@@ -371,7 +371,7 @@ impl ShuffleProof {
 
         ShuffleProof::gadget(&mut verifier, input_vars, output_vars)?;
 
-        verifier.verify(&self.0)
+        verifier.verify(&self.0, &pc_gens, &bp_gens)
     }
 }
 ```
@@ -459,7 +459,7 @@ Because only the prover knows the scalar values of the inputs and outputs, and t
 #         transcript.commit_bytes(b"dom-sep", b"ShuffleProof");
 #         transcript.commit_bytes(b"k", Scalar::from(k as u64).as_bytes());
 # 
-#         let mut prover = Prover::new(&bp_gens, &pc_gens, transcript);
+#         let mut prover = Prover::new(&pc_gens, transcript);
 # 
 #         // Construct blinding factors using an RNG.
 #         // Note: a non-example implementation would want to operate on existing commitments.
@@ -479,7 +479,7 @@ Because only the prover knows the scalar values of the inputs and outputs, and t
 #
 #         ShuffleProof::gadget(&mut prover, input_vars, output_vars)?;
 #
-#         let proof = prover.prove()?;
+#         let proof = prover.prove(&bp_gens)?;
 #
 #         Ok((ShuffleProof(proof), input_commitments, output_commitments))
 #     }
@@ -499,7 +499,7 @@ Because only the prover knows the scalar values of the inputs and outputs, and t
 #         transcript.commit_bytes(b"dom-sep", b"ShuffleProof");
 #         transcript.commit_bytes(b"k", Scalar::from(k as u64).as_bytes());
 # 
-#         let mut verifier = Verifier::new(&bp_gens, &pc_gens, transcript);
+#         let mut verifier = Verifier::new(transcript);
 # 
 #         let input_vars: Vec<_> = input_commitments.iter().map(|commitment| {
 #             verifier.commit(*commitment)
@@ -511,7 +511,7 @@ Because only the prover knows the scalar values of the inputs and outputs, and t
 #
 #         ShuffleProof::gadget(&mut verifier, input_vars, output_vars)?;
 #
-#         verifier.verify(&self.0)
+#         verifier.verify(&self.0, &pc_gens, &bp_gens)
 #     }
 # }
 # fn main() {
