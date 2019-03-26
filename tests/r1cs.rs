@@ -65,7 +65,7 @@ impl ShuffleProof {
     /// Returns a tuple `(proof, input_commitments || output_commitments)`.
     pub fn prove<'a, 'b>(
         pc_gens: &'b PedersenGens,
-        bp_gens: &'b BulletproofGens,
+        bp_gens: &'b mut BulletproofGens,
         transcript: &'a mut Transcript,
         input: &[Scalar],
         output: &[Scalar],
@@ -100,7 +100,9 @@ impl ShuffleProof {
 
         ShuffleProof::gadget(&mut prover, input_vars, output_vars)?;
 
-        let proof = prover.prove(&bp_gens)?;
+        let proof = prover.prove(bp_gens, |capacity, gens| {
+            gens.increase_capacity(capacity);
+        })?;
 
         Ok((ShuffleProof(proof), input_commitments, output_commitments))
     }
@@ -144,7 +146,7 @@ fn kshuffle_helper(k: usize) {
 
     // Common code
     let pc_gens = PedersenGens::default();
-    let bp_gens = BulletproofGens::new((2 * k).next_power_of_two(), 1);
+    let mut bp_gens = BulletproofGens::new((2 * k).next_power_of_two(), 1);
 
     let (proof, input_commitments, output_commitments) = {
         // Randomly generate inputs and outputs to kshuffle
@@ -157,7 +159,14 @@ fn kshuffle_helper(k: usize) {
         rand::thread_rng().shuffle(&mut output);
 
         let mut prover_transcript = Transcript::new(b"ShuffleProofTest");
-        ShuffleProof::prove(&pc_gens, &bp_gens, &mut prover_transcript, &input, &output).unwrap()
+        ShuffleProof::prove(
+            &pc_gens,
+            &mut bp_gens,
+            &mut prover_transcript,
+            &input,
+            &output,
+        )
+        .unwrap()
     };
 
     {
@@ -236,7 +245,7 @@ fn example_gadget<CS: ConstraintSystem>(
 // Prover's scope
 fn example_gadget_proof(
     pc_gens: &PedersenGens,
-    bp_gens: &BulletproofGens,
+    bp_gens: &mut BulletproofGens,
     a1: u64,
     a2: u64,
     b1: u64,
@@ -267,7 +276,9 @@ fn example_gadget_proof(
     );
 
     // 4. Make a proof
-    let proof = prover.prove(bp_gens)?;
+    let proof = prover.prove(bp_gens, |capacity, gens| {
+        gens.increase_capacity(capacity);
+    })?;
 
     Ok((proof, commitments))
 }
@@ -315,9 +326,10 @@ fn example_gadget_roundtrip_helper(
 ) -> Result<(), R1CSError> {
     // Common
     let pc_gens = PedersenGens::default();
-    let bp_gens = BulletproofGens::new(128, 1);
+    let mut bp_gens = BulletproofGens::new(128, 1);
 
-    let (proof, commitments) = example_gadget_proof(&pc_gens, &bp_gens, a1, a2, b1, b2, c1, c2)?;
+    let (proof, commitments) =
+        example_gadget_proof(&pc_gens, &mut bp_gens, a1, a2, b1, b2, c1, c2)?;
 
     example_gadget_verify(&pc_gens, &bp_gens, c2, proof, commitments)
 }
@@ -332,9 +344,10 @@ fn example_gadget_roundtrip_serialization_helper(
 ) -> Result<(), R1CSError> {
     // Common
     let pc_gens = PedersenGens::default();
-    let bp_gens = BulletproofGens::new(128, 1);
+    let mut bp_gens = BulletproofGens::new(128, 1);
 
-    let (proof, commitments) = example_gadget_proof(&pc_gens, &bp_gens, a1, a2, b1, b2, c1, c2)?;
+    let (proof, commitments) =
+        example_gadget_proof(&pc_gens, &mut bp_gens, a1, a2, b1, b2, c1, c2)?;
 
     let proof = proof.to_bytes();
 
@@ -417,7 +430,7 @@ fn range_proof_gadget() {
 fn range_proof_helper(v_val: u64, n: usize) -> Result<(), R1CSError> {
     // Common
     let pc_gens = PedersenGens::default();
-    let bp_gens = BulletproofGens::new(128, 1);
+    let mut bp_gens = BulletproofGens::new(128, 1);
 
     // Prover's scope
     let (proof, commitment) = {
@@ -430,8 +443,7 @@ fn range_proof_helper(v_val: u64, n: usize) -> Result<(), R1CSError> {
         let (com, var) = prover.commit(v_val.into(), Scalar::random(&mut rng));
         assert!(range_proof(&mut prover, var.into(), Some(v_val), n).is_ok());
 
-        let proof = prover.prove(&bp_gens)?;
-
+        let proof = prover.prove(&mut bp_gens, |capacity, gens| ())?;
         (proof, com)
     };
 

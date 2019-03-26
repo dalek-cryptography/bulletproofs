@@ -202,7 +202,7 @@ impl ShuffleProof {
     /// Returns a tuple `(proof, input_commitments || output_commitments)`.
     pub fn prove<'a, 'b>(
         pc_gens: &'b PedersenGens,
-        bp_gens: &'b BulletproofGens,
+        bp_gens: &'b mut BulletproofGens,
         transcript: &'a mut Transcript,
         input: &[Scalar],
         output: &[Scalar],
@@ -232,7 +232,7 @@ impl ShuffleProof {
 
         ShuffleProof::gadget(&mut prover, input_vars, output_vars)?;
 
-        let proof = prover.prove(&bp_gens)?;
+        let proof = prover.prove(bp_gens, |capacity, gens| gens.increase_capacity(capacity))?;
 
         Ok((ShuffleProof(proof), input_commitments, output_commitments))
     }
@@ -309,7 +309,7 @@ The verifier receives a proof, and a list of committed inputs and outputs, from 
 #     /// Returns a tuple `(proof, input_commitments || output_commitments)`.
 #     pub fn prove<'a, 'b>(
 #         pc_gens: &'b PedersenGens,
-#         bp_gens: &'b BulletproofGens,
+#         bp_gens: &'b mut BulletproofGens,
 #         transcript: &'a mut Transcript,
 #         input: &[Scalar],
 #         output: &[Scalar],
@@ -339,7 +339,7 @@ The verifier receives a proof, and a list of committed inputs and outputs, from 
 #
 #         ShuffleProof::gadget(&mut prover, input_vars, output_vars)?;
 #
-#         let proof = prover.prove(&bp_gens)?;
+#         let proof = prover.prove(bp_gens, |capacity, gens| gens.increase_capacity(capacity))?;
 #
 #         Ok((ShuffleProof(proof), input_commitments, output_commitments))
 #     }
@@ -449,7 +449,7 @@ Because only the prover knows the scalar values of the inputs and outputs, and t
 #     /// Returns a tuple `(proof, input_commitments || output_commitments)`.
 #     pub fn prove<'a, 'b>(
 #         pc_gens: &'b PedersenGens,
-#         bp_gens: &'b BulletproofGens,
+#         bp_gens: &'b mut BulletproofGens,
 #         transcript: &'a mut Transcript,
 #         input: &[Scalar],
 #         output: &[Scalar],
@@ -479,7 +479,7 @@ Because only the prover knows the scalar values of the inputs and outputs, and t
 #
 #         ShuffleProof::gadget(&mut prover, input_vars, output_vars)?;
 #
-#         let proof = prover.prove(&bp_gens)?;
+#         let proof = prover.prove(bp_gens, |capacity, gens| gens.increase_capacity(capacity))?;
 #
 #         Ok((ShuffleProof(proof), input_commitments, output_commitments))
 #     }
@@ -517,7 +517,7 @@ Because only the prover knows the scalar values of the inputs and outputs, and t
 # fn main() {
 // Construct generators. 1024 Bulletproofs generators is enough for 512-size shuffles.
 let pc_gens = PedersenGens::default();
-let bp_gens = BulletproofGens::new(1024, 1);
+let mut bp_gens = BulletproofGens::new(1024, 1);
 
 // Putting the prover code in its own scope means we can't
 // accidentally reuse prover data in the test.
@@ -538,7 +538,7 @@ let (proof, in_commitments, out_commitments) = {
     let mut prover_transcript = Transcript::new(b"ShuffleProofTest");
     ShuffleProof::prove(
         &pc_gens,
-        &bp_gens,
+        &mut bp_gens,
         &mut prover_transcript,
         &inputs,
         &outputs,

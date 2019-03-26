@@ -359,7 +359,14 @@ impl<'t, 'g> Prover<'t, 'g> {
     }
 
     /// Consume this `ConstraintSystem` to produce a proof.
-    pub fn prove(mut self, bp_gens: &BulletproofGens) -> Result<R1CSProof, R1CSError> {
+    pub fn prove<F>(
+        mut self,
+        bp_gens: &mut BulletproofGens,
+        mut resize_fn: F,
+    ) -> Result<R1CSProof, R1CSError>
+    where
+        F: FnMut(usize, &mut BulletproofGens),
+    {
         use std::iter;
         use util;
 
@@ -397,6 +404,8 @@ impl<'t, 'g> Prover<'t, 'g> {
         // Commit to the first-phase low-level witness variables.
         let n1 = self.a_L.len();
 
+        /// Get resized generators and check sufficient capacity
+        resize_fn(n1, bp_gens);
         if bp_gens.gens_capacity < n1 {
             return Err(R1CSError::InvalidGeneratorsLength);
         }
@@ -455,9 +464,12 @@ impl<'t, 'g> Prover<'t, 'g> {
         let padded_n = self.a_L.len().next_power_of_two();
         let pad = padded_n - n;
 
+        // Resize from phase 2 and check capacity
+        resize_fn(padded_n, bp_gens);
         if bp_gens.gens_capacity < padded_n {
             return Err(R1CSError::InvalidGeneratorsLength);
         }
+        let gens = bp_gens.share(0);
 
         // Commit to the second-phase low-level witness variables
 
