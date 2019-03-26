@@ -359,7 +359,7 @@ impl ShuffleProof {
         transcript.commit_bytes(b"dom-sep", b"ShuffleProof");
         transcript.commit_bytes(b"k", Scalar::from(k as u64).as_bytes());
 
-        let mut verifier = Verifier::new(&pc_gens, transcript);
+        let mut verifier = Verifier::new(transcript);
 
         let input_vars: Vec<_> = input_commitments.iter().map(|commitment| {
             verifier.commit(*commitment)
@@ -371,7 +371,7 @@ impl ShuffleProof {
 
         ShuffleProof::gadget(&mut verifier, input_vars, output_vars)?;
 
-        verifier.verify(&self.0, &bp_gens)
+        verifier.verify(&self.0, &pc_gens, &bp_gens)
     }
 }
 ```
@@ -499,7 +499,7 @@ Because only the prover knows the scalar values of the inputs and outputs, and t
 #         transcript.commit_bytes(b"dom-sep", b"ShuffleProof");
 #         transcript.commit_bytes(b"k", Scalar::from(k as u64).as_bytes());
 # 
-#         let mut verifier = Verifier::new(&pc_gens, transcript);
+#         let mut verifier = Verifier::new(transcript);
 # 
 #         let input_vars: Vec<_> = input_commitments.iter().map(|commitment| {
 #             verifier.commit(*commitment)
@@ -511,7 +511,7 @@ Because only the prover knows the scalar values of the inputs and outputs, and t
 #
 #         ShuffleProof::gadget(&mut verifier, input_vars, output_vars)?;
 #
-#         verifier.verify(&self.0, &bp_gens)
+#         verifier.verify(&self.0, &pc_gens, &bp_gens)
 #     }
 # }
 # fn main() {

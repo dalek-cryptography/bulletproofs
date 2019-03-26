@@ -23,9 +23,9 @@ use transcript::TranscriptProtocol;
 /// When all constraints are added, the proving code calls `prove`
 /// which consumes the `Prover` instance, samples random challenges
 /// that instantiate the randomized constraints, and creates a complete proof.
-pub struct Prover<'a, 'b> {
-    transcript: &'a mut Transcript,
-    pc_gens: &'b PedersenGens,
+pub struct Prover<'t, 'g> {
+    transcript: &'t mut Transcript,
+    pc_gens: &'g PedersenGens,
     /// The constraints accumulated so far.
     constraints: Vec<LinearCombination>,
     /// Stores assignments to the "left" of multiplication gates
@@ -41,7 +41,7 @@ pub struct Prover<'a, 'b> {
 
     /// This list holds closures that will be called in the second phase of the protocol,
     /// when non-randomized variables are committed.
-    deferred_constraints: Vec<Box<Fn(&mut RandomizingProver<'a, 'b>) -> Result<(), R1CSError>>>,
+    deferred_constraints: Vec<Box<Fn(&mut RandomizingProver<'t, 'g>) -> Result<(), R1CSError>>>,
 
     /// Index of a pending multiplier that's not fully assigned yet.
     pending_multiplier: Option<usize>,
@@ -54,12 +54,12 @@ pub struct Prover<'a, 'b> {
 /// monomorphize the closures for the proving and verifying code.
 /// However, this type cannot be instantiated by the user and therefore can only be used within
 /// the callback provided to `specify_randomized_constraints`.
-pub struct RandomizingProver<'a, 'b> {
-    prover: Prover<'a, 'b>,
+pub struct RandomizingProver<'t, 'g> {
+    prover: Prover<'t, 'g>,
 }
 
 /// Overwrite secrets with null bytes when they go out of scope.
-impl<'a, 'b> Drop for Prover<'a, 'b> {
+impl<'t, 'g> Drop for Prover<'t, 'g> {
     fn drop(&mut self) {
         self.v.clear();
         self.v_blinding.clear();
@@ -82,8 +82,8 @@ impl<'a, 'b> Drop for Prover<'a, 'b> {
     }
 }
 
-impl<'a, 'b> ConstraintSystem for Prover<'a, 'b> {
-    type RandomizedCS = RandomizingProver<'a, 'b>;
+impl<'t, 'g> ConstraintSystem for Prover<'t, 'g> {
+    type RandomizedCS = RandomizingProver<'t, 'g>;
 
     fn multiply(
         &mut self,
@@ -168,7 +168,7 @@ impl<'a, 'b> ConstraintSystem for Prover<'a, 'b> {
     }
 }
 
-impl<'a, 'b> ConstraintSystem for RandomizingProver<'a, 'b> {
+impl<'t, 'g> ConstraintSystem for RandomizingProver<'t, 'g> {
     type RandomizedCS = Self;
 
     fn multiply(
@@ -202,13 +202,13 @@ impl<'a, 'b> ConstraintSystem for RandomizingProver<'a, 'b> {
     }
 }
 
-impl<'a, 'b> RandomizedConstraintSystem for RandomizingProver<'a, 'b> {
+impl<'t, 'g> RandomizedConstraintSystem for RandomizingProver<'t, 'g> {
     fn challenge_scalar(&mut self, label: &'static [u8]) -> Scalar {
         self.prover.transcript.challenge_scalar(label)
     }
 }
 
-impl<'a, 'b> Prover<'a, 'b> {
+impl<'t, 'g> Prover<'t, 'g> {
     /// Construct an empty constraint system with specified external
     /// input variables.
     ///
@@ -229,7 +229,7 @@ impl<'a, 'b> Prover<'a, 'b> {
     /// # Returns
     ///
     /// Returns a new `Prover` instance.
-    pub fn new(pc_gens: &'b PedersenGens, transcript: &'a mut Transcript) -> Self {
+    pub fn new(pc_gens: &'g PedersenGens, transcript: &'t mut Transcript) -> Self {
         transcript.r1cs_domain_sep();
 
         Prover {
