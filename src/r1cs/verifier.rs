@@ -291,15 +291,21 @@ impl<'t> Verifier<'t> {
         // Clear the pending multiplier (if any) because it was committed into A_L/A_R/S.
         self.pending_multiplier = None;
 
-        // Note: the wrapper could've used &mut instead of ownership,
-        // but specifying lifetimes for boxed closures is not going to be nice,
-        // so we move the self into wrapper and then move it back out afterwards.
-        let mut callbacks = mem::replace(&mut self.deferred_constraints, Vec::new());
-        let mut wrapped_self = RandomizingVerifier { verifier: self };
-        for callback in callbacks.drain(..) {
-            callback(&mut wrapped_self)?;
+        if self.deferred_constraints.len() == 0 {
+            self.transcript.r1cs_1phase_domain_sep();
+            Ok(self)
+        } else {
+            self.transcript.r1cs_2phase_domain_sep();
+            // Note: the wrapper could've used &mut instead of ownership,
+            // but specifying lifetimes for boxed closures is not going to be nice,
+            // so we move the self into wrapper and then move it back out afterwards.
+            let mut callbacks = mem::replace(&mut self.deferred_constraints, Vec::new());
+            let mut wrapped_self = RandomizingVerifier { verifier: self };
+            for callback in callbacks.drain(..) {
+                callback(&mut wrapped_self)?;
+            }
+            Ok(wrapped_self.verifier)
         }
-        Ok(wrapped_self.verifier)
     }
 
     /// Consume this `VerifierCS` and attempt to verify the supplied `proof`.

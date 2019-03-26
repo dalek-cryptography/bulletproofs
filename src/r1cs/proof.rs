@@ -3,6 +3,7 @@
 
 use curve25519_dalek::ristretto::CompressedRistretto;
 use curve25519_dalek::scalar::Scalar;
+use curve25519_dalek::traits::{Identity, IsIdentity};
 
 use errors::R1CSError;
 use inner_product_proof::InnerProductProof;
@@ -10,6 +11,9 @@ use util;
 
 use serde::de::Visitor;
 use serde::{self, Deserialize, Deserializer, Serialize, Serializer};
+
+const ONE_PHASE_COMMITMENTS: u8 = 0;
+const TWO_PHASE_COMMITMENTS: u8 = 1;
 
 /// A proof of some statement specified by a
 /// [`ConstraintSystem`](::r1cs::ConstraintSystem).
@@ -64,25 +68,34 @@ pub struct R1CSProof {
 }
 
 impl R1CSProof {
-    /// Serializes the proof into a byte array of \\(16 + 2k\\) 32-byte elements,
+    /// Serializes the proof into a byte array of 1 version byte + \\((13 or 16) + 2k\\) 32-byte elements,
     /// where \\(k=\lceil \log_2(n) \rceil\\) and \\(n\\) is the number of multiplication gates.
     ///
     /// # Layout
     ///
     /// The layout of the r1cs proof encoding is:
-    ///
-    /// * eleven compressed Ristretto points \\(A_{I1},A_{O1},S_1,A_{I2},A_{O2},S_2,T_1,...,T_6\\),
+    /// * 1 version byte indicating whether the proof contains second-phase commitments or not,
+    /// * 8 or 11 compressed Ristretto points \\(A_{I1},A_{O1},S_1,(A_{I2},A_{O2},S_2),T_1,...,T_6\\)
+    ///   (\\(A_{I2},A_{O2},S_2\\) are skipped if there were no multipliers added in the randomized phase),
     /// * three scalars \\(t_x, \tilde{t}_x, \tilde{e}\\),
     /// * \\(k\\) pairs of compressed Ristretto points \\(L_0,R_0\dots,L_{k-1},R_{k-1}\\),
     /// * two scalars \\(a, b\\).
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut buf = Vec::with_capacity(self.serialized_size());
-        buf.extend_from_slice(self.A_I1.as_bytes());
-        buf.extend_from_slice(self.A_O1.as_bytes());
-        buf.extend_from_slice(self.S1.as_bytes());
-        buf.extend_from_slice(self.A_I2.as_bytes());
-        buf.extend_from_slice(self.A_O2.as_bytes());
-        buf.extend_from_slice(self.S2.as_bytes());
+        if self.missing_phase2_commitments() {
+            buf.push(ONE_PHASE_COMMITMENTS);
+            buf.extend_from_slice(self.A_I1.as_bytes());
+            buf.extend_from_slice(self.A_O1.as_bytes());
+            buf.extend_from_slice(self.S1.as_bytes());
+        } else {
+            buf.push(TWO_PHASE_COMMITMENTS);
+            buf.extend_from_slice(self.A_I1.as_bytes());
+            buf.extend_from_slice(self.A_O1.as_bytes());
+            buf.extend_from_slice(self.S1.as_bytes());
+            buf.extend_from_slice(self.A_I2.as_bytes());
+            buf.extend_from_slice(self.A_O2.as_bytes());
+            buf.extend_from_slice(self.S2.as_bytes());
+        }
         buf.extend_from_slice(self.T_1.as_bytes());
         buf.extend_from_slice(self.T_3.as_bytes());
         buf.extend_from_slice(self.T_4.as_bytes());
@@ -98,18 +111,40 @@ impl R1CSProof {
 
     /// Returns the size in bytes required to serialize the `R1CSProof`.
     pub fn serialized_size(&self) -> usize {
-        // 14 elements + the ipp
-        14 * 32 + self.ipp_proof.serialized_size()
+        // version tag + (11 or 14) elements + the ipp
+        let elements = if self.missing_phase2_commitments() {
+            11
+        } else {
+            14
+        };
+        1 + elements * 32 + self.ipp_proof.serialized_size()
+    }
+
+    fn missing_phase2_commitments(&self) -> bool {
+        self.A_I2.is_identity() && self.A_O2.is_identity() && self.S2.is_identity()
     }
 
     /// Deserializes the proof from a byte slice.
     ///
     /// Returns an error if the byte slice cannot be parsed into a `R1CSProof`.
-    pub fn from_bytes(mut slice: &[u8]) -> Result<R1CSProof, R1CSError> {
+    pub fn from_bytes(slice: &[u8]) -> Result<R1CSProof, R1CSError> {
+        if slice.len() < 1 {
+            return Err(R1CSError::FormatError);
+        }
+        let version = slice[0];
+        let mut slice = &slice[1..];
+
         if slice.len() % 32 != 0 {
             return Err(R1CSError::FormatError);
         }
-        if slice.len() < 14 * 32 {
+
+        let minlength = match version {
+            ONE_PHASE_COMMITMENTS => 11 * 32,
+            TWO_PHASE_COMMITMENTS => 14 * 32,
+            _ => return Err(R1CSError::FormatError),
+        };
+
+        if slice.len() < minlength {
             return Err(R1CSError::FormatError);
         }
 
@@ -125,9 +160,19 @@ impl R1CSProof {
         let A_I1 = CompressedRistretto(read32!());
         let A_O1 = CompressedRistretto(read32!());
         let S1 = CompressedRistretto(read32!());
-        let A_I2 = CompressedRistretto(read32!());
-        let A_O2 = CompressedRistretto(read32!());
-        let S2 = CompressedRistretto(read32!());
+        let (A_I2, A_O2, S2) = if version == ONE_PHASE_COMMITMENTS {
+            (
+                CompressedRistretto::identity(),
+                CompressedRistretto::identity(),
+                CompressedRistretto::identity(),
+            )
+        } else {
+            (
+                CompressedRistretto(read32!()),
+                CompressedRistretto(read32!()),
+                CompressedRistretto(read32!()),
+            )
+        };
         let T_1 = CompressedRistretto(read32!());
         let T_3 = CompressedRistretto(read32!());
         let T_4 = CompressedRistretto(read32!());
