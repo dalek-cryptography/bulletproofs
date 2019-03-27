@@ -17,7 +17,7 @@ use curve25519_dalek::traits::MultiscalarMul;
 use clear_on_drop::clear::Clear;
 use errors::MPCError;
 use generators::{BulletproofGens, PedersenGens};
-use rand;
+use rand_core::{CryptoRng, RngCore};
 use std::iter;
 use util;
 
@@ -68,13 +68,11 @@ pub struct PartyAwaitingPosition<'a> {
 impl<'a> PartyAwaitingPosition<'a> {
     /// Assigns a position in the aggregated proof to this party,
     /// allowing the party to commit to the bits of their value.
-    pub fn assign_position(
+    pub fn assign_position<T: RngCore + CryptoRng>(
         self,
         j: usize,
+        rng: &mut T,
     ) -> Result<(PartyAwaitingBitChallenge<'a>, BitCommitment), MPCError> {
-        // XXX use transcript RNG
-        let mut rng = rand::thread_rng();
-
         if self.bp_gens.party_capacity <= j {
             return Err(MPCError::InvalidGeneratorsLength);
         }
@@ -155,12 +153,11 @@ pub struct PartyAwaitingBitChallenge<'a> {
 impl<'a> PartyAwaitingBitChallenge<'a> {
     /// Receive a [`BitChallenge`] from the dealer and use it to
     /// compute commitments to the party's polynomial coefficients.
-    pub fn apply_challenge(
+    pub fn apply_challenge<T: RngCore + CryptoRng>(
         self,
         vc: &BitChallenge,
+        rng: &mut T,
     ) -> (PartyAwaitingPolyChallenge, PolyCommitment) {
-        let mut rng = rand::thread_rng();
-
         let n = self.n;
         let offset_y = util::scalar_exp_vartime(&vc.y, (self.j * n) as u64);
         let offset_z = util::scalar_exp_vartime(&vc.z, self.j as u64);
@@ -255,7 +252,10 @@ pub struct PartyAwaitingPolyChallenge {
 impl PartyAwaitingPolyChallenge {
     /// Receive a [`PolyChallenge`] from the dealer and compute the
     /// party's proof share.
-    pub fn apply_challenge(self, pc: &PolyChallenge) -> Result<ProofShare, MPCError> {
+    pub fn apply_challenge(
+        self,
+        pc: &PolyChallenge,
+    ) -> Result<ProofShare, MPCError> {
         // Prevent a malicious dealer from annihilating the blinding
         // factors by supplying a zero challenge.
         if pc.x == Scalar::zero() {

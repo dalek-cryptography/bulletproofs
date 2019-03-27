@@ -8,7 +8,7 @@
 extern crate byteorder;
 extern crate core;
 extern crate digest;
-extern crate rand;
+extern crate rand_core;
 extern crate sha3;
 
 extern crate clear_on_drop;

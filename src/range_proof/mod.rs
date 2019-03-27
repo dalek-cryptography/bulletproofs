@@ -1,8 +1,6 @@
 #![allow(non_snake_case)]
 #![doc(include = "../../docs/range-proof-protocol.md")]
 
-use rand;
-
 use std::iter;
 
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
@@ -18,6 +16,8 @@ use util;
 
 use serde::de::Visitor;
 use serde::{self, Deserialize, Deserializer, Serialize, Serializer};
+
+use rand_core::{CryptoRng, RngCore};
 
 // Modules for MPC protocol
 
@@ -125,16 +125,17 @@ impl RangeProof {
     /// );
     /// # }
     /// ```
-    pub fn prove_single(
+    pub fn prove_single<T: RngCore + CryptoRng>(
         bp_gens: &BulletproofGens,
         pc_gens: &PedersenGens,
         transcript: &mut Transcript,
         v: u64,
         v_blinding: &Scalar,
         n: usize,
+        rng: &mut T,
     ) -> Result<(RangeProof, CompressedRistretto), ProofError> {
         let (p, Vs) =
-            RangeProof::prove_multiple(bp_gens, pc_gens, transcript, &[v], &[*v_blinding], n)?;
+            RangeProof::prove_multiple(bp_gens, pc_gens, transcript, &[v], &[*v_blinding], n, rng)?;
         Ok((p, Vs[0]))
     }
 
@@ -192,13 +193,14 @@ impl RangeProof {
     /// );
     /// # }
     /// ```
-    pub fn prove_multiple(
+    pub fn prove_multiple<T: RngCore + CryptoRng>(
         bp_gens: &BulletproofGens,
         pc_gens: &PedersenGens,
         transcript: &mut Transcript,
         values: &[u64],
         blindings: &[Scalar],
         n: usize,
+        rng: &mut T,
     ) -> Result<(RangeProof, Vec<CompressedRistretto>), ProofError> {
         use self::dealer::*;
         use self::party::*;
@@ -220,7 +222,7 @@ impl RangeProof {
             .into_iter()
             .enumerate()
             .map(|(j, p)| {
-                p.assign_position(j)
+                p.assign_position(j, rng)
                     .expect("We already checked the parameters, so this should never happen")
             })
             .unzip();
@@ -231,7 +233,7 @@ impl RangeProof {
 
         let (parties, poly_commitments): (Vec<_>, Vec<_>) = parties
             .into_iter()
-            .map(|p| p.apply_challenge(&bit_challenge))
+            .map(|p| p.apply_challenge(&bit_challenge, rng))
             .unzip();
 
         let (dealer, poly_challenge) = dealer.receive_poly_commitments(poly_commitments)?;
@@ -250,25 +252,27 @@ impl RangeProof {
     /// Verifies a rangeproof for a given value commitment \\(V\\).
     ///
     /// This is a convenience wrapper around `verify_multiple` for the `m=1` case.
-    pub fn verify_single(
+    pub fn verify_single<T: RngCore + CryptoRng>(
         &self,
         bp_gens: &BulletproofGens,
         pc_gens: &PedersenGens,
         transcript: &mut Transcript,
         V: &CompressedRistretto,
         n: usize,
+        rng: &mut T,
     ) -> Result<(), ProofError> {
-        self.verify_multiple(bp_gens, pc_gens, transcript, &[*V], n)
+        self.verify_multiple(bp_gens, pc_gens, transcript, &[*V], n, rng)
     }
 
     /// Verifies an aggregated rangeproof for the given value commitments.
-    pub fn verify_multiple(
+    pub fn verify_multiple<T: RngCore + CryptoRng>(
         &self,
         bp_gens: &BulletproofGens,
         pc_gens: &PedersenGens,
         transcript: &mut Transcript,
         value_commitments: &[CompressedRistretto],
         n: usize,
+        rng: &mut T,
     ) -> Result<(), ProofError> {
         let m = value_commitments.len();
 
@@ -310,8 +314,6 @@ impl RangeProof {
         transcript.append_scalar(b"e_blinding", &self.e_blinding);
 
         let w = transcript.challenge_scalar(b"w");
-
-        let mut rng = transcript.build_rng().finalize(&mut rand::thread_rng());
 
         // Challenge value for batching statements to be verified
         let c = Scalar::random(&mut rng);

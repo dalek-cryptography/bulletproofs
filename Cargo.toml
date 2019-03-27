@@ -12,16 +12,18 @@ keywords = ["cryptography", "crypto", "ristretto", "zero-knowledge", "bulletproo
 description = "A pure-Rust implementation of Bulletproofs using Ristretto"
 
 [dependencies]
-curve25519-dalek = { version = "1.0.3", features = ["serde"] }
-subtle = "2"
-sha3 = "0.8"
-digest = "0.8"
-rand = "0.6"
-byteorder = "1"
-serde = "1"
-serde_derive = "1"
-failure = "0.1"
-merlin = "1.1"
+cfg-if = "0.1"
+curve25519-dalek = { version = "1.2", default-features = false, features = ["u64_backend", "nightly", "serde"] }
+subtle = { version = "2", default-features = false }
+sha3 = { version = "0.8", default-features = false }
+digest = { version = "0.8", default-features = false }
+rand_core = { version = "0.4", default-features = false }
+rand = { version = "0.5", default-features = false }
+byteorder = { version = "1", default-features = false }
+serde = { version = "1", default-features = false }
+serde_derive = { version = "1", default-features = false }
+failure = { version = "0.1", default-features = false, features = ["derive"] }
+merlin = { version = "1.2", default-features = false }
 clear_on_drop = "0.2"
 
 [dev-dependencies]
@@ -31,8 +33,11 @@ bincode = "1"
 rand_chacha = "0.1"
 
 [features]
+default = ["std", "avx2_backend"]
 avx2_backend = ["curve25519-dalek/avx2_backend"]
 yoloproofs = []
+std = ["serde/std"]
+alloc = ["rand_core/alloc", "serde/alloc"]
 
 [[test]]
 name = "range_proof"
