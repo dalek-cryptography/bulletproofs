@@ -359,13 +359,12 @@ impl<'t, 'g> Prover<'t, 'g> {
     }
 
     /// Consume this `ConstraintSystem` to produce a proof.
-    pub fn prove<F>(
+    pub fn prove<'a, F>(
         mut self,
-        bp_gens: &mut BulletproofGens,
         mut resize_fn: F,
     ) -> Result<R1CSProof, R1CSError>
     where
-        F: FnMut(usize, &mut BulletproofGens),
+        F: FnMut(usize) -> Result<&'a BulletproofGens, R1CSError>
     {
         use std::iter;
         use util;
@@ -405,7 +404,7 @@ impl<'t, 'g> Prover<'t, 'g> {
         let n1 = self.a_L.len();
 
         /// Get resized generators and check sufficient capacity
-        resize_fn(n1, bp_gens);
+        let bp_gens = resize_fn(n1)?;
         if bp_gens.gens_capacity < n1 {
             return Err(R1CSError::InvalidGeneratorsLength);
         }
@@ -465,7 +464,7 @@ impl<'t, 'g> Prover<'t, 'g> {
         let pad = padded_n - n;
 
         // Resize from phase 2 and check capacity
-        resize_fn(padded_n, bp_gens);
+        let bp_gens = resize_fn(padded_n)?;
         if bp_gens.gens_capacity < padded_n {
             return Err(R1CSError::InvalidGeneratorsLength);
         }
