@@ -15,6 +15,8 @@ use inner_product_proof;
 use range_proof::RangeProof;
 use transcript::TranscriptProtocol;
 
+use rand_core::{CryptoRng, RngCore};
+
 use util;
 
 use super::messages::*;
@@ -281,7 +283,11 @@ impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
     /// performing local aggregation,
     /// [`receive_trusted_shares`](DealerAwaitingProofShares::receive_trusted_shares)
     /// saves time by skipping verification of the aggregated proof.
-    pub fn receive_shares(mut self, proof_shares: &[ProofShare]) -> Result<RangeProof, MPCError> {
+    pub fn receive_shares<T: RngCore + CryptoRng>(
+        mut self,
+        proof_shares: &[ProofShare],
+        rng: &mut T,
+    ) -> Result<RangeProof, MPCError> {
         let proof = self.assemble_shares(proof_shares)?;
 
         let Vs: Vec<_> = self.bit_commitments.iter().map(|vc| vc.V_j).collect();
@@ -289,7 +295,7 @@ impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
         // See comment in `Dealer::new` for why we use `initial_transcript`
         let transcript = &mut self.initial_transcript;
         if proof
-            .verify_multiple(self.bp_gens, self.pc_gens, transcript, &Vs, self.n)
+            .verify_multiple(self.bp_gens, self.pc_gens, transcript, &Vs, self.n, rng)
             .is_ok()
         {
             Ok(proof)

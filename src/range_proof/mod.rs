@@ -316,7 +316,7 @@ impl RangeProof {
         let w = transcript.challenge_scalar(b"w");
 
         // Challenge value for batching statements to be verified
-        let c = Scalar::random(&mut rng);
+        let c = Scalar::random(rng);
 
         let (x_sq, x_inv_sq, s) = self.ipp_proof.verification_scalars(n * m, transcript)?;
         let s_inv = s.iter().rev();
