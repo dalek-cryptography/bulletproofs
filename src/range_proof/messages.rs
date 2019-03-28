@@ -7,7 +7,7 @@
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
 
-use generators::{BulletproofGens, PedersenGens};
+use generators::{BulletproofGens, BulletproofGensTrait, PedersenGens};
 
 /// A commitment to the bits of a party's value.
 #[derive(Serialize, Deserialize, Copy, Clone, Debug)]

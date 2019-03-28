@@ -101,6 +101,35 @@ impl Iterator for GeneratorsChain {
     }
 }
 
+/// Defines a Bulletproofs generator
+pub trait BulletproofGensTrait {
+    /// Optionally resizes the generator capacity
+    fn increase_capacity(&mut self, new_capacity: usize);
+
+    /// Returns capacity
+    fn capacity(&self) -> usize;
+
+    /// Returns j-th share of generators, with an appropriate
+    /// slice of vectors G and H for the j-th range proof.
+    fn share(&self, j: usize) -> BulletproofGensShare;
+}
+
+/// Defines a static, non-resizable BulletproofGens object.
+pub struct BulletproofGensStatic(pub BulletproofGens);
+
+impl BulletproofGensTrait for BulletproofGensStatic {
+    /// For static generator, `increase_capacity` does nothing.
+    fn increase_capacity(&mut self, _: usize) {}
+
+    fn share(&self, j: usize) -> BulletproofGensShare {
+        self.0.share(j)
+    }
+
+    fn capacity(&self) -> usize {
+        self.0.gens_capacity
+    }
+}
+
 /// The `BulletproofGens` struct contains all the generators needed
 /// for aggregating up to `m` range proofs of up to `n` bits each.
 ///
@@ -163,18 +192,37 @@ impl BulletproofGens {
         gens
     }
 
-    /// Returns j-th share of generators, with an appropriate
-    /// slice of vectors G and H for the j-th range proof.
-    pub fn share(&self, j: usize) -> BulletproofGensShare {
-        BulletproofGensShare {
-            gens: &self,
-            share: j,
+    /// Return an iterator over the aggregation of the parties' G generators with given size `n`.
+    pub(crate) fn G(&self, n: usize, m: usize) -> impl Iterator<Item = &RistrettoPoint> {
+        AggregatedGensIter {
+            n,
+            m,
+            array: &self.G_vec,
+            party_idx: 0,
+            gen_idx: 0,
         }
+    }
+
+    /// Return an iterator over the aggregation of the parties' H generators with given size `n`.
+    pub(crate) fn H(&self, n: usize, m: usize) -> impl Iterator<Item = &RistrettoPoint> {
+        AggregatedGensIter {
+            n,
+            m,
+            array: &self.H_vec,
+            party_idx: 0,
+            gen_idx: 0,
+        }
+    }
+}
+
+impl BulletproofGensTrait for BulletproofGens {
+    fn capacity(&self) -> usize {
+        self.gens_capacity
     }
 
     /// Increases the generators' capacity to the amount specified.
     /// If less than or equal to the current capacity, does nothing.
-    pub fn increase_capacity(&mut self, new_capacity: usize) {
+    fn increase_capacity(&mut self, new_capacity: usize) {
         use byteorder::{ByteOrder, LittleEndian};
 
         if self.gens_capacity >= new_capacity {
@@ -201,25 +249,10 @@ impl BulletproofGens {
         self.gens_capacity = new_capacity;
     }
 
-    /// Return an iterator over the aggregation of the parties' G generators with given size `n`.
-    pub(crate) fn G(&self, n: usize, m: usize) -> impl Iterator<Item = &RistrettoPoint> {
-        AggregatedGensIter {
-            n,
-            m,
-            array: &self.G_vec,
-            party_idx: 0,
-            gen_idx: 0,
-        }
-    }
-
-    /// Return an iterator over the aggregation of the parties' H generators with given size `n`.
-    pub(crate) fn H(&self, n: usize, m: usize) -> impl Iterator<Item = &RistrettoPoint> {
-        AggregatedGensIter {
-            n,
-            m,
-            array: &self.H_vec,
-            party_idx: 0,
-            gen_idx: 0,
+    fn share(&self, j: usize) -> BulletproofGensShare {
+        BulletproofGensShare {
+            gens: &self,
+            share: j,
         }
     }
 }

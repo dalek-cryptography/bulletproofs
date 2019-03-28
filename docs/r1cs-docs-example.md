@@ -232,7 +232,7 @@ impl ShuffleProof {
 
         ShuffleProof::gadget(&mut prover, input_vars, output_vars)?;
 
-        let proof = prover.prove(bp_gens, |capacity, gens| gens.increase_capacity(capacity))?;
+        let proof = prover.prove(bp_gens)?;
 
         Ok((ShuffleProof(proof), input_commitments, output_commitments))
     }
@@ -339,7 +339,7 @@ The verifier receives a proof, and a list of committed inputs and outputs, from 
 #
 #         ShuffleProof::gadget(&mut prover, input_vars, output_vars)?;
 #
-#         let proof = prover.prove(bp_gens, |capacity, gens| gens.increase_capacity(capacity))?;
+#         let proof = prover.prove(bp_gens)?;
 #
 #         Ok((ShuffleProof(proof), input_commitments, output_commitments))
 #     }
@@ -479,7 +479,7 @@ Because only the prover knows the scalar values of the inputs and outputs, and t
 #
 #         ShuffleProof::gadget(&mut prover, input_vars, output_vars)?;
 #
-#         let proof = prover.prove(bp_gens, |capacity, gens| gens.increase_capacity(capacity))?;
+#         let proof = prover.prove(bp_gens)?;
 #
 #         Ok((ShuffleProof(proof), input_commitments, output_commitments))
 #     }

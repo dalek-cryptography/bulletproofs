@@ -156,7 +156,7 @@ impl KShuffleGadget {
             .unzip();
 
         Self::fill_cs(&mut prover, input_vars, output_vars)?;
-        let proof = prover.prove(bp_gens, |capacity, gens| gens.increase_capacity(capacity))?;
+        let proof = prover.prove(bp_gens)?;
 
         Ok((proof, input_commitments, output_commitments))
     }

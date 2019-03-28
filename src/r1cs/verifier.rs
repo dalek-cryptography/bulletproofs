@@ -9,7 +9,7 @@ use merlin::Transcript;
 use super::{ConstraintSystem, LinearCombination, R1CSProof, RandomizedConstraintSystem, Variable};
 
 use errors::R1CSError;
-use generators::{BulletproofGens, PedersenGens};
+use generators::{BulletproofGens, BulletproofGensTrait, PedersenGens};
 use transcript::TranscriptProtocol;
 
 /// A [`ConstraintSystem`] implementation for use by the verifier.

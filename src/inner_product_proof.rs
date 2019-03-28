@@ -415,7 +415,7 @@ mod tests {
     fn test_helper_create(n: usize) {
         let mut rng = rand::thread_rng();
 
-        use generators::BulletproofGens;
+        use generators::{BulletproofGens, BulletproofGensTrait};
         let bp_gens = BulletproofGens::new(n, 1);
         let G: Vec<RistrettoPoint> = bp_gens.share(0).G(n).cloned().collect();
         let H: Vec<RistrettoPoint> = bp_gens.share(0).H(n).cloned().collect();

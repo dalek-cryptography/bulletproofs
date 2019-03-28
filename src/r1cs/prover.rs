@@ -10,7 +10,7 @@ use merlin::Transcript;
 use super::{ConstraintSystem, LinearCombination, R1CSProof, RandomizedConstraintSystem, Variable};
 
 use errors::R1CSError;
-use generators::{BulletproofGens, PedersenGens};
+use generators::{BulletproofGens, BulletproofGensTrait, PedersenGens};
 use inner_product_proof::InnerProductProof;
 use transcript::TranscriptProtocol;
 
@@ -359,12 +359,9 @@ impl<'t, 'g> Prover<'t, 'g> {
     }
 
     /// Consume this `ConstraintSystem` to produce a proof.
-    pub fn prove<'a, F>(
-        mut self,
-        mut resize_fn: F,
-    ) -> Result<R1CSProof, R1CSError>
+    pub fn prove<G>(mut self, bp_gens: &mut G) -> Result<R1CSProof, R1CSError>
     where
-        F: FnMut(usize) -> Result<&'a BulletproofGens, R1CSError>
+        G: BulletproofGensTrait,
     {
         use std::iter;
         use util;
@@ -404,8 +401,8 @@ impl<'t, 'g> Prover<'t, 'g> {
         let n1 = self.a_L.len();
 
         /// Get resized generators and check sufficient capacity
-        let bp_gens = resize_fn(n1)?;
-        if bp_gens.gens_capacity < n1 {
+        bp_gens.increase_capacity(n1);
+        if bp_gens.capacity() < n1 {
             return Err(R1CSError::InvalidGeneratorsLength);
         }
 
@@ -464,8 +461,8 @@ impl<'t, 'g> Prover<'t, 'g> {
         let pad = padded_n - n;
 
         // Resize from phase 2 and check capacity
-        let bp_gens = resize_fn(padded_n)?;
-        if bp_gens.gens_capacity < padded_n {
+        bp_gens.increase_capacity(padded_n);
+        if bp_gens.capacity() < padded_n {
             return Err(R1CSError::InvalidGeneratorsLength);
         }
         let gens = bp_gens.share(0);
