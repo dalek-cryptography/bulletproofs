@@ -439,7 +439,7 @@ impl RangeProof {
         })
     }
 }
-
+/*
 impl Serialize for RangeProof {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -474,7 +474,7 @@ impl<'de> Deserialize<'de> for RangeProof {
         deserializer.deserialize_bytes(RangeProofVisitor)
     }
 }
-
+*/
 /// Compute
 /// \\[
 /// \delta(y,z) = (z - z^{2}) \langle \mathbf{1}, {\mathbf{y}}^{n \cdot m} \rangle - \sum_{j=0}^{m-1} z^{j+3} \cdot \langle \mathbf{1}, {\mathbf{2}}^{n \cdot m} \rangle
