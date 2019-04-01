@@ -122,7 +122,7 @@ impl R1CSProof {
 
     fn missing_phase2_commitments(&self) -> bool {
         let identity = CompressedRistretto::identity();
-        self.A_I2 == identity && self.A_O2  == identity && self.S2  == identity
+        self.A_I2 == identity && self.A_O2 == identity && self.S2 == identity
     }
 
     /// Deserializes the proof from a byte slice.
