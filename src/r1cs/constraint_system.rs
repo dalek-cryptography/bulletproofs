@@ -21,7 +21,7 @@ pub trait ConstraintSystem {
     type RandomizedCS: RandomizedConstraintSystem;
 
     /// Leases the proof transcript to the user, so they can
-    /// add extra data to which the proof must be bound, but that
+    /// add extra data to which the proof must be bound, but which
     /// is not available before creation of the constraint system.
     fn transcript(&mut self) -> &mut Transcript;
 
