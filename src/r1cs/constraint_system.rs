@@ -17,9 +17,6 @@ use merlin::Transcript;
 /// using the `ConstraintSystem` trait, so that the prover and
 /// verifier share the logic for specifying constraints.
 pub trait ConstraintSystem {
-    /// Represents a concrete type for the CS in a randomization phase.
-    type RandomizedCS: RandomizedConstraintSystem;
-
     /// Leases the proof transcript to the user, so they can
     /// add extra data to which the proof must be bound, but which
     /// is not available before creation of the constraint system.
@@ -74,6 +71,16 @@ pub trait ConstraintSystem {
     /// lc = 0
     /// ```
     fn constrain(&mut self, lc: LinearCombination);
+}
+
+/// An extension to the constraint system trait that permits randomized constraints.
+/// Gadgets that do not use randomization should use trait bound `CS: ConstraintSystem`,
+/// while gadgets that need randomization should use trait bound `CS: RandomizedConstraintSystem`.
+/// Gadgets generally _should not_ use this trait as a bound on the CS argument: it should be used
+/// by the higher-order protocol that composes gadgets together.
+pub trait RandomizableConstraintSystem: ConstraintSystem {
+    /// Represents a concrete type for the CS in a randomization phase.
+    type RandomizedCS: RandomizedConstraintSystem;
 
     /// Specify additional variables and constraints randomized using a challenge scalar
     /// bound to the assignments of the non-randomized variables.

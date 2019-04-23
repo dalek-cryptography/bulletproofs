@@ -6,7 +6,10 @@ use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::VartimeMultiscalarMul;
 use merlin::Transcript;
 
-use super::{ConstraintSystem, LinearCombination, R1CSProof, RandomizedConstraintSystem, Variable};
+use super::{
+    ConstraintSystem, LinearCombination, R1CSProof, RandomizableConstraintSystem,
+    RandomizedConstraintSystem, Variable,
+};
 
 use errors::R1CSError;
 use generators::{BulletproofGens, PedersenGens};
@@ -57,8 +60,6 @@ pub struct RandomizingVerifier<'t> {
 }
 
 impl<'t> ConstraintSystem for Verifier<'t> {
-    type RandomizedCS = RandomizingVerifier<'t>;
-
     fn transcript(&mut self) -> &mut Transcript {
         self.transcript
     }
@@ -121,6 +122,10 @@ impl<'t> ConstraintSystem for Verifier<'t> {
         // evals to 0 for prover, etc).
         self.constraints.push(lc);
     }
+}
+
+impl<'t> RandomizableConstraintSystem for Verifier<'t> {
+    type RandomizedCS = RandomizingVerifier<'t>;
 
     fn specify_randomized_constraints<F>(&mut self, callback: F) -> Result<(), R1CSError>
     where
@@ -132,8 +137,6 @@ impl<'t> ConstraintSystem for Verifier<'t> {
 }
 
 impl<'t> ConstraintSystem for RandomizingVerifier<'t> {
-    type RandomizedCS = Self;
-
     fn transcript(&mut self) -> &mut Transcript {
         self.verifier.transcript
     }
@@ -159,13 +162,6 @@ impl<'t> ConstraintSystem for RandomizingVerifier<'t> {
 
     fn constrain(&mut self, lc: LinearCombination) {
         self.verifier.constrain(lc)
-    }
-
-    fn specify_randomized_constraints<F>(&mut self, callback: F) -> Result<(), R1CSError>
-    where
-        F: 'static + Fn(&mut Self::RandomizedCS) -> Result<(), R1CSError>,
-    {
-        callback(self)
     }
 }
 

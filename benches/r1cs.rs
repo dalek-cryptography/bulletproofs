@@ -73,7 +73,7 @@ For K = 1:
 struct KShuffleGadget {}
 
 impl KShuffleGadget {
-    fn fill_cs<CS: ConstraintSystem>(
+    fn fill_cs<CS: RandomizableConstraintSystem>(
         cs: &mut CS,
         x: Vec<Variable>,
         y: Vec<Variable>,
