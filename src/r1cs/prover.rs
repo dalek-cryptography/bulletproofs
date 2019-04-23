@@ -85,6 +85,10 @@ impl<'t, 'g> Drop for Prover<'t, 'g> {
 impl<'t, 'g> ConstraintSystem for Prover<'t, 'g> {
     type RandomizedCS = RandomizingProver<'t, 'g>;
 
+    fn transcript(&mut self) -> &mut Transcript {
+        self.transcript
+    }
+
     fn multiply(
         &mut self,
         mut left: LinearCombination,
@@ -170,6 +174,10 @@ impl<'t, 'g> ConstraintSystem for Prover<'t, 'g> {
 
 impl<'t, 'g> ConstraintSystem for RandomizingProver<'t, 'g> {
     type RandomizedCS = Self;
+
+    fn transcript(&mut self) -> &mut Transcript {
+        self.prover.transcript
+    }
 
     fn multiply(
         &mut self,

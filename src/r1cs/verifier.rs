@@ -59,6 +59,10 @@ pub struct RandomizingVerifier<'t> {
 impl<'t> ConstraintSystem for Verifier<'t> {
     type RandomizedCS = RandomizingVerifier<'t>;
 
+    fn transcript(&mut self) -> &mut Transcript {
+        self.transcript
+    }
+
     fn multiply(
         &mut self,
         mut left: LinearCombination,
@@ -129,6 +133,10 @@ impl<'t> ConstraintSystem for Verifier<'t> {
 
 impl<'t> ConstraintSystem for RandomizingVerifier<'t> {
     type RandomizedCS = Self;
+
+    fn transcript(&mut self) -> &mut Transcript {
+        self.verifier.transcript
+    }
 
     fn multiply(
         &mut self,

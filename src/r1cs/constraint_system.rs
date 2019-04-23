@@ -2,6 +2,7 @@
 
 use super::{LinearCombination, R1CSError, Variable};
 use curve25519_dalek::scalar::Scalar;
+use merlin::Transcript;
 
 /// The interface for a constraint system, abstracting over the prover
 /// and verifier's roles.
@@ -18,6 +19,11 @@ use curve25519_dalek::scalar::Scalar;
 pub trait ConstraintSystem {
     /// Represents a concrete type for the CS in a randomization phase.
     type RandomizedCS: RandomizedConstraintSystem;
+
+    /// Leases the proof transcript to the user, so they can
+    /// add extra data to which the proof must be bound, but which
+    /// is not available before creation of the constraint system.
+    fn transcript(&mut self) -> &mut Transcript;
 
     /// Allocate and constrain multiplication variables.
     ///
