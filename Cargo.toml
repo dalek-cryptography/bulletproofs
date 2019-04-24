@@ -23,6 +23,8 @@ serde_derive = "1"
 failure = "0.1"
 merlin = "1"
 clear_on_drop = "0.2"
+hex = "0.3"
+
 
 [dev-dependencies]
 hex = "0.3"
@@ -41,6 +43,9 @@ name = "range_proof"
 [[test]]
 name = "r1cs"
 required-features = ["yoloproofs"]
+
+[[demo]]
+name = "rangeProof"
 
 [[bench]]
 name = "range_proof"

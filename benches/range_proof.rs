@@ -16,7 +16,7 @@ extern crate bulletproofs;
 use bulletproofs::RangeProof;
 use bulletproofs::{BulletproofGens, PedersenGens};
 
-static AGGREGATION_SIZES: [usize; 6] = [1, 2, 4, 8, 16, 32];
+static AGGREGATION_SIZES: [usize; 4] = [2, 4, 8, 16];
 
 fn create_aggregated_rangeproof_helper(n: usize, c: &mut Criterion) {
     let label = format!("Aggregated {}-bit rangeproof creation", n);
