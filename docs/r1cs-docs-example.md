@@ -75,7 +75,7 @@ use rand::thread_rng;
 struct ShuffleProof(R1CSProof);
 
 impl ShuffleProof {
-    fn gadget<CS: ConstraintSystem>(cs: &mut CS, x: Vec<Variable>, y: Vec<Variable>) -> Result<(),R1CSError> {
+    fn gadget<CS: RandomizableConstraintSystem>(cs: &mut CS, x: Vec<Variable>, y: Vec<Variable>) -> Result<(),R1CSError> {
 
         assert_eq!(x.len(), y.len());
         let k = x.len();
@@ -156,7 +156,7 @@ For simplicity, in this example the `prove` function does not take a list of bli
 # struct ShuffleProof(R1CSProof);
 # 
 # impl ShuffleProof {
-#     fn gadget<CS: ConstraintSystem>(cs: &mut CS, x: Vec<Variable>, y: Vec<Variable>) -> Result<(),R1CSError> {
+#     fn gadget<CS: RandomizableConstraintSystem>(cs: &mut CS, x: Vec<Variable>, y: Vec<Variable>) -> Result<(),R1CSError> {
 # 
 #         assert_eq!(x.len(), y.len());
 #         let k = x.len();
@@ -263,7 +263,7 @@ The verifier receives a proof, and a list of committed inputs and outputs, from 
 # struct ShuffleProof(R1CSProof);
 # 
 # impl ShuffleProof {
-#     fn gadget<CS: ConstraintSystem>(cs: &mut CS, x: Vec<Variable>, y: Vec<Variable>) -> Result<(),R1CSError> {
+#     fn gadget<CS: RandomizableConstraintSystem>(cs: &mut CS, x: Vec<Variable>, y: Vec<Variable>) -> Result<(),R1CSError> {
 # 
 #         assert_eq!(x.len(), y.len());
 #         let k = x.len();
@@ -403,7 +403,7 @@ Because only the prover knows the scalar values of the inputs and outputs, and t
 # struct ShuffleProof(R1CSProof);
 # 
 # impl ShuffleProof {
-#     fn gadget<CS: ConstraintSystem>(cs: &mut CS, x: Vec<Variable>, y: Vec<Variable>) -> Result<(),R1CSError> {
+#     fn gadget<CS: RandomizableConstraintSystem>(cs: &mut CS, x: Vec<Variable>, y: Vec<Variable>) -> Result<(),R1CSError> {
 # 
 #         assert_eq!(x.len(), y.len());
 #         let k = x.len();

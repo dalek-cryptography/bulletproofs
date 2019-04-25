@@ -17,7 +17,7 @@ use rand::thread_rng;
 struct ShuffleProof(R1CSProof);
 
 impl ShuffleProof {
-    fn gadget<CS: ConstraintSystem>(
+    fn gadget<CS: RandomizableConstraintSystem>(
         cs: &mut CS,
         x: Vec<Variable>,
         y: Vec<Variable>,

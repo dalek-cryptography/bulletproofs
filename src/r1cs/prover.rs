@@ -7,7 +7,10 @@ use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::{Identity, MultiscalarMul};
 use merlin::Transcript;
 
-use super::{ConstraintSystem, LinearCombination, R1CSProof, RandomizedConstraintSystem, Variable};
+use super::{
+    ConstraintSystem, LinearCombination, R1CSProof, RandomizableConstraintSystem,
+    RandomizedConstraintSystem, Variable,
+};
 
 use errors::R1CSError;
 use generators::{BulletproofGens, PedersenGens};
@@ -83,8 +86,6 @@ impl<'t, 'g> Drop for Prover<'t, 'g> {
 }
 
 impl<'t, 'g> ConstraintSystem for Prover<'t, 'g> {
-    type RandomizedCS = RandomizingProver<'t, 'g>;
-
     fn transcript(&mut self) -> &mut Transcript {
         self.transcript
     }
@@ -162,6 +163,10 @@ impl<'t, 'g> ConstraintSystem for Prover<'t, 'g> {
         // (e.g. that variables are valid, that the linear combination evals to 0 for prover, etc).
         self.constraints.push(lc);
     }
+}
+
+impl<'t, 'g> RandomizableConstraintSystem for Prover<'t, 'g> {
+    type RandomizedCS = RandomizingProver<'t, 'g>;
 
     fn specify_randomized_constraints<F>(&mut self, callback: F) -> Result<(), R1CSError>
     where
@@ -173,8 +178,6 @@ impl<'t, 'g> ConstraintSystem for Prover<'t, 'g> {
 }
 
 impl<'t, 'g> ConstraintSystem for RandomizingProver<'t, 'g> {
-    type RandomizedCS = Self;
-
     fn transcript(&mut self) -> &mut Transcript {
         self.prover.transcript
     }
@@ -200,13 +203,6 @@ impl<'t, 'g> ConstraintSystem for RandomizingProver<'t, 'g> {
 
     fn constrain(&mut self, lc: LinearCombination) {
         self.prover.constrain(lc)
-    }
-
-    fn specify_randomized_constraints<F>(&mut self, callback: F) -> Result<(), R1CSError>
-    where
-        F: 'static + Fn(&mut Self::RandomizedCS) -> Result<(), R1CSError>,
-    {
-        callback(self)
     }
 }
 
