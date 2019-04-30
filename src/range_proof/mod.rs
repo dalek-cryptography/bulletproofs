@@ -287,7 +287,9 @@ impl RangeProof {
         transcript.rangeproof_domain_sep(n as u64, m as u64);
 
         for V in value_commitments.iter() {
-            transcript.validate_and_append_point(b"V", V)?;
+            // Allow the commitments to be zero (0 value, 0 blinding)
+            // See https://github.com/dalek-cryptography/bulletproofs/pull/248#discussion_r255167177
+            transcript.append_point(b"V", V);
         }
 
         transcript.validate_and_append_point(b"A", &self.A)?;
