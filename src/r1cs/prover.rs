@@ -325,7 +325,7 @@ impl<'a, 'b> ProverCS<'a, 'b> {
 
             // Commit the blinding factors for the input wires
             for v_b in &self.v_blinding {
-                builder = builder.commit_witness_bytes(b"v_blinding", v_b.as_bytes());
+                builder = builder.rekey_with_witness_bytes(b"v_blinding", v_b.as_bytes());
             }
 
             use rand::thread_rng;
