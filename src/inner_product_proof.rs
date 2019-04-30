@@ -107,8 +107,8 @@ impl InnerProductProof {
             L_vec.push(L);
             R_vec.push(R);
 
-            transcript.commit_point(b"L", &L);
-            transcript.commit_point(b"R", &R);
+            transcript.append_point(b"L", &L);
+            transcript.append_point(b"R", &R);
 
             let u = transcript.challenge_scalar(b"u");
             let u_inv = u.invert();
@@ -154,8 +154,8 @@ impl InnerProductProof {
             L_vec.push(L);
             R_vec.push(R);
 
-            transcript.commit_point(b"L", &L);
-            transcript.commit_point(b"R", &R);
+            transcript.append_point(b"L", &L);
+            transcript.append_point(b"R", &R);
 
             let u = transcript.challenge_scalar(b"u");
             let u_inv = u.invert();
@@ -205,8 +205,8 @@ impl InnerProductProof {
 
         let mut challenges = Vec::with_capacity(lg_n);
         for (L, R) in self.L_vec.iter().zip(self.R_vec.iter()) {
-            transcript.validate_and_commit_point(b"L", L)?;
-            transcript.validate_and_commit_point(b"R", R)?;
+            transcript.validate_and_append_point(b"L", L)?;
+            transcript.validate_and_append_point(b"R", R)?;
             challenges.push(transcript.challenge_scalar(b"u"));
         }
 

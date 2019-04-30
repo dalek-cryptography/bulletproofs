@@ -171,7 +171,7 @@ impl<'a, 'b> Verifier<'a, 'b> {
         self.cs.V.push(commitment);
 
         // Add the commitment to the transcript.
-        self.cs.transcript.commit_point(b"V", &commitment);
+        self.cs.transcript.append_point(b"V", &commitment);
 
         Variable::Committed(i)
     }
@@ -183,7 +183,7 @@ impl<'a, 'b> Verifier<'a, 'b> {
         // We cannot do this in advance because user can commit variables one-by-one,
         // but this suffix provides safe disambiguation because each variable
         // is prefixed with a separate label.
-        self.cs.transcript.commit_u64(b"m", self.m);
+        self.cs.transcript.append_u64(b"m", self.m);
         self.cs
     }
 }
@@ -261,26 +261,26 @@ impl<'a, 'b> VerifierCS<'a, 'b> {
         // We are performing a single-party circuit proof, so party index is 0.
         let gens = self.bp_gens.share(0);
 
-        self.transcript.commit_point(b"A_I", &proof.A_I);
-        self.transcript.commit_point(b"A_O", &proof.A_O);
-        self.transcript.commit_point(b"S", &proof.S);
+        self.transcript.append_point(b"A_I", &proof.A_I);
+        self.transcript.append_point(b"A_O", &proof.A_O);
+        self.transcript.append_point(b"S", &proof.S);
 
         let y = self.transcript.challenge_scalar(b"y");
         let z = self.transcript.challenge_scalar(b"z");
 
-        self.transcript.commit_point(b"T_1", &proof.T_1);
-        self.transcript.commit_point(b"T_3", &proof.T_3);
-        self.transcript.commit_point(b"T_4", &proof.T_4);
-        self.transcript.commit_point(b"T_5", &proof.T_5);
-        self.transcript.commit_point(b"T_6", &proof.T_6);
+        self.transcript.append_point(b"T_1", &proof.T_1);
+        self.transcript.append_point(b"T_3", &proof.T_3);
+        self.transcript.append_point(b"T_4", &proof.T_4);
+        self.transcript.append_point(b"T_5", &proof.T_5);
+        self.transcript.append_point(b"T_6", &proof.T_6);
 
         let x = self.transcript.challenge_scalar(b"x");
 
-        self.transcript.commit_scalar(b"t_x", &proof.t_x);
+        self.transcript.append_scalar(b"t_x", &proof.t_x);
         self.transcript
-            .commit_scalar(b"t_x_blinding", &proof.t_x_blinding);
+            .append_scalar(b"t_x_blinding", &proof.t_x_blinding);
         self.transcript
-            .commit_scalar(b"e_blinding", &proof.e_blinding);
+            .append_scalar(b"e_blinding", &proof.e_blinding);
 
         let w = self.transcript.challenge_scalar(b"w");
 
