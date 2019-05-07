@@ -94,15 +94,15 @@ impl<'a, 'b> DealerAwaitingBitCommitments<'a, 'b> {
 
         // Commit each V_j individually
         for vc in bit_commitments.iter() {
-            self.transcript.commit_point(b"V", &vc.V_j);
+            self.transcript.append_point(b"V", &vc.V_j);
         }
 
         // Commit aggregated A_j, S_j
         let A: RistrettoPoint = bit_commitments.iter().map(|vc| vc.A_j).sum();
-        self.transcript.commit_point(b"A", &A.compress());
+        self.transcript.append_point(b"A", &A.compress());
 
         let S: RistrettoPoint = bit_commitments.iter().map(|vc| vc.S_j).sum();
-        self.transcript.commit_point(b"S", &S.compress());
+        self.transcript.append_point(b"S", &S.compress());
 
         let y = self.transcript.challenge_scalar(b"y");
         let z = self.transcript.challenge_scalar(b"z");
@@ -158,8 +158,8 @@ impl<'a, 'b> DealerAwaitingPolyCommitments<'a, 'b> {
         let T_1: RistrettoPoint = poly_commitments.iter().map(|pc| pc.T_1_j).sum();
         let T_2: RistrettoPoint = poly_commitments.iter().map(|pc| pc.T_2_j).sum();
 
-        self.transcript.commit_point(b"T_1", &T_1.compress());
-        self.transcript.commit_point(b"T_2", &T_2.compress());
+        self.transcript.append_point(b"T_1", &T_1.compress());
+        self.transcript.append_point(b"T_2", &T_2.compress());
 
         let x = self.transcript.challenge_scalar(b"x");
         let poly_challenge = PolyChallenge { x };
@@ -221,10 +221,10 @@ impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
         let t_x_blinding: Scalar = proof_shares.iter().map(|ps| ps.t_x_blinding).sum();
         let e_blinding: Scalar = proof_shares.iter().map(|ps| ps.e_blinding).sum();
 
-        self.transcript.commit_scalar(b"t_x", &t_x);
+        self.transcript.append_scalar(b"t_x", &t_x);
         self.transcript
-            .commit_scalar(b"t_x_blinding", &t_x_blinding);
-        self.transcript.commit_scalar(b"e_blinding", &e_blinding);
+            .append_scalar(b"t_x_blinding", &t_x_blinding);
+        self.transcript.append_scalar(b"e_blinding", &e_blinding);
 
         // Get a challenge value to combine statements for the IPP
         let w = self.transcript.challenge_scalar(b"w");
