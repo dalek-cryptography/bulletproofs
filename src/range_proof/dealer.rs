@@ -4,8 +4,12 @@
 //! For more explanation of how the `dealer`, `party`, and `messages` modules orchestrate the protocol execution, see
 //! [the API for the aggregated multiparty computation protocol](../aggregation/index.html#api-for-the-aggregated-multiparty-computation-protocol).
 
+<<<<<<< HEAD
 use core::iter;
 use curve25519_dalek::ristretto::RistrettoPoint;
+=======
+use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
+>>>>>>> use upstream dalek curve release, without using serde; remove all naive Ristretto and Scalar serialization; convert to and from byte arrays when dealing with serialized data structures
 use curve25519_dalek::scalar::Scalar;
 use merlin::Transcript;
 
@@ -97,18 +101,18 @@ impl<'a, 'b> DealerAwaitingBitCommitments<'a, 'b> {
 
         // Commit each V_j individually
         for vc in bit_commitments.iter() {
-            self.transcript.append_point(b"V", &vc.V_j);
+            self.transcript.append_point(b"V", &CompressedRistretto::from_slice(&vc.V_j));
         }
 
-        // Commit aggregated A_j, S_j
-        let A: RistrettoPoint = bit_commitments.iter().map(|vc| vc.A_j).sum();
+        // Append aggregated A_j, S_j
+        let A: RistrettoPoint = bit_commitments.iter().map(|vc| CompressedRistretto::from_slice(&vc.A_j).decompress().unwrap()).sum();
         self.transcript.append_point(b"A", &A.compress());
 
-        let S: RistrettoPoint = bit_commitments.iter().map(|vc| vc.S_j).sum();
+        let S: RistrettoPoint = bit_commitments.iter().map(|vc| CompressedRistretto::from_slice(&vc.S_j).decompress().unwrap()).sum();
         self.transcript.append_point(b"S", &S.compress());
 
-        let y = self.transcript.challenge_scalar(b"y");
-        let z = self.transcript.challenge_scalar(b"z");
+        let y = self.transcript.challenge_scalar(b"y").to_bytes();
+        let z = self.transcript.challenge_scalar(b"z").to_bytes();
         let bit_challenge = BitChallenge { y, z };
 
         Ok((
@@ -158,13 +162,13 @@ impl<'a, 'b> DealerAwaitingPolyCommitments<'a, 'b> {
         }
 
         // Commit sums of T_1_j's and T_2_j's
-        let T_1: RistrettoPoint = poly_commitments.iter().map(|pc| pc.T_1_j).sum();
-        let T_2: RistrettoPoint = poly_commitments.iter().map(|pc| pc.T_2_j).sum();
+        let T_1: RistrettoPoint = poly_commitments.iter().map(|pc| CompressedRistretto::from_slice(&pc.T_1_j).decompress().unwrap()).sum();
+        let T_2: RistrettoPoint = poly_commitments.iter().map(|pc| CompressedRistretto::from_slice(&pc.T_2_j).decompress().unwrap()).sum();
 
         self.transcript.append_point(b"T_1", &T_1.compress());
         self.transcript.append_point(b"T_2", &T_2.compress());
 
-        let x = self.transcript.challenge_scalar(b"x");
+        let x = self.transcript.challenge_scalar(b"x").to_bytes();
         let poly_challenge = PolyChallenge { x };
 
         Ok((
@@ -220,9 +224,9 @@ impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
             return Err(MPCError::WrongNumProofShares);
         }
 
-        let t_x: Scalar = proof_shares.iter().map(|ps| ps.t_x).sum();
-        let t_x_blinding: Scalar = proof_shares.iter().map(|ps| ps.t_x_blinding).sum();
-        let e_blinding: Scalar = proof_shares.iter().map(|ps| ps.e_blinding).sum();
+        let t_x: Scalar = proof_shares.iter().map(|ps| Scalar::from_bytes_mod_order(ps.t_x)).sum();
+        let t_x_blinding: Scalar = proof_shares.iter().map(|ps| Scalar::from_bytes_mod_order(ps.t_x_blinding)).sum();
+        let e_blinding: Scalar = proof_shares.iter().map(|ps| Scalar::from_bytes_mod_order(ps.e_blinding)).sum();
 
         self.transcript.append_scalar(b"t_x", &t_x);
         self.transcript
@@ -238,13 +242,21 @@ impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
             .take(self.n * self.m)
             .collect();
 
-        let l_vec: Vec<Scalar> = proof_shares
+        let l_vec_bytes: Vec<CurveScalar> = proof_shares
             .iter()
             .flat_map(|ps| ps.l_vec.clone().into_iter())
             .collect();
-        let r_vec: Vec<Scalar> = proof_shares
+        let l_vec: Vec<Scalar> = l_vec_bytes
+            .iter()
+            .map(|ps| Scalar::from_bytes_mod_order(*ps))
+            .collect();
+        let r_vec_bytes: Vec<CurveScalar> = proof_shares
             .iter()
             .flat_map(|ps| ps.r_vec.clone().into_iter())
+            .collect();
+        let r_vec: Vec<Scalar> = r_vec_bytes
+            .iter()
+            .map(|ps| Scalar::from_bytes_mod_order(*ps))
             .collect();
 
         let ipp_proof = inner_product_proof::InnerProductProof::create(
@@ -290,7 +302,7 @@ impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
     ) -> Result<RangeProof, MPCError> {
         let proof = self.assemble_shares(proof_shares)?;
 
-        let Vs: Vec<_> = self.bit_commitments.iter().map(|vc| vc.V_j).collect();
+        let Vs: Vec<_> = self.bit_commitments.iter().map(|vc| CompressedRistretto::from_slice(&vc.V_j)).collect();
 
         // See comment in `Dealer::new` for why we use `initial_transcript`
         let transcript = &mut self.initial_transcript;

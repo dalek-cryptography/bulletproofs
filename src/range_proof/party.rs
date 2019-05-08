@@ -109,9 +109,9 @@ impl<'a> PartyAwaitingPosition<'a> {
 
         // Return next state and all commitments
         let bit_commitment = BitCommitment {
-            V_j: self.V,
-            A_j: A,
-            S_j: S,
+            V_j: self.V.to_bytes(),
+            A_j: A.compress().to_bytes(),
+            S_j: S.compress().to_bytes(),
         };
         let next_state = PartyAwaitingBitChallenge {
             n: self.n,
@@ -159,26 +159,28 @@ impl<'a> PartyAwaitingBitChallenge<'a> {
         rng: &mut T,
     ) -> (PartyAwaitingPolyChallenge, PolyCommitment) {
         let n = self.n;
-        let offset_y = util::scalar_exp_vartime(&vc.y, (self.j * n) as u64);
-        let offset_z = util::scalar_exp_vartime(&vc.z, self.j as u64);
+        let offset_y = util::scalar_exp_vartime(&Scalar::from_bytes_mod_order(vc.y), (self.j * n) as u64);
+        let offset_z = util::scalar_exp_vartime(&Scalar::from_bytes_mod_order(vc.z), self.j as u64);
 
         // Calculate t by calculating vectors l0, l1, r0, r1 and multiplying
         let mut l_poly = util::VecPoly1::zero(n);
         let mut r_poly = util::VecPoly1::zero(n);
 
-        let zz = vc.z * vc.z;
+        let y = Scalar::from_bytes_mod_order(vc.y);
+        let z = Scalar::from_bytes_mod_order(vc.z);
+        let zz = z * z;
         let mut exp_y = offset_y; // start at y^j
         let mut exp_2 = Scalar::one(); // start at 2^0 = 1
         for i in 0..n {
             let a_L_i = Scalar::from((self.v >> i) & 1);
             let a_R_i = a_L_i - Scalar::one();
 
-            l_poly.0[i] = a_L_i - vc.z;
+            l_poly.0[i] = a_L_i - z;
             l_poly.1[i] = self.s_L[i];
-            r_poly.0[i] = exp_y * (a_R_i + vc.z) + zz * offset_z * exp_2;
+            r_poly.0[i] = exp_y * (a_R_i + z) + zz * offset_z * exp_2;
             r_poly.1[i] = exp_y * self.s_R[i];
 
-            exp_y *= vc.y; // y^i -> y^(i+1)
+            exp_y *= y; // y^i -> y^(i+1)
             exp_2 = exp_2 + exp_2; // 2^i -> 2^(i+1)
         }
 
@@ -191,15 +193,15 @@ impl<'a> PartyAwaitingBitChallenge<'a> {
         let T_2 = self.pc_gens.commit(t_poly.2, t_2_blinding);
 
         let poly_commitment = PolyCommitment {
-            T_1_j: T_1,
-            T_2_j: T_2,
+            T_1_j: T_1.compress().to_bytes(),
+            T_2_j: T_2.compress().to_bytes(),
         };
 
         let papc = PartyAwaitingPolyChallenge {
             v_blinding: self.v_blinding,
             a_blinding: self.a_blinding,
             s_blinding: self.s_blinding,
-            z: vc.z,
+            z: z,
             offset_z,
             l_poly,
             r_poly,
@@ -258,7 +260,8 @@ impl PartyAwaitingPolyChallenge {
     ) -> Result<ProofShare, MPCError> {
         // Prevent a malicious dealer from annihilating the blinding
         // factors by supplying a zero challenge.
-        if pc.x == Scalar::zero() {
+        let pc_x = Scalar::from_bytes_mod_order(pc.x);
+        if pc_x == Scalar::zero() {
             return Err(MPCError::MaliciousDealer);
         }
 
@@ -268,18 +271,18 @@ impl PartyAwaitingPolyChallenge {
             self.t_2_blinding,
         );
 
-        let t_x = self.t_poly.eval(pc.x);
-        let t_x_blinding = t_blinding_poly.eval(pc.x);
-        let e_blinding = self.a_blinding + self.s_blinding * &pc.x;
-        let l_vec = self.l_poly.eval(pc.x);
-        let r_vec = self.r_poly.eval(pc.x);
+        let t_x = self.t_poly.eval(pc_x);
+        let t_x_blinding = t_blinding_poly.eval(pc_x);
+        let e_blinding = self.a_blinding + self.s_blinding * &pc_x;
+        let l_vec = self.l_poly.eval(pc_x);
+        let r_vec = self.r_poly.eval(pc_x);
 
         Ok(ProofShare {
-            t_x_blinding,
-            t_x,
-            e_blinding,
-            l_vec,
-            r_vec,
+            t_x_blinding: t_x_blinding.to_bytes(),
+            t_x: t_x.to_bytes(),
+            e_blinding: e_blinding.to_bytes(),
+            l_vec: l_vec.iter().map(|l| l.to_bytes()).collect(),
+            r_vec: r_vec.iter().map(|r| r.to_bytes()).collect(),
         })
     }
 }

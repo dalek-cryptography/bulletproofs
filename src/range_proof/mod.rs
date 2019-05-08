@@ -246,7 +246,7 @@ impl RangeProof {
 
         let proof = dealer.receive_trusted_shares(&proof_shares)?;
 
-        Ok((proof, value_commitments))
+        Ok((proof, value_commitments.iter().map(|s| CompressedRistretto::from_slice(s)).collect()))
     }
 
     /// Verifies a rangeproof for a given value commitment \\(V\\).
