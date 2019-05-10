@@ -1,3 +1,5 @@
+//! A zkInterface backend using Bulletproofs.
+
 extern crate curve25519_dalek;
 extern crate merlin;
 extern crate rand;
@@ -24,10 +26,10 @@ use std::collections::HashMap;
 use std::error::Error;
 
 
-// Generate a proof using zkInterface messages:
-// - `Circuit` contains the public inputs.
-// - `R1CSConstraints` contains an R1CS which we convert to an arithmetic circuit on the fly.
-// - `Witness` contains the values to assign to all variables.
+/// Generate a proof using zkInterface messages:
+/// - `Circuit` contains the public inputs.
+/// - `R1CSConstraints` contains an R1CS which we convert to an arithmetic circuit on the fly.
+/// - `Witness` contains the values to assign to all variables.
 pub fn prove(messages: &Messages) -> Result<R1CSProof, Box<Error>> {
     // Common
     let pc_gens = PedersenGens::default();
@@ -55,9 +57,9 @@ pub fn prove(messages: &Messages) -> Result<R1CSProof, Box<Error>> {
 }
 
 
-// Verify a proof using zkInterface messages:
-// - `Circuit` contains the public inputs.
-// - `R1CSConstraints` contains an R1CS which we convert to an arithmetic circuit on the fly.
+/// Verify a proof using zkInterface messages:
+/// - `Circuit` contains the public inputs.
+/// - `R1CSConstraints` contains an R1CS which we convert to an arithmetic circuit on the fly.
 pub fn verify(messages: &Messages, proof: &R1CSProof) -> Result<(), Box<Error>> {
     // Common
     let pc_gens = PedersenGens::default();
@@ -83,6 +85,7 @@ pub fn verify(messages: &Messages, proof: &R1CSProof) -> Result<(), Box<Error>> 
 }
 
 
+/// A gadget using a circuit in zkInterface messages.
 pub fn gadget_from_messages<CS: ConstraintSystem>(
     cs: &mut CS,
     messages: &Messages,

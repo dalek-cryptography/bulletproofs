@@ -8,7 +8,7 @@ mod linear_combination;
 mod proof;
 mod prover;
 mod verifier;
-mod zkinterface_backend;
+pub mod zkinterface_backend;
 
 pub use self::constraint_system::ConstraintSystem;
 pub use self::linear_combination::{LinearCombination, Variable};

@@ -12,7 +12,7 @@ use merlin::Transcript;
 use errors::ProofError;
 use transcript::TranscriptProtocol;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct InnerProductProof {
     pub(crate) L_vec: Vec<CompressedRistretto>,
     pub(crate) R_vec: Vec<CompressedRistretto>,

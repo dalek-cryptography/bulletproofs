@@ -21,7 +21,7 @@ use inner_product_proof::InnerProductProof;
 /// the constraint system using
 /// [`VerifierCS::verify`](::r1cs::VerifierCS::verify) to verify the
 /// proof.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[allow(non_snake_case)]
 pub struct R1CSProof {
     /// Commitment to the values of input wires
