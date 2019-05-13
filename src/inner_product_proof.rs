@@ -1,13 +1,19 @@
 #![allow(non_snake_case)]
 #![doc(include = "../docs/inner-product-protocol.md")]
 
-use std::borrow::Borrow;
-use std::iter;
+cfg_if::cfg_if! {
+    if #[cfg(feature = "std")] {
+        use std::borrow::Borrow;
+        use std::iter;
+    }
+}
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "alloc")] {
         extern crate alloc;
         use alloc::vec::Vec;
+        use alloc::iter;
+        use alloc::borrow::Borrow;
     }
 }
 
