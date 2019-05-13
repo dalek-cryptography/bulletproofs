@@ -71,7 +71,7 @@ pub fn exp_iter(x: Scalar) -> ScalarExp {
 pub fn add_vec(a: &[Scalar], b: &[Scalar]) -> Vec<Scalar> {
     if a.len() != b.len() {
         // throw some error
-        println!("lengths of vectors don't match for vector addition");
+        //println!("lengths of vectors don't match for vector addition");
     }
     let mut out = vec![Scalar::zero(); b.len()];
     for i in 0..a.len() {
