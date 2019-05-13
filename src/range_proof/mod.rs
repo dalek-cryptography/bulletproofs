@@ -68,6 +68,88 @@ pub struct RangeProof {
     ipp_proof: InnerProductProof,
 }
 
+/// In order to get around weird serde nostd issues with curve255519-dalek,
+/// our custom bulletproofs fork no longer does any curve serde ops.  Some
+/// of the internal bulletproofs data structures were changed to use byte buffers
+/// which were converted as needed.  But the main RangeProof data structure
+/// was left alone, it just had the De/Serialize derivations removed.  So we need a parallel
+/// data structure here that does support naive serialization.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct SerializedInnerProductProof {
+    pub L_vec: Vec<[u8; 32]>,
+    pub R_vec: Vec<[u8; 32]>,
+    pub a: [u8; 32],
+    pub b: [u8; 32],
+}
+
+impl SerializedInnerProductProof {
+    pub fn from(proof: &InnerProductProof) -> SerializedInnerProductProof {
+        SerializedInnerProductProof {
+            L_vec: proof.L_vec.iter().map(|cr| cr.to_bytes()).collect(),
+            R_vec: proof.R_vec.iter().map(|cr| cr.to_bytes()).collect(),
+            a: proof.a.to_bytes(),
+            b: proof.b.to_bytes(),
+        }
+    }
+
+    pub fn to_inner_product_proof(self) -> InnerProductProof {
+        InnerProductProof {
+            L_vec: self.L_vec.iter().map(|b| CompressedRistretto::from_slice(b)).collect(),
+            R_vec: self.R_vec.iter().map(|b| CompressedRistretto::from_slice(b)).collect(),
+            a: Scalar::from_bytes_mod_order(self.a),
+            b: Scalar::from_bytes_mod_order(self.b),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct SerializedRangeProof {
+    /// Commitment to the bits of the value
+    A: [u8; 32],
+    /// Commitment to the blinding factors
+    S: [u8; 32],
+    /// Commitment to the \\(t_1\\) coefficient of \\( t(x) \\)
+    T_1: [u8; 32],
+    /// Commitment to the \\(t_2\\) coefficient of \\( t(x) \\)
+    T_2: [u8; 32],
+    /// Evaluation of the polynomial \\(t(x)\\) at the challenge point \\(x\\)
+    t_x: [u8; 32],
+    /// Blinding factor for the synthetic commitment to \\(t(x)\\)
+    t_x_blinding: [u8; 32],
+    /// Blinding factor for the synthetic commitment to the inner-product arguments
+    e_blinding: [u8; 32],
+    /// Proof data for the inner-product argument.
+    ipp_proof: SerializedInnerProductProof,
+}
+
+impl SerializedRangeProof {
+    pub fn from(proof: &RangeProof) -> SerializedRangeProof {
+        SerializedRangeProof {
+            A: proof.A.to_bytes(),
+            S: proof.S.to_bytes(),
+            T_1: proof.T_1.to_bytes(),
+            T_2: proof.T_2.to_bytes(),
+            t_x: proof.t_x.to_bytes(),
+            t_x_blinding: proof.t_x_blinding.to_bytes(),
+            e_blinding: proof.e_blinding.to_bytes(),
+            ipp_proof: SerializedInnerProductProof::from(&proof.ipp_proof),
+        }
+    }
+
+    pub fn to_range_proof(self) -> RangeProof {
+        RangeProof {
+            A: CompressedRistretto::from_slice(&self.A),
+            S: CompressedRistretto::from_slice(&self.S),
+            T_1: CompressedRistretto::from_slice(&self.T_1),
+            T_2: CompressedRistretto::from_slice(&self.T_2),
+            t_x: Scalar::from_bytes_mod_order(self.t_x),
+            t_x_blinding: Scalar::from_bytes_mod_order(self.t_x_blinding),
+            e_blinding: Scalar::from_bytes_mod_order(self.e_blinding),
+            ipp_proof: self.ipp_proof.to_inner_product_proof(),
+        }
+    }
+}
+
 impl RangeProof {
     /// Create a rangeproof for a given pair of value `v` and
     /// blinding scalar `v_blinding`.
