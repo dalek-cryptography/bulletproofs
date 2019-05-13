@@ -1,6 +1,13 @@
 #![allow(non_snake_case)]
 #![doc(include = "../../docs/range-proof-protocol.md")]
 
+cfg_if::cfg_if! {
+    if #[cfg(feature = "alloc")] {
+        extern crate alloc;
+        use alloc::vec::Vec;
+    }
+}
+
 use std::iter;
 
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};

@@ -1,6 +1,13 @@
 #![deny(missing_docs)]
 #![allow(non_snake_case)]
 
+cfg_if::cfg_if! {
+    if #[cfg(feature = "alloc")] {
+        extern crate alloc;
+        use alloc::vec::Vec;
+    }
+}
+
 use clear_on_drop::clear::Clear;
 use curve25519_dalek::scalar::Scalar;
 use inner_product_proof::inner_product;
