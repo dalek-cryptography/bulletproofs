@@ -10,6 +10,13 @@
 //! modules orchestrate the protocol execution, see the documentation
 //! in the [`aggregation`](::range_proof_mpc) module.
 
+cfg_if::cfg_if! {
+    if #[cfg(feature = "alloc")] {
+        extern crate alloc;
+        use alloc::vec::Vec;
+    }
+}
+
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::MultiscalarMul;

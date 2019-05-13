@@ -4,12 +4,16 @@
 //! For more explanation of how the `dealer`, `party`, and `messages` modules orchestrate the protocol execution, see
 //! [the API for the aggregated multiparty computation protocol](../aggregation/index.html#api-for-the-aggregated-multiparty-computation-protocol).
 
-<<<<<<< HEAD
 use core::iter;
 use curve25519_dalek::ristretto::RistrettoPoint;
-=======
-use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
->>>>>>> use upstream dalek curve release, without using serde; remove all naive Ristretto and Scalar serialization; convert to and from byte arrays when dealing with serialized data structures
+
+cfg_if::cfg_if! {
+    if #[cfg(feature = "alloc")] {
+        extern crate alloc;
+        use alloc::vec::Vec;
+    }
+}
+
 use curve25519_dalek::scalar::Scalar;
 use merlin::Transcript;
 
