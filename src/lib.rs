@@ -1,3 +1,4 @@
+#![cfg_attr(not(feature = "std"), no_std)]
 #![feature(nll)]
 #![feature(external_doc)]
 #![feature(try_trait)]
