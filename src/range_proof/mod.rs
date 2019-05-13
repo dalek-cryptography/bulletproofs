@@ -8,7 +8,7 @@ cfg_if::cfg_if! {
     }
 }
 
-use std::iter;
+use core::iter;
 
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
