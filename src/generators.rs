@@ -4,6 +4,13 @@
 #![allow(non_snake_case)]
 #![deny(missing_docs)]
 
+cfg_if::cfg_if! {
+    if #[cfg(feature = "alloc")] {
+        extern crate alloc;
+        use alloc::vec::Vec;
+    }
+}
+
 use curve25519_dalek::constants::RISTRETTO_BASEPOINT_COMPRESSED;
 use curve25519_dalek::constants::RISTRETTO_BASEPOINT_POINT;
 use curve25519_dalek::ristretto::RistrettoPoint;
