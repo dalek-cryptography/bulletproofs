@@ -12,7 +12,7 @@ use super::{
 };
 
 use errors::R1CSError;
-use generators::{BulletproofGens, PedersenGens};
+use generators::{BulletproofGens, BulletproofGensTrait, PedersenGens};
 use transcript::TranscriptProtocol;
 
 /// A [`ConstraintSystem`] implementation for use by the verifier.

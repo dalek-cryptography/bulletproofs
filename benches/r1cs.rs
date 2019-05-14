@@ -122,7 +122,7 @@ impl KShuffleGadget {
 
     pub fn prove<'a, 'b>(
         pc_gens: &'b PedersenGens,
-        bp_gens: &'b BulletproofGens,
+        bp_gens: &'b mut BulletproofGens,
         transcript: &'a mut Transcript,
         input: &[Scalar],
         output: &[Scalar],
@@ -156,7 +156,7 @@ impl KShuffleGadget {
             .unzip();
 
         Self::fill_cs(&mut prover, input_vars, output_vars)?;
-        let proof = prover.prove(&bp_gens)?;
+        let proof = prover.prove(bp_gens)?;
 
         Ok((proof, input_commitments, output_commitments))
     }
@@ -206,11 +206,17 @@ fn bench_kshuffle_prove(c: &mut Criterion) {
 
             // Make kshuffle proof
             let pc_gens = PedersenGens::default();
-            let bp_gens = BulletproofGens::new(128, 1);
+            let mut bp_gens = BulletproofGens::new(128, 1);
             b.iter(|| {
                 let mut prover_transcript = Transcript::new(b"ShuffleTest");
-                KShuffleGadget::prove(&pc_gens, &bp_gens, &mut prover_transcript, &input, &output)
-                    .unwrap();
+                KShuffleGadget::prove(
+                    &pc_gens,
+                    &mut bp_gens,
+                    &mut prover_transcript,
+                    &input,
+                    &output,
+                )
+                .unwrap();
             })
         },
         vec![8, 16, 32, 64, 17],
@@ -239,11 +245,16 @@ fn bench_kshuffle_verify(c: &mut Criterion) {
 
             // Make kshuffle proof
             let pc_gens = PedersenGens::default();
-            let bp_gens = BulletproofGens::new(128, 1);
+            let mut bp_gens = BulletproofGens::new(128, 1);
             let mut prover_transcript = Transcript::new(b"ShuffleTest");
-            let (proof, in_commitments, out_commitments) =
-                KShuffleGadget::prove(&pc_gens, &bp_gens, &mut prover_transcript, &input, &output)
-                    .unwrap();
+            let (proof, in_commitments, out_commitments) = KShuffleGadget::prove(
+                &pc_gens,
+                &mut bp_gens,
+                &mut prover_transcript,
+                &input,
+                &output,
+            )
+            .unwrap();
 
             // Verify kshuffle proof
             b.iter(|| {
