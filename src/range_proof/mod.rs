@@ -11,7 +11,6 @@ cfg_if::cfg_if! {
 cfg_if::cfg_if! {
     if #[cfg(feature = "std")] {
         extern crate rand;
-        use self::rand::rngs::ThreadRng;
         use self::rand::thread_rng;
     }
 }
@@ -155,7 +154,8 @@ impl RangeProof {
 
     /// Create a rangeproof for a given pair of value `v` and
     /// blinding scalar `v_blinding`.
-    /// This is a convenience wrapper around [`RangeProof::prove_single_with_rng`].
+    /// This is a convenience wrapper around [`RangeProof::prove_single_with_rng`],
+    /// passing in a threadsafe RNG.
     #[cfg(feature = "std")]
     pub fn prove_single(
         bp_gens: &BulletproofGens,
@@ -165,8 +165,7 @@ impl RangeProof {
         v_blinding: &Scalar,
         n: usize,
     ) -> Result<(RangeProof, CompressedRistretto), ProofError> {
-        let mut rng: ThreadRng = thread_rng();
-        RangeProof::prove_single_with_rng(bp_gens, pc_gens, transcript, v, v_blinding, n, &mut rng)
+        RangeProof::prove_single_with_rng(bp_gens, pc_gens, transcript, v, v_blinding, n, &mut thread_rng())
     }
 
     /// Create a rangeproof for a set of values.
@@ -279,7 +278,9 @@ impl RangeProof {
         Ok((proof, value_commitments))
     }
 
-    /// Create a rangeproof for a set of values, passing in a threadsafe RNG (std mode only)
+    /// Create a rangeproof for a set of values.
+    /// This is a convenience wrapper around [`RangeProof::prove_multiple_with_rng`],
+    /// passing in a threadsafe RNG.
     #[cfg(feature = "std")]
     pub fn prove_multiple(
         bp_gens: &BulletproofGens,
@@ -309,7 +310,8 @@ impl RangeProof {
 
     /// Verifies a rangeproof for a given value commitment \\(V\\).
     ///
-    /// This is a convenience wrapper around `verify_multiple` for the `m=1` case.
+    /// This is a convenience wrapper around [`RangeProof::verify_single_with_rng`],
+    /// passing in a threadsafe RNG.
     #[cfg(feature = "std")]
     pub fn verify_single(
         &self,
@@ -433,6 +435,8 @@ impl RangeProof {
     }
 
     /// Verifies an aggregated rangeproof for the given value commitments.
+    /// This is a convenience wrapper around [`RangeProof::verify_multiple_with_rng`],
+    /// passing in a threadsafe RNG.
     #[cfg(feature = "std")]
     pub fn verify_multiple(
         &self,
