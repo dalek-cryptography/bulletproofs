@@ -308,7 +308,7 @@ impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
         // See comment in `Dealer::new` for why we use `initial_transcript`
         let transcript = &mut self.initial_transcript;
         if proof
-            .verify_multiple(self.bp_gens, self.pc_gens, transcript, &Vs, self.n, rng)
+            .verify_multiple_with_rng(self.bp_gens, self.pc_gens, transcript, &Vs, self.n, rng)
             .is_ok()
         {
             Ok(proof)

@@ -8,6 +8,14 @@ cfg_if::cfg_if! {
     }
 }
 
+cfg_if::cfg_if! {
+    if #[cfg(feature = "std")] {
+        extern crate rand;
+        use self::rand::rngs::ThreadRng;
+        use self::rand::thread_rng;
+    }
+}
+
 use core::iter;
 
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
@@ -131,7 +139,7 @@ impl RangeProof {
     /// );
     /// # }
     /// ```
-    pub fn prove_single<T: RngCore + CryptoRng>(
+    pub fn prove_single_with_rng<T: RngCore + CryptoRng>(
         bp_gens: &BulletproofGens,
         pc_gens: &PedersenGens,
         transcript: &mut Transcript,
@@ -141,8 +149,24 @@ impl RangeProof {
         rng: &mut T,
     ) -> Result<(RangeProof, CompressedRistretto), ProofError> {
         let (p, Vs) =
-            RangeProof::prove_multiple(bp_gens, pc_gens, transcript, &[v], &[*v_blinding], n, rng)?;
+            RangeProof::prove_multiple_with_rng(bp_gens, pc_gens, transcript, &[v], &[*v_blinding], n, rng)?;
         Ok((p, Vs[0]))
+    }
+
+    /// Create a rangeproof for a given pair of value `v` and
+    /// blinding scalar `v_blinding`.
+    /// This is a convenience wrapper around [`RangeProof::prove_single_with_rng`].
+    #[cfg(feature = "std")]
+    pub fn prove_single(
+        bp_gens: &BulletproofGens,
+        pc_gens: &PedersenGens,
+        transcript: &mut Transcript,
+        v: u64,
+        v_blinding: &Scalar,
+        n: usize,
+    ) -> Result<(RangeProof, CompressedRistretto), ProofError> {
+        let mut rng: ThreadRng = thread_rng();
+        RangeProof::prove_single_with_rng(bp_gens, pc_gens, transcript, v, v_blinding, n, &mut rng)
     }
 
     /// Create a rangeproof for a set of values.
@@ -199,7 +223,7 @@ impl RangeProof {
     /// );
     /// # }
     /// ```
-    pub fn prove_multiple<T: RngCore + CryptoRng>(
+    pub fn prove_multiple_with_rng<T: RngCore + CryptoRng>(
         bp_gens: &BulletproofGens,
         pc_gens: &PedersenGens,
         transcript: &mut Transcript,
@@ -255,10 +279,23 @@ impl RangeProof {
         Ok((proof, value_commitments))
     }
 
+    /// Create a rangeproof for a set of values, passing in a threadsafe RNG (std mode only)
+    #[cfg(feature = "std")]
+    pub fn prove_multiple(
+        bp_gens: &BulletproofGens,
+        pc_gens: &PedersenGens,
+        transcript: &mut Transcript,
+        values: &[u64],
+        blindings: &[Scalar],
+        n: usize,
+    ) -> Result<(RangeProof, Vec<CompressedRistretto>), ProofError> {
+        RangeProof::prove_multiple_with_rng(bp_gens, pc_gens, transcript, values, blindings, n, &mut thread_rng())
+    }
+    
     /// Verifies a rangeproof for a given value commitment \\(V\\).
     ///
     /// This is a convenience wrapper around `verify_multiple` for the `m=1` case.
-    pub fn verify_single<T: RngCore + CryptoRng>(
+    pub fn verify_single_with_rng<T: RngCore + CryptoRng>(
         &self,
         bp_gens: &BulletproofGens,
         pc_gens: &PedersenGens,
@@ -267,11 +304,26 @@ impl RangeProof {
         n: usize,
         rng: &mut T,
     ) -> Result<(), ProofError> {
-        self.verify_multiple(bp_gens, pc_gens, transcript, &[*V], n, rng)
+        self.verify_multiple_with_rng(bp_gens, pc_gens, transcript, &[*V], n, rng)
     }
 
+    /// Verifies a rangeproof for a given value commitment \\(V\\).
+    ///
+    /// This is a convenience wrapper around `verify_multiple` for the `m=1` case.
+    #[cfg(feature = "std")]
+    pub fn verify_single(
+        &self,
+        bp_gens: &BulletproofGens,
+        pc_gens: &PedersenGens,
+        transcript: &mut Transcript,
+        V: &CompressedRistretto,
+        n: usize,
+    ) -> Result<(), ProofError> {
+        self.verify_single_with_rng(bp_gens, pc_gens, transcript, V, n, &mut thread_rng())
+    }
+    
     /// Verifies an aggregated rangeproof for the given value commitments.
-    pub fn verify_multiple<T: RngCore + CryptoRng>(
+    pub fn verify_multiple_with_rng<T: RngCore + CryptoRng>(
         &self,
         bp_gens: &BulletproofGens,
         pc_gens: &PedersenGens,
@@ -380,6 +432,20 @@ impl RangeProof {
         }
     }
 
+    /// Verifies an aggregated rangeproof for the given value commitments.
+    #[cfg(feature = "std")]
+    pub fn verify_multiple(
+        &self,
+        bp_gens: &BulletproofGens,
+        pc_gens: &PedersenGens,
+        transcript: &mut Transcript,
+        value_commitments: &[CompressedRistretto],
+        n: usize,
+    ) -> Result<(), ProofError> {
+        self.verify_multiple_with_rng(bp_gens, pc_gens, transcript, value_commitments, n, &mut thread_rng())
+    }
+
+    
     /// Serializes the proof into a byte array of \\(2 \lg n + 9\\)
     /// 32-byte elements, where \\(n\\) is the number of secret bits.
     ///

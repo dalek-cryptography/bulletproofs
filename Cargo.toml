@@ -36,7 +36,7 @@ rand_chacha = "0.1"
 default = ["std", "avx2_backend"]
 avx2_backend = ["curve25519-dalek/avx2_backend"]
 yoloproofs = []
-std = ["serde/std", "curve25519-dalek/std", "merlin/std"]
+std = ["rand/std", "serde/std", "curve25519-dalek/std", "merlin/std"]
 alloc = ["rand_core/alloc", "serde/alloc", "curve25519-dalek/alloc", "merlin/alloc"]
 
 [[test]]
