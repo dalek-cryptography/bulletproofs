@@ -331,9 +331,9 @@ impl<'t> Verifier<'t> {
         self.transcript.append_u64(b"m", self.V.len() as u64);
 
         let n1 = self.num_vars;
-        self.transcript.append_point(b"A_I1", &proof.A_I1);
-        self.transcript.append_point(b"A_O1", &proof.A_O1);
-        self.transcript.append_point(b"S1", &proof.S1);
+        self.transcript.validate_and_append_point(b"A_I1", &proof.A_I1)?;
+        self.transcript.validate_and_append_point(b"A_O1", &proof.A_O1)?;
+        self.transcript.validate_and_append_point(b"S1", &proof.S1)?;
 
         // Process the remaining constraints.
         self = self.create_randomized_constraints()?;
@@ -354,6 +354,7 @@ impl<'t> Verifier<'t> {
         // We are performing a single-party circuit proof, so party index is 0.
         let gens = bp_gens.share(0);
 
+        // These points are the identity in the 1-phase unrandomized case.
         self.transcript.append_point(b"A_I2", &proof.A_I2);
         self.transcript.append_point(b"A_O2", &proof.A_O2);
         self.transcript.append_point(b"S2", &proof.S2);
@@ -361,11 +362,11 @@ impl<'t> Verifier<'t> {
         let y = self.transcript.challenge_scalar(b"y");
         let z = self.transcript.challenge_scalar(b"z");
 
-        self.transcript.append_point(b"T_1", &proof.T_1);
-        self.transcript.append_point(b"T_3", &proof.T_3);
-        self.transcript.append_point(b"T_4", &proof.T_4);
-        self.transcript.append_point(b"T_5", &proof.T_5);
-        self.transcript.append_point(b"T_6", &proof.T_6);
+        self.transcript.validate_and_append_point(b"T_1", &proof.T_1)?;
+        self.transcript.validate_and_append_point(b"T_3", &proof.T_3)?;
+        self.transcript.validate_and_append_point(b"T_4", &proof.T_4)?;
+        self.transcript.validate_and_append_point(b"T_5", &proof.T_5)?;
+        self.transcript.validate_and_append_point(b"T_6", &proof.T_6)?;
 
         let u = self.transcript.challenge_scalar(b"u");
         let x = self.transcript.challenge_scalar(b"x");
