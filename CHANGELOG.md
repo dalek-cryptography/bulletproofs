@@ -2,6 +2,15 @@
 
 Entries are listed in reverse chronological order.
 
+## 1.0.2
+
+* Updates the library to use the renamed functions in Merlin 1.1.
+* Adds additional validation checks to prevent identity points being used as
+  part of a proof.  This does not appear to have security content, but is
+  intended as a defense-in-depth mechanism.  
+  See [this comment][identity_comment] for more motivation.
+* Documentation tweaks.
+
 ## 1.0.1
 
 * Tweaks to crate metadata.
@@ -20,3 +29,4 @@ Entries are listed in reverse chronological order.
 Initial prerelease version, supporting single and aggregated range proofs, and
 multiparty proof aggregation.
 
+[identity_comment]: https://github.com/dalek-cryptography/bulletproofs/pull/248#discussion_r251916724

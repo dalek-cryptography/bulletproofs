@@ -78,9 +78,10 @@ impl ShuffleProof {
         R1CSError,
     > {
         // Apply a domain separator with the shuffle parameters to the transcript
+        // XXX should this be part of the gadget?
         let k = input.len();
-        transcript.commit_bytes(b"dom-sep", b"ShuffleProof");
-        transcript.commit_bytes(b"k", Scalar::from(k as u64).as_bytes());
+        transcript.append_message(b"dom-sep", b"ShuffleProof");
+        transcript.append_u64(b"k", k as u64);
 
         let mut prover = Prover::new(&pc_gens, transcript);
 
@@ -117,9 +118,10 @@ impl ShuffleProof {
         output_commitments: &Vec<CompressedRistretto>,
     ) -> Result<(), R1CSError> {
         // Apply a domain separator with the shuffle parameters to the transcript
+        // XXX should this be part of the gadget?
         let k = input_commitments.len();
-        transcript.commit_bytes(b"dom-sep", b"ShuffleProof");
-        transcript.commit_bytes(b"k", Scalar::from(k as u64).as_bytes());
+        transcript.append_message(b"dom-sep", b"ShuffleProof");
+        transcript.append_u64(b"k", k as u64);
 
         let mut verifier = Verifier::new(transcript);
 
