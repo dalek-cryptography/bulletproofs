@@ -13,7 +13,7 @@ description = "A pure-Rust implementation of Bulletproofs using Ristretto"
 
 [dependencies]
 cfg-if = "0.1"
-curve25519-dalek = { version = "1.2", default-features = false, features = ["u64_backend", "nightly", "serde"] }
+curve25519-dalek = { version = "1", default-features = false, features = ["u64_backend", "nightly", "serde"] }
 subtle = { version = "2", default-features = false }
 sha3 = { version = "0.8", default-features = false }
 digest = { version = "0.8", default-features = false }
