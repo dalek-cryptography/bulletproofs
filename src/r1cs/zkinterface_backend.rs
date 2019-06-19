@@ -5,26 +5,23 @@ extern crate merlin;
 extern crate rand;
 extern crate zkinterface;
 
-use BulletproofGens;
-use curve25519_dalek::{
-    scalar::Scalar,
-};
+use self::zkinterface::reading::Messages;
+use self::zkinterface::reading::Term;
+use curve25519_dalek::scalar::Scalar;
 use errors::R1CSError;
 use failure::Fail;
 use merlin::Transcript;
-use PedersenGens;
 use r1cs::ConstraintSystem;
 use r1cs::LinearCombination;
 use r1cs::Prover;
 use r1cs::R1CSProof;
 use r1cs::Variable;
 use r1cs::Verifier;
-use self::zkinterface::reading::Messages;
-use self::zkinterface::reading::Term;
 use std::cmp::min;
 use std::collections::HashMap;
 use std::error::Error;
-
+use BulletproofGens;
+use PedersenGens;
 
 /// Generate a proof using zkInterface messages:
 /// - `Circuit` contains the public inputs.
@@ -50,12 +47,10 @@ pub fn prove(messages: &Messages) -> Result<R1CSProof, Box<Error>> {
     gadget_from_messages(&mut cs, messages, true)?;
 
     // 4. Make a proof
-    let proof = cs.prove()
-        .map_err(|e| e.compat())?;
+    let proof = cs.prove().map_err(|e| e.compat())?;
 
     Ok(proof)
 }
-
 
 /// Verify a proof using zkInterface messages:
 /// - `Circuit` contains the public inputs.
@@ -84,17 +79,18 @@ pub fn verify(messages: &Messages, proof: &R1CSProof) -> Result<(), Box<Error>> 
         .map_err(|_| R1CSError::VerificationError.compat().into())
 }
 
-
 /// A gadget using a circuit in zkInterface messages.
 pub fn gadget_from_messages<CS: ConstraintSystem>(
     cs: &mut CS,
     messages: &Messages,
     prover: bool,
 ) -> Result<(), Box<Error>> {
-    let public_vars = messages.connection_variables()
+    let public_vars = messages
+        .connection_variables()
         .ok_or("Missing Circuit.connections")?;
 
-    let private_vars = messages.private_variables()
+    let private_vars = messages
+        .private_variables()
         .ok_or("Missing Circuit.connections")?;
 
     // Map zkif variables to Bulletproofs's equivalent, LinearCombination.
@@ -139,12 +135,16 @@ pub fn gadget_from_messages<CS: ConstraintSystem>(
     let mut gates_c = vec![];
 
     for constraint in messages.iter_constraints() {
-        let (gate_a, gate_b, gate_c) = cs.allocate(|| Ok((
-            // Prover evaluates the incoming linear combinations using the witness.
-            eval_zkif_lc(&id_to_value, &constraint.a),
-            eval_zkif_lc(&id_to_value, &constraint.b),
-            eval_zkif_lc(&id_to_value, &constraint.c),
-        ))).map_err(|e| e.compat())?;
+        let (gate_a, gate_b, gate_c) = cs
+            .allocate(|| {
+                Ok((
+                    // Prover evaluates the incoming linear combinations using the witness.
+                    eval_zkif_lc(&id_to_value, &constraint.a),
+                    eval_zkif_lc(&id_to_value, &constraint.b),
+                    eval_zkif_lc(&id_to_value, &constraint.c),
+                ))
+            })
+            .map_err(|e| e.compat())?;
 
         gates_a.push(gate_a);
         gates_b.push(gate_b);
@@ -156,15 +156,17 @@ pub fn gadget_from_messages<CS: ConstraintSystem>(
     // Step 2: Allocate extra gates for variables that are not yet defined.
     for circuit_var in private_vars.iter() {
         if !id_to_lc.contains_key(&circuit_var.id) {
-            let (gate_var, _, _) = cs.allocate(|| {
-                // Prover takes the value from witness.
-                let val = id_to_value.get(&circuit_var.id);
-                Ok((
-                    val.unwrap().clone(),
-                    Scalar::zero(), // Dummy.
-                    Scalar::zero(), // Dummy.
-                ))
-            }).map_err(|e| e.compat())?;
+            let (gate_var, _, _) = cs
+                .allocate(|| {
+                    // Prover takes the value from witness.
+                    let val = id_to_value.get(&circuit_var.id);
+                    Ok((
+                        val.unwrap().clone(),
+                        Scalar::zero(), // Dummy.
+                        Scalar::zero(), // Dummy.
+                    ))
+                })
+                .map_err(|e| e.compat())?;
 
             id_to_lc.insert(circuit_var.id, gate_var.into());
             println!("private{} allocated to {:?}", circuit_var.id, gate_var);
@@ -222,8 +224,7 @@ fn scalar_from_zkif(le_bytes: &[u8]) -> Result<Scalar, Box<Error>> {
     let mut bytes32 = [0; 32];
     let l = min(le_bytes.len(), 32);
     bytes32[..l].copy_from_slice(&le_bytes[..l]);
-    Scalar::from_canonical_bytes(bytes32)
-        .ok_or("Invalid scalar encoding".into())
+    Scalar::from_canonical_bytes(bytes32).ok_or("Invalid scalar encoding".into())
 }
 
 fn convert_zkif_lc(
@@ -233,7 +234,8 @@ fn convert_zkif_lc(
     let mut lc = LinearCombination::default();
 
     for term in zkif_terms {
-        let var = id_to_lc.get(&term.id)
+        let var = id_to_lc
+            .get(&term.id)
             .ok_or(format!("Unknown var {}", term.id))?;
         let coeff = scalar_from_zkif(term.value)?;
         lc = lc + (var.clone() * coeff);
@@ -242,11 +244,9 @@ fn convert_zkif_lc(
     Ok(lc)
 }
 
-fn eval_zkif_lc(
-    id_to_value: &HashMap<u64, Scalar>,
-    terms: &[Term],
-) -> Scalar {
-    terms.iter()
+fn eval_zkif_lc(id_to_value: &HashMap<u64, Scalar>, terms: &[Term]) -> Scalar {
+    terms
+        .iter()
         .map(|term| {
             let val = match id_to_value.get(&term.id) {
                 Some(s) => s.clone(),
