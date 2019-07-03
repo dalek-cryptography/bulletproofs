@@ -347,7 +347,7 @@ mod tests {
     #[test]
     fn vec_of_scalars_clear_on_drop() {
         let mut v = Vec::new();
-        v.extend_from_slice([Scalar::from(24u64), Scalar::from(42u64)]);
+        v.extend_from_slice(&[Scalar::from(24u64), Scalar::from(42u64)]);
 
         for e in v.iter_mut() {
             e.clear();
