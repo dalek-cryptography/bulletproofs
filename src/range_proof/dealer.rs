@@ -118,7 +118,6 @@ impl<'a, 'b> DealerAwaitingBitCommitments<'a, 'b> {
 
         let S: RistrettoPoint = bit_commitments.iter().map(|vc| vc.S_j).sum();
         self.transcript.append_point(b"S", &S.compress());
->>>>>>> use naive curve point serialization in internal data structures
 
         let y = self.transcript.challenge_scalar(b"y");
         let z = self.transcript.challenge_scalar(b"z");
