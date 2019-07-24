@@ -259,10 +259,7 @@ pub struct PartyAwaitingPolyChallenge {
 impl PartyAwaitingPolyChallenge {
     /// Receive a [`PolyChallenge`] from the dealer and compute the
     /// party's proof share.
-    pub fn apply_challenge(
-        self,
-        pc: &PolyChallenge,
-    ) -> Result<ProofShare, MPCError> {
+    pub fn apply_challenge(self, pc: &PolyChallenge) -> Result<ProofShare, MPCError> {
         // Prevent a malicious dealer from annihilating the blinding
         // factors by supplying a zero challenge.
         if pc.x == Scalar::zero() {

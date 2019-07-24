@@ -29,7 +29,7 @@ use transcript::TranscriptProtocol;
 use util;
 
 use rand_core::{CryptoRng, RngCore};
-use serde::de::Visitor;	
+use serde::de::Visitor;
 use serde::{self, Deserialize, Deserializer, Serialize, Serializer};
 
 // Modules for MPC protocol
@@ -147,8 +147,15 @@ impl RangeProof {
         n: usize,
         rng: &mut T,
     ) -> Result<(RangeProof, CompressedRistretto), ProofError> {
-        let (p, Vs) =
-            RangeProof::prove_multiple_with_rng(bp_gens, pc_gens, transcript, &[v], &[*v_blinding], n, rng)?;
+        let (p, Vs) = RangeProof::prove_multiple_with_rng(
+            bp_gens,
+            pc_gens,
+            transcript,
+            &[v],
+            &[*v_blinding],
+            n,
+            rng,
+        )?;
         Ok((p, Vs[0]))
     }
 
@@ -165,7 +172,15 @@ impl RangeProof {
         v_blinding: &Scalar,
         n: usize,
     ) -> Result<(RangeProof, CompressedRistretto), ProofError> {
-        RangeProof::prove_single_with_rng(bp_gens, pc_gens, transcript, v, v_blinding, n, &mut thread_rng())
+        RangeProof::prove_single_with_rng(
+            bp_gens,
+            pc_gens,
+            transcript,
+            v,
+            v_blinding,
+            n,
+            &mut thread_rng(),
+        )
     }
 
     /// Create a rangeproof for a set of values.
@@ -290,9 +305,17 @@ impl RangeProof {
         blindings: &[Scalar],
         n: usize,
     ) -> Result<(RangeProof, Vec<CompressedRistretto>), ProofError> {
-        RangeProof::prove_multiple_with_rng(bp_gens, pc_gens, transcript, values, blindings, n, &mut thread_rng())
+        RangeProof::prove_multiple_with_rng(
+            bp_gens,
+            pc_gens,
+            transcript,
+            values,
+            blindings,
+            n,
+            &mut thread_rng(),
+        )
     }
-    
+
     /// Verifies a rangeproof for a given value commitment \\(V\\).
     ///
     /// This is a convenience wrapper around `verify_multiple` for the `m=1` case.
@@ -323,7 +346,7 @@ impl RangeProof {
     ) -> Result<(), ProofError> {
         self.verify_single_with_rng(bp_gens, pc_gens, transcript, V, n, &mut thread_rng())
     }
-    
+
     /// Verifies an aggregated rangeproof for the given value commitments.
     pub fn verify_multiple_with_rng<T: RngCore + CryptoRng>(
         &self,
@@ -446,10 +469,16 @@ impl RangeProof {
         value_commitments: &[CompressedRistretto],
         n: usize,
     ) -> Result<(), ProofError> {
-        self.verify_multiple_with_rng(bp_gens, pc_gens, transcript, value_commitments, n, &mut thread_rng())
+        self.verify_multiple_with_rng(
+            bp_gens,
+            pc_gens,
+            transcript,
+            value_commitments,
+            n,
+            &mut thread_rng(),
+        )
     }
 
-    
     /// Serializes the proof into a byte array of \\(2 \lg n + 9\\)
     /// 32-byte elements, where \\(n\\) is the number of secret bits.
     ///

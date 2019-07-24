@@ -116,12 +116,7 @@ impl VecPoly1 {
 impl VecPoly3 {
     pub fn zero(n: usize) -> Self {
         let zn: Vec<Scalar> = (0..n).map(|_| Scalar::zero()).collect();
-        VecPoly3(
-            zn.clone(),
-            zn.clone(),
-            zn.clone(),
-            zn.clone(),
-        )
+        VecPoly3(zn.clone(), zn.clone(), zn.clone(), zn.clone())
     }
 
     /// Compute an inner product of `lhs`, `rhs` which have the property that:
