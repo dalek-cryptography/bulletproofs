@@ -1,5 +1,5 @@
 #![allow(non_snake_case)]
-#![doc(include = "../docs/range-proof-protocol.md")]
+#![doc(include = "../../docs/range-proof-protocol.md")]
 
 use rand;
 
