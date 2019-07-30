@@ -8,7 +8,7 @@ readme = "README.md"
 license = "MIT"
 repository = "https://github.com/dalek-cryptography/bulletproofs"
 categories = ["cryptography"]
-keywords = ["cryptography", "ristretto", "zero-knowledge", "bulletproofs"]
+keywords = ["cryptography", "crypto", "ristretto", "zero-knowledge", "bulletproofs"]
 description = "A pure-Rust implementation of Bulletproofs using Ristretto"
 
 [dependencies]
