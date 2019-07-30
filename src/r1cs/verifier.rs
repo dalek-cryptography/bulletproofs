@@ -331,9 +331,12 @@ impl<'t> Verifier<'t> {
         self.transcript.append_u64(b"m", self.V.len() as u64);
 
         let n1 = self.num_vars;
-        self.transcript.validate_and_append_point(b"A_I1", &proof.A_I1)?;
-        self.transcript.validate_and_append_point(b"A_O1", &proof.A_O1)?;
-        self.transcript.validate_and_append_point(b"S1", &proof.S1)?;
+        self.transcript
+            .validate_and_append_point(b"A_I1", &proof.A_I1)?;
+        self.transcript
+            .validate_and_append_point(b"A_O1", &proof.A_O1)?;
+        self.transcript
+            .validate_and_append_point(b"S1", &proof.S1)?;
 
         // Process the remaining constraints.
         self = self.create_randomized_constraints()?;
@@ -362,11 +365,16 @@ impl<'t> Verifier<'t> {
         let y = self.transcript.challenge_scalar(b"y");
         let z = self.transcript.challenge_scalar(b"z");
 
-        self.transcript.validate_and_append_point(b"T_1", &proof.T_1)?;
-        self.transcript.validate_and_append_point(b"T_3", &proof.T_3)?;
-        self.transcript.validate_and_append_point(b"T_4", &proof.T_4)?;
-        self.transcript.validate_and_append_point(b"T_5", &proof.T_5)?;
-        self.transcript.validate_and_append_point(b"T_6", &proof.T_6)?;
+        self.transcript
+            .validate_and_append_point(b"T_1", &proof.T_1)?;
+        self.transcript
+            .validate_and_append_point(b"T_3", &proof.T_3)?;
+        self.transcript
+            .validate_and_append_point(b"T_4", &proof.T_4)?;
+        self.transcript
+            .validate_and_append_point(b"T_5", &proof.T_5)?;
+        self.transcript
+            .validate_and_append_point(b"T_6", &proof.T_6)?;
 
         let u = self.transcript.challenge_scalar(b"u");
         let x = self.transcript.challenge_scalar(b"x");

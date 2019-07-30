@@ -1,4 +1,5 @@
 #![allow(non_snake_case)]
+
 extern crate bulletproofs;
 extern crate curve25519_dalek;
 extern crate merlin;
