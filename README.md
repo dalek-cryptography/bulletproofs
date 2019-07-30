@@ -2,7 +2,7 @@
 
 <img
  width="100%"
- src="https://user-images.githubusercontent.com/698/46373713-9cc40280-c643-11e8-9bfe-2b0586e40369.png"
+ src="https://doc.dalek.rs/assets/bulletproofs-rangeproof.png"
 />
 
 The fastest [Bulletproofs][bp_website] implementation ever, featuring
@@ -144,6 +144,15 @@ assert!(
         .is_ok()
 );
 # }
+```
+## Building
+
+To compile successfully, you will need to have nightly Rust installed, rather than stable.
+
+You can install nightly Rust with rustup:
+
+```text
+rustup default nightly
 ```
 
 ## Tests and Benchmarks

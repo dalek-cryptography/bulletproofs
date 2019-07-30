@@ -287,24 +287,27 @@ impl RangeProof {
         transcript.rangeproof_domain_sep(n as u64, m as u64);
 
         for V in value_commitments.iter() {
-            transcript.commit_point(b"V", V);
+            // Allow the commitments to be zero (0 value, 0 blinding)
+            // See https://github.com/dalek-cryptography/bulletproofs/pull/248#discussion_r255167177
+            transcript.append_point(b"V", V);
         }
-        transcript.commit_point(b"A", &self.A);
-        transcript.commit_point(b"S", &self.S);
+
+        transcript.validate_and_append_point(b"A", &self.A)?;
+        transcript.validate_and_append_point(b"S", &self.S)?;
 
         let y = transcript.challenge_scalar(b"y");
         let z = transcript.challenge_scalar(b"z");
         let zz = z * z;
         let minus_z = -z;
 
-        transcript.commit_point(b"T_1", &self.T_1);
-        transcript.commit_point(b"T_2", &self.T_2);
+        transcript.validate_and_append_point(b"T_1", &self.T_1)?;
+        transcript.validate_and_append_point(b"T_2", &self.T_2)?;
 
         let x = transcript.challenge_scalar(b"x");
 
-        transcript.commit_scalar(b"t_x", &self.t_x);
-        transcript.commit_scalar(b"t_x_blinding", &self.t_x_blinding);
-        transcript.commit_scalar(b"e_blinding", &self.e_blinding);
+        transcript.append_scalar(b"t_x", &self.t_x);
+        transcript.append_scalar(b"t_x_blinding", &self.t_x_blinding);
+        transcript.append_scalar(b"e_blinding", &self.e_blinding);
 
         let w = transcript.challenge_scalar(b"w");
 
