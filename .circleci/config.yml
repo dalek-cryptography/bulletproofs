@@ -1,0 +1,23 @@
+version: 2
+jobs:
+  build:  # required for runs that don't use workflows
+    docker:
+      - image: rust:1  # primary container for the build job
+    steps:
+      - checkout
+      - restore_cache:
+          key: project-cache
+      - run:
+          name: Nightly Build
+          command: |
+            rustup default nightly
+            rustc --version
+            rustup --version
+            cargo build
+            cargo test
+            cargo bench
+workflows:
+  version: 2
+  build:
+    jobs:
+      - build
