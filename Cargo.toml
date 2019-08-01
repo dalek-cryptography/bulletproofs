@@ -1,6 +1,6 @@
 [package]
 name = "bulletproofs"
-version = "1.0.2"
+version = "1.0.4"
 authors = ["Cathie Yun <cathieyun@gmail.com>", 
            "Henry de Valence <hdevalence@hdevalence.ca>",
            "Oleg Andreev <oleganza@gmail.com>"]
@@ -32,7 +32,11 @@ rand_chacha = "0.1"
 
 [features]
 avx2_backend = ["curve25519-dalek/avx2_backend"]
-yoloproofs = []
+# Disable the yoloproofs feature in the released crate.
+# To test it, use a git dependency on the develop branch and enable the
+# yoloproofs feature.  Note that this means it's impossible to publish a crate
+# depending on the unstable R1CS API.
+#yoloproofs = []
 
 [[test]]
 name = "range_proof"

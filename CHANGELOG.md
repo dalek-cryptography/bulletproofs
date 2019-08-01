@@ -2,6 +2,17 @@
 
 Entries are listed in reverse chronological order.
 
+## 1.0.4
+
+* Change doc-include paths to allow compilation on the latest Rust nightly
+  (which changed the path root).
+* Various changes to the (unreleased, unstable) R1CS implementation, which is
+  disabled in the released version of the code.
+
+## 1.0.3
+
+* Mistakes were made. Yanked and replaced by 1.0.4 above.
+
 ## 1.0.2
 
 * Updates the library to use the renamed functions in Merlin 1.1.
