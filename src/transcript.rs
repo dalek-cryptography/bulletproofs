@@ -16,6 +16,12 @@ pub trait TranscriptProtocol {
     /// Append a domain separator for a constraint system.
     fn r1cs_domain_sep(&mut self);
 
+    /// Commit a domain separator for a CS without randomized constraints.
+    fn r1cs_1phase_domain_sep(&mut self);
+
+    /// Commit a domain separator for a CS with randomized constraints.
+    fn r1cs_2phase_domain_sep(&mut self);
+
     /// Append a `scalar` with the given `label`.
     fn append_scalar(&mut self, label: &'static [u8], scalar: &Scalar);
 
@@ -48,6 +54,14 @@ impl TranscriptProtocol for Transcript {
 
     fn r1cs_domain_sep(&mut self) {
         self.append_message(b"dom-sep", b"r1cs v1");
+    }
+
+    fn r1cs_1phase_domain_sep(&mut self) {
+        self.append_message(b"dom-sep", b"r1cs-1phase");
+    }
+
+    fn r1cs_2phase_domain_sep(&mut self) {
+        self.append_message(b"dom-sep", b"r1cs-2phase");
     }
 
     fn append_scalar(&mut self, label: &'static [u8], scalar: &Scalar) {

@@ -91,12 +91,17 @@ pub enum MPCError {
 }
 
 /// Represents an error during the proving or verifying of a constraint system.
+///
+/// XXX: should this be separate from a `ProofError`?
 #[cfg(feature = "yoloproofs")]
-#[derive(Fail, Copy, Clone, Debug, Eq, PartialEq)]
+#[derive(Fail, Clone, Debug, Eq, PartialEq)]
 pub enum R1CSError {
     /// Occurs when there are insufficient generators for the proof.
     #[fail(display = "Invalid generators size, too few generators for proof")]
     InvalidGeneratorsLength,
+    /// This error occurs when the proof encoding is malformed.
+    #[fail(display = "Proof data could not be parsed.")]
+    FormatError,
     /// Occurs when verification of an
     /// [`R1CSProof`](::r1cs::R1CSProof) fails.
     #[fail(display = "R1CSProof did not verify correctly.")]
@@ -107,4 +112,23 @@ pub enum R1CSError {
     /// a variable assignment is not provided when the prover needs it.
     #[fail(display = "Variable does not have a value assignment.")]
     MissingAssignment,
+
+    /// Occurs when a gadget receives an inconsistent input.
+    #[fail(display = "Gadget error: {:?}", description)]
+    GadgetError {
+        /// The description of the reasons for the error.
+        description: String,
+    },
+}
+
+#[cfg(feature = "yoloproofs")]
+impl From<ProofError> for R1CSError {
+    fn from(e: ProofError) -> R1CSError {
+        match e {
+            ProofError::InvalidGeneratorsLength => R1CSError::InvalidGeneratorsLength,
+            ProofError::FormatError => R1CSError::FormatError,
+            ProofError::VerificationError => R1CSError::VerificationError,
+            _ => panic!("unexpected error type in conversion"),
+        }
+    }
 }

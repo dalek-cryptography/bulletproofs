@@ -1,6 +1,6 @@
 [package]
 name = "bulletproofs"
-version = "1.0.2"
+version = "1.0.4"
 authors = ["Cathie Yun <cathieyun@gmail.com>", 
            "Henry de Valence <hdevalence@hdevalence.ca>",
            "Oleg Andreev <oleganza@gmail.com>"]
@@ -8,7 +8,7 @@ readme = "README.md"
 license = "MIT"
 repository = "https://github.com/dalek-cryptography/bulletproofs"
 categories = ["cryptography"]
-keywords = ["cryptography", "ristretto", "zero-knowledge", "bulletproofs"]
+keywords = ["cryptography", "crypto", "ristretto", "zero-knowledge", "bulletproofs"]
 description = "A pure-Rust implementation of Bulletproofs using Ristretto"
 
 [dependencies]
@@ -32,8 +32,11 @@ rand_chacha = "0.1"
 
 [features]
 avx2_backend = ["curve25519-dalek/avx2_backend"]
-# Disable the yoloproofs feature for the released crate, so that it's not possible for someone to publish a crate using R1CS proofs yet.
-# yoloproofs = []
+# Disable the yoloproofs feature in the released crate.
+# To test it, use a git dependency on the develop branch and enable the
+# yoloproofs feature.  Note that this means it's impossible to publish a crate
+# depending on the unstable R1CS API.
+#yoloproofs = []
 
 [[test]]
 name = "range_proof"
@@ -44,6 +47,10 @@ required-features = ["yoloproofs"]
 
 [[bench]]
 name = "range_proof"
+harness = false
+
+[[bench]]
+name = "generators"
 harness = false
 
 [[bench]]
