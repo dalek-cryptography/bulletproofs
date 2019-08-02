@@ -73,7 +73,7 @@ pub fn add_vec(a: &[Scalar], b: &[Scalar]) -> Vec<Scalar> {
         // throw some error
         //println!("lengths of vectors don't match for vector addition");
     }
-    let mut out = vec![Scalar::zero(); b.len()];
+    let mut out: Vec<Scalar> = (0..b.len()).map(|_| Scalar::zero()).collect();
     for i in 0..a.len() {
         out[i] = a[i] + b[i];
     }
