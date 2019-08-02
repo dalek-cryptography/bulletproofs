@@ -19,6 +19,9 @@ cfg_if::cfg_if! {
 #[cfg(feature = "std")]
 extern crate core;
 
+#[cfg(feature = "std")]
+extern crate rand;
+
 extern crate digest;
 extern crate rand_core;
 extern crate sha3;
@@ -68,4 +71,8 @@ pub mod range_proof_mpc {
 }
 
 #[cfg(feature = "yoloproofs")]
-pub mod r1cs;
+cfg_if::cfg_if! {
+    if #[cfg(feature = "std")] {
+        pub mod r1cs;
+    }
+}
