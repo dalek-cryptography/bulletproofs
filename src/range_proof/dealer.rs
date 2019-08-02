@@ -5,7 +5,6 @@
 //! [the API for the aggregated multiparty computation protocol](../aggregation/index.html#api-for-the-aggregated-multiparty-computation-protocol).
 
 use core::iter;
-use curve25519_dalek::ristretto::RistrettoPoint;
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "alloc")] {
@@ -14,10 +13,7 @@ cfg_if::cfg_if! {
     }
 }
 
-<<<<<<< HEAD
-=======
 use curve25519_dalek::ristretto::RistrettoPoint;
->>>>>>> use naive curve point serialization in internal data structures
 use curve25519_dalek::scalar::Scalar;
 use merlin::Transcript;
 
