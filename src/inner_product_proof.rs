@@ -1,19 +1,15 @@
 #![allow(non_snake_case)]
 #![doc(include = "../docs/inner-product-protocol.md")]
 
-cfg_if::cfg_if! {
-    if #[cfg(feature = "std")] {
-        use std::borrow::Borrow;
-    }
-}
+#[cfg(feature = "alloc")]
+extern crate alloc;
 
-cfg_if::cfg_if! {
-    if #[cfg(feature = "alloc")] {
-        extern crate alloc;
-        use alloc::vec::Vec;
-        use alloc::borrow::Borrow;
-    }
-}
+#[cfg(feature = "alloc")]
+use alloc::vec::Vec;
+#[cfg(feature = "alloc")]
+use alloc::borrow::Borrow;
+#[cfg(feature = "std")]
+use std::borrow::Borrow;
 
 use core::iter;
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};

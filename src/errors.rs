@@ -1,11 +1,9 @@
 //! Errors related to proving and verifying proofs.
 
-cfg_if::cfg_if! {
-    if #[cfg(feature = "alloc")] {
-        extern crate alloc;
-        use alloc::vec::Vec;
-    }
-}
+#[cfg(feature = "alloc")]        
+extern crate alloc;
+#[cfg(feature = "alloc")]
+use alloc::vec::Vec;
 
 /// Represents an error in proof creation, verification, or parsing.
 #[derive(Fail, Clone, Debug, Eq, PartialEq)]

@@ -6,12 +6,11 @@
 
 use core::iter;
 
-cfg_if::cfg_if! {
-    if #[cfg(feature = "alloc")] {
-        extern crate alloc;
-        use alloc::vec::Vec;
-    }
-}
+#[cfg(feature = "alloc")]
+extern crate alloc;
+
+#[cfg(feature = "alloc")]
+use alloc::vec::Vec;
 
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;

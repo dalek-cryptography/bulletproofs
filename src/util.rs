@@ -1,13 +1,13 @@
 #![deny(missing_docs)]
 #![allow(non_snake_case)]
 
-cfg_if::cfg_if! {
-    if #[cfg(feature = "alloc")] {
-        extern crate alloc;
-        use alloc::vec::Vec;
-    }
-}
+#[cfg(feature = "alloc")]
+extern crate alloc;
 
+#[cfg(feature = "alloc")]
+use alloc::vec;
+#[cfg(feature = "alloc")]
+use alloc::vec::Vec;
 use clear_on_drop::clear::Clear;
 use curve25519_dalek::scalar::Scalar;
 use inner_product_proof::inner_product;
@@ -73,7 +73,7 @@ pub fn add_vec(a: &[Scalar], b: &[Scalar]) -> Vec<Scalar> {
         // throw some error
         //println!("lengths of vectors don't match for vector addition");
     }
-    let mut out: Vec<Scalar> = (0..b.len()).map(|_| Scalar::zero()).collect();
+    let mut out = vec![Scalar::zero(); b.len()];
     for i in 0..a.len() {
         out[i] = a[i] + b[i];
     }
@@ -82,8 +82,7 @@ pub fn add_vec(a: &[Scalar], b: &[Scalar]) -> Vec<Scalar> {
 
 impl VecPoly1 {
     pub fn zero(n: usize) -> Self {
-        let zn: Vec<Scalar> = (0..n).map(|_| Scalar::zero()).collect();
-        VecPoly1(zn.clone(), zn)
+        VecPoly1(vec![Scalar::zero(); n], vec![Scalar::zero(); n])
     }
 
     pub fn inner_product(&self, rhs: &VecPoly1) -> Poly2 {
@@ -104,7 +103,7 @@ impl VecPoly1 {
 
     pub fn eval(&self, x: Scalar) -> Vec<Scalar> {
         let n = self.0.len();
-        let mut out: Vec<Scalar> = (0..n).map(|_| Scalar::zero()).collect();
+        let mut out = vec![Scalar::zero(); n];
         for i in 0..n {
             out[i] = self.0[i] + self.1[i] * x;
         }
@@ -115,8 +114,12 @@ impl VecPoly1 {
 #[cfg(feature = "yoloproofs")]
 impl VecPoly3 {
     pub fn zero(n: usize) -> Self {
-        let zn: Vec<Scalar> = (0..n).map(|_| Scalar::zero()).collect();
-        VecPoly3(zn.clone(), zn.clone(), zn.clone(), zn.clone())
+        VecPoly3(
+            vec![Scalar::zero(); n],
+            vec![Scalar::zero(); n],
+            vec![Scalar::zero(); n],
+            vec![Scalar::zero(); n],
+        )
     }
 
     /// Compute an inner product of `lhs`, `rhs` which have the property that:
@@ -145,7 +148,7 @@ impl VecPoly3 {
 
     pub fn eval(&self, x: Scalar) -> Vec<Scalar> {
         let n = self.0.len();
-        let mut out: Vec<Scalar> = (0..n).map(|_| Scalar::zero()).collect();
+        let mut out = vec![Scalar::zero(); n];
         for i in 0..n {
             out[i] = self.0[i] + x * (self.1[i] + x * (self.2[i] + x * self.3[i]));
         }
@@ -282,8 +285,18 @@ mod tests {
 
     #[test]
     fn test_inner_product() {
-        let a: Vec<Scalar> = (1..5).map(|i| Scalar::from(i as u64)).collect();
-        let b: Vec<Scalar> = (2..6).map(|i| Scalar::from(i as u64)).collect();
+        let a = vec![
+            Scalar::from(1u64),
+            Scalar::from(2u64),
+            Scalar::from(3u64),
+            Scalar::from(4u64),
+        ];
+        let b = vec![
+            Scalar::from(2u64),
+            Scalar::from(3u64),
+            Scalar::from(4u64),
+            Scalar::from(5u64),
+        ];
         assert_eq!(Scalar::from(40u64), inner_product(&a, &b));
     }
 
@@ -341,8 +354,7 @@ mod tests {
 
     #[test]
     fn vec_of_scalars_clear_on_drop() {
-        let mut v = Vec::new();
-        v.extend_from_slice(&[Scalar::from(24u64), Scalar::from(42u64)]);
+        let mut v = vec![Scalar::from(24u64), Scalar::from(42u64)];
 
         for e in v.iter_mut() {
             e.clear();

@@ -9,12 +9,8 @@
 
 extern crate byteorder;
 
-cfg_if::cfg_if! {
-    if #[cfg(feature = "alloc")] {
-        extern crate alloc;
-        use alloc::vec::Vec;
-    }
-}
+#[cfg(feature = "alloc")]
+extern crate alloc;
 
 #[cfg(feature = "std")]
 extern crate core;
@@ -58,6 +54,9 @@ mod inner_product_proof;
 mod range_proof;
 mod transcript;
 
+#[cfg(feature = "alloc")]
+use alloc::vec::Vec;
+
 pub use errors::ProofError;
 pub use generators::{BulletproofGens, BulletproofGensShare, PedersenGens};
 pub use range_proof::RangeProof;
@@ -71,8 +70,5 @@ pub mod range_proof_mpc {
 }
 
 #[cfg(feature = "yoloproofs")]
-cfg_if::cfg_if! {
-    if #[cfg(feature = "std")] {
-        pub mod r1cs;
-    }
-}
+#[cfg(feature = "std")]
+pub mod r1cs;

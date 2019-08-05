@@ -1,19 +1,15 @@
 #![allow(non_snake_case)]
 #![doc(include = "../../docs/range-proof-protocol.md")]
 
-cfg_if::cfg_if! {
-    if #[cfg(feature = "alloc")] {
-        extern crate alloc;
-        use alloc::vec::Vec;
-    }
-}
+#[cfg(feature = "alloc")]
+extern crate alloc;
+#[cfg(feature = "std")]
+extern crate rand;
 
-cfg_if::cfg_if! {
-    if #[cfg(feature = "std")] {
-        extern crate rand;
-        use self::rand::thread_rng;
-    }
-}
+#[cfg(feature = "alloc")]
+use alloc::vec::Vec;
+#[cfg(feature = "std")]
+use self::rand::thread_rng;
 
 use core::iter;
 
