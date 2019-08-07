@@ -13,6 +13,17 @@ use curve25519_dalek::traits::MultiscalarMul;
 use digest::{ExtendableOutput, Input, XofReader};
 use sha3::{Sha3XofReader, Sha3_512, Shake256};
 
+/// Trait for any bulletproof commitment generate compliant implementation.
+/// Will be used in the prover
+pub trait CommitmentGenerator: Copy + Clone {
+    /// Return a ref to the base for the committed value
+    fn get_B(&self) -> &RistrettoPoint;
+    /// Return a ref to the blinding factor
+    fn get_B_blinding(&self) -> &RistrettoPoint;
+    /// Creates a commitment using the value scalar and a blinding factor.
+    fn commit(&self, value: Scalar, blinding: Scalar) -> RistrettoPoint;
+}
+
 /// Represents a pair of base points for Pedersen commitments.
 ///
 /// The Bulletproofs implementation and API is designed to support
@@ -32,10 +43,32 @@ pub struct PedersenGens {
     pub B_blinding: RistrettoPoint,
 }
 
-impl PedersenGens {
+impl CommitmentGenerator for PedersenGens {
+    fn get_B(&self) -> &RistrettoPoint {
+        &self.B
+    }
+
+    fn get_B_blinding(&self) -> &RistrettoPoint {
+        &self.B_blinding
+    }
+
     /// Creates a Pedersen commitment using the value scalar and a blinding factor.
-    pub fn commit(&self, value: Scalar, blinding: Scalar) -> RistrettoPoint {
+    fn commit(&self, value: Scalar, blinding: Scalar) -> RistrettoPoint {
         RistrettoPoint::multiscalar_mul(&[value, blinding], &[self.B, self.B_blinding])
+    }
+}
+
+impl CommitmentGenerator for &PedersenGens {
+    fn get_B(&self) -> &RistrettoPoint {
+        (*self).get_B()
+    }
+
+    fn get_B_blinding(&self) -> &RistrettoPoint {
+        (*self).get_B_blinding()
+    }
+    /// Creates a Pedersen commitment using the value scalar and a blinding factor.
+    fn commit(&self, value: Scalar, blinding: Scalar) -> RistrettoPoint {
+        (*self).commit(value, blinding)
     }
 }
 

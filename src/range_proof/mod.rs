@@ -527,9 +527,6 @@ mod tests {
         // Split the test into two scopes, so that it's explicit what
         // data is shared between the prover and the verifier.
 
-        // Use bincode for serialization
-        use bincode;
-
         // Both prover and verifier have access to the generators and the proof
         let max_bitsize = 64;
         let max_parties = 8;

@@ -16,7 +16,7 @@ use curve25519_dalek::traits::MultiscalarMul;
 
 use clear_on_drop::clear::Clear;
 use errors::MPCError;
-use generators::{BulletproofGens, PedersenGens};
+use generators::{BulletproofGens, CommitmentGenerator, PedersenGens};
 use rand;
 use std::iter;
 use util;

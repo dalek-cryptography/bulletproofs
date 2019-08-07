@@ -13,7 +13,7 @@ use super::{
 };
 
 use errors::R1CSError;
-use generators::{BulletproofGens, PedersenGens};
+use generators::{BulletproofGens, CommitmentGenerator};
 use inner_product_proof::InnerProductProof;
 use transcript::TranscriptProtocol;
 
@@ -26,9 +26,9 @@ use transcript::TranscriptProtocol;
 /// When all constraints are added, the proving code calls `prove`
 /// which consumes the `Prover` instance, samples random challenges
 /// that instantiate the randomized constraints, and creates a complete proof.
-pub struct Prover<'t, 'g> {
+pub struct Prover<'t, 'g, G: CommitmentGenerator> {
     transcript: &'t mut Transcript,
-    pc_gens: &'g PedersenGens,
+    pc_gens: &'g G,
     /// The constraints accumulated so far.
     constraints: Vec<LinearCombination>,
     /// Stores assignments to the "left" of multiplication gates
@@ -44,7 +44,7 @@ pub struct Prover<'t, 'g> {
 
     /// This list holds closures that will be called in the second phase of the protocol,
     /// when non-randomized variables are committed.
-    deferred_constraints: Vec<Box<Fn(&mut RandomizingProver<'t, 'g>) -> Result<(), R1CSError>>>,
+    deferred_constraints: Vec<Box<dyn Fn(&mut RandomizingProver<'t, 'g, G>) -> Result<(), R1CSError>>>,
 
     /// Index of a pending multiplier that's not fully assigned yet.
     pending_multiplier: Option<usize>,
@@ -57,12 +57,12 @@ pub struct Prover<'t, 'g> {
 /// monomorphize the closures for the proving and verifying code.
 /// However, this type cannot be instantiated by the user and therefore can only be used within
 /// the callback provided to `specify_randomized_constraints`.
-pub struct RandomizingProver<'t, 'g> {
-    prover: Prover<'t, 'g>,
+pub struct RandomizingProver<'t, 'g, G: CommitmentGenerator> {
+    prover: Prover<'t, 'g, G>,
 }
 
 /// Overwrite secrets with null bytes when they go out of scope.
-impl<'t, 'g> Drop for Prover<'t, 'g> {
+impl<'t, 'g, G: CommitmentGenerator> Drop for Prover<'t, 'g, G> {
     fn drop(&mut self) {
         self.v.clear();
         self.v_blinding.clear();
@@ -85,7 +85,7 @@ impl<'t, 'g> Drop for Prover<'t, 'g> {
     }
 }
 
-impl<'t, 'g> ConstraintSystem for Prover<'t, 'g> {
+impl<'t, 'g, G: CommitmentGenerator> ConstraintSystem for Prover<'t, 'g, G> {
     fn transcript(&mut self) -> &mut Transcript {
         self.transcript
     }
@@ -165,8 +165,8 @@ impl<'t, 'g> ConstraintSystem for Prover<'t, 'g> {
     }
 }
 
-impl<'t, 'g> RandomizableConstraintSystem for Prover<'t, 'g> {
-    type RandomizedCS = RandomizingProver<'t, 'g>;
+impl<'t, 'g, G: CommitmentGenerator> RandomizableConstraintSystem for Prover<'t, 'g, G> {
+    type RandomizedCS = RandomizingProver<'t, 'g, G>;
 
     fn specify_randomized_constraints<F>(&mut self, callback: F) -> Result<(), R1CSError>
     where
@@ -177,7 +177,7 @@ impl<'t, 'g> RandomizableConstraintSystem for Prover<'t, 'g> {
     }
 }
 
-impl<'t, 'g> ConstraintSystem for RandomizingProver<'t, 'g> {
+impl<'t, 'g, G: CommitmentGenerator> ConstraintSystem for RandomizingProver<'t, 'g, G> {
     fn transcript(&mut self) -> &mut Transcript {
         self.prover.transcript
     }
@@ -206,13 +206,13 @@ impl<'t, 'g> ConstraintSystem for RandomizingProver<'t, 'g> {
     }
 }
 
-impl<'t, 'g> RandomizedConstraintSystem for RandomizingProver<'t, 'g> {
+impl<'t, 'g, G: CommitmentGenerator> RandomizedConstraintSystem for RandomizingProver<'t, 'g, G> {
     fn challenge_scalar(&mut self, label: &'static [u8]) -> Scalar {
         self.prover.transcript.challenge_scalar(label)
     }
 }
 
-impl<'t, 'g> Prover<'t, 'g> {
+impl<'t, 'g, G: CommitmentGenerator> Prover<'t, 'g, G> {
     /// Construct an empty constraint system with specified external
     /// input variables.
     ///
@@ -233,7 +233,7 @@ impl<'t, 'g> Prover<'t, 'g> {
     /// # Returns
     ///
     /// Returns a new `Prover` instance.
-    pub fn new(pc_gens: &'g PedersenGens, transcript: &'t mut Transcript) -> Self {
+    pub fn new(pc_gens: &'g G, transcript: &'t mut Transcript) -> Self {
         transcript.r1cs_domain_sep();
 
         Prover {
@@ -426,7 +426,7 @@ impl<'t, 'g> Prover<'t, 'g> {
             iter::once(&i_blinding1)
                 .chain(self.a_L.iter())
                 .chain(self.a_R.iter()),
-            iter::once(&self.pc_gens.B_blinding)
+            iter::once(self.pc_gens.get_B_blinding())
                 .chain(gens.G(n1))
                 .chain(gens.H(n1)),
         )
@@ -435,7 +435,7 @@ impl<'t, 'g> Prover<'t, 'g> {
         // A_O = <a_O, G> + o_blinding * B_blinding
         let A_O1 = RistrettoPoint::multiscalar_mul(
             iter::once(&o_blinding1).chain(self.a_O.iter()),
-            iter::once(&self.pc_gens.B_blinding).chain(gens.G(n1)),
+            iter::once(self.pc_gens.get_B_blinding()).chain(gens.G(n1)),
         )
         .compress();
 
@@ -444,7 +444,7 @@ impl<'t, 'g> Prover<'t, 'g> {
             iter::once(&s_blinding1)
                 .chain(s_L1.iter())
                 .chain(s_R1.iter()),
-            iter::once(&self.pc_gens.B_blinding)
+            iter::once(self.pc_gens.get_B_blinding())
                 .chain(gens.G(n1))
                 .chain(gens.H(n1)),
         )
@@ -493,7 +493,7 @@ impl<'t, 'g> Prover<'t, 'g> {
                     iter::once(&i_blinding2)
                         .chain(self.a_L.iter().skip(n1))
                         .chain(self.a_R.iter().skip(n1)),
-                    iter::once(&self.pc_gens.B_blinding)
+                    iter::once(self.pc_gens.get_B_blinding())
                         .chain(gens.G(n).skip(n1))
                         .chain(gens.H(n).skip(n1)),
                 )
@@ -501,7 +501,7 @@ impl<'t, 'g> Prover<'t, 'g> {
                 // A_O = <a_O, G> + o_blinding * B_blinding
                 RistrettoPoint::multiscalar_mul(
                     iter::once(&o_blinding2).chain(self.a_O.iter().skip(n1)),
-                    iter::once(&self.pc_gens.B_blinding).chain(gens.G(n).skip(n1)),
+                    iter::once(self.pc_gens.get_B_blinding()).chain(gens.G(n).skip(n1)),
                 )
                 .compress(),
                 // S = <s_L, G> + <s_R, H> + s_blinding * B_blinding
@@ -509,7 +509,7 @@ impl<'t, 'g> Prover<'t, 'g> {
                     iter::once(&s_blinding2)
                         .chain(s_L2.iter())
                         .chain(s_R2.iter()),
-                    iter::once(&self.pc_gens.B_blinding)
+                    iter::once(self.pc_gens.get_B_blinding())
                         .chain(gens.G(n).skip(n1))
                         .chain(gens.H(n).skip(n1)),
                 )
@@ -635,7 +635,7 @@ impl<'t, 'g> Prover<'t, 'g> {
 
         // Get a challenge value to combine statements for the IPP
         let w = self.transcript.challenge_scalar(b"w");
-        let Q = w * self.pc_gens.B;
+        let Q = w * self.pc_gens.get_B();
 
         let G_factors = iter::repeat(Scalar::one())
             .take(n1)
