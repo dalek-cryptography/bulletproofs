@@ -218,6 +218,15 @@ impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
             return Err(MPCError::WrongNumProofShares);
         }
 
+        // Validate lengths for each share
+        for (j,share) in proof_shares.iter().enumerate() {
+            let n = share.check_size(&self.bp_gens, j).map_err(|_| MPCError::WrongNumProofShares)?;
+            if n != self.n {
+                // TBD: better error!
+                return Err(MPCError::WrongNumProofShares);
+            }
+        }
+
         let t_x: Scalar = proof_shares.iter().map(|ps| ps.t_x).sum();
         let t_x_blinding: Scalar = proof_shares.iter().map(|ps| ps.t_x_blinding).sum();
         let e_blinding: Scalar = proof_shares.iter().map(|ps| ps.e_blinding).sum();
