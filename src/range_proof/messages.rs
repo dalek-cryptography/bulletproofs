@@ -50,12 +50,7 @@ pub struct ProofShare {
 
 impl ProofShare {
     /// Checks consistency of all sizes in the proof share and returns the size of the l/r vector.
-    pub(super) fn check_size(
-        &self,
-        bp_gens: &BulletproofGens,
-        j: usize,
-    ) -> Result<usize, ()> {
-
+    pub(super) fn check_size(&self, bp_gens: &BulletproofGens, j: usize) -> Result<usize, ()> {
         let n = self.l_vec.len();
 
         if self.r_vec.len() != n {
@@ -66,7 +61,7 @@ impl ProofShare {
             return Err(());
         }
 
-        if bp_gens.party_capacity < (j+1) {
+        if bp_gens.party_capacity < (j + 1) {
             return Err(());
         }
 

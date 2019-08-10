@@ -219,8 +219,10 @@ impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
         }
 
         // Validate lengths for each share
-        for (j,share) in proof_shares.iter().enumerate() {
-            let n = share.check_size(&self.bp_gens, j).map_err(|_| MPCError::WrongNumProofShares)?;
+        for (j, share) in proof_shares.iter().enumerate() {
+            let n = share
+                .check_size(&self.bp_gens, j)
+                .map_err(|_| MPCError::WrongNumProofShares)?;
             if n != self.n {
                 // TBD: better error!
                 return Err(MPCError::WrongNumProofShares);
