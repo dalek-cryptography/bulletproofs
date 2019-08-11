@@ -57,11 +57,11 @@ impl ProofShare {
             return Err(());
         }
 
-        if bp_gens.gens_capacity < n {
+        if n > bp_gens.gens_capacity {
             return Err(());
         }
 
-        if bp_gens.party_capacity < (j + 1) {
+        if j >= bp_gens.party_capacity {
             return Err(());
         }
 

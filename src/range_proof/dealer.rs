@@ -219,14 +219,24 @@ impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
         }
 
         // Validate lengths for each share
+        let mut bad_shares = Vec::<usize>::new(); // no allocations until we append
         for (j, share) in proof_shares.iter().enumerate() {
-            let n = share
-                .check_size(&self.bp_gens, j)
-                .map_err(|_| MPCError::WrongNumProofShares)?;
-            if n != self.n {
-                // TBD: better error!
-                return Err(MPCError::WrongNumProofShares);
+            match share.check_size(&self.bp_gens, j).and_then(|n| {
+                if n != self.n {
+                    Err(())
+                } else {
+                    Ok(())
+                }
+            }) {
+                Ok(_) => {}
+                Err(_) => {
+                    bad_shares.push(j);
+                }
             }
+        }
+
+        if bad_shares.len() > 0 {
+            return Err(MPCError::MalformedProofShares { bad_shares });
         }
 
         let t_x: Scalar = proof_shares.iter().map(|ps| ps.t_x).sum();
