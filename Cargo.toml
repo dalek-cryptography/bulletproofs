@@ -12,7 +12,7 @@ keywords = ["cryptography", "crypto", "ristretto", "zero-knowledge", "bulletproo
 description = "A pure-Rust implementation of Bulletproofs using Ristretto"
 
 [dependencies]
-curve25519-dalek = { version = "1.2.3", features = ["serde"] }
+curve25519-dalek = { version = "^1.2.3", features = ["serde"] }
 subtle = "2"
 sha3 = "0.8"
 digest = "0.8"
