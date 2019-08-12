@@ -1,8 +1,6 @@
 //! Errors related to proving and verifying proofs.
 
-#[cfg(feature = "alloc")]        
 extern crate alloc;
-#[cfg(feature = "alloc")]
 use alloc::vec::Vec;
 
 /// Represents an error in proof creation, verification, or parsing.

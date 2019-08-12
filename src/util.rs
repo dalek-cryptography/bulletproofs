@@ -1,12 +1,9 @@
 #![deny(missing_docs)]
 #![allow(non_snake_case)]
 
-#[cfg(feature = "alloc")]
 extern crate alloc;
 
-#[cfg(feature = "alloc")]
 use alloc::vec;
-#[cfg(feature = "alloc")]
 use alloc::vec::Vec;
 use clear_on_drop::clear::Clear;
 use curve25519_dalek::scalar::Scalar;

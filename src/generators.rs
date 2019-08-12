@@ -4,18 +4,14 @@
 #![allow(non_snake_case)]
 #![deny(missing_docs)]
 
-#[cfg(feature = "alloc")]        
 extern crate alloc;
 
-#[cfg(feature = "alloc")]
 use alloc::vec::Vec;
-
 use curve25519_dalek::constants::RISTRETTO_BASEPOINT_COMPRESSED;
 use curve25519_dalek::constants::RISTRETTO_BASEPOINT_POINT;
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::MultiscalarMul;
-
 use digest::{ExtendableOutput, Input, XofReader};
 use sha3::{Sha3XofReader, Sha3_512, Shake256};
 

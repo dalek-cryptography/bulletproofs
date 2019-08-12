@@ -1,5 +1,4 @@
 #![cfg_attr(not(feature = "std"), no_std)]
-#![cfg_attr(feature = "alloc", feature(alloc))]
 #![feature(nll)]
 #![feature(external_doc)]
 #![feature(try_trait)]
@@ -9,7 +8,6 @@
 
 extern crate byteorder;
 
-#[cfg(feature = "alloc")]
 extern crate alloc;
 
 #[cfg(feature = "std")]
@@ -53,9 +51,6 @@ mod generators;
 mod inner_product_proof;
 mod range_proof;
 mod transcript;
-
-#[cfg(feature = "alloc")]
-use alloc::vec::Vec;
 
 pub use errors::ProofError;
 pub use generators::{BulletproofGens, BulletproofGensShare, PedersenGens};

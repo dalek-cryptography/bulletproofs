@@ -1,12 +1,10 @@
 #![allow(non_snake_case)]
 #![doc(include = "../../docs/range-proof-protocol.md")]
 
-#[cfg(feature = "alloc")]
 extern crate alloc;
 #[cfg(feature = "std")]
 extern crate rand;
 
-#[cfg(feature = "alloc")]
 use alloc::vec::Vec;
 #[cfg(feature = "std")]
 use self::rand::thread_rng;

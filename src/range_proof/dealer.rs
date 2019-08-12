@@ -6,10 +6,8 @@
 
 use core::iter;
 
-#[cfg(feature = "alloc")]
 extern crate alloc;
 
-#[cfg(feature = "alloc")]
 use alloc::vec::Vec;
 
 use curve25519_dalek::ristretto::RistrettoPoint;
