@@ -50,14 +50,21 @@ pub struct ProofShare {
 
 impl ProofShare {
     /// Checks consistency of all sizes in the proof share and returns the size of the l/r vector.
-    pub(super) fn check_size(&self, bp_gens: &BulletproofGens, j: usize) -> Result<usize, ()> {
-        let n = self.l_vec.len();
-
-        if self.r_vec.len() != n {
+    pub(super) fn check_size(
+        &self,
+        expected_n: usize,
+        bp_gens: &BulletproofGens,
+        j: usize,
+    ) -> Result<(), ()> {
+        if self.l_vec.len() != expected_n {
             return Err(());
         }
 
-        if n > bp_gens.gens_capacity {
+        if self.r_vec.len() != expected_n {
+            return Err(());
+        }
+
+        if expected_n > bp_gens.gens_capacity {
             return Err(());
         }
 
@@ -65,7 +72,7 @@ impl ProofShare {
             return Err(());
         }
 
-        Ok(n)
+        Ok(())
     }
 
     /// Audit an individual proof share to determine whether it is
@@ -87,7 +94,9 @@ impl ProofShare {
         use inner_product_proof::inner_product;
         use util;
 
-        let n = self.check_size(bp_gens, j)?;
+        let n = self.l_vec.len();
+
+        self.check_size(n, bp_gens, j)?;
 
         let (y, z) = (&bit_challenge.y, &bit_challenge.z);
         let x = &poly_challenge.x;

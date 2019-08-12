@@ -221,18 +221,11 @@ impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
         // Validate lengths for each share
         let mut bad_shares = Vec::<usize>::new(); // no allocations until we append
         for (j, share) in proof_shares.iter().enumerate() {
-            match share.check_size(&self.bp_gens, j).and_then(|n| {
-                if n != self.n {
-                    Err(())
-                } else {
-                    Ok(())
-                }
-            }) {
-                Ok(_) => {}
-                Err(_) => {
+            share
+                .check_size(self.n, &self.bp_gens, j)
+                .unwrap_or_else(|_| {
                     bad_shares.push(j);
-                }
-            }
+                });
         }
 
         if bad_shares.len() > 0 {
