@@ -49,6 +49,32 @@ pub struct ProofShare {
 }
 
 impl ProofShare {
+    /// Checks consistency of all sizes in the proof share and returns the size of the l/r vector.
+    pub(super) fn check_size(
+        &self,
+        expected_n: usize,
+        bp_gens: &BulletproofGens,
+        j: usize,
+    ) -> Result<(), ()> {
+        if self.l_vec.len() != expected_n {
+            return Err(());
+        }
+
+        if self.r_vec.len() != expected_n {
+            return Err(());
+        }
+
+        if expected_n > bp_gens.gens_capacity {
+            return Err(());
+        }
+
+        if j >= bp_gens.party_capacity {
+            return Err(());
+        }
+
+        Ok(())
+    }
+
     /// Audit an individual proof share to determine whether it is
     /// malformed.
     pub(super) fn audit_share(
@@ -69,6 +95,9 @@ impl ProofShare {
         use util;
 
         let n = self.l_vec.len();
+
+        self.check_size(n, bp_gens, j)?;
+
         let (y, z) = (&bit_challenge.y, &bit_challenge.z);
         let x = &poly_challenge.x;
 
