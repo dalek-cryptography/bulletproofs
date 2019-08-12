@@ -17,13 +17,13 @@ subtle = { version = "2", default-features = false }
 sha3 = { version = "0.8", default-features = false }
 digest = { version = "0.8", default-features = false }
 rand_core = { version = "0.4", default-features = false, features = ["alloc"] }
-rand = { version = "0.6", default-features = false }
+rand = { version = "0.6", default-features = false, optional = true }
 byteorder = { version = "1", default-features = false }
 serde = { version = "1", default-features = false, features = ["alloc"] }
 serde_derive = { version = "1", default-features = false }
 failure = { version = "0.1", default-features = false, features = ["derive"] }
 merlin = { version = "1.2", default-features = false }
-clear_on_drop = "0.2"
+clear_on_drop = { version = "0.2", default-features = false, features = ["nightly"] }
 
 [dev-dependencies]
 hex = "0.3"
@@ -35,7 +35,7 @@ rand_chacha = "0.1"
 default = ["std", "avx2_backend"]
 avx2_backend = ["curve25519-dalek/avx2_backend"]
 yoloproofs = []
-std = ["rand/std"]
+std = ["rand", "rand/std"]
 
 [[test]]
 name = "range_proof"
