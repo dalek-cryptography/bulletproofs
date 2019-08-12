@@ -3,8 +3,8 @@
 
 extern crate alloc;
 
-use alloc::vec::Vec;
 use alloc::borrow::Borrow;
+use alloc::vec::Vec;
 
 use core::iter;
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};

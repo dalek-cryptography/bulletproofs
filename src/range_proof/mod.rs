@@ -5,9 +5,9 @@ extern crate alloc;
 #[cfg(feature = "std")]
 extern crate rand;
 
-use alloc::vec::Vec;
 #[cfg(feature = "std")]
 use self::rand::thread_rng;
+use alloc::vec::Vec;
 
 use core::iter;
 
