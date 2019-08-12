@@ -168,7 +168,7 @@ impl<'a> PartyAwaitingBitChallenge<'a> {
         let mut l_poly = util::VecPoly1::zero(n);
         let mut r_poly = util::VecPoly1::zero(n);
 
-        let zz = vc.z * vc.z;
+        let offset_zz = vc.z * vc.z * offset_z;
         let mut exp_y = offset_y; // start at y^j
         let mut exp_2 = Scalar::one(); // start at 2^0 = 1
         for i in 0..n {
@@ -177,7 +177,7 @@ impl<'a> PartyAwaitingBitChallenge<'a> {
 
             l_poly.0[i] = a_L_i - vc.z;
             l_poly.1[i] = self.s_L[i];
-            r_poly.0[i] = exp_y * (a_R_i + vc.z) + zz * offset_z * exp_2;
+            r_poly.0[i] = exp_y * (a_R_i + vc.z) + offset_zz * exp_2;
             r_poly.1[i] = exp_y * self.s_R[i];
 
             exp_y *= vc.y; // y^i -> y^(i+1)
@@ -201,8 +201,7 @@ impl<'a> PartyAwaitingBitChallenge<'a> {
             v_blinding: self.v_blinding,
             a_blinding: self.a_blinding,
             s_blinding: self.s_blinding,
-            z: vc.z,
-            offset_z,
+            offset_zz,
             l_poly,
             r_poly,
             t_poly,
@@ -239,8 +238,7 @@ impl<'a> Drop for PartyAwaitingBitChallenge<'a> {
 /// A party which has committed to their polynomial coefficents
 /// and is waiting for the polynomial challenge from the dealer.
 pub struct PartyAwaitingPolyChallenge {
-    z: Scalar,
-    offset_z: Scalar,
+    offset_zz: Scalar,
     l_poly: util::VecPoly1,
     r_poly: util::VecPoly1,
     t_poly: util::Poly2,
@@ -262,7 +260,7 @@ impl PartyAwaitingPolyChallenge {
         }
 
         let t_blinding_poly = util::Poly2(
-            self.z * self.z * self.offset_z * self.v_blinding,
+            self.offset_zz * self.v_blinding,
             self.t_1_blinding,
             self.t_2_blinding,
         );

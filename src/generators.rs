@@ -253,7 +253,7 @@ impl<'a> Iterator for AggregatedGensIter<'a> {
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let size = self.n * self.m;
+        let size = self.n * (self.m - self.party_idx) - self.gen_idx;
         (size, Some(size))
     }
 }
