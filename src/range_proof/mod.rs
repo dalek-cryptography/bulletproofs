@@ -714,9 +714,7 @@ mod tests {
 
     #[test]
     fn create_and_verify_n_64_m_8() {
-        // XXX disable this test since it's failing with
-        //     'attempt to negate with overflow'
-        //singleparty_create_and_verify_helper(64, 8);
+        singleparty_create_and_verify_helper(64, 8);
     }
 
     #[test]
