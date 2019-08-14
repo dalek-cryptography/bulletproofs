@@ -169,7 +169,7 @@ impl<'a> PartyAwaitingBitChallenge<'a> {
     /// Receive a [`BitChallenge`] from the dealer and use it to
     /// compute commitments to the party's polynomial coefficients.
     #[cfg(feature = "std")]
-    pub fn apply_challenge<T: RngCore + CryptoRng>(
+    pub fn apply_challenge(
         self,
         vc: &BitChallenge,
     ) -> (PartyAwaitingPolyChallenge, PolyCommitment) {
