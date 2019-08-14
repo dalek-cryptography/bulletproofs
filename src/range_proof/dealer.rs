@@ -24,6 +24,9 @@ use rand_core::{CryptoRng, RngCore};
 
 use util;
 
+#[cfg(feature = "std")]
+use rand::thread_rng;
+
 use super::messages::*;
 
 /// Used to construct a dealer for the aggregated rangeproof MPC protocol.
@@ -293,6 +296,17 @@ impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
     /// `proof_shares`, then validate the proof to ensure that all
     /// `ProofShare`s were well-formed.
     ///
+    /// This is a convenience wrapper around receive_shares_with_rng
+    ///
+    #[cfg(feature = "std")]
+    pub fn receive_shares(self, proof_shares: &[ProofShare]) -> Result<RangeProof, MPCError> {
+        self.receive_shares_with_rng(proof_shares, &mut thread_rng())
+    }
+
+    /// Assemble the final aggregated [`RangeProof`] from the given
+    /// `proof_shares`, then validate the proof to ensure that all
+    /// `ProofShare`s were well-formed.
+    ///
     /// If the aggregated proof fails to validate, this function
     /// audits the submitted shares to determine which shares were
     /// invalid.  This information is returned as part of the
@@ -302,7 +316,7 @@ impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
     /// performing local aggregation,
     /// [`receive_trusted_shares`](DealerAwaitingProofShares::receive_trusted_shares)
     /// saves time by skipping verification of the aggregated proof.
-    pub fn receive_shares<T: RngCore + CryptoRng>(
+    pub fn receive_shares_with_rng<T: RngCore + CryptoRng>(
         mut self,
         proof_shares: &[ProofShare],
         rng: &mut T,

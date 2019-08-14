@@ -23,6 +23,9 @@ use generators::{BulletproofGens, PedersenGens};
 use rand_core::{CryptoRng, RngCore};
 use util;
 
+#[cfg(feature = "std")]
+use rand::thread_rng;
+
 use super::messages::*;
 
 /// Used to construct a party for the aggregated rangeproof MPC protocol.
@@ -70,7 +73,17 @@ pub struct PartyAwaitingPosition<'a> {
 impl<'a> PartyAwaitingPosition<'a> {
     /// Assigns a position in the aggregated proof to this party,
     /// allowing the party to commit to the bits of their value.
-    pub fn assign_position<T: RngCore + CryptoRng>(
+    #[cfg(feature = "std")]
+    pub fn assign_position(
+        self,
+        j: usize,
+    ) -> Result<(PartyAwaitingBitChallenge<'a>, BitCommitment), MPCError> {
+        self.assign_position_with_rng(j, &mut thread_rng())
+    }
+
+    /// Assigns a position in the aggregated proof to this party,
+    /// allowing the party to commit to the bits of their value.
+    pub fn assign_position_with_rng<T: RngCore + CryptoRng>(
         self,
         j: usize,
         rng: &mut T,
@@ -155,7 +168,17 @@ pub struct PartyAwaitingBitChallenge<'a> {
 impl<'a> PartyAwaitingBitChallenge<'a> {
     /// Receive a [`BitChallenge`] from the dealer and use it to
     /// compute commitments to the party's polynomial coefficients.
+    #[cfg(feature = "std")]
     pub fn apply_challenge<T: RngCore + CryptoRng>(
+        self,
+        vc: &BitChallenge,
+    ) -> (PartyAwaitingPolyChallenge, PolyCommitment) {
+        self.apply_challenge_with_rng(vc, &mut thread_rng())
+    }
+
+    /// Receive a [`BitChallenge`] from the dealer and use it to
+    /// compute commitments to the party's polynomial coefficients.
+    pub fn apply_challenge_with_rng<T: RngCore + CryptoRng>(
         self,
         vc: &BitChallenge,
         rng: &mut T,

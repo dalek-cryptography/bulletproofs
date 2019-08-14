@@ -260,7 +260,7 @@ impl RangeProof {
             .into_iter()
             .enumerate()
             .map(|(j, p)| {
-                p.assign_position(j, rng)
+                p.assign_position_with_rng(j, rng)
                     .expect("We already checked the parameters, so this should never happen")
             })
             .unzip();
@@ -271,7 +271,7 @@ impl RangeProof {
 
         let (parties, poly_commitments): (Vec<_>, Vec<_>) = parties
             .into_iter()
-            .map(|p| p.apply_challenge(&bit_challenge, rng))
+            .map(|p| p.apply_challenge_with_rng(&bit_challenge, rng))
             .unzip();
 
         let (dealer, poly_challenge) = dealer.receive_poly_commitments(poly_commitments)?;
@@ -757,19 +757,19 @@ mod tests {
 
         let dealer = Dealer::new(&bp_gens, &pc_gens, &mut transcript, n, m).unwrap();
 
-        let (party0, bit_com0) = party0.assign_position(0, &mut rng).unwrap();
-        let (party1, bit_com1) = party1.assign_position(1, &mut rng).unwrap();
-        let (party2, bit_com2) = party2.assign_position(2, &mut rng).unwrap();
-        let (party3, bit_com3) = party3.assign_position(3, &mut rng).unwrap();
+        let (party0, bit_com0) = party0.assign_position_with_rng(0, &mut rng).unwrap();
+        let (party1, bit_com1) = party1.assign_position_with_rng(1, &mut rng).unwrap();
+        let (party2, bit_com2) = party2.assign_position_with_rng(2, &mut rng).unwrap();
+        let (party3, bit_com3) = party3.assign_position_with_rng(3, &mut rng).unwrap();
 
         let (dealer, bit_challenge) = dealer
             .receive_bit_commitments(vec![bit_com0, bit_com1, bit_com2, bit_com3])
             .unwrap();
 
-        let (party0, poly_com0) = party0.apply_challenge(&bit_challenge, &mut rng);
-        let (party1, poly_com1) = party1.apply_challenge(&bit_challenge, &mut rng);
-        let (party2, poly_com2) = party2.apply_challenge(&bit_challenge, &mut rng);
-        let (party3, poly_com3) = party3.apply_challenge(&bit_challenge, &mut rng);
+        let (party0, poly_com0) = party0.apply_challenge_with_rng(&bit_challenge, &mut rng);
+        let (party1, poly_com1) = party1.apply_challenge_with_rng(&bit_challenge, &mut rng);
+        let (party2, poly_com2) = party2.apply_challenge_with_rng(&bit_challenge, &mut rng);
+        let (party3, poly_com3) = party3.apply_challenge_with_rng(&bit_challenge, &mut rng);
 
         let (dealer, poly_challenge) = dealer
             .receive_poly_commitments(vec![poly_com0, poly_com1, poly_com2, poly_com3])
@@ -780,7 +780,7 @@ mod tests {
         let share2 = party2.apply_challenge(&poly_challenge).unwrap();
         let share3 = party3.apply_challenge(&poly_challenge).unwrap();
 
-        match dealer.receive_shares(&[share0, share1, share2, share3], &mut rng) {
+        match dealer.receive_shares_with_rng(&[share0, share1, share2, share3], &mut rng) {
             Err(MPCError::MalformedProofShares { bad_shares }) => {
                 assert_eq!(bad_shares, vec![1, 3]);
             }
@@ -818,11 +818,11 @@ mod tests {
 
         // Now do the protocol flow as normal....
 
-        let (party0, bit_com0) = party0.assign_position(0, &mut rng).unwrap();
+        let (party0, bit_com0) = party0.assign_position_with_rng(0, &mut rng).unwrap();
 
         let (dealer, bit_challenge) = dealer.receive_bit_commitments(vec![bit_com0]).unwrap();
 
-        let (party0, poly_com0) = party0.apply_challenge(&bit_challenge, &mut rng);
+        let (party0, poly_com0) = party0.apply_challenge_with_rng(&bit_challenge, &mut rng);
 
         let (_dealer, mut poly_challenge) =
             dealer.receive_poly_commitments(vec![poly_com0]).unwrap();
