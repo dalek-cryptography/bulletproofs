@@ -353,7 +353,7 @@ impl InnerProductProof {
     #[inline]
     pub fn to_bytes_iter(&self) -> impl Iterator<Item = u8> + '_ {
         self.L_vec.iter()
-            .zip(self.R_vec_iter())
+            .zip(self.R_vec.iter())
             .flat_map(|(l, r)| l.as_bytes().iter().chain(r.as_bytes()))
             .chain(self.a.as_bytes())
             .chain(self.b.as_bytes())
