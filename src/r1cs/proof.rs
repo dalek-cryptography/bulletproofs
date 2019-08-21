@@ -104,8 +104,7 @@ impl R1CSProof {
         buf.extend_from_slice(self.t_x.as_bytes());
         buf.extend_from_slice(self.t_x_blinding.as_bytes());
         buf.extend_from_slice(self.e_blinding.as_bytes());
-        // XXX this costs an extra alloc
-        buf.extend_from_slice(self.ipp_proof.to_bytes().as_slice());
+        buf.extend(self.ipp_proof.to_bytes_iter());
         buf
     }
 
