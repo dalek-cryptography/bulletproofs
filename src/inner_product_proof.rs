@@ -346,6 +346,20 @@ impl InnerProductProof {
         buf
     }
 
+    /// Converts the proof into a byte iterator over serialized view of the proof.
+    /// The layout of the inner product proof is:
+    /// * \\(n\\) pairs of compressed Ristretto points \\(L_0, R_0 \dots, L_{n-1}, R_{n-1}\\),
+    /// * two scalars \\(a, b\\).
+    #[inline]
+    pub fn to_bytes_iter(&self) -> impl Iterator<Item = u8> + '_ {
+        self.L_vec.iter()
+            .zip(self.R_vec_iter())
+            .flat_map(|(l, r)| l.as_bytes().iter().chain(r.as_bytes()))
+            .chain(self.a.as_bytes())
+            .chain(self.b.as_bytes())
+            .copied()
+    }
+
     /// Deserializes the proof from a byte slice.
     /// Returns an error in the following cases:
     /// * the slice does not have \\(2n+2\\) 32-byte elements,
