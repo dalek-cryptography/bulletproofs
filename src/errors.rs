@@ -1,5 +1,8 @@
 //! Errors related to proving and verifying proofs.
 
+extern crate alloc;
+use alloc::vec::Vec;
+
 /// Represents an error in proof creation, verification, or parsing.
 #[derive(Fail, Clone, Debug, Eq, PartialEq)]
 pub enum ProofError {

@@ -1,3 +1,4 @@
+#![cfg_attr(not(feature = "std"), no_std)]
 #![feature(nll)]
 #![feature(external_doc)]
 #![feature(try_trait)]
@@ -6,9 +7,17 @@
 #![doc(html_logo_url = "https://doc.dalek.rs/assets/dalek-logo-clear.png")]
 
 extern crate byteorder;
+
+extern crate alloc;
+
+#[cfg(feature = "std")]
 extern crate core;
-extern crate digest;
+
+#[cfg(feature = "std")]
 extern crate rand;
+
+extern crate digest;
+extern crate rand_core;
 extern crate sha3;
 
 extern crate clear_on_drop;
@@ -56,4 +65,5 @@ pub mod range_proof_mpc {
 }
 
 #[cfg(feature = "yoloproofs")]
+#[cfg(feature = "std")]
 pub mod r1cs;

@@ -1,9 +1,12 @@
 #![allow(non_snake_case)]
 #![doc(include = "../docs/inner-product-protocol.md")]
 
-use std::borrow::Borrow;
-use std::iter;
+extern crate alloc;
 
+use alloc::borrow::Borrow;
+use alloc::vec::Vec;
+
+use core::iter;
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::VartimeMultiscalarMul;

@@ -5,6 +5,11 @@
 //! [the API for the aggregated multiparty computation protocol](../aggregation/index.html#api-for-the-aggregated-multiparty-computation-protocol).
 
 use core::iter;
+
+extern crate alloc;
+
+use alloc::vec::Vec;
+
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
 use merlin::Transcript;
@@ -15,7 +20,12 @@ use inner_product_proof;
 use range_proof::RangeProof;
 use transcript::TranscriptProtocol;
 
+use rand_core::{CryptoRng, RngCore};
+
 use util;
+
+#[cfg(feature = "std")]
+use rand::thread_rng;
 
 use super::messages::*;
 
@@ -286,6 +296,17 @@ impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
     /// `proof_shares`, then validate the proof to ensure that all
     /// `ProofShare`s were well-formed.
     ///
+    /// This is a convenience wrapper around receive_shares_with_rng
+    ///
+    #[cfg(feature = "std")]
+    pub fn receive_shares(self, proof_shares: &[ProofShare]) -> Result<RangeProof, MPCError> {
+        self.receive_shares_with_rng(proof_shares, &mut thread_rng())
+    }
+
+    /// Assemble the final aggregated [`RangeProof`] from the given
+    /// `proof_shares`, then validate the proof to ensure that all
+    /// `ProofShare`s were well-formed.
+    ///
     /// If the aggregated proof fails to validate, this function
     /// audits the submitted shares to determine which shares were
     /// invalid.  This information is returned as part of the
@@ -295,7 +316,11 @@ impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
     /// performing local aggregation,
     /// [`receive_trusted_shares`](DealerAwaitingProofShares::receive_trusted_shares)
     /// saves time by skipping verification of the aggregated proof.
-    pub fn receive_shares(mut self, proof_shares: &[ProofShare]) -> Result<RangeProof, MPCError> {
+    pub fn receive_shares_with_rng<T: RngCore + CryptoRng>(
+        mut self,
+        proof_shares: &[ProofShare],
+        rng: &mut T,
+    ) -> Result<RangeProof, MPCError> {
         let proof = self.assemble_shares(proof_shares)?;
 
         let Vs: Vec<_> = self.bit_commitments.iter().map(|vc| vc.V_j).collect();
@@ -303,7 +328,7 @@ impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
         // See comment in `Dealer::new` for why we use `initial_transcript`
         let transcript = &mut self.initial_transcript;
         if proof
-            .verify_multiple(self.bp_gens, self.pc_gens, transcript, &Vs, self.n)
+            .verify_multiple_with_rng(self.bp_gens, self.pc_gens, transcript, &Vs, self.n, rng)
             .is_ok()
         {
             Ok(proof)
