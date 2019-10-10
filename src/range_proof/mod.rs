@@ -393,7 +393,7 @@ impl RangeProof {
         buf.extend_from_slice(self.t_x.as_bytes());
         buf.extend_from_slice(self.t_x_blinding.as_bytes());
         buf.extend_from_slice(self.e_blinding.as_bytes());
-        buf.extend_from_slice(self.ipp_proof.to_bytes_iter());
+        buf.extend(self.ipp_proof.to_bytes_iter());
         buf
     }
 
