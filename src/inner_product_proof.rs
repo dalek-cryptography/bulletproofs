@@ -351,7 +351,7 @@ impl InnerProductProof {
     /// * \\(n\\) pairs of compressed Ristretto points \\(L_0, R_0 \dots, L_{n-1}, R_{n-1}\\),
     /// * two scalars \\(a, b\\).
     #[inline]
-    pub fn to_bytes_iter(&self) -> impl Iterator<Item = u8> + '_ {
+    pub(crate) fn to_bytes_iter(&self) -> impl Iterator<Item = u8> + '_ {
         self.L_vec
             .iter()
             .zip(self.R_vec.iter())
