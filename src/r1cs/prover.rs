@@ -688,4 +688,14 @@ impl<'t, 'g> Prover<'t, 'g> {
             ipp_proof,
         })
     }
+
+    /// returns the number of constraints in the prover system
+    pub fn num_constraints(&self) -> usize {
+        self.constraints.len()
+    }
+
+    /// returns the constraints field
+    pub fn constraints(&self) -> &Vec<LinearCombination> {
+        &self.constraints
+    }
 }
