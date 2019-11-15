@@ -158,6 +158,10 @@ impl<'t, 'g> ConstraintSystem for Prover<'t, 'g> {
         Ok((l_var, r_var, o_var))
     }
 
+    fn multipliers_len(&self) -> usize {
+        self.a_L.len()
+    }
+
     fn constrain(&mut self, lc: LinearCombination) {
         // TODO: check that the linear combinations are valid
         // (e.g. that variables are valid, that the linear combination evals to 0 for prover, etc).
@@ -199,6 +203,10 @@ impl<'t, 'g> ConstraintSystem for RandomizingProver<'t, 'g> {
         input_assignments: Option<(Scalar, Scalar)>,
     ) -> Result<(Variable, Variable, Variable), R1CSError> {
         self.prover.allocate_multiplier(input_assignments)
+    }
+
+    fn multipliers_len(&self) -> usize {
+        self.prover.multipliers_len()
     }
 
     fn constrain(&mut self, lc: LinearCombination) {

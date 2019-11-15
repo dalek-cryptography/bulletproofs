@@ -116,6 +116,10 @@ impl<'t> ConstraintSystem for Verifier<'t> {
         Ok((l_var, r_var, o_var))
     }
 
+    fn multipliers_len(&self) -> usize {
+        self.num_vars
+    }
+
     fn constrain(&mut self, lc: LinearCombination) {
         // TODO: check that the linear combinations are valid
         // (e.g. that variables are valid, that the linear combination
@@ -158,6 +162,10 @@ impl<'t> ConstraintSystem for RandomizingVerifier<'t> {
         input_assignments: Option<(Scalar, Scalar)>,
     ) -> Result<(Variable, Variable, Variable), R1CSError> {
         self.verifier.allocate_multiplier(input_assignments)
+    }
+
+    fn multipliers_len(&self) -> usize {
+        self.verifier.multipliers_len()
     }
 
     fn constrain(&mut self, lc: LinearCombination) {
