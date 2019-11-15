@@ -1,5 +1,8 @@
 //! Errors related to proving and verifying proofs.
 
+extern crate alloc;
+use alloc::vec::Vec;
+
 /// Represents an error in proof creation, verification, or parsing.
 #[derive(Fail, Clone, Debug, Eq, PartialEq)]
 pub enum ProofError {
@@ -91,6 +94,8 @@ pub enum MPCError {
 }
 
 /// Represents an error during the proving or verifying of a constraint system.
+///
+/// XXX: should this be separate from a `ProofError`?
 #[cfg(feature = "yoloproofs")]
 #[derive(Fail, Clone, Debug, Eq, PartialEq)]
 pub enum R1CSError {
@@ -117,4 +122,16 @@ pub enum R1CSError {
         /// The description of the reasons for the error.
         description: String,
     },
+}
+
+#[cfg(feature = "yoloproofs")]
+impl From<ProofError> for R1CSError {
+    fn from(e: ProofError) -> R1CSError {
+        match e {
+            ProofError::InvalidGeneratorsLength => R1CSError::InvalidGeneratorsLength,
+            ProofError::FormatError => R1CSError::FormatError,
+            ProofError::VerificationError => R1CSError::VerificationError,
+            _ => panic!("unexpected error type in conversion"),
+        }
+    }
 }

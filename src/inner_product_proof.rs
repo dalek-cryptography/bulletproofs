@@ -1,9 +1,12 @@
 #![allow(non_snake_case)]
 #![doc(include = "../docs/inner-product-protocol.md")]
 
-use std::borrow::Borrow;
-use std::iter;
+extern crate alloc;
 
+use alloc::borrow::Borrow;
+use alloc::vec::Vec;
+
+use core::iter;
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::VartimeMultiscalarMul;
@@ -112,8 +115,8 @@ impl InnerProductProof {
             L_vec.push(L);
             R_vec.push(R);
 
-            transcript.commit_point(b"L", &L);
-            transcript.commit_point(b"R", &R);
+            transcript.append_point(b"L", &L);
+            transcript.append_point(b"R", &R);
 
             let u = transcript.challenge_scalar(b"u");
             let u_inv = u.invert();
@@ -162,8 +165,8 @@ impl InnerProductProof {
             L_vec.push(L);
             R_vec.push(R);
 
-            transcript.commit_point(b"L", &L);
-            transcript.commit_point(b"R", &R);
+            transcript.append_point(b"L", &L);
+            transcript.append_point(b"R", &R);
 
             let u = transcript.challenge_scalar(b"u");
             let u_inv = u.invert();
@@ -213,8 +216,8 @@ impl InnerProductProof {
 
         let mut challenges = Vec::with_capacity(lg_n);
         for (L, R) in self.L_vec.iter().zip(self.R_vec.iter()) {
-            transcript.commit_point(b"L", L);
-            transcript.commit_point(b"R", R);
+            transcript.validate_and_append_point(b"L", L)?;
+            transcript.validate_and_append_point(b"R", R)?;
             challenges.push(transcript.challenge_scalar(b"u"));
         }
 
@@ -344,6 +347,21 @@ impl InnerProductProof {
         buf.extend_from_slice(self.a.as_bytes());
         buf.extend_from_slice(self.b.as_bytes());
         buf
+    }
+
+    /// Converts the proof into a byte iterator over serialized view of the proof.
+    /// The layout of the inner product proof is:
+    /// * \\(n\\) pairs of compressed Ristretto points \\(L_0, R_0 \dots, L_{n-1}, R_{n-1}\\),
+    /// * two scalars \\(a, b\\).
+    #[inline]
+    pub(crate) fn to_bytes_iter(&self) -> impl Iterator<Item = u8> + '_ {
+        self.L_vec
+            .iter()
+            .zip(self.R_vec.iter())
+            .flat_map(|(l, r)| l.as_bytes().iter().chain(r.as_bytes()))
+            .chain(self.a.as_bytes())
+            .chain(self.b.as_bytes())
+            .copied()
     }
 
     /// Deserializes the proof from a byte slice.

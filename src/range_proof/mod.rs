@@ -1,9 +1,15 @@
 #![allow(non_snake_case)]
-#![doc(include = "../docs/range-proof-protocol.md")]
+#![doc(include = "../../docs/range-proof-protocol.md")]
 
-use rand;
+extern crate alloc;
+#[cfg(feature = "std")]
+extern crate rand;
 
-use std::iter;
+#[cfg(feature = "std")]
+use self::rand::thread_rng;
+use alloc::vec::Vec;
+
+use core::iter;
 
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
@@ -16,6 +22,7 @@ use inner_product_proof::InnerProductProof;
 use transcript::TranscriptProtocol;
 use util;
 
+use rand_core::{CryptoRng, RngCore};
 use serde::de::Visitor;
 use serde::{self, Deserialize, Deserializer, Serialize, Serializer};
 
@@ -125,6 +132,32 @@ impl RangeProof {
     /// );
     /// # }
     /// ```
+    pub fn prove_single_with_rng<T: RngCore + CryptoRng>(
+        bp_gens: &BulletproofGens,
+        pc_gens: &PedersenGens,
+        transcript: &mut Transcript,
+        v: u64,
+        v_blinding: &Scalar,
+        n: usize,
+        rng: &mut T,
+    ) -> Result<(RangeProof, CompressedRistretto), ProofError> {
+        let (p, Vs) = RangeProof::prove_multiple_with_rng(
+            bp_gens,
+            pc_gens,
+            transcript,
+            &[v],
+            &[*v_blinding],
+            n,
+            rng,
+        )?;
+        Ok((p, Vs[0]))
+    }
+
+    /// Create a rangeproof for a given pair of value `v` and
+    /// blinding scalar `v_blinding`.
+    /// This is a convenience wrapper around [`RangeProof::prove_single_with_rng`],
+    /// passing in a threadsafe RNG.
+    #[cfg(feature = "std")]
     pub fn prove_single(
         bp_gens: &BulletproofGens,
         pc_gens: &PedersenGens,
@@ -133,9 +166,15 @@ impl RangeProof {
         v_blinding: &Scalar,
         n: usize,
     ) -> Result<(RangeProof, CompressedRistretto), ProofError> {
-        let (p, Vs) =
-            RangeProof::prove_multiple(bp_gens, pc_gens, transcript, &[v], &[*v_blinding], n)?;
-        Ok((p, Vs[0]))
+        RangeProof::prove_single_with_rng(
+            bp_gens,
+            pc_gens,
+            transcript,
+            v,
+            v_blinding,
+            n,
+            &mut thread_rng(),
+        )
     }
 
     /// Create a rangeproof for a set of values.
@@ -192,13 +231,14 @@ impl RangeProof {
     /// );
     /// # }
     /// ```
-    pub fn prove_multiple(
+    pub fn prove_multiple_with_rng<T: RngCore + CryptoRng>(
         bp_gens: &BulletproofGens,
         pc_gens: &PedersenGens,
         transcript: &mut Transcript,
         values: &[u64],
         blindings: &[Scalar],
         n: usize,
+        rng: &mut T,
     ) -> Result<(RangeProof, Vec<CompressedRistretto>), ProofError> {
         use self::dealer::*;
         use self::party::*;
@@ -220,7 +260,7 @@ impl RangeProof {
             .into_iter()
             .enumerate()
             .map(|(j, p)| {
-                p.assign_position(j)
+                p.assign_position_with_rng(j, rng)
                     .expect("We already checked the parameters, so this should never happen")
             })
             .unzip();
@@ -231,7 +271,7 @@ impl RangeProof {
 
         let (parties, poly_commitments): (Vec<_>, Vec<_>) = parties
             .into_iter()
-            .map(|p| p.apply_challenge(&bit_challenge))
+            .map(|p| p.apply_challenge_with_rng(&bit_challenge, rng))
             .unzip();
 
         let (dealer, poly_challenge) = dealer.receive_poly_commitments(poly_commitments)?;
@@ -247,9 +287,49 @@ impl RangeProof {
         Ok((proof, value_commitments))
     }
 
+    /// Create a rangeproof for a set of values.
+    /// This is a convenience wrapper around [`RangeProof::prove_multiple_with_rng`],
+    /// passing in a threadsafe RNG.
+    #[cfg(feature = "std")]
+    pub fn prove_multiple(
+        bp_gens: &BulletproofGens,
+        pc_gens: &PedersenGens,
+        transcript: &mut Transcript,
+        values: &[u64],
+        blindings: &[Scalar],
+        n: usize,
+    ) -> Result<(RangeProof, Vec<CompressedRistretto>), ProofError> {
+        RangeProof::prove_multiple_with_rng(
+            bp_gens,
+            pc_gens,
+            transcript,
+            values,
+            blindings,
+            n,
+            &mut thread_rng(),
+        )
+    }
+
     /// Verifies a rangeproof for a given value commitment \\(V\\).
     ///
     /// This is a convenience wrapper around `verify_multiple` for the `m=1` case.
+    pub fn verify_single_with_rng<T: RngCore + CryptoRng>(
+        &self,
+        bp_gens: &BulletproofGens,
+        pc_gens: &PedersenGens,
+        transcript: &mut Transcript,
+        V: &CompressedRistretto,
+        n: usize,
+        rng: &mut T,
+    ) -> Result<(), ProofError> {
+        self.verify_multiple_with_rng(bp_gens, pc_gens, transcript, &[*V], n, rng)
+    }
+
+    /// Verifies a rangeproof for a given value commitment \\(V\\).
+    ///
+    /// This is a convenience wrapper around [`RangeProof::verify_single_with_rng`],
+    /// passing in a threadsafe RNG.
+    #[cfg(feature = "std")]
     pub fn verify_single(
         &self,
         bp_gens: &BulletproofGens,
@@ -258,17 +338,18 @@ impl RangeProof {
         V: &CompressedRistretto,
         n: usize,
     ) -> Result<(), ProofError> {
-        self.verify_multiple(bp_gens, pc_gens, transcript, &[*V], n)
+        self.verify_single_with_rng(bp_gens, pc_gens, transcript, V, n, &mut thread_rng())
     }
 
     /// Verifies an aggregated rangeproof for the given value commitments.
-    pub fn verify_multiple(
+    pub fn verify_multiple_with_rng<T: RngCore + CryptoRng>(
         &self,
         bp_gens: &BulletproofGens,
         pc_gens: &PedersenGens,
         transcript: &mut Transcript,
         value_commitments: &[CompressedRistretto],
         n: usize,
+        rng: &mut T,
     ) -> Result<(), ProofError> {
         let m = value_commitments.len();
 
@@ -287,31 +368,32 @@ impl RangeProof {
         transcript.rangeproof_domain_sep(n as u64, m as u64);
 
         for V in value_commitments.iter() {
-            transcript.commit_point(b"V", V);
+            // Allow the commitments to be zero (0 value, 0 blinding)
+            // See https://github.com/dalek-cryptography/bulletproofs/pull/248#discussion_r255167177
+            transcript.append_point(b"V", V);
         }
-        transcript.commit_point(b"A", &self.A);
-        transcript.commit_point(b"S", &self.S);
+
+        transcript.validate_and_append_point(b"A", &self.A)?;
+        transcript.validate_and_append_point(b"S", &self.S)?;
 
         let y = transcript.challenge_scalar(b"y");
         let z = transcript.challenge_scalar(b"z");
         let zz = z * z;
         let minus_z = -z;
 
-        transcript.commit_point(b"T_1", &self.T_1);
-        transcript.commit_point(b"T_2", &self.T_2);
+        transcript.validate_and_append_point(b"T_1", &self.T_1)?;
+        transcript.validate_and_append_point(b"T_2", &self.T_2)?;
 
         let x = transcript.challenge_scalar(b"x");
 
-        transcript.commit_scalar(b"t_x", &self.t_x);
-        transcript.commit_scalar(b"t_x_blinding", &self.t_x_blinding);
-        transcript.commit_scalar(b"e_blinding", &self.e_blinding);
+        transcript.append_scalar(b"t_x", &self.t_x);
+        transcript.append_scalar(b"t_x_blinding", &self.t_x_blinding);
+        transcript.append_scalar(b"e_blinding", &self.e_blinding);
 
         let w = transcript.challenge_scalar(b"w");
 
-        let mut rng = transcript.build_rng().finalize(&mut rand::thread_rng());
-
         // Challenge value for batching statements to be verified
-        let c = Scalar::random(&mut rng);
+        let c = Scalar::random(rng);
 
         let (x_sq, x_inv_sq, s) = self.ipp_proof.verification_scalars(n * m, transcript)?;
         let s_inv = s.iter().rev();
@@ -369,6 +451,28 @@ impl RangeProof {
         }
     }
 
+    /// Verifies an aggregated rangeproof for the given value commitments.
+    /// This is a convenience wrapper around [`RangeProof::verify_multiple_with_rng`],
+    /// passing in a threadsafe RNG.
+    #[cfg(feature = "std")]
+    pub fn verify_multiple(
+        &self,
+        bp_gens: &BulletproofGens,
+        pc_gens: &PedersenGens,
+        transcript: &mut Transcript,
+        value_commitments: &[CompressedRistretto],
+        n: usize,
+    ) -> Result<(), ProofError> {
+        self.verify_multiple_with_rng(
+            bp_gens,
+            pc_gens,
+            transcript,
+            value_commitments,
+            n,
+            &mut thread_rng(),
+        )
+    }
+
     /// Serializes the proof into a byte array of \\(2 \lg n + 9\\)
     /// 32-byte elements, where \\(n\\) is the number of secret bits.
     ///
@@ -390,8 +494,7 @@ impl RangeProof {
         buf.extend_from_slice(self.t_x.as_bytes());
         buf.extend_from_slice(self.t_x_blinding.as_bytes());
         buf.extend_from_slice(self.e_blinding.as_bytes());
-        // XXX this costs an extra alloc
-        buf.extend_from_slice(self.ipp_proof.to_bytes().as_slice());
+        buf.extend(self.ipp_proof.to_bytes_iter());
         buf
     }
 
@@ -525,7 +628,7 @@ mod tests {
         // data is shared between the prover and the verifier.
 
         // Use bincode for serialization
-        use bincode;
+        //use bincode; // already present in lib.rs
 
         // Both prover and verifier have access to the generators and the proof
         let max_bitsize = 64;
@@ -535,7 +638,7 @@ mod tests {
 
         // Prover's scope
         let (proof_bytes, value_commitments) = {
-            use rand::Rng;
+            use self::rand::Rng;
             let mut rng = rand::thread_rng();
 
             // 0. Create witness data
@@ -627,7 +730,7 @@ mod tests {
         let pc_gens = PedersenGens::default();
         let bp_gens = BulletproofGens::new(n, m);
 
-        use rand::Rng;
+        use self::rand::Rng;
         let mut rng = rand::thread_rng();
         let mut transcript = Transcript::new(b"AggregatedRangeProofTest");
 
@@ -700,7 +803,7 @@ mod tests {
         let pc_gens = PedersenGens::default();
         let bp_gens = BulletproofGens::new(n, m);
 
-        use rand::Rng;
+        use self::rand::Rng;
         let mut rng = rand::thread_rng();
         let mut transcript = Transcript::new(b"AggregatedRangeProofTest");
 

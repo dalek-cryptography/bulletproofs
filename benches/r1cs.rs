@@ -1,90 +1,46 @@
-extern crate bulletproofs;
-use bulletproofs::r1cs::{
-    ConstraintSystem, Prover, R1CSError, R1CSProof, RandomizedConstraintSystem, Variable, Verifier,
-};
-use bulletproofs::{BulletproofGens, PedersenGens};
+#![allow(non_snake_case)]
 
 #[macro_use]
 extern crate criterion;
 use criterion::Criterion;
 
+// Code below copied from ../tests/r1cs.rs
+//
+// Ideally we wouldn't duplicate it, but AFAIK criterion requires a
+// seperate benchmark harness, while the test code uses a different
+// test harness, so I (hdevalence) just copied the code over.  It
+// should not be edited here.  In the future it would be good if
+// someone wants to figure a way to use #[path] attributes or
+// something to avoid the duplication.
+
+extern crate bulletproofs;
 extern crate curve25519_dalek;
+extern crate merlin;
+extern crate rand;
+
+use bulletproofs::r1cs::*;
+use bulletproofs::{BulletproofGens, PedersenGens};
 use curve25519_dalek::ristretto::CompressedRistretto;
 use curve25519_dalek::scalar::Scalar;
-
-extern crate merlin;
 use merlin::Transcript;
+use rand::{thread_rng, Rng};
 
-extern crate rand;
-use rand::Rng;
+// Shuffle gadget (documented in markdown file)
 
-/*
-K-SHUFFLE GADGET SPECIFICATION:
+/// A proof-of-shuffle.
+struct ShuffleProof(R1CSProof);
 
-Represents a permutation of a list of `k` scalars `{x_i}` into a list of `k` scalars `{y_i}`.
-
-Algebraically it can be expressed as a statement that for a free variable `z`,
-the roots of the two polynomials in terms of `z` are the same up to a permutation:
-
-    ∏(x_i - z) == ∏(y_i - z)
-
-Prover can commit to blinded scalars `x_i` and `y_i` then receive a random challenge `z`,
-and build a proof that the above relation holds.
-
-K-shuffle requires `2*(K-1)` multipliers.
-
-For K > 1:
-
-        (x_0 - z)---⊗------⊗---(y_0 - z)        // mulx[0], muly[0]
-                    |      |
-        (x_1 - z)---⊗      ⊗---(y_1 - z)        // mulx[1], muly[1]
-                    |      |
-                   ...    ...
-                    |      |
-    (x_{k-2} - z)---⊗      ⊗---(y_{k-2} - z)    // mulx[k-2], muly[k-2]
-                   /        \
-    (x_{k-1} - z)_/          \_(y_{k-1} - z)
-
-    // Connect left and right sides of the shuffle statement
-    mulx_out[0] = muly_out[0]
-
-    // For i == [0, k-3]:
-    mulx_left[i]  = x_i - z
-    mulx_right[i] = mulx_out[i+1]
-    muly_left[i]  = y_i - z
-    muly_right[i] = muly_out[i+1]
-
-    // last multipliers connect two last variables (on each side)
-    mulx_left[k-2]  = x_{k-2} - z
-    mulx_right[k-2] = x_{k-1} - z
-    muly_left[k-2]  = y_{k-2} - z
-    muly_right[k-2] = y_{k-1} - z
-
-For K = 1:
-
-    (x_0 - z)--------------(y_0 - z)
-
-    // Connect x to y directly, omitting the challenge entirely as it cancels out
-    x_0 = y_0
-*/
-
-// Make a gadget that adds constraints to a ConstraintSystem, such that the
-// y variables are constrained to be a valid shuffle of the x variables.
-struct KShuffleGadget {}
-
-impl KShuffleGadget {
-    fn fill_cs<CS: RandomizableConstraintSystem>(
+impl ShuffleProof {
+    fn gadget<CS: RandomizableConstraintSystem>(
         cs: &mut CS,
         x: Vec<Variable>,
         y: Vec<Variable>,
     ) -> Result<(), R1CSError> {
-        let one = Scalar::one();
-
         assert_eq!(x.len(), y.len());
-
         let k = x.len();
+
         if k == 1 {
-            cs.constrain([(x[0], -one), (y[0], one)].iter().collect());
+            cs.constrain(y[0] - x[0]);
             return Ok(());
         }
 
@@ -110,16 +66,17 @@ impl KShuffleGadget {
             });
 
             // Constrain last x mul output and last y mul output to be equal
-            cs.constrain(
-                [(first_muly_out, -one), (first_mulx_out, one)]
-                    .iter()
-                    .collect(),
-            );
+            cs.constrain(first_mulx_out - first_muly_out);
 
             Ok(())
         })
     }
+}
 
+impl ShuffleProof {
+    /// Attempt to construct a proof that `output` is a permutation of `input`.
+    ///
+    /// Returns a tuple `(proof, input_commitments || output_commitments)`.
     pub fn prove<'a, 'b>(
         pc_gens: &'b PedersenGens,
         bp_gens: &'b BulletproofGens,
@@ -128,16 +85,17 @@ impl KShuffleGadget {
         output: &[Scalar],
     ) -> Result<
         (
-            R1CSProof,
+            ShuffleProof,
             Vec<CompressedRistretto>,
             Vec<CompressedRistretto>,
         ),
         R1CSError,
     > {
         // Apply a domain separator with the shuffle parameters to the transcript
+        // XXX should this be part of the gadget?
         let k = input.len();
-        transcript.commit_bytes(b"dom-sep", b"ShuffleProof");
-        transcript.commit_bytes(b"k", Scalar::from(k as u64).as_bytes());
+        transcript.append_message(b"dom-sep", b"ShuffleProof");
+        transcript.append_u64(b"k", k as u64);
 
         let mut prover = Prover::new(&pc_gens, transcript);
 
@@ -155,43 +113,60 @@ impl KShuffleGadget {
             .map(|v| prover.commit(*v, Scalar::random(&mut blinding_rng)))
             .unzip();
 
-        Self::fill_cs(&mut prover, input_vars, output_vars)?;
+        ShuffleProof::gadget(&mut prover, input_vars, output_vars)?;
+
         let proof = prover.prove(&bp_gens)?;
 
-        Ok((proof, input_commitments, output_commitments))
+        Ok((ShuffleProof(proof), input_commitments, output_commitments))
     }
+}
 
+impl ShuffleProof {
+    /// Attempt to verify a `ShuffleProof`.
     pub fn verify<'a, 'b>(
+        &self,
         pc_gens: &'b PedersenGens,
         bp_gens: &'b BulletproofGens,
         transcript: &'a mut Transcript,
-        proof: &R1CSProof,
         input_commitments: &Vec<CompressedRistretto>,
         output_commitments: &Vec<CompressedRistretto>,
     ) -> Result<(), R1CSError> {
         // Apply a domain separator with the shuffle parameters to the transcript
+        // XXX should this be part of the gadget?
         let k = input_commitments.len();
-        transcript.commit_bytes(b"dom-sep", b"ShuffleProof");
-        transcript.commit_bytes(b"k", Scalar::from(k as u64).as_bytes());
+        transcript.append_message(b"dom-sep", b"ShuffleProof");
+        transcript.append_u64(b"k", k as u64);
 
         let mut verifier = Verifier::new(transcript);
 
         let input_vars: Vec<_> = input_commitments
             .iter()
-            .map(|commitment| verifier.commit(*commitment))
+            .map(|V| verifier.commit(*V))
             .collect();
 
         let output_vars: Vec<_> = output_commitments
             .iter()
-            .map(|commitment| verifier.commit(*commitment))
+            .map(|V| verifier.commit(*V))
             .collect();
 
-        Self::fill_cs(&mut verifier, input_vars, output_vars)?;
-        verifier.verify(proof, &pc_gens, &bp_gens)
+        ShuffleProof::gadget(&mut verifier, input_vars, output_vars)?;
+
+        verifier.verify(&self.0, &pc_gens, &bp_gens)
     }
 }
 
+// End of copied code.
+
+/// Binary logarithm of maximum shuffle size.
+const LG_MAX_SHUFFLE_SIZE: usize = 10;
+/// Maximum shuffle size to benchmark.
+const MAX_SHUFFLE_SIZE: usize = 1 << LG_MAX_SHUFFLE_SIZE;
+
 fn bench_kshuffle_prove(c: &mut Criterion) {
+    // Construct Bulletproof generators externally
+    let pc_gens = PedersenGens::default();
+    let bp_gens = BulletproofGens::new(2 * MAX_SHUFFLE_SIZE, 1);
+
     c.bench_function_over_inputs(
         "k-shuffle proof creation",
         move |b, k| {
@@ -205,67 +180,78 @@ fn bench_kshuffle_prove(c: &mut Criterion) {
             rand::thread_rng().shuffle(&mut output);
 
             // Make kshuffle proof
-            let pc_gens = PedersenGens::default();
-            let bp_gens = BulletproofGens::new(128, 1);
             b.iter(|| {
-                let mut prover_transcript = Transcript::new(b"ShuffleTest");
-                KShuffleGadget::prove(&pc_gens, &bp_gens, &mut prover_transcript, &input, &output)
+                let mut prover_transcript = Transcript::new(b"ShuffleBenchmark");
+                ShuffleProof::prove(&pc_gens, &bp_gens, &mut prover_transcript, &input, &output)
                     .unwrap();
             })
         },
-        vec![8, 16, 32, 64, 17],
+        (1..=LG_MAX_SHUFFLE_SIZE)
+            .map(|i| 1 << i)
+            .collect::<Vec<_>>(),
     );
 }
 
 criterion_group! {
     name = kshuffle_prove;
-    config = Criterion::default();
+    // Lower the sample size to run faster; larger shuffle sizes are
+    // long so we're not microbenchmarking anyways.
+    config = Criterion::default().sample_size(10);
     targets =
     bench_kshuffle_prove,
 }
 
 fn bench_kshuffle_verify(c: &mut Criterion) {
+    // Construct Bulletproof generators externally
+    let pc_gens = PedersenGens::default();
+    let bp_gens = BulletproofGens::new(2 * MAX_SHUFFLE_SIZE, 1);
+
     c.bench_function_over_inputs(
         "k-shuffle proof verification",
         move |b, k| {
-            // Generate inputs and outputs to kshuffle
-            let mut rng = rand::thread_rng();
-            let (min, max) = (0u64, std::u64::MAX);
-            let input: Vec<Scalar> = (0..*k)
-                .map(|_| Scalar::from(rng.gen_range(min, max)))
-                .collect();
-            let mut output = input.clone();
-            rand::thread_rng().shuffle(&mut output);
+            // Generate the proof in its own scope to prevent reuse of
+            // prover variables by the verifier
+            let (proof, input_commitments, output_commitments) = {
+                // Generate inputs and outputs to kshuffle
+                let mut rng = rand::thread_rng();
+                let (min, max) = (0u64, std::u64::MAX);
+                let input: Vec<Scalar> = (0..*k)
+                    .map(|_| Scalar::from(rng.gen_range(min, max)))
+                    .collect();
+                let mut output = input.clone();
+                rand::thread_rng().shuffle(&mut output);
 
-            // Make kshuffle proof
-            let pc_gens = PedersenGens::default();
-            let bp_gens = BulletproofGens::new(128, 1);
-            let mut prover_transcript = Transcript::new(b"ShuffleTest");
-            let (proof, in_commitments, out_commitments) =
-                KShuffleGadget::prove(&pc_gens, &bp_gens, &mut prover_transcript, &input, &output)
-                    .unwrap();
+                let mut prover_transcript = Transcript::new(b"ShuffleBenchmark");
+
+                ShuffleProof::prove(&pc_gens, &bp_gens, &mut prover_transcript, &input, &output)
+                    .unwrap()
+            };
 
             // Verify kshuffle proof
             b.iter(|| {
-                let mut verifier_transcript = Transcript::new(b"ShuffleTest");
-                KShuffleGadget::verify(
-                    &pc_gens,
-                    &bp_gens,
-                    &mut verifier_transcript,
-                    &proof,
-                    &in_commitments,
-                    &out_commitments,
-                )
-                .unwrap();
+                let mut verifier_transcript = Transcript::new(b"ShuffleBenchmark");
+                proof
+                    .verify(
+                        &pc_gens,
+                        &bp_gens,
+                        &mut verifier_transcript,
+                        &input_commitments,
+                        &output_commitments,
+                    )
+                    .unwrap();
             })
         },
-        vec![8, 16, 32, 64, 17],
+        (1..=LG_MAX_SHUFFLE_SIZE)
+            .map(|i| 1 << i)
+            .collect::<Vec<_>>(),
     );
 }
 
 criterion_group! {
     name = kshuffle_verify;
-    config = Criterion::default();
+    // Lower the sample size to run faster; larger shuffle sizes are
+    // long so we're not microbenchmarking anyways.
+    config = Criterion::default().sample_size(10);
     targets =
     bench_kshuffle_verify,
 }

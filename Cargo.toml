@@ -1,6 +1,6 @@
 [package]
 name = "bulletproofs"
-version = "1.0.1"
+version = "1.0.4"
 authors = ["Cathie Yun <cathieyun@gmail.com>", 
            "Henry de Valence <hdevalence@hdevalence.ca>",
            "Oleg Andreev <oleganza@gmail.com>"]
@@ -8,21 +8,22 @@ readme = "README.md"
 license = "MIT"
 repository = "https://github.com/dalek-cryptography/bulletproofs"
 categories = ["cryptography"]
-keywords = ["cryptography", "ristretto", "zero-knowledge", "bulletproofs"]
+keywords = ["cryptography", "crypto", "ristretto", "zero-knowledge", "bulletproofs"]
 description = "A pure-Rust implementation of Bulletproofs using Ristretto"
 
 [dependencies]
-curve25519-dalek = { version = "1", features = ["serde"] }
-subtle = "2"
-sha3 = "0.8"
-digest = "0.8"
-rand = "0.6"
-byteorder = "1"
-serde = "1"
-serde_derive = "1"
-failure = "0.1"
-merlin = "1"
-clear_on_drop = "0.2"
+curve25519-dalek = { version = "^1.2.3", default-features = false, features = ["u64_backend", "nightly", "serde", "alloc"] }
+subtle = { version = "2", default-features = false }
+sha3 = { version = "0.8", default-features = false }
+digest = { version = "0.8", default-features = false }
+rand_core = { version = "0.4", default-features = false, features = ["alloc"] }
+rand = { version = "0.6", default-features = false, optional = true }
+byteorder = { version = "1", default-features = false }
+serde = { version = "1", default-features = false, features = ["alloc"] }
+serde_derive = { version = "1", default-features = false }
+failure = { version = "0.1", default-features = false, features = ["derive"] }
+merlin = { version = "1.2", default-features = false }
+clear_on_drop = { version = "0.2", default-features = false, features = ["nightly"] }
 
 [dev-dependencies]
 hex = "0.3"
@@ -31,8 +32,10 @@ bincode = "1"
 rand_chacha = "0.1"
 
 [features]
+default = ["std", "avx2_backend"]
 avx2_backend = ["curve25519-dalek/avx2_backend"]
 yoloproofs = []
+std = ["rand", "rand/std"]
 
 [[test]]
 name = "range_proof"

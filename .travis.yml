@@ -1,9 +1,6 @@
 language: rust
 cache: cargo
 
-rust:
-  - nightly-2018-12-31
-
 env:
   - TEST_COMMAND=test EXTRA_FLAGS='' FEATURES=''
   - TEST_COMMAND=test EXTRA_FLAGS='' FEATURES='yoloproofs'
@@ -14,7 +11,6 @@ env:
 matrix:
   fast_finish: true
   include:
-  - rust: nightly-2018-12-31
     before_script:
     - rustup component add rustfmt-preview
     script:
