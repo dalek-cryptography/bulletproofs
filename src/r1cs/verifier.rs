@@ -481,4 +481,8 @@ impl<'t> Verifier<'t> {
 
         Ok(())
     }
+
+    pub fn get_num_vars(&self) -> usize {
+        self.num_vars
+    }
 }

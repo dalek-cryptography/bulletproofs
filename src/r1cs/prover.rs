@@ -698,4 +698,9 @@ impl<'t, 'g> Prover<'t, 'g> {
     pub fn constraints(&self) -> &Vec<LinearCombination> {
         &self.constraints
     }
+
+    /// returns the number of multiplications in the prover constraint system
+    pub fn get_num_multiplications(&self) -> usize {
+        self.a_L.len()
+    }
 }
