@@ -1,5 +1,5 @@
-extern crate rand;
-use rand::SeedableRng;
+extern crate rand_core;
+use rand_core::SeedableRng;
 
 extern crate rand_chacha;
 use rand_chacha::ChaChaRng;
