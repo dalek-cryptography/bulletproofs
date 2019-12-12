@@ -1,8 +1,7 @@
-extern crate rand;
-use rand::SeedableRng;
-
 extern crate rand_chacha;
 use rand_chacha::ChaChaRng;
+
+extern crate rand_core;
 
 extern crate curve25519_dalek;
 use curve25519_dalek::ristretto::CompressedRistretto;
@@ -110,6 +109,7 @@ fn generate_test_vectors() {
 
     // Use a deterministic RNG for proving, so the test vectors can be
     // generated reproducibly.
+    use rand_core::SeedableRng;
     let mut test_rng = ChaChaRng::from_seed([24u8; 32]);
 
     let values = vec![0u64, 1, 2, 3, 4, 5, 6, 7];

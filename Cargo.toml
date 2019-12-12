@@ -29,7 +29,7 @@ clear_on_drop = { version = "0.2", default-features = false, features = ["nightl
 hex = "0.3"
 criterion = "0.2"
 bincode = "1"
-rand_chacha = "0.1"
+rand_chacha = "0.2"
 
 [features]
 default = ["std", "avx2_backend"]
