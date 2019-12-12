@@ -23,8 +23,8 @@ use bulletproofs::{BulletproofGens, PedersenGens};
 use curve25519_dalek::ristretto::CompressedRistretto;
 use curve25519_dalek::scalar::Scalar;
 use merlin::Transcript;
-use rand::{Rng};
 use rand::seq::SliceRandom;
+use rand::Rng;
 
 // Shuffle gadget (documented in markdown file)
 

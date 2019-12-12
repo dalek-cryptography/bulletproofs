@@ -10,6 +10,7 @@ use bulletproofs::{BulletproofGens, PedersenGens};
 use curve25519_dalek::ristretto::CompressedRistretto;
 use curve25519_dalek::scalar::Scalar;
 use merlin::Transcript;
+use rand::seq::SliceRandom;
 use rand::thread_rng;
 
 // Shuffle gadget (documented in markdown file)
@@ -157,7 +158,7 @@ fn kshuffle_helper(k: usize) {
             .map(|_| Scalar::from(rng.gen_range(min, max)))
             .collect();
         let mut output = input.clone();
-        rand::thread_rng().shuffle(&mut output);
+        output.shuffle(&mut rand::thread_rng());
 
         let mut prover_transcript = Transcript::new(b"ShuffleProofTest");
         ShuffleProof::prove(&pc_gens, &bp_gens, &mut prover_transcript, &input, &output).unwrap()
@@ -401,10 +402,10 @@ pub fn range_proof<CS: ConstraintSystem>(
 
 #[test]
 fn range_proof_gadget() {
-    use rand::rngs::OsRng;
+    use rand::thread_rng;
     use rand::Rng;
 
-    let mut rng = OsRng::new().unwrap();
+    let mut rng = thread_rng();
     let m = 3; // number of values to test per `n`
 
     for n in [2, 10, 32, 63].iter() {
