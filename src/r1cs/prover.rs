@@ -378,8 +378,8 @@ impl<'t, 'g> Prover<'t, 'g> {
 
     /// Consume this `ConstraintSystem` to produce a proof.
     pub fn prove(mut self, bp_gens: &BulletproofGens) -> Result<R1CSProof, R1CSError> {
-        use std::iter;
         use crate::util;
+        use std::iter;
 
         // Commit a length _suffix_ for the number of high-level variables.
         // We cannot do this in advance because user can commit variables one-by-one,

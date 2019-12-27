@@ -6,33 +6,14 @@
 #![doc(include = "../README.md")]
 #![doc(html_logo_url = "https://doc.dalek.rs/assets/dalek-logo-clear.png")]
 
-extern crate byteorder;
-
 extern crate alloc;
 
-#[cfg(feature = "std")]
-extern crate core;
-
-#[cfg(feature = "std")]
-extern crate rand;
-
-extern crate digest;
-extern crate rand_core;
-extern crate sha3;
-
-extern crate clear_on_drop;
-extern crate curve25519_dalek;
-extern crate merlin;
-extern crate subtle;
 #[macro_use]
 extern crate serde_derive;
-extern crate serde;
+use serde;
 
 #[macro_use]
 extern crate failure;
-
-#[cfg(test)]
-extern crate bincode;
 
 mod util;
 

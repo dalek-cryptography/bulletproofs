@@ -167,7 +167,7 @@ impl BulletproofGens {
 
     /// Returns j-th share of generators, with an appropriate
     /// slice of vectors G and H for the j-th range proof.
-    pub fn share(&self, j: usize) -> BulletproofGensShare {
+    pub fn share(&self, j: usize) -> BulletproofGensShare<'_> {
         BulletproofGensShare {
             gens: &self,
             share: j,

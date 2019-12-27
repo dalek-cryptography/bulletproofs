@@ -3,16 +3,13 @@
 extern crate criterion;
 use criterion::Criterion;
 
-extern crate rand;
+use rand;
 use rand::Rng;
 
-extern crate curve25519_dalek;
 use curve25519_dalek::scalar::Scalar;
 
-extern crate merlin;
 use merlin::Transcript;
 
-extern crate bulletproofs;
 use bulletproofs::RangeProof;
 use bulletproofs::{BulletproofGens, PedersenGens};
 

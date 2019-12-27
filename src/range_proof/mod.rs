@@ -557,7 +557,7 @@ impl<'de> Deserialize<'de> for RangeProof {
         impl<'de> Visitor<'de> for RangeProofVisitor {
             type Value = RangeProof;
 
-            fn expecting(&self, formatter: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
+            fn expecting(&self, formatter: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
                 formatter.write_str("a valid RangeProof")
             }
 

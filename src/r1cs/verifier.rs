@@ -356,8 +356,8 @@ impl<'t> Verifier<'t> {
         let pad = padded_n - n;
 
         use crate::inner_product_proof::inner_product;
-        use std::iter;
         use crate::util;
+        use std::iter;
 
         if bp_gens.gens_capacity < padded_n {
             return Err(R1CSError::InvalidGeneratorsLength);
