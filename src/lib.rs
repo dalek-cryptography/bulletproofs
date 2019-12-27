@@ -10,7 +10,6 @@ extern crate alloc;
 
 #[macro_use]
 extern crate serde_derive;
-use serde;
 
 #[macro_use]
 extern crate failure;
