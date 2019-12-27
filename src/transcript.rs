@@ -4,7 +4,7 @@ use curve25519_dalek::ristretto::CompressedRistretto;
 use curve25519_dalek::scalar::Scalar;
 use merlin::Transcript;
 
-use errors::ProofError;
+use crate::errors::ProofError;
 
 pub trait TranscriptProtocol {
     /// Append a domain separator for an `n`-bit, `m`-party range proof.

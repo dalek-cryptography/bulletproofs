@@ -10,7 +10,8 @@ use alloc::vec::Vec;
 use core::iter;
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
-use generators::{BulletproofGens, PedersenGens};
+
+use crate::generators::{BulletproofGens, PedersenGens};
 
 /// A commitment to the bits of a party's value.
 #[derive(Serialize, Deserialize, Copy, Clone, Debug)]
@@ -92,8 +93,8 @@ impl ProofShare {
     ) -> Result<(), ()> {
         use curve25519_dalek::traits::{IsIdentity, VartimeMultiscalarMul};
 
-        use inner_product_proof::inner_product;
-        use util;
+        use crate::inner_product_proof::inner_product;
+        use crate::util;
 
         let n = self.l_vec.len();
 

@@ -14,15 +14,15 @@ use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
 use merlin::Transcript;
 
-use errors::MPCError;
-use generators::{BulletproofGens, PedersenGens};
-use inner_product_proof;
-use range_proof::RangeProof;
-use transcript::TranscriptProtocol;
+use crate::errors::MPCError;
+use crate::generators::{BulletproofGens, PedersenGens};
+use crate::inner_product_proof;
+use crate::range_proof::RangeProof;
+use crate::transcript::TranscriptProtocol;
 
 use rand_core::{CryptoRng, RngCore};
 
-use util;
+use crate::util;
 
 #[cfg(feature = "std")]
 use rand::thread_rng;

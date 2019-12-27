@@ -12,10 +12,10 @@ use super::{
     RandomizedConstraintSystem, Variable,
 };
 
-use errors::R1CSError;
-use generators::{BulletproofGens, PedersenGens};
-use inner_product_proof::InnerProductProof;
-use transcript::TranscriptProtocol;
+use crate::errors::R1CSError;
+use crate::generators::{BulletproofGens, PedersenGens};
+use crate::inner_product_proof::InnerProductProof;
+use crate::transcript::TranscriptProtocol;
 
 /// A [`ConstraintSystem`] implementation for use by the prover.
 ///
@@ -44,7 +44,7 @@ pub struct Prover<'t, 'g> {
 
     /// This list holds closures that will be called in the second phase of the protocol,
     /// when non-randomized variables are committed.
-    deferred_constraints: Vec<Box<Fn(&mut RandomizingProver<'t, 'g>) -> Result<(), R1CSError>>>,
+    deferred_constraints: Vec<Box<dyn Fn(&mut RandomizingProver<'t, 'g>) -> Result<(), R1CSError>>>,
 
     /// Index of a pending multiplier that's not fully assigned yet.
     pending_multiplier: Option<usize>,
@@ -379,7 +379,7 @@ impl<'t, 'g> Prover<'t, 'g> {
     /// Consume this `ConstraintSystem` to produce a proof.
     pub fn prove(mut self, bp_gens: &BulletproofGens) -> Result<R1CSProof, R1CSError> {
         use std::iter;
-        use util;
+        use crate::util;
 
         // Commit a length _suffix_ for the number of high-level variables.
         // We cannot do this in advance because user can commit variables one-by-one,
