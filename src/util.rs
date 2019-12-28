@@ -7,7 +7,8 @@ use alloc::vec;
 use alloc::vec::Vec;
 use clear_on_drop::clear::Clear;
 use curve25519_dalek::scalar::Scalar;
-use inner_product_proof::inner_product;
+
+use crate::inner_product_proof::inner_product;
 
 /// Represents a degree-1 vector polynomial \\(\mathbf{a} + \mathbf{b} \cdot x\\).
 pub struct VecPoly1(pub Vec<Scalar>, pub Vec<Scalar>);

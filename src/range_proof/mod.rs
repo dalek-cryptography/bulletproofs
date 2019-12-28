@@ -16,11 +16,11 @@ use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::{IsIdentity, VartimeMultiscalarMul};
 use merlin::Transcript;
 
-use errors::ProofError;
-use generators::{BulletproofGens, PedersenGens};
-use inner_product_proof::InnerProductProof;
-use transcript::TranscriptProtocol;
-use util;
+use crate::errors::ProofError;
+use crate::generators::{BulletproofGens, PedersenGens};
+use crate::inner_product_proof::InnerProductProof;
+use crate::transcript::TranscriptProtocol;
+use crate::util;
 
 use rand_core::{CryptoRng, RngCore};
 use serde::de::Visitor;
@@ -509,7 +509,7 @@ impl RangeProof {
             return Err(ProofError::FormatError);
         }
 
-        use util::read32;
+        use crate::util::read32;
 
         let A = CompressedRistretto(read32(&slice[0 * 32..]));
         let S = CompressedRistretto(read32(&slice[1 * 32..]));
@@ -557,7 +557,7 @@ impl<'de> Deserialize<'de> for RangeProof {
         impl<'de> Visitor<'de> for RangeProofVisitor {
             type Value = RangeProof;
 
-            fn expecting(&self, formatter: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
+            fn expecting(&self, formatter: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
                 formatter.write_str("a valid RangeProof")
             }
 
@@ -589,7 +589,7 @@ fn delta(n: usize, m: usize, y: &Scalar, z: &Scalar) -> Scalar {
 mod tests {
     use super::*;
 
-    use generators::PedersenGens;
+    use crate::generators::PedersenGens;
 
     #[test]
     fn test_delta() {
@@ -721,7 +721,7 @@ mod tests {
         use self::dealer::*;
         use self::party::*;
 
-        use errors::MPCError;
+        use crate::errors::MPCError;
 
         // Simulate four parties, two of which will be dishonest and use a 64-bit value.
         let m = 4;
@@ -794,7 +794,7 @@ mod tests {
     fn detect_dishonest_dealer_during_aggregation() {
         use self::dealer::*;
         use self::party::*;
-        use errors::MPCError;
+        use crate::errors::MPCError;
 
         // Simulate one party
         let m = 1;

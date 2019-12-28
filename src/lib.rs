@@ -6,33 +6,13 @@
 #![doc(include = "../README.md")]
 #![doc(html_logo_url = "https://doc.dalek.rs/assets/dalek-logo-clear.png")]
 
-extern crate byteorder;
-
 extern crate alloc;
 
-#[cfg(feature = "std")]
-extern crate core;
-
-#[cfg(feature = "std")]
-extern crate rand;
-
-extern crate digest;
-extern crate rand_core;
-extern crate sha3;
-
-extern crate clear_on_drop;
-extern crate curve25519_dalek;
-extern crate merlin;
-extern crate subtle;
 #[macro_use]
 extern crate serde_derive;
-extern crate serde;
 
 #[macro_use]
 extern crate failure;
-
-#[cfg(test)]
-extern crate bincode;
 
 mod util;
 
@@ -52,16 +32,16 @@ mod inner_product_proof;
 mod range_proof;
 mod transcript;
 
-pub use errors::ProofError;
-pub use generators::{BulletproofGens, BulletproofGensShare, PedersenGens};
-pub use range_proof::RangeProof;
+pub use crate::errors::ProofError;
+pub use crate::generators::{BulletproofGens, BulletproofGensShare, PedersenGens};
+pub use crate::range_proof::RangeProof;
 
 #[doc(include = "../docs/aggregation-api.md")]
 pub mod range_proof_mpc {
-    pub use errors::MPCError;
-    pub use range_proof::dealer;
-    pub use range_proof::messages;
-    pub use range_proof::party;
+    pub use crate::errors::MPCError;
+    pub use crate::range_proof::dealer;
+    pub use crate::range_proof::messages;
+    pub use crate::range_proof::party;
 }
 
 #[cfg(feature = "yoloproofs")]

@@ -5,9 +5,9 @@ use curve25519_dalek::ristretto::CompressedRistretto;
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::{Identity, IsIdentity};
 
-use errors::R1CSError;
-use inner_product_proof::InnerProductProof;
-use util;
+use crate::errors::R1CSError;
+use crate::inner_product_proof::InnerProductProof;
+use crate::util;
 
 use serde::de::Visitor;
 use serde::{self, Deserialize, Deserializer, Serialize, Serializer};

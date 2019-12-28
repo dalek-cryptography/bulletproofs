@@ -12,8 +12,8 @@ use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::VartimeMultiscalarMul;
 use merlin::Transcript;
 
-use errors::ProofError;
-use transcript::TranscriptProtocol;
+use crate::errors::ProofError;
+use crate::transcript::TranscriptProtocol;
 
 #[derive(Clone, Debug)]
 pub struct InnerProductProof {
@@ -387,7 +387,7 @@ impl InnerProductProof {
             return Err(ProofError::FormatError);
         }
 
-        use util::read32;
+        use crate::util::read32;
 
         let mut L_vec: Vec<CompressedRistretto> = Vec::with_capacity(lg_n);
         let mut R_vec: Vec<CompressedRistretto> = Vec::with_capacity(lg_n);
@@ -427,13 +427,13 @@ pub fn inner_product(a: &[Scalar], b: &[Scalar]) -> Scalar {
 mod tests {
     use super::*;
 
+    use crate::util;
     use sha3::Sha3_512;
-    use util;
 
     fn test_helper_create(n: usize) {
         let mut rng = rand::thread_rng();
 
-        use generators::BulletproofGens;
+        use crate::generators::BulletproofGens;
         let bp_gens = BulletproofGens::new(n, 1);
         let G: Vec<RistrettoPoint> = bp_gens.share(0).G(n).cloned().collect();
         let H: Vec<RistrettoPoint> = bp_gens.share(0).H(n).cloned().collect();

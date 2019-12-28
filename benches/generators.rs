@@ -1,4 +1,3 @@
-extern crate bulletproofs;
 use bulletproofs::{BulletproofGens, PedersenGens};
 
 #[macro_use]
