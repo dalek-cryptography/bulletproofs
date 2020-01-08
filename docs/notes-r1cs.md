@@ -121,7 +121,7 @@ The matrices \\(\mathbf{W}\_L, \mathbf{W}\_R, \mathbf{W}\_O, \mathbf{W}\_V\\) ar
 because most constraints apply only to a few variables. As a result, constraints are represented as short lists
 of pairs \\((i, w)\\) where \\(i\\) is an index of a variable, and \\(w\\) is its (non-zero) weight.
 
-Multiplication of a matrix by a vector is implemented via multiplication of each weight \\(w\\) by 
+Multiplication of a matrix by a vector is implemented via multiplication of each weight \\(w\\) by
 a scalar in the vector at a corresponding index \\(i\\). This way, all zero-weight terms are automatically skipped.
 
 
@@ -177,7 +177,7 @@ We can do this for a random challenge \\(z\\), for the same reason as above. The
 \mathbf{W}\_O \cdot \mathbf{a}\_O =
 \mathbf{W}\_V \cdot \mathbf{v} +
 \mathbf{c}
-\\) 
+\\)
 becomes:
 
 \\[
@@ -197,7 +197,7 @@ are multiplied by a powers of \\(z\\) between \\(z^1\\) and \\(z^q\\). Combining
 \\[
 \langle \mathbf{a}\_L \circ \mathbf{a}\_R - \mathbf{a}\_O ,
 \mathbf{y}^n \rangle +
-\langle z \mathbf{z}^q, 
+\langle z \mathbf{z}^q,
 \mathbf{W}\_L \cdot \mathbf{a}\_L +
 \mathbf{W}\_R \cdot \mathbf{a}\_R +
 \mathbf{W}\_O \cdot \mathbf{a}\_O -
@@ -238,7 +238,7 @@ Rearranging into a single inner product statement
 
 We want to work towards expressing the constraints in terms of a single inner product,
 so that we can use the [inner product argument](../notes/index.html#inner-product-proof)
-to represent it in a more compact and efficient-to-verify form. 
+to represent it in a more compact and efficient-to-verify form.
 To do that we will rearrange the above equation so that terms
 involving \\({\mathbf{a}}\_{L}\\) and \\({\mathbf{a}}\_{O}\\) appear only on the left-hand side, terms
 involving \\({\mathbf{a}}\_{R}\\) appear only on the right-hand side, and
@@ -254,8 +254,7 @@ the proof would still work if \\({\mathbf{a}}\_{O}\\) was rearranged on the righ
 If we reorder terms, we get:
 
 \\[
-w\_c + \langle \mathbf{w}\_V, \mathbf{v} \rangle
-=
+w\_c + \langle \mathbf{w}\_V, \mathbf{v} \rangle =
 \langle \mathbf{a}\_L \circ \mathbf{a}\_R, \mathbf{y}^n \rangle -
 \langle \mathbf{a}\_O, \mathbf{y}^n \rangle +
 \langle \mathbf{w}\_L, \mathbf{a}\_L \rangle +
@@ -266,8 +265,7 @@ w\_c + \langle \mathbf{w}\_V, \mathbf{v} \rangle
 Merge the statements containing \\(\mathbf{a}\_O \\):
 
 \\[
-w\_c + \langle \mathbf{w}\_V, \mathbf{v} \rangle
-=
+w\_c + \langle \mathbf{w}\_V, \mathbf{v} \rangle =
 \langle \mathbf{a}\_L \circ \mathbf{a}\_R, \mathbf{y}^n \rangle +
 \langle \mathbf{a}\_L, \mathbf{w}\_L                    \rangle +
 \langle \mathbf{a}\_O, -\mathbf{y}^n + \mathbf{w}\_O    \rangle +
@@ -278,21 +276,19 @@ Rearrange \\(\langle \mathbf{a}\_L \circ \mathbf{a}\_R, \mathbf{y}^n \rangle\\) 
 \\(\langle \mathbf{a}\_L, \mathbf{y}^n \circ \mathbf{a}\_R \rangle\\):
 
 \\[
-w\_c + \langle \mathbf{w}\_V, \mathbf{v} \rangle
-=
-\langle \mathbf{a}\_L, \mathbf{y}^n \circ \mathbf{a}\_R \rangle + 
+w\_c + \langle \mathbf{w}\_V, \mathbf{v} \rangle =
+\langle \mathbf{a}\_L, \mathbf{y}^n \circ \mathbf{a}\_R \rangle +
 \langle \mathbf{a}\_L, \mathbf{w}\_L                    \rangle +
 \langle \mathbf{a}\_O, -\mathbf{y}^n + \mathbf{w}\_O    \rangle +
 \langle \mathbf{a}\_R, \mathbf{w}\_R                    \rangle
 \\]
 
-Multiply the \\( \langle \mathbf{a}\_R, 
+Multiply the \\( \langle \mathbf{a}\_R,
 \mathbf{w}\_R \rangle \\) term by \\(\mathbf{y}^n\\) one one side of the inner product and by \\(\mathbf{y}^{-n}\\) on the other side:
 
 \\[
-w\_c + \langle \mathbf{w}\_V, \mathbf{v} \rangle
-=
-\langle \mathbf{a}\_L,                    \mathbf{y}^n \circ \mathbf{a}\_R    \rangle + 
+w\_c + \langle \mathbf{w}\_V, \mathbf{v} \rangle =
+\langle \mathbf{a}\_L,                    \mathbf{y}^n \circ \mathbf{a}\_R    \rangle +
 \langle \mathbf{a}\_L,                    \mathbf{w}\_L                       \rangle +
 \langle \mathbf{a}\_O,                   -\mathbf{y}^n + \mathbf{w}\_O        \rangle +
 \langle \mathbf{y}^n \circ \mathbf{a}\_R, \mathbf{y}^{-n} \circ \mathbf{w}\_R \rangle
@@ -301,9 +297,8 @@ w\_c + \langle \mathbf{w}\_V, \mathbf{v} \rangle
 Merge the statements containing \\(\mathbf{y}^n \circ \mathbf{a}\_R\\):
 
 \\[
-w\_c + \langle \mathbf{w}\_V, \mathbf{v} \rangle
-=
-\langle \mathbf{a}\_L + \mathbf{y}^{-n} \circ \mathbf{w}\_R, \mathbf{y}^n \circ \mathbf{a}\_R \rangle + 
+w\_c + \langle \mathbf{w}\_V, \mathbf{v} \rangle =
+\langle \mathbf{a}\_L + \mathbf{y}^{-n} \circ \mathbf{w}\_R, \mathbf{y}^n \circ \mathbf{a}\_R \rangle +
 \langle \mathbf{a}\_L,                                       \mathbf{w}\_L                    \rangle +
 \langle \mathbf{a}\_O,                                      -\mathbf{y}^n + \mathbf{w}\_O     \rangle
 \\]
@@ -315,10 +310,10 @@ Add \\(\delta(y, z) = \langle \mathbf{y}^{-n} \circ \mathbf{w}\_R, \mathbf{w}\_L
 w\_c + \langle \mathbf{w}\_V, \mathbf{v} \rangle +
 \delta(y, z)
 &=
-\langle \mathbf{a}\_L + \mathbf{y}^{-n} \circ \mathbf{w}\_R, \mathbf{y}^n \circ \mathbf{a}\_R \rangle + 
-\langle \mathbf{a}\_L,                       \mathbf{w}\_L                \rangle \\\\ 
+\langle \mathbf{a}\_L + \mathbf{y}^{-n} \circ \mathbf{w}\_R, \mathbf{y}^n \circ \mathbf{a}\_R \rangle +
+\langle \mathbf{a}\_L,                       \mathbf{w}\_L                \rangle \\\\
 &+
-\langle \mathbf{a}\_O,                      -\mathbf{y}^n + \mathbf{w}\_O \rangle + 
+\langle \mathbf{a}\_O,                      -\mathbf{y}^n + \mathbf{w}\_O \rangle +
 \langle \mathbf{y}^{-n} \circ \mathbf{w}\_R, \mathbf{w}\_L                \rangle
 \end{aligned}
 \\]
@@ -328,11 +323,11 @@ Merge the terms containing \\(\mathbf{w}\_L\\):
 \\[
 \begin{aligned}
 w\_c + \langle \mathbf{w}\_V, \mathbf{v} \rangle + \delta(y, z)
-&= \langle \mathbf{a}\_L + \mathbf{y}^{-n} \circ \mathbf{w}\_R, 
-\mathbf{y}^n \circ \mathbf{a}\_R \rangle + 
+&= \langle \mathbf{a}\_L + \mathbf{y}^{-n} \circ \mathbf{w}\_R,
+\mathbf{y}^n \circ \mathbf{a}\_R \rangle +
 \langle \mathbf{a}\_L + \mathbf{y}^{-n} \circ \mathbf{w}\_R,
 \mathbf{w}\_L \rangle +
-\langle \mathbf{a}\_O, 
+\langle \mathbf{a}\_O,
 -\mathbf{y}^n + \mathbf{w}\_O \rangle
 \end{aligned}
 \\]
@@ -341,10 +336,10 @@ Merge the terms containing \\(\mathbf{a}\_L + \mathbf{y}^{-n} \circ \mathbf{w}\_
 
 \\[
 w\_c + \langle \mathbf{w}\_V, \mathbf{v} \rangle + \delta(y, z) =
-\langle \mathbf{a}\_L + \mathbf{y}^{-n} \circ \mathbf{w}\_R, 
+\langle \mathbf{a}\_L + \mathbf{y}^{-n} \circ \mathbf{w}\_R,
 \mathbf{y}^n \circ \mathbf{a}\_R +
 \mathbf{w}\_L \rangle +
-\langle \mathbf{a}\_O, 
+\langle \mathbf{a}\_O,
 -\mathbf{y}^n + \mathbf{w}\_O \rangle
 \\]
 
@@ -367,21 +362,21 @@ d &= -\mathbf{y}^n + \mathbf{w}\_O
 Next, we combine \\(a, b, c, d\\) using the equation \\( \langle a \cdot x + c \cdot x^2, b \cdot x + d \cdot x^0 \rangle \\). When we take its second degree, we recover a single inner product, which was our original goal:
 
 \\[
-w\_c + \langle \mathbf{w}\_V, \mathbf{v} \rangle + \delta(y, z) = 
+w\_c + \langle \mathbf{w}\_V, \mathbf{v} \rangle + \delta(y, z) =
 \text{2nd degree of }
-\langle (\mathbf{a}\_L + \mathbf{y}^{-n} \circ \mathbf{w}\_R) \cdot x + 
+\langle (\mathbf{a}\_L + \mathbf{y}^{-n} \circ \mathbf{w}\_R) \cdot x +
 \mathbf{a}\_O \cdot x^2,
 (\mathbf{y}^n \circ \mathbf{a}\_R +
 \mathbf{w}\_L) \cdot x +
-(-\mathbf{y}^n + \mathbf{w}\_O) \cdot x^0 \rangle 
+(-\mathbf{y}^n + \mathbf{w}\_O) \cdot x^0 \rangle
 \\]
 
-Distribute the \\(x\\) values: 
+Distribute the \\(x\\) values:
 
 \\[
-w\_c + \langle \mathbf{w}\_V, \mathbf{v} \rangle + \delta(y, z) = 
+w\_c + \langle \mathbf{w}\_V, \mathbf{v} \rangle + \delta(y, z) =
 \text{2nd degree of }
-\langle \mathbf{a}\_L \cdot x + \mathbf{y}^{-n} \circ \mathbf{w}\_R \cdot x + 
+\langle \mathbf{a}\_L \cdot x + \mathbf{y}^{-n} \circ \mathbf{w}\_R \cdot x +
 \mathbf{a}\_O \cdot x^2,
 \mathbf{y}^n \circ \mathbf{a}\_R \cdot x +
 \mathbf{w}\_L \cdot x -
@@ -449,7 +444,7 @@ t_2 &= \text{2nd degree of } \langle {\mathbf{l}}(x), {\mathbf{r}}(x) \rangle
 &= w\_c + \langle \mathbf{w}\_V, \mathbf{v} \rangle + \delta(y, z) \\\\
 &=
 \langle \mathbf{a}\_L \circ \mathbf{a}\_R, \mathbf{y}^n \rangle -
-\langle \mathbf{a}\_O, \mathbf{y}^n \rangle + 
+\langle \mathbf{a}\_O, \mathbf{y}^n \rangle +
 \langle \mathbf{w}\_L, \mathbf{a}\_L \rangle +
 \langle \mathbf{w}\_R, \mathbf{a}\_R \rangle +
 \langle \mathbf{w}\_O, \mathbf{a}\_O \rangle +
@@ -618,11 +613,11 @@ Verifying challenge-based constraints
 
 Some [gadgets](#gadgets) can be made more efficient if they can [sample random challenges](#gadget-as-a-challenge) when building
 a constraint system, provided certain variables are committed. For instance, a shuffle gadget
-can use just \\(2(k-1)\\) multipliers for \\(k\\) inputs and \\(k\\) outputs to implement the check 
+can use just \\(2(k-1)\\) multipliers for \\(k\\) inputs and \\(k\\) outputs to implement the check
 that two polynomials are equal up to a permutation of their roots, but it is only sound as long
 as the roots of the polynomials (the inputs/outputs to the shuffle) are fixed before the evaluation point is chosen.
 
-To faciliate this, we split the vectors of multipliers and their blinding factors in two subvectors of lengths \\(n'\\) and \\(n''\\): 
+To faciliate this, we split the vectors of multipliers and their blinding factors in two subvectors of lengths \\(n'\\) and \\(n''\\):
 
 \\[
 \begin{aligned}
