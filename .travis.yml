@@ -3,7 +3,8 @@ cache: cargo
 
 env:
   - TEST_COMMAND=test EXTRA_FLAGS='' FEATURES=''
-  - TEST_COMMAND=test EXTRA_FLAGS='' FEATURES='yoloproofs'
+  # The yoloproofs feature is disabled on the main branch.
+  #- TEST_COMMAND=test EXTRA_FLAGS='' FEATURES='yoloproofs'
   # run cargo bench with a filter that matches no benchmarks.
   # this ensures the benchmarks build but doesn't run them on the CI server.
   - TEST_COMMAND=bench EXTRA_FLAGS='"DONTRUNBENCHMARKS"' FEATURES=''
