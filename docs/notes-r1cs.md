@@ -254,8 +254,7 @@ the proof would still work if \\({\mathbf{a}}\_{O}\\) was rearranged on the righ
 If we reorder terms, we get:
 
 \\[
-w\_c + \langle \mathbf{w}\_V, \mathbf{v} \rangle
-=
+w\_c + \langle \mathbf{w}\_V, \mathbf{v} \rangle =
 \langle \mathbf{a}\_L \circ \mathbf{a}\_R, \mathbf{y}^n \rangle -
 \langle \mathbf{a}\_O, \mathbf{y}^n \rangle +
 \langle \mathbf{w}\_L, \mathbf{a}\_L \rangle +
@@ -266,8 +265,7 @@ w\_c + \langle \mathbf{w}\_V, \mathbf{v} \rangle
 Merge the statements containing \\(\mathbf{a}\_O \\):
 
 \\[
-w\_c + \langle \mathbf{w}\_V, \mathbf{v} \rangle
-=
+w\_c + \langle \mathbf{w}\_V, \mathbf{v} \rangle =
 \langle \mathbf{a}\_L \circ \mathbf{a}\_R, \mathbf{y}^n \rangle +
 \langle \mathbf{a}\_L, \mathbf{w}\_L                    \rangle +
 \langle \mathbf{a}\_O, -\mathbf{y}^n + \mathbf{w}\_O    \rangle +
@@ -278,8 +276,7 @@ Rearrange \\(\langle \mathbf{a}\_L \circ \mathbf{a}\_R, \mathbf{y}^n \rangle\\) 
 \\(\langle \mathbf{a}\_L, \mathbf{y}^n \circ \mathbf{a}\_R \rangle\\):
 
 \\[
-w\_c + \langle \mathbf{w}\_V, \mathbf{v} \rangle
-=
+w\_c + \langle \mathbf{w}\_V, \mathbf{v} \rangle =
 \langle \mathbf{a}\_L, \mathbf{y}^n \circ \mathbf{a}\_R \rangle + 
 \langle \mathbf{a}\_L, \mathbf{w}\_L                    \rangle +
 \langle \mathbf{a}\_O, -\mathbf{y}^n + \mathbf{w}\_O    \rangle +
@@ -290,8 +287,7 @@ Multiply the \\( \langle \mathbf{a}\_R,
 \mathbf{w}\_R \rangle \\) term by \\(\mathbf{y}^n\\) one one side of the inner product and by \\(\mathbf{y}^{-n}\\) on the other side:
 
 \\[
-w\_c + \langle \mathbf{w}\_V, \mathbf{v} \rangle
-=
+w\_c + \langle \mathbf{w}\_V, \mathbf{v} \rangle =
 \langle \mathbf{a}\_L,                    \mathbf{y}^n \circ \mathbf{a}\_R    \rangle + 
 \langle \mathbf{a}\_L,                    \mathbf{w}\_L                       \rangle +
 \langle \mathbf{a}\_O,                   -\mathbf{y}^n + \mathbf{w}\_O        \rangle +
@@ -301,8 +297,7 @@ w\_c + \langle \mathbf{w}\_V, \mathbf{v} \rangle
 Merge the statements containing \\(\mathbf{y}^n \circ \mathbf{a}\_R\\):
 
 \\[
-w\_c + \langle \mathbf{w}\_V, \mathbf{v} \rangle
-=
+w\_c + \langle \mathbf{w}\_V, \mathbf{v} \rangle =
 \langle \mathbf{a}\_L + \mathbf{y}^{-n} \circ \mathbf{w}\_R, \mathbf{y}^n \circ \mathbf{a}\_R \rangle + 
 \langle \mathbf{a}\_L,                                       \mathbf{w}\_L                    \rangle +
 \langle \mathbf{a}\_O,                                      -\mathbf{y}^n + \mathbf{w}\_O     \rangle
