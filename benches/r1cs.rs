@@ -23,7 +23,8 @@ use bulletproofs::{BulletproofGens, PedersenGens};
 use curve25519_dalek::ristretto::CompressedRistretto;
 use curve25519_dalek::scalar::Scalar;
 use merlin::Transcript;
-use rand::{thread_rng, Rng};
+use rand::seq::SliceRandom;
+use rand::Rng;
 
 // Shuffle gadget (documented in markdown file)
 
@@ -177,7 +178,7 @@ fn bench_kshuffle_prove(c: &mut Criterion) {
                 .map(|_| Scalar::from(rng.gen_range(min, max)))
                 .collect();
             let mut output = input.clone();
-            rand::thread_rng().shuffle(&mut output);
+            output.shuffle(&mut rand::thread_rng());
 
             // Make kshuffle proof
             b.iter(|| {
@@ -219,7 +220,7 @@ fn bench_kshuffle_verify(c: &mut Criterion) {
                     .map(|_| Scalar::from(rng.gen_range(min, max)))
                     .collect();
                 let mut output = input.clone();
-                rand::thread_rng().shuffle(&mut output);
+                output.shuffle(&mut rand::thread_rng());
 
                 let mut prover_transcript = Transcript::new(b"ShuffleBenchmark");
 

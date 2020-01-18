@@ -66,6 +66,9 @@ pub trait ConstraintSystem {
         input_assignments: Option<(Scalar, Scalar)>,
     ) -> Result<(Variable, Variable, Variable), R1CSError>;
 
+    /// Counts the amount of allocated multipliers.
+    fn multipliers_len(&self) -> usize;
+
     /// Enforce the explicit constraint that
     /// ```text
     /// lc = 0

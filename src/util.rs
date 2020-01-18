@@ -1,9 +1,14 @@
 #![deny(missing_docs)]
 #![allow(non_snake_case)]
 
+extern crate alloc;
+
+use alloc::vec;
+use alloc::vec::Vec;
 use clear_on_drop::clear::Clear;
 use curve25519_dalek::scalar::Scalar;
-use inner_product_proof::inner_product;
+
+use crate::inner_product_proof::inner_product;
 
 /// Represents a degree-1 vector polynomial \\(\mathbf{a} + \mathbf{b} \cdot x\\).
 pub struct VecPoly1(pub Vec<Scalar>, pub Vec<Scalar>);
@@ -64,7 +69,7 @@ pub fn exp_iter(x: Scalar) -> ScalarExp {
 pub fn add_vec(a: &[Scalar], b: &[Scalar]) -> Vec<Scalar> {
     if a.len() != b.len() {
         // throw some error
-        println!("lengths of vectors don't match for vector addition");
+        //println!("lengths of vectors don't match for vector addition");
     }
     let mut out = vec![Scalar::zero(); b.len()];
     for i in 0..a.len() {

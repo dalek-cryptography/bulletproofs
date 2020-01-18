@@ -1,16 +1,19 @@
 #![allow(non_snake_case)]
 #![doc(include = "../docs/inner-product-protocol.md")]
 
-use std::borrow::Borrow;
-use std::iter;
+extern crate alloc;
 
+use alloc::borrow::Borrow;
+use alloc::vec::Vec;
+
+use core::iter;
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::VartimeMultiscalarMul;
 use merlin::Transcript;
 
-use errors::ProofError;
-use transcript::TranscriptProtocol;
+use crate::errors::ProofError;
+use crate::transcript::TranscriptProtocol;
 
 #[derive(Clone, Debug)]
 pub struct InnerProductProof {
@@ -346,6 +349,21 @@ impl InnerProductProof {
         buf
     }
 
+    /// Converts the proof into a byte iterator over serialized view of the proof.
+    /// The layout of the inner product proof is:
+    /// * \\(n\\) pairs of compressed Ristretto points \\(L_0, R_0 \dots, L_{n-1}, R_{n-1}\\),
+    /// * two scalars \\(a, b\\).
+    #[inline]
+    pub(crate) fn to_bytes_iter(&self) -> impl Iterator<Item = u8> + '_ {
+        self.L_vec
+            .iter()
+            .zip(self.R_vec.iter())
+            .flat_map(|(l, r)| l.as_bytes().iter().chain(r.as_bytes()))
+            .chain(self.a.as_bytes())
+            .chain(self.b.as_bytes())
+            .copied()
+    }
+
     /// Deserializes the proof from a byte slice.
     /// Returns an error in the following cases:
     /// * the slice does not have \\(2n+2\\) 32-byte elements,
@@ -369,7 +387,7 @@ impl InnerProductProof {
             return Err(ProofError::FormatError);
         }
 
-        use util::read32;
+        use crate::util::read32;
 
         let mut L_vec: Vec<CompressedRistretto> = Vec::with_capacity(lg_n);
         let mut R_vec: Vec<CompressedRistretto> = Vec::with_capacity(lg_n);
@@ -409,13 +427,13 @@ pub fn inner_product(a: &[Scalar], b: &[Scalar]) -> Scalar {
 mod tests {
     use super::*;
 
+    use crate::util;
     use sha3::Sha3_512;
-    use util;
 
     fn test_helper_create(n: usize) {
         let mut rng = rand::thread_rng();
 
-        use generators::BulletproofGens;
+        use crate::generators::BulletproofGens;
         let bp_gens = BulletproofGens::new(n, 1);
         let G: Vec<RistrettoPoint> = bp_gens.share(0).G(n).cloned().collect();
         let H: Vec<RistrettoPoint> = bp_gens.share(0).H(n).cloned().collect();

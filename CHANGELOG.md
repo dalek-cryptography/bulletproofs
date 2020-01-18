@@ -2,6 +2,12 @@
 
 Entries are listed in reverse chronological order.
 
+## 2.0.0
+
+* Switch from `failure` to `std`-compatible errors via `thiserror`.
+* Update `rand`, `curve25519-dalek`, `merlin` versions.
+* Adds `no_std` support by @xoloki.
+
 ## 1.0.4
 
 * Change doc-include paths to allow compilation on the latest Rust nightly

@@ -4,12 +4,14 @@
 #![allow(non_snake_case)]
 #![deny(missing_docs)]
 
+extern crate alloc;
+
+use alloc::vec::Vec;
 use curve25519_dalek::constants::RISTRETTO_BASEPOINT_COMPRESSED;
 use curve25519_dalek::constants::RISTRETTO_BASEPOINT_POINT;
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::MultiscalarMul;
-
 use digest::{ExtendableOutput, Input, XofReader};
 use sha3::{Sha3XofReader, Sha3_512, Shake256};
 
@@ -165,7 +167,7 @@ impl BulletproofGens {
 
     /// Returns j-th share of generators, with an appropriate
     /// slice of vectors G and H for the j-th range proof.
-    pub fn share(&self, j: usize) -> BulletproofGensShare {
+    pub fn share(&self, j: usize) -> BulletproofGensShare<'_> {
         BulletproofGensShare {
             gens: &self,
             share: j,
@@ -251,7 +253,7 @@ impl<'a> Iterator for AggregatedGensIter<'a> {
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let size = self.n * self.m;
+        let size = self.n * (self.m - self.party_idx) - self.gen_idx;
         (size, Some(size))
     }
 }

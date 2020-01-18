@@ -1,20 +1,15 @@
-extern crate rand;
-use rand::SeedableRng;
+use rand_core::SeedableRng;
 
-extern crate rand_chacha;
 use rand_chacha::ChaChaRng;
 
-extern crate curve25519_dalek;
 use curve25519_dalek::ristretto::CompressedRistretto;
 use curve25519_dalek::scalar::Scalar;
 
-extern crate merlin;
 use merlin::Transcript;
 
-extern crate bulletproofs;
 use bulletproofs::{BulletproofGens, PedersenGens, RangeProof};
 
-extern crate hex;
+use hex;
 
 // Tests that proofs generated with v1.0.0 continue to verify in later versions.
 #[test]

@@ -17,4 +17,4 @@ pub use self::proof::R1CSProof;
 pub use self::prover::Prover;
 pub use self::verifier::Verifier;
 
-pub use errors::R1CSError;
+pub use crate::errors::R1CSError;

@@ -11,9 +11,9 @@ use super::{
     RandomizedConstraintSystem, Variable,
 };
 
-use errors::R1CSError;
-use generators::{BulletproofGens, PedersenGens};
-use transcript::TranscriptProtocol;
+use crate::errors::R1CSError;
+use crate::generators::{BulletproofGens, PedersenGens};
+use crate::transcript::TranscriptProtocol;
 
 /// A [`ConstraintSystem`] implementation for use by the verifier.
 ///
@@ -42,7 +42,7 @@ pub struct Verifier<'t> {
     /// when non-randomized variables are committed.
     /// After that, the option will flip to None and additional calls to `randomize_constraints`
     /// will invoke closures immediately.
-    deferred_constraints: Vec<Box<Fn(&mut RandomizingVerifier<'t>) -> Result<(), R1CSError>>>,
+    deferred_constraints: Vec<Box<dyn Fn(&mut RandomizingVerifier<'t>) -> Result<(), R1CSError>>>,
 
     /// Index of a pending multiplier that's not fully assigned yet.
     pending_multiplier: Option<usize>,
@@ -116,6 +116,10 @@ impl<'t> ConstraintSystem for Verifier<'t> {
         Ok((l_var, r_var, o_var))
     }
 
+    fn multipliers_len(&self) -> usize {
+        self.num_vars
+    }
+
     fn constrain(&mut self, lc: LinearCombination) {
         // TODO: check that the linear combinations are valid
         // (e.g. that variables are valid, that the linear combination
@@ -158,6 +162,10 @@ impl<'t> ConstraintSystem for RandomizingVerifier<'t> {
         input_assignments: Option<(Scalar, Scalar)>,
     ) -> Result<(Variable, Variable, Variable), R1CSError> {
         self.verifier.allocate_multiplier(input_assignments)
+    }
+
+    fn multipliers_len(&self) -> usize {
+        self.verifier.multipliers_len()
     }
 
     fn constrain(&mut self, lc: LinearCombination) {
@@ -347,9 +355,9 @@ impl<'t> Verifier<'t> {
         let padded_n = self.num_vars.next_power_of_two();
         let pad = padded_n - n;
 
-        use inner_product_proof::inner_product;
+        use crate::inner_product_proof::inner_product;
+        use crate::util;
         use std::iter;
-        use util;
 
         if bp_gens.gens_capacity < padded_n {
             return Err(R1CSError::InvalidGeneratorsLength);

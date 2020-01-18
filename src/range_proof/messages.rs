@@ -4,10 +4,14 @@
 //! For more explanation of how the `dealer`, `party`, and `messages` modules orchestrate the protocol execution, see
 //! [the API for the aggregated multiparty computation protocol](../aggregation/index.html#api-for-the-aggregated-multiparty-computation-protocol).
 
+extern crate alloc;
+
+use alloc::vec::Vec;
+use core::iter;
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
 
-use generators::{BulletproofGens, PedersenGens};
+use crate::generators::{BulletproofGens, PedersenGens};
 
 /// A commitment to the bits of a party's value.
 #[derive(Serialize, Deserialize, Copy, Clone, Debug)]
@@ -49,6 +53,32 @@ pub struct ProofShare {
 }
 
 impl ProofShare {
+    /// Checks consistency of all sizes in the proof share and returns the size of the l/r vector.
+    pub(super) fn check_size(
+        &self,
+        expected_n: usize,
+        bp_gens: &BulletproofGens,
+        j: usize,
+    ) -> Result<(), ()> {
+        if self.l_vec.len() != expected_n {
+            return Err(());
+        }
+
+        if self.r_vec.len() != expected_n {
+            return Err(());
+        }
+
+        if expected_n > bp_gens.gens_capacity {
+            return Err(());
+        }
+
+        if j >= bp_gens.party_capacity {
+            return Err(());
+        }
+
+        Ok(())
+    }
+
     /// Audit an individual proof share to determine whether it is
     /// malformed.
     pub(super) fn audit_share(
@@ -61,14 +91,15 @@ impl ProofShare {
         poly_commitment: &PolyCommitment,
         poly_challenge: &PolyChallenge,
     ) -> Result<(), ()> {
-        use std::iter;
-
         use curve25519_dalek::traits::{IsIdentity, VartimeMultiscalarMul};
 
-        use inner_product_proof::inner_product;
-        use util;
+        use crate::inner_product_proof::inner_product;
+        use crate::util;
 
         let n = self.l_vec.len();
+
+        self.check_size(n, bp_gens, j)?;
+
         let (y, z) = (&bit_challenge.y, &bit_challenge.z);
         let x = &poly_challenge.x;
 

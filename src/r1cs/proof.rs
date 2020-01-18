@@ -5,9 +5,9 @@ use curve25519_dalek::ristretto::CompressedRistretto;
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::{Identity, IsIdentity};
 
-use errors::R1CSError;
-use inner_product_proof::InnerProductProof;
-use util;
+use crate::errors::R1CSError;
+use crate::inner_product_proof::InnerProductProof;
+use crate::util;
 
 use serde::de::Visitor;
 use serde::{self, Deserialize, Deserializer, Serialize, Serializer};
@@ -104,8 +104,7 @@ impl R1CSProof {
         buf.extend_from_slice(self.t_x.as_bytes());
         buf.extend_from_slice(self.t_x_blinding.as_bytes());
         buf.extend_from_slice(self.e_blinding.as_bytes());
-        // XXX this costs an extra alloc
-        buf.extend_from_slice(self.ipp_proof.to_bytes().as_slice());
+        buf.extend(self.ipp_proof.to_bytes_iter());
         buf
     }
 
@@ -232,7 +231,14 @@ impl<'de> Deserialize<'de> for R1CSProof {
             where
                 E: serde::de::Error,
             {
-                R1CSProof::from_bytes(v).map_err(serde::de::Error::custom)
+                // Using Error::custom requires T: Display, which our error
+                // type only implements when it implements std::error::Error.
+                #[cfg(feature = "std")]
+                return R1CSProof::from_bytes(v).map_err(serde::de::Error::custom);
+                // In no-std contexts, drop the error message.
+                #[cfg(not(feature = "std"))]
+                return R1CSProof::from_bytes(v)
+                    .map_err(|_| serde::de::Error::custom("deserialization error"));
             }
         }
 
