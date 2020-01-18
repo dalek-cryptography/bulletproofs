@@ -11,9 +11,6 @@ extern crate alloc;
 #[macro_use]
 extern crate serde_derive;
 
-#[macro_use]
-extern crate failure;
-
 mod util;
 
 #[doc(include = "../docs/notes-intro.md")]
