@@ -1,6 +1,11 @@
 [package]
 name = "bulletproofs"
-version = "1.0.4"
+# Before doing a release:
+# - update version field 
+# - update html_root_url
+# - ensure yoloproofs was disabled in an atomic (revertable) commit
+# - update CHANGELOG
+version = "2.0.0"
 authors = ["Cathie Yun <cathieyun@gmail.com>", 
            "Henry de Valence <hdevalence@hdevalence.ca>",
            "Oleg Andreev <oleganza@gmail.com>"]
@@ -35,7 +40,7 @@ rand_chacha = "0.2"
 [features]
 default = ["std", "avx2_backend"]
 avx2_backend = ["curve25519-dalek/avx2_backend"]
-yoloproofs = []
+# yoloproofs = []
 std = ["rand", "rand/std", "thiserror"]
 
 [[test]]
