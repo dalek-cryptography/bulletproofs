@@ -139,7 +139,8 @@ impl ShuffleProof {
 
         ShuffleProof::gadget(&mut verifier, input_vars, output_vars)?;
 
-        verifier.verify(&self.0, &pc_gens, &bp_gens)
+        verifier.verify(&self.0, &pc_gens, &bp_gens)?;
+        Ok(())
     }
 }
 
@@ -306,7 +307,8 @@ fn example_gadget_verify(
     // 4. Verify the proof
     verifier
         .verify(&proof, &pc_gens, &bp_gens)
-        .map_err(|_| R1CSError::VerificationError)
+        .map_err(|_| R1CSError::VerificationError)?;
+    Ok(())
 }
 
 fn example_gadget_roundtrip_helper(
@@ -449,5 +451,6 @@ fn range_proof_helper(v_val: u64, n: usize) -> Result<(), R1CSError> {
     assert!(range_proof(&mut verifier, var.into(), None, n).is_ok());
 
     // Verifier verifies proof
-    Ok(verifier.verify(&proof, &pc_gens, &bp_gens)?)
+    verifier.verify(&proof, &pc_gens, &bp_gens)?;
+    Ok(())
 }
