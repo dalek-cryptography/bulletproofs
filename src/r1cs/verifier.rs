@@ -331,6 +331,16 @@ impl<T: BorrowMut<Transcript>> Verifier<T> {
     /// the number of multiplication constraints that will eventually
     /// be added into the constraint system.
     pub fn verify(
+        self,
+        proof: &R1CSProof,
+        pc_gens: &PedersenGens,
+        bp_gens: &BulletproofGens,
+    ) -> Result<(), R1CSError> {
+        self.verify_and_return_transcript(proof, pc_gens, bp_gens)
+            .map(|_| ())
+    }
+    /// Same as `verify`, but also returns the transcript back to the user.
+    pub fn verify_and_return_transcript(
         mut self,
         proof: &R1CSProof,
         pc_gens: &PedersenGens,
