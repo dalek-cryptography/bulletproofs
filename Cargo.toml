@@ -38,7 +38,7 @@ bincode = "1"
 rand_chacha = "0.2"
 
 [features]
-default = ["std", "avx2_backend", "nightly", "docs"]
+default = ["std"]
 avx2_backend = ["curve25519-dalek/avx2_backend"]
 yoloproofs = []
 std = ["rand", "rand/std", "thiserror", "curve25519-dalek/std"]
@@ -55,6 +55,7 @@ required-features = ["yoloproofs"]
 [[bench]]
 name = "range_proof"
 harness = false
+required-features = ["avx2_backend"]
 
 [[bench]]
 name = "generators"
@@ -63,4 +64,4 @@ harness = false
 [[bench]]
 name = "r1cs"
 harness = false
-required-features = ["yoloproofs"]
+required-features = ["yoloproofs", "avx2_backend"]
