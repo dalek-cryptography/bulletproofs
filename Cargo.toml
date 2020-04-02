@@ -45,6 +45,7 @@ std = ["rand", "rand/std", "thiserror", "curve25519-dalek/std"]
 nightly = ["curve25519-dalek/nightly", "curve25519-dalek/alloc", "subtle/nightly", "clear_on_drop/nightly"]
 docs = ["nightly"]
 
+
 [[test]]
 name = "range_proof"
 
