@@ -1,5 +1,5 @@
 #![allow(non_snake_case)]
-#![doc(include = "../../docs/range-proof-protocol.md")]
+#![cfg_attr(feature = "docs", doc(include = "../../docs/range-proof-protocol.md"))]
 
 extern crate alloc;
 #[cfg(feature = "std")]
