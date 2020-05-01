@@ -35,7 +35,7 @@ jobs:
     - name: Install the nightly
       uses: actions-rs/toolchain@v1
       with:
-          toolchain: nightly-2020-04-25
+          toolchain: nightly
           override: true
     - name: Run tests
       run: cargo test --features="std,nightly" --verbose
