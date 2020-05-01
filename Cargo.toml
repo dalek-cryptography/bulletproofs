@@ -40,7 +40,7 @@ rand_chacha = "0.2"
 [features]
 default = ["std", "avx2_backend"]
 avx2_backend = ["curve25519-dalek/avx2_backend"]
-# yoloproofs = []
+yoloproofs = []
 std = ["rand", "rand/std", "thiserror"]
 
 [[test]]
