@@ -1,2 +1,0 @@
-rustfmt: rustfmt --version && cargo fmt -- --write-mode=diff
-cargotest: cargo test
