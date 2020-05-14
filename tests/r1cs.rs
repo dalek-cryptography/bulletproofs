@@ -19,7 +19,7 @@ use rand::thread_rng;
 struct ShuffleProof(R1CSProof);
 
 impl ShuffleProof {
-    fn gadget<CS: RandomizableConstraintSystem>(
+    fn gadget<'c, CS: RandomizableConstraintSystem<'c>>(
         cs: &mut CS,
         x: Vec<Variable>,
         y: Vec<Variable>,
@@ -451,4 +451,39 @@ fn range_proof_helper(v_val: u64, n: usize) -> Result<(), R1CSError> {
 
     // Verifier verifies proof
     verifier.verify(&proof, &pc_gens, &bp_gens)
+}
+
+#[test]
+fn non_static_lifetimes() {
+    // Common
+    let pc_gens = PedersenGens::default();
+    let bp_gens = BulletproofGens::new(128, 1);
+
+    let a = 1;
+    let a: &u32 = &a;
+
+    let proof = {
+        let mut prover_transcript = Transcript::new(b"NonStaticRandomClosuresTest");
+        let mut prover = Prover::new(&pc_gens, &mut prover_transcript);
+
+        prover
+            .specify_randomized_constraints(|rcs| {
+                rcs.constrain((Scalar::from(a.clone()) - Scalar::one()).into());
+                Ok(())
+            })
+            .unwrap();
+
+        let proof = prover.prove(&bp_gens).unwrap();
+        proof
+    };
+
+    let mut verifier_transcript = Transcript::new(b"NonStaticRandomClosuresTest");
+    let mut verifier = Verifier::new(&mut verifier_transcript);
+    verifier
+        .specify_randomized_constraints(|rcs| {
+            rcs.constrain((Scalar::from(a.clone()) - Scalar::one()).into());
+            Ok(())
+        })
+        .unwrap();
+    verifier.verify(&proof, &pc_gens, &bp_gens).unwrap();
 }

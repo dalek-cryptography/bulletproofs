@@ -25,7 +25,7 @@ use crate::transcript::TranscriptProtocol;
 /// When all constraints are added, the verifying code calls `verify`
 /// which consumes the `Verifier` instance, samples random challenges
 /// that instantiate the randomized constraints, and verifies the proof.
-pub struct Verifier<T: BorrowMut<Transcript>> {
+pub struct Verifier<'c, T: BorrowMut<Transcript>> {
     transcript: T,
     constraints: Vec<LinearCombination>,
 
@@ -44,7 +44,7 @@ pub struct Verifier<T: BorrowMut<Transcript>> {
     /// After that, the option will flip to None and additional calls to `randomize_constraints`
     /// will invoke closures immediately.
     deferred_constraints:
-        Vec<Box<dyn FnOnce(&mut RandomizingVerifier<T>) -> Result<(), R1CSError>>>,
+        Vec<Box<dyn 'c + FnOnce(&mut RandomizingVerifier<'c, T>) -> Result<(), R1CSError>>>,
 
     /// Index of a pending multiplier that's not fully assigned yet.
     pending_multiplier: Option<usize>,
@@ -57,11 +57,11 @@ pub struct Verifier<T: BorrowMut<Transcript>> {
 /// monomorphize the closures for the proving and verifying code.
 /// However, this type cannot be instantiated by the user and therefore can only be used within
 /// the callback provided to `specify_randomized_constraints`.
-pub struct RandomizingVerifier<T: BorrowMut<Transcript>> {
-    verifier: Verifier<T>,
+pub struct RandomizingVerifier<'c, T: BorrowMut<Transcript>> {
+    verifier: Verifier<'c, T>,
 }
 
-impl<T: BorrowMut<Transcript>> ConstraintSystem for Verifier<T> {
+impl<'c, T: BorrowMut<Transcript>> ConstraintSystem for Verifier<'c, T> {
     fn transcript(&mut self) -> &mut Transcript {
         self.transcript.borrow_mut()
     }
@@ -130,19 +130,24 @@ impl<T: BorrowMut<Transcript>> ConstraintSystem for Verifier<T> {
     }
 }
 
-impl<T: BorrowMut<Transcript>> RandomizableConstraintSystem for Verifier<T> {
-    type RandomizedCS = RandomizingVerifier<T>;
+impl<'constraints, T: BorrowMut<Transcript> + 'constraints>
+    RandomizableConstraintSystem<'constraints> for Verifier<'constraints, T>
+{
+    type RandomizedCS = RandomizingVerifier<'constraints, T>;
 
-    fn specify_randomized_constraints<F>(&mut self, callback: F) -> Result<(), R1CSError>
+    fn specify_randomized_constraints<'a: 'constraints, F>(
+        &mut self,
+        callback: F,
+    ) -> Result<(), R1CSError>
     where
-        F: 'static + FnOnce(&mut Self::RandomizedCS) -> Result<(), R1CSError>,
+        F: 'a + FnOnce(&mut Self::RandomizedCS) -> Result<(), R1CSError>,
     {
         self.deferred_constraints.push(Box::new(callback));
         Ok(())
     }
 }
 
-impl<T: BorrowMut<Transcript>> ConstraintSystem for RandomizingVerifier<T> {
+impl<'c, T: BorrowMut<Transcript>> ConstraintSystem for RandomizingVerifier<'c, T> {
     fn transcript(&mut self) -> &mut Transcript {
         self.verifier.transcript.borrow_mut()
     }
@@ -175,7 +180,7 @@ impl<T: BorrowMut<Transcript>> ConstraintSystem for RandomizingVerifier<T> {
     }
 }
 
-impl<T: BorrowMut<Transcript>> RandomizedConstraintSystem for RandomizingVerifier<T> {
+impl<'c, T: BorrowMut<Transcript>> RandomizedConstraintSystem for RandomizingVerifier<'c, T> {
     fn challenge_scalar(&mut self, label: &'static [u8]) -> Scalar {
         self.verifier
             .transcript
@@ -184,7 +189,7 @@ impl<T: BorrowMut<Transcript>> RandomizedConstraintSystem for RandomizingVerifie
     }
 }
 
-impl<T: BorrowMut<Transcript>> Verifier<T> {
+impl<'c, T: BorrowMut<Transcript>> Verifier<'c, T> {
     /// Construct an empty constraint system with specified external
     /// input variables.
     ///

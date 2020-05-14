@@ -81,9 +81,9 @@ pub trait ConstraintSystem {
 /// while gadgets that need randomization should use trait bound `CS: RandomizedConstraintSystem`.
 /// Gadgets generally _should not_ use this trait as a bound on the CS argument: it should be used
 /// by the higher-order protocol that composes gadgets together.
-pub trait RandomizableConstraintSystem: ConstraintSystem {
+pub trait RandomizableConstraintSystem<'constraints>: ConstraintSystem {
     /// Represents a concrete type for the CS in a randomization phase.
-    type RandomizedCS: RandomizedConstraintSystem;
+    type RandomizedCS: RandomizedConstraintSystem + 'constraints;
 
     /// Specify additional variables and constraints randomized using a challenge scalar
     /// bound to the assignments of the non-randomized variables.
@@ -104,9 +104,12 @@ pub trait RandomizableConstraintSystem: ConstraintSystem {
     ///     // ...
     /// })
     /// ```
-    fn specify_randomized_constraints<F>(&mut self, callback: F) -> Result<(), R1CSError>
+    fn specify_randomized_constraints<'a: 'constraints, F>(
+        &mut self,
+        callback: F,
+    ) -> Result<(), R1CSError>
     where
-        F: 'static + FnOnce(&mut Self::RandomizedCS) -> Result<(), R1CSError>;
+        F: 'a + FnOnce(&mut Self::RandomizedCS) -> Result<(), R1CSError>;
 }
 
 /// Represents a constraint system in the second phase:
