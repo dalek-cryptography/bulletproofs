@@ -16,6 +16,7 @@ use super::{
 use crate::errors::R1CSError;
 use crate::generators::{BulletproofGens, PedersenGens};
 use crate::inner_product_proof::InnerProductProof;
+use crate::r1cs::Metrics;
 use crate::transcript::TranscriptProtocol;
 
 /// A [`ConstraintSystem`] implementation for use by the prover.
@@ -166,8 +167,13 @@ impl<'g, T: BorrowMut<Transcript>> ConstraintSystem for Prover<'g, T> {
         Ok((l_var, r_var, o_var))
     }
 
-    fn multipliers_len(&self) -> usize {
-        self.secrets.a_L.len()
+    fn metrics(&self) -> Metrics {
+        Metrics {
+            multipliers: self.secrets.a_L.len(),
+            constraints: self.constraints.len() + self.deferred_constraints.len(),
+            phase_one_constraints: self.constraints.len(),
+            phase_two_constraints: self.deferred_constraints.len(),
+        }
     }
 
     fn constrain(&mut self, lc: LinearCombination) {
@@ -213,8 +219,8 @@ impl<'g, T: BorrowMut<Transcript>> ConstraintSystem for RandomizingProver<'g, T>
         self.prover.allocate_multiplier(input_assignments)
     }
 
-    fn multipliers_len(&self) -> usize {
-        self.prover.multipliers_len()
+    fn metrics(&self) -> Metrics {
+        self.prover.metrics()
     }
 
     fn constrain(&mut self, lc: LinearCombination) {
