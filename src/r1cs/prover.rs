@@ -27,7 +27,7 @@ use crate::transcript::TranscriptProtocol;
 /// When all constraints are added, the proving code calls `prove`
 /// which consumes the `Prover` instance, samples random challenges
 /// that instantiate the randomized constraints, and creates a complete proof.
-pub struct Prover<'g, T: BorrowMut<Transcript>> {
+pub struct Prover<'g, 'c, T: BorrowMut<Transcript>> {
     transcript: T,
     pc_gens: &'g PedersenGens,
     /// The constraints accumulated so far.
@@ -37,7 +37,8 @@ pub struct Prover<'g, T: BorrowMut<Transcript>> {
 
     /// This list holds closures that will be called in the second phase of the protocol,
     /// when non-randomized variables are committed.
-    deferred_constraints: Vec<Box<dyn Fn(&mut RandomizingProver<'g, T>) -> Result<(), R1CSError>>>,
+    deferred_constraints:
+        Vec<Box<dyn 'c + FnOnce(&mut RandomizingProver<'g, 'c, T>) -> Result<(), R1CSError>>>,
 
     /// Index of a pending multiplier that's not fully assigned yet.
     pending_multiplier: Option<usize>,
@@ -65,8 +66,8 @@ struct Secrets {
 /// monomorphize the closures for the proving and verifying code.
 /// However, this type cannot be instantiated by the user and therefore can only be used within
 /// the callback provided to `specify_randomized_constraints`.
-pub struct RandomizingProver<'g, T: BorrowMut<Transcript>> {
-    prover: Prover<'g, T>,
+pub struct RandomizingProver<'g, 'c, T: BorrowMut<Transcript>> {
+    prover: Prover<'g, 'c, T>,
 }
 
 /// Overwrite secrets with null bytes when they go out of scope.
@@ -93,7 +94,7 @@ impl Drop for Secrets {
     }
 }
 
-impl<'g, T: BorrowMut<Transcript>> ConstraintSystem for Prover<'g, T> {
+impl<'g, 'c, T: BorrowMut<Transcript>> ConstraintSystem for Prover<'g, 'c, T> {
     fn transcript(&mut self) -> &mut Transcript {
         self.transcript.borrow_mut()
     }
@@ -177,19 +178,26 @@ impl<'g, T: BorrowMut<Transcript>> ConstraintSystem for Prover<'g, T> {
     }
 }
 
-impl<'g, T: BorrowMut<Transcript>> RandomizableConstraintSystem for Prover<'g, T> {
-    type RandomizedCS = RandomizingProver<'g, T>;
+impl<'g, 'constraints, T: BorrowMut<Transcript> + 'constraints>
+    RandomizableConstraintSystem<'constraints> for Prover<'g, 'constraints, T>
+where
+    'g: 'constraints,
+{
+    type RandomizedCS = RandomizingProver<'g, 'constraints, T>;
 
-    fn specify_randomized_constraints<F>(&mut self, callback: F) -> Result<(), R1CSError>
+    fn specify_randomized_constraints<'a: 'constraints, F>(
+        &mut self,
+        callback: F,
+    ) -> Result<(), R1CSError>
     where
-        F: 'static + Fn(&mut Self::RandomizedCS) -> Result<(), R1CSError>,
+        F: 'a + FnOnce(&mut Self::RandomizedCS) -> Result<(), R1CSError>,
     {
         self.deferred_constraints.push(Box::new(callback));
         Ok(())
     }
 }
 
-impl<'g, T: BorrowMut<Transcript>> ConstraintSystem for RandomizingProver<'g, T> {
+impl<'g, 'c, T: BorrowMut<Transcript>> ConstraintSystem for RandomizingProver<'g, 'c, T> {
     fn transcript(&mut self) -> &mut Transcript {
         self.prover.transcript.borrow_mut()
     }
@@ -222,13 +230,13 @@ impl<'g, T: BorrowMut<Transcript>> ConstraintSystem for RandomizingProver<'g, T>
     }
 }
 
-impl<'g, T: BorrowMut<Transcript>> RandomizedConstraintSystem for RandomizingProver<'g, T> {
+impl<'g, 'c, T: BorrowMut<Transcript>> RandomizedConstraintSystem for RandomizingProver<'g, 'c, T> {
     fn challenge_scalar(&mut self, label: &'static [u8]) -> Scalar {
         self.prover.transcript.borrow_mut().challenge_scalar(label)
     }
 }
 
-impl<'g, T: BorrowMut<Transcript>> Prover<'g, T> {
+impl<'g, 'c, T: BorrowMut<Transcript>> Prover<'g, 'c, T> {
     /// Construct an empty constraint system with specified external
     /// input variables.
     ///
