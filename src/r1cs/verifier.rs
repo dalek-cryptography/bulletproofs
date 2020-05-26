@@ -14,6 +14,7 @@ use super::{
 
 use crate::errors::R1CSError;
 use crate::generators::{BulletproofGens, PedersenGens};
+use crate::r1cs::Metrics;
 use crate::transcript::TranscriptProtocol;
 
 /// A [`ConstraintSystem`] implementation for use by the verifier.
@@ -117,8 +118,13 @@ impl<T: BorrowMut<Transcript>> ConstraintSystem for Verifier<T> {
         Ok((l_var, r_var, o_var))
     }
 
-    fn multipliers_len(&self) -> usize {
-        self.num_vars
+    fn metrics(&self) -> Metrics {
+        Metrics {
+            multipliers: self.num_vars,
+            constraints: self.constraints.len() + self.deferred_constraints.len(),
+            phase_one_constraints: self.constraints.len(),
+            phase_two_constraints: self.deferred_constraints.len(),
+        }
     }
 
     fn constrain(&mut self, lc: LinearCombination) {
@@ -165,8 +171,8 @@ impl<T: BorrowMut<Transcript>> ConstraintSystem for RandomizingVerifier<T> {
         self.verifier.allocate_multiplier(input_assignments)
     }
 
-    fn multipliers_len(&self) -> usize {
-        self.verifier.multipliers_len()
+    fn metrics(&self) -> Metrics {
+        self.verifier.metrics()
     }
 
     fn constrain(&mut self, lc: LinearCombination) {

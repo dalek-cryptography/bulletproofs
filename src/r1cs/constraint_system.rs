@@ -66,8 +66,8 @@ pub trait ConstraintSystem {
         input_assignments: Option<(Scalar, Scalar)>,
     ) -> Result<(Variable, Variable, Variable), R1CSError>;
 
-    /// Counts the amount of allocated multipliers.
-    fn multipliers_len(&self) -> usize;
+    /// Counts the amount of constraints in the constraint system.
+    fn metrics(&self) -> crate::r1cs::Metrics;
 
     /// Enforce the explicit constraint that
     /// ```text
