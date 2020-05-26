@@ -38,7 +38,8 @@ pub struct Prover<'g, T: BorrowMut<Transcript>> {
 
     /// This list holds closures that will be called in the second phase of the protocol,
     /// when non-randomized variables are committed.
-    deferred_constraints: Vec<Box<dyn Fn(&mut RandomizingProver<'g, T>) -> Result<(), R1CSError>>>,
+    deferred_constraints:
+        Vec<Box<dyn FnOnce(&mut RandomizingProver<'g, T>) -> Result<(), R1CSError>>>,
 
     /// Index of a pending multiplier that's not fully assigned yet.
     pending_multiplier: Option<usize>,
@@ -188,7 +189,7 @@ impl<'g, T: BorrowMut<Transcript>> RandomizableConstraintSystem for Prover<'g, T
 
     fn specify_randomized_constraints<F>(&mut self, callback: F) -> Result<(), R1CSError>
     where
-        F: 'static + Fn(&mut Self::RandomizedCS) -> Result<(), R1CSError>,
+        F: 'static + FnOnce(&mut Self::RandomizedCS) -> Result<(), R1CSError>,
     {
         self.deferred_constraints.push(Box::new(callback));
         Ok(())

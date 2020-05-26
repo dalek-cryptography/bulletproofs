@@ -44,7 +44,8 @@ pub struct Verifier<T: BorrowMut<Transcript>> {
     /// when non-randomized variables are committed.
     /// After that, the option will flip to None and additional calls to `randomize_constraints`
     /// will invoke closures immediately.
-    deferred_constraints: Vec<Box<dyn Fn(&mut RandomizingVerifier<T>) -> Result<(), R1CSError>>>,
+    deferred_constraints:
+        Vec<Box<dyn FnOnce(&mut RandomizingVerifier<T>) -> Result<(), R1CSError>>>,
 
     /// Index of a pending multiplier that's not fully assigned yet.
     pending_multiplier: Option<usize>,
@@ -140,7 +141,7 @@ impl<T: BorrowMut<Transcript>> RandomizableConstraintSystem for Verifier<T> {
 
     fn specify_randomized_constraints<F>(&mut self, callback: F) -> Result<(), R1CSError>
     where
-        F: 'static + Fn(&mut Self::RandomizedCS) -> Result<(), R1CSError>,
+        F: 'static + FnOnce(&mut Self::RandomizedCS) -> Result<(), R1CSError>,
     {
         self.deferred_constraints.push(Box::new(callback));
         Ok(())
