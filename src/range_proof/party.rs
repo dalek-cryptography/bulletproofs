@@ -28,6 +28,8 @@ use crate::util;
 use rand::thread_rng;
 
 use super::messages::*;
+use crate::range_proof::{get_rewind_nonce_from_pvt_key, get_secret_nonce_from_pvt_key};
+use crate::util::{add_bytes_to_word, xor_32_bytes};
 
 /// Used to construct a party for the aggregated rangeproof MPC protocol.
 pub struct Party {}
@@ -40,6 +42,9 @@ impl Party {
         v: u64,
         v_blinding: Scalar,
         n: usize,
+        pvt_rewind_key: Scalar,
+        pvt_blinding_key: Scalar,
+        proof_message: Scalar,
     ) -> Result<PartyAwaitingPosition<'a>, MPCError> {
         if !(n == 8 || n == 16 || n == 32 || n == 64) {
             return Err(MPCError::InvalidBitsize);
@@ -49,6 +54,22 @@ impl Party {
         }
 
         let V = pc_gens.commit(v.into(), v_blinding).compress();
+        let (rewind_nonce_1, rewind_nonce_2, blinding_nonce_1, blinding_nonce_2) =
+            if pvt_rewind_key == Scalar::default() {
+                (
+                    Scalar::default(),
+                    Scalar::default(),
+                    Scalar::default(),
+                    Scalar::default(),
+                )
+            } else {
+                (
+                    get_rewind_nonce_from_pvt_key(&pvt_rewind_key, &V),
+                    get_rewind_nonce_from_pvt_key(&pvt_blinding_key, &V),
+                    get_secret_nonce_from_pvt_key(&pvt_rewind_key, &V),
+                    get_secret_nonce_from_pvt_key(&pvt_blinding_key, &V),
+                )
+            };
 
         Ok(PartyAwaitingPosition {
             bp_gens,
@@ -57,6 +78,11 @@ impl Party {
             v,
             v_blinding,
             V,
+            rewind_nonce_1,
+            rewind_nonce_2,
+            blinding_nonce_1,
+            blinding_nonce_2,
+            proof_message,
         })
     }
 }
@@ -69,6 +95,11 @@ pub struct PartyAwaitingPosition<'a> {
     v: u64,
     v_blinding: Scalar,
     V: CompressedRistretto,
+    rewind_nonce_1: Scalar,
+    rewind_nonce_2: Scalar,
+    blinding_nonce_1: Scalar,
+    blinding_nonce_2: Scalar,
+    proof_message: Scalar,
 }
 
 impl<'a> PartyAwaitingPosition<'a> {
@@ -95,7 +126,11 @@ impl<'a> PartyAwaitingPosition<'a> {
 
         let bp_share = self.bp_gens.share(j);
 
-        let a_blinding = Scalar::random(rng);
+        let a_blinding = if self.rewind_nonce_1 == Scalar::default() {
+            Scalar::random(rng)
+        } else {
+            self.rewind_nonce_1
+        };
         // Compute A = <a_L, G> + <a_R, H> + a_blinding * B_blinding
         let mut A = self.pc_gens.B_blinding * a_blinding;
 
@@ -111,7 +146,17 @@ impl<'a> PartyAwaitingPosition<'a> {
             i += 1;
         }
 
-        let s_blinding = Scalar::random(rng);
+        let s_blinding = if self.rewind_nonce_2 == Scalar::default() {
+            Scalar::random(rng)
+        } else {
+            let value_and_extra_data =
+                add_bytes_to_word(*self.proof_message.as_bytes(), &self.v.to_le_bytes(), 0);
+            let xor = xor_32_bytes(
+                &Scalar::from_bits(value_and_extra_data).as_bytes(),
+                &self.rewind_nonce_2.as_bytes(),
+            );
+            Scalar::from_bits(xor)
+        };
         let s_L: Vec<Scalar> = (0..self.n).map(|_| Scalar::random(rng)).collect();
         let s_R: Vec<Scalar> = (0..self.n).map(|_| Scalar::random(rng)).collect();
 
@@ -139,6 +184,8 @@ impl<'a> PartyAwaitingPosition<'a> {
             s_blinding,
             s_L,
             s_R,
+            blinding_nonce_1: self.blinding_nonce_1,
+            blinding_nonce_2: self.blinding_nonce_2,
         };
         Ok((next_state, bit_commitment))
     }
@@ -164,6 +211,8 @@ pub struct PartyAwaitingBitChallenge<'a> {
     s_blinding: Scalar,
     s_L: Vec<Scalar>,
     s_R: Vec<Scalar>,
+    blinding_nonce_1: Scalar,
+    blinding_nonce_2: Scalar,
 }
 
 impl<'a> PartyAwaitingBitChallenge<'a> {
@@ -211,8 +260,16 @@ impl<'a> PartyAwaitingBitChallenge<'a> {
         let t_poly = l_poly.inner_product(&r_poly);
 
         // Generate x by committing to T_1, T_2 (line 49-54)
-        let t_1_blinding = Scalar::random(rng);
-        let t_2_blinding = Scalar::random(rng);
+        let t_1_blinding = if self.blinding_nonce_1 == Scalar::default() {
+            Scalar::random(rng)
+        } else {
+            self.blinding_nonce_1
+        };
+        let t_2_blinding = if self.blinding_nonce_2 == Scalar::default() {
+            Scalar::random(rng)
+        } else {
+            self.blinding_nonce_2
+        };
         let T_1 = self.pc_gens.commit(t_poly.1, t_1_blinding);
         let T_2 = self.pc_gens.commit(t_poly.2, t_2_blinding);
 

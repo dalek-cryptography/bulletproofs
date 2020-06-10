@@ -9,6 +9,7 @@ use clear_on_drop::clear::Clear;
 use curve25519_dalek::scalar::Scalar;
 
 use crate::inner_product_proof::inner_product;
+use std::cmp::{max, min};
 
 /// Represents a degree-1 vector polynomial \\(\mathbf{a} + \mathbf{b} \cdot x\\).
 pub struct VecPoly1(pub Vec<Scalar>, pub Vec<Scalar>);
@@ -267,6 +268,76 @@ pub fn read32(data: &[u8]) -> [u8; 32] {
     buf32
 }
 
+/// Converts Vec<u8> of bytes to Vec<u8> representing its bits.
+pub fn bytes_to_bits(bytes: &[u8]) -> Vec<u8> {
+    let mut bits = vec![0u8; bytes.len() * 8];
+    for i in 0..(bytes.len() * 8) {
+        // As i runs from 0..(bytes.len() * 8), the bottom 3 bits index the bit,
+        // while the upper bits index the byte.
+        bits[i] = ((bytes[i >> 3] >> (i & 7) as u8) & 1u8) as u8;
+    }
+    bits
+}
+
+/// Converts up to 64 bits of a little endian bit vector, represented
+/// by Vec<u8>, to usize.
+pub fn bits_to_usize(bits: &[u8]) -> usize {
+    let end_bit = min(bits.len(), 64);
+    let mut result = bits[0] as usize;
+    for (i, bit) in bits.iter().enumerate().take(end_bit).skip(1) {
+        if *bit != 0 {
+            result += (2u64 << (i - 1) as u64) as usize;
+        }
+    }
+    result
+}
+
+/// Converts up to 16 bytes of a little endian byte vector to usize,
+/// from start byte to end byte inclusive.
+pub fn bytes_to_usize(bytes: &[u8], start_byte: usize, end_byte: usize) -> usize {
+    // bytes to bits to vector
+    let bits = bytes_to_bits(&bytes);
+    // Apply usize limits
+    let start_byte = max(start_byte, 1);
+    let end_byte = min(bytes.len(), end_byte);
+    let end_byte = start_byte + min(end_byte - start_byte + 1, 16) - 1;
+    let start_bit_index = (start_byte - 1) * 8;
+    let end_bit_index = end_byte * 8;
+    // bits to usize using bit vector
+    let bits = bits[start_bit_index..end_bit_index].to_vec();
+    bits_to_usize(&bits)
+}
+
+/// XOR two 32 byte sized vectors of u8.
+pub fn xor_32_bytes(vec1: &[u8; 32], vec2: &[u8; 32]) -> [u8; 32] {
+    let xor_vec: Vec<u8> = vec1
+        .iter()
+        .zip(vec2.iter())
+        .map(|(&x1, &x2)| {
+            let byte1_bits = bytes_to_bits(&[x1]);
+            let byte2_bits = bytes_to_bits(&[x2]);
+            let bits: Vec<u8> = byte1_bits
+                .iter()
+                .zip(byte2_bits.iter())
+                .map(|(&x1, &x2)| match (&x1, &x2) {
+                    (1, 0) | (0, 1) => 1,
+                    _ => 0,
+                })
+                .collect();
+            bits_to_usize(&bits) as u8
+        })
+        .collect();
+    add_bytes_to_word([0u8; 32], &xor_vec, 0)
+}
+
+/// Add bytes to a 32 byte word (overwrite contents) from a specified array position
+pub fn add_bytes_to_word(mut word: [u8; 32], bytes: &[u8], array_position: usize) -> [u8; 32] {
+    for (place, element) in word.iter_mut().skip(array_position).zip(bytes.iter()) {
+        *place = *element;
+    }
+    word
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -393,5 +464,200 @@ mod tests {
         assert_eq!(v.0, Scalar::zero());
         assert_eq!(v.1, Scalar::zero());
         assert_eq!(v.2, Scalar::zero());
+    }
+
+    #[test]
+    fn test_bytes_to_bits() {
+        let byte_vec: Vec<u8> = [
+            21, 205, 91, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0,
+        ]
+        .to_vec();
+
+        let bit_vec = bytes_to_bits(&[byte_vec[0]]);
+        assert_eq!(bit_vec, [1, 0, 1, 0, 1, 0, 0, 0].to_vec());
+
+        let bit_vec = bytes_to_bits(&byte_vec[0..2]);
+        assert_eq!(
+            bit_vec,
+            [1, 0, 1, 0, 1, 0, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1].to_vec()
+        );
+
+        let bit_vec = bytes_to_bits(&byte_vec[2..4]);
+        assert_eq!(
+            bit_vec,
+            [1, 1, 0, 1, 1, 0, 1, 0, 1, 1, 1, 0, 0, 0, 0, 0].to_vec()
+        );
+
+        let bit_vec = bytes_to_bits(&byte_vec[3..6]);
+        assert_eq!(
+            bit_vec,
+            [1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0].to_vec()
+        );
+    }
+
+    #[test]
+    fn test_bits_to_usize() {
+        // Test lower bounds
+        let bit_vec: Vec<u8> = [0].to_vec();
+        assert_eq!(bits_to_usize(&bit_vec), 0);
+
+        let bit_vec: Vec<u8> = [1, 0, 1].to_vec();
+        assert_eq!(bits_to_usize(&bit_vec), 5);
+
+        let bit_vec: Vec<u8> = [
+            1, 0, 1, 0, 1, 0, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 1, 1, 0, 1, 1, 0, 1, 0, 1, 1, 1,
+        ]
+        .to_vec();
+        assert_eq!(bits_to_usize(&bit_vec), 123456789);
+
+        let bit_vec: Vec<u8> = [
+            1, 0, 1, 0, 1, 0, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 1, 1, 0, 1, 1, 0, 1, 0, 1, 1, 1, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0,
+        ]
+        .to_vec();
+        assert_eq!(bits_to_usize(&bit_vec), 123456789);
+
+        // Test upper bounds
+        let bit_vec: Vec<u8> = [
+            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+            1, 1, 1, 1, 1, 1,
+        ]
+        .to_vec();
+        assert_eq!(bits_to_usize(&bit_vec), std::usize::MAX);
+
+        let bit_vec: Vec<u8> = [
+            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        ]
+        .to_vec();
+        assert_eq!(bits_to_usize(&bit_vec), std::usize::MAX);
+    }
+
+    #[test]
+    fn test_bytes_to_usize() {
+        // Test lower bounds
+        let byte_vec: Vec<u8> = [
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0,
+        ]
+        .to_vec();
+        assert_eq!(bytes_to_usize(&byte_vec, 1, 1), 0);
+
+        let byte_vec: Vec<u8> = [
+            255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0,
+        ]
+        .to_vec();
+        assert_eq!(bytes_to_usize(&byte_vec, 1, 1), 255);
+
+        let byte_vec: Vec<u8> = [
+            21, 205, 91, 7, 22, 33, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0,
+        ]
+        .to_vec();
+        assert_eq!(bytes_to_usize(&byte_vec, 1, 4), 123456789);
+
+        let byte_vec: Vec<u8> = [
+            21, 205, 91, 7, 22, 33, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0,
+        ]
+        .to_vec();
+        assert_eq!(bytes_to_usize(&byte_vec, 5, 6), 8470);
+
+        let byte_vec: Vec<u8> = [
+            21, 205, 91, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0,
+        ]
+        .to_vec();
+        assert_eq!(bytes_to_usize(&byte_vec, 1, 4), 123456789);
+
+        // Test upper bounds
+        let byte_vec: Vec<u8> = [
+            255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0,
+        ]
+        .to_vec();
+        assert_eq!(bytes_to_usize(&byte_vec, 1, 8), std::usize::MAX);
+
+        let byte_vec: Vec<u8> = [
+            255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+            255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+        ]
+        .to_vec();
+        assert_eq!(
+            bytes_to_usize(&byte_vec, 1, byte_vec.len()),
+            std::usize::MAX
+        );
+    }
+
+    #[test]
+    fn test_xor_32_bytes() {
+        let vec1: [u8; 32] = [
+            88, 38, 63, 128, 120, 246, 179, 65, 172, 254, 213, 32, 26, 126, 42, 168, 25, 172, 68,
+            174, 13, 24, 30, 83, 187, 187, 147, 104, 226, 85, 95, 15,
+        ];
+        let vec2: [u8; 32] = [
+            21, 205, 91, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0,
+        ];
+
+        let vec3 = xor_32_bytes(&vec1, &vec2);
+        assert_ne!(vec1, vec2);
+        assert_ne!(vec1, vec3);
+        assert_ne!(vec2, vec3);
+
+        let vec3_xor_vec1 = xor_32_bytes(&vec3, &vec1);
+        assert_eq!(vec3_xor_vec1, vec2);
+
+        let vec3_xor_vec2 = xor_32_bytes(&vec3, &vec2);
+        assert_eq!(vec3_xor_vec2, vec1);
+    }
+
+    #[test]
+    fn test_add_bytes_to_word() {
+        let vec1: [u8; 32] = [
+            1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
+            25, 26, 27, 28, 29, 30, 31, 32,
+        ];
+        let vec2: [u8; 4] = [101, 102, 103, 104];
+
+        let mut word = add_bytes_to_word(vec1, &vec2.to_vec(), 0);
+        assert_eq!(
+            word,
+            [
+                101, 102, 103, 104, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21,
+                22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32
+            ]
+        );
+        word = add_bytes_to_word(word, &vec2.to_vec(), 8);
+        assert_eq!(
+            word,
+            [
+                101, 102, 103, 104, 5, 6, 7, 8, 101, 102, 103, 104, 13, 14, 15, 16, 17, 18, 19, 20,
+                21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32
+            ]
+        );
+        word = add_bytes_to_word(word, &vec2.to_vec(), 16);
+        assert_eq!(
+            word,
+            [
+                101, 102, 103, 104, 5, 6, 7, 8, 101, 102, 103, 104, 13, 14, 15, 16, 101, 102, 103,
+                104, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32
+            ]
+        );
+        word = add_bytes_to_word(word, &vec2.to_vec(), 24);
+        assert_eq!(
+            word,
+            [
+                101, 102, 103, 104, 5, 6, 7, 8, 101, 102, 103, 104, 13, 14, 15, 16, 101, 102, 103,
+                104, 21, 22, 23, 24, 101, 102, 103, 104, 29, 30, 31, 32
+            ]
+        );
     }
 }

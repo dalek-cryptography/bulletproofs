@@ -21,7 +21,10 @@ use crate::generators::{BulletproofGens, PedersenGens};
 use crate::inner_product_proof::InnerProductProof;
 use crate::transcript::TranscriptProtocol;
 use crate::util;
+use sha3::Sha3_512;
 
+use crate::util::{add_bytes_to_word, bytes_to_usize, xor_32_bytes};
+use curve25519_dalek::constants::{RISTRETTO_BASEPOINT_COMPRESSED, RISTRETTO_BASEPOINT_TABLE};
 use rand_core::{CryptoRng, RngCore};
 use serde::de::Visitor;
 use serde::{self, Deserialize, Deserializer, Serialize, Serializer};
@@ -154,6 +157,163 @@ impl RangeProof {
     }
 
     /// Create a rangeproof for a given pair of value `v` and
+    /// blinding scalar `v_blinding`, passing in a rewind key to
+    /// enable rangeproof rewinding with 23 bytes worth of extra
+    /// data that can be embedded.
+    /// This is a convenience wrapper around [`RangeProof::prove_multiple`].
+    ///
+    /// # Example
+    /// ```
+    /// extern crate rand;
+    /// use rand::thread_rng;
+    ///
+    /// extern crate curve25519_dalek;
+    /// use curve25519_dalek::scalar::Scalar;
+    ///
+    /// extern crate merlin;
+    /// use merlin::Transcript;
+    ///
+    /// extern crate bulletproofs;
+    /// use bulletproofs::{BulletproofGens, PedersenGens, RangeProof};
+    ///
+    /// # fn main() {
+    /// // Generators for Pedersen commitments.  These can be selected
+    /// // independently of the Bulletproofs generators.
+    /// use curve25519_dalek::ristretto::RistrettoPoint;
+    /// use curve25519_dalek::constants::RISTRETTO_BASEPOINT_TABLE;
+    /// use bulletproofs::range_proof::{get_rewind_nonce_from_pub_key, get_secret_nonce_from_pvt_key};
+    /// let pc_gens = PedersenGens::default();
+    ///
+    /// // Generators for Bulletproofs, valid for proofs up to bitsize 64
+    /// // and aggregation size up to 1.
+    /// let bp_gens = BulletproofGens::new(64, 1);
+    ///
+    /// // A secret value we want to prove lies in the range [0, 2^32)
+    /// let confidential_value = 1037578891u64;
+    ///
+    /// // The API takes a blinding factor for the commitment.
+    /// let blinding_factor = Scalar::random(&mut thread_rng());
+    ///
+    /// // The private keys for range proof rewinding; these may be based on a wallet's private root key
+    /// let pvt_rewind_key = Scalar::random(&mut thread_rng());
+    /// let pvt_blinding_key = Scalar::random(&mut thread_rng());
+    ///
+    /// // Up to 23 bytes extra data may be embedded in the range proof meta data
+    /// let proof_message: [u8; 23] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17,
+    ///         18, 19, 20, 21, 22, 23];
+    ///
+    /// // The proof can be chained to an existing transcript.
+    /// // Here we create a transcript with a doctest domain separator.
+    /// let mut prover_transcript = Transcript::new(b"doctest example");
+    ///
+    /// // Create a 32-bit rangeproof.
+    /// let (proof, committed_value) = RangeProof::prove_single_with_rewind_key(
+    ///     &bp_gens,
+    ///     &pc_gens,
+    ///     &mut prover_transcript,
+    ///     confidential_value,
+    ///     &blinding_factor,
+    ///     32,
+    ///     &pvt_rewind_key,
+    ///     &pvt_blinding_key,
+    ///     &proof_message,
+    /// ).expect("A real program could handle errors");
+    ///
+    /// // Verification requires a transcript with identical initial state:
+    /// let mut verifier_transcript = Transcript::new(b"doctest example");
+    /// assert!(
+    ///     proof
+    ///         .verify_single(&bp_gens, &pc_gens, &mut verifier_transcript, &committed_value, 32)
+    ///         .is_ok()
+    /// );
+    ///
+    /// // A third party may have access to the public keys and extra data for range proof rewinding
+    /// let pub_rewind_key_1 = RistrettoPoint::from(&pvt_rewind_key * &RISTRETTO_BASEPOINT_TABLE).compress();
+    /// let pub_rewind_key_2 = RistrettoPoint::from(&pvt_blinding_key * &RISTRETTO_BASEPOINT_TABLE).compress();
+    ///
+    /// // The rewind nonce is necessary to rewind the range proof, which is uniquely bound to the commitment
+    /// let rewind_nonce_1 = get_rewind_nonce_from_pub_key(&pub_rewind_key_1, &committed_value);
+    /// let rewind_nonce_2 = get_rewind_nonce_from_pub_key(&pub_rewind_key_2, &committed_value);
+    ///
+    /// // A owner or third party can extract the value and extra data; if it is the wrong combination
+    /// // garbage data will be extracted
+    /// let mut rewind_transcript = Transcript::new(b"doctest example");
+    /// assert_eq!(
+    ///     proof.rewind_single_get_value_only(
+    ///         &bp_gens,
+    ///         &mut rewind_transcript,
+    ///         &committed_value,
+    ///         32,
+    ///         &rewind_nonce_1,
+    ///         &rewind_nonce_2,
+    ///     ),
+    ///     Ok((confidential_value, proof_message))
+    /// );
+    ///
+    /// // The two blinding nonces are necessary to rewind the range proof fully, which are also
+    /// // uniquely bound to the commitment
+    /// let blinding_nonce_1 = get_secret_nonce_from_pvt_key(&pvt_rewind_key, &committed_value);
+    /// let blinding_nonce_2 = get_secret_nonce_from_pvt_key(&pvt_blinding_key, &committed_value);
+    ///
+    /// // The owner or trusted party can extract the value, extra data and blinding factor; if it is the
+    /// // wrong combination an error will be returned
+    /// let mut rewind_transcript = Transcript::new(b"doctest example");
+    /// assert_eq!(
+    ///     proof.rewind_single_get_commitment_data(
+    ///         &bp_gens,
+    ///         &pc_gens,
+    ///         &mut rewind_transcript,
+    ///         &committed_value,
+    ///         32,
+    ///         &rewind_nonce_1,
+    ///         &rewind_nonce_2,
+    ///         &blinding_nonce_1,
+    ///         &blinding_nonce_2,
+    ///     ),
+    ///     Ok((confidential_value, blinding_factor, proof_message))
+    /// );
+    ///
+    /// # }
+    /// ```
+    pub fn prove_single_with_rng_and_rewind_key<T: RngCore + CryptoRng>(
+        bp_gens: &BulletproofGens,
+        pc_gens: &PedersenGens,
+        transcript: &mut Transcript,
+        v: u64,
+        v_blinding: &Scalar,
+        n: usize,
+        rng: &mut T,
+        pvt_rewind_key: &Scalar,
+        pvt_blinding_key: &Scalar,
+        proof_message: &[u8; 23],
+    ) -> Result<(RangeProof, CompressedRistretto), ProofError> {
+        let values = &[v];
+        let blindings = &[*v_blinding];
+        // Temporarily borrow the blindings array to pass the additional parameters
+        // into the next function
+        let mut blindings = blindings.to_vec();
+        blindings.push(RangeProof::get_rewind_key_separator());
+        blindings.push(*pvt_rewind_key);
+        blindings.push(*pvt_blinding_key);
+        blindings.push(Scalar::from_bits(add_bytes_to_word(
+            [0u8; 32],
+            proof_message,
+            8,
+        )));
+
+        let (p, Vs) = RangeProof::prove_multiple_with_rng(
+            bp_gens,
+            pc_gens,
+            transcript,
+            values,
+            &blindings[0..blindings.len()],
+            n,
+            rng,
+        )?;
+        Ok((p, Vs[0]))
+    }
+
+    /// Create a rangeproof for a given pair of value `v` and
     /// blinding scalar `v_blinding`.
     /// This is a convenience wrapper around [`RangeProof::prove_single_with_rng`],
     /// passing in a threadsafe RNG.
@@ -174,6 +334,39 @@ impl RangeProof {
             v_blinding,
             n,
             &mut thread_rng(),
+        )
+    }
+
+    /// Create a rangeproof for a given pair of value `v` and
+    /// blinding scalar `v_blinding`, passing in a rewind key to
+    /// enable rangeproof rewinding with 23 bytes worth of extra
+    /// data that can be embedded.
+    /// This is a convenience wrapper around
+    /// [`RangeProof::prove_single_with_rng_and_rewind_key`],
+    /// passing in a threadsafe RNG.
+    #[cfg(feature = "std")]
+    pub fn prove_single_with_rewind_key(
+        bp_gens: &BulletproofGens,
+        pc_gens: &PedersenGens,
+        transcript: &mut Transcript,
+        v: u64,
+        v_blinding: &Scalar,
+        n: usize,
+        pvt_rewind_key: &Scalar,
+        pvt_blinding_key: &Scalar,
+        proof_message: &[u8; 23],
+    ) -> Result<(RangeProof, CompressedRistretto), ProofError> {
+        RangeProof::prove_single_with_rng_and_rewind_key(
+            bp_gens,
+            pc_gens,
+            transcript,
+            v,
+            v_blinding,
+            n,
+            &mut thread_rng(),
+            pvt_rewind_key,
+            pvt_blinding_key,
+            proof_message,
         )
     }
 
@@ -243,6 +436,30 @@ impl RangeProof {
         use self::dealer::*;
         use self::party::*;
 
+        //Extract the rewind key and extra bytes from the blindings vector where it was temporarily assigned
+        let (pvt_rewind_key, pvt_blinding_key, proof_message, blindings) =
+            if values.len() + 4 == blindings.len() {
+                if blindings[blindings.len() - 4] != RangeProof::get_rewind_key_separator() {
+                    return Err(ProofError::InvalidRewindKeySeparator);
+                }
+                let rewind_key = blindings[blindings.len() - 3].to_owned();
+                let blinding_key = blindings[blindings.len() - 2].to_owned();
+                let data = blindings[blindings.len() - 1].to_owned();
+                (
+                    rewind_key,
+                    blinding_key,
+                    data,
+                    &blindings[0..blindings.len() - 4],
+                )
+            } else {
+                (
+                    Scalar::default().to_owned(),
+                    Scalar::default().to_owned(),
+                    Scalar::default().to_owned(),
+                    &blindings[0..blindings.len()],
+                )
+            };
+
         if values.len() != blindings.len() {
             return Err(ProofError::WrongNumBlindingFactors);
         }
@@ -252,7 +469,18 @@ impl RangeProof {
         let parties: Vec<_> = values
             .iter()
             .zip(blindings.iter())
-            .map(|(&v, &v_blinding)| Party::new(bp_gens, pc_gens, v, v_blinding, n))
+            .map(|(&v, &v_blinding)| {
+                Party::new(
+                    bp_gens,
+                    pc_gens,
+                    v,
+                    v_blinding,
+                    n,
+                    pvt_rewind_key,
+                    pvt_blinding_key,
+                    proof_message,
+                )
+            })
             // Collect the iterator of Results into a Result<Vec>, then unwrap it
             .collect::<Result<Vec<_>, _>>()?;
 
@@ -308,6 +536,11 @@ impl RangeProof {
             n,
             &mut thread_rng(),
         )
+    }
+
+    /// Uniquely identify-able scalar used as a pvt_rewind_key separator
+    fn get_rewind_key_separator() -> Scalar {
+        Scalar::from_bits(*RISTRETTO_BASEPOINT_COMPRESSED.as_bytes())
     }
 
     /// Verifies a rangeproof for a given value commitment \\(V\\).
@@ -536,6 +769,128 @@ impl RangeProof {
             ipp_proof,
         })
     }
+
+    /// Rewinds a rangeproof for a given value commitment \\(V\\),
+    /// returning the value, blinding factor and 23 bytes extra data
+    /// upon success.
+    pub fn rewind_single_get_commitment_data(
+        &self,
+        bp_gens: &BulletproofGens,
+        pc_gens: &PedersenGens,
+        transcript: &mut Transcript,
+        value_commitment: &CompressedRistretto,
+        n: usize,
+        rewind_nonce_1: &Scalar,
+        rewind_nonce_2: &Scalar,
+        blinding_nonce_1: &Scalar,
+        blinding_nonce_2: &Scalar,
+    ) -> Result<(u64, Scalar, [u8; 23]), ProofError> {
+        let result = self.rewind_single_get_commitment_value(
+            bp_gens,
+            transcript,
+            value_commitment,
+            n,
+            &rewind_nonce_1,
+            &rewind_nonce_2,
+        )?;
+        let value = result.0;
+        let proof_message = result.1;
+        let x = result.2;
+        let z = result.3;
+
+        // Extract the blinding factor:
+        //   t_x_blinding = z^2 * v_blinding + x * t_1_blinding + x^2 * t_2_blinding
+        //   v_blinding = (1 / z^2) * (t_x_blinding - x * t_1_blinding - x^2 * t_2_blinding)
+        //   t_1_blinding: replaced by blinding_nonce_1
+        //   t_2_blinding: replaced by blinding_nonce_2
+        let v_blinding = z.invert()
+            * z.invert()
+            * (self.t_x_blinding - x * blinding_nonce_1 - x * x * blinding_nonce_2);
+
+        //Verify if the correct value and blinding factor was extracted
+        let value_commitment_calculated = pc_gens.commit(value.into(), v_blinding).compress();
+        if value_commitment.as_bytes() != value_commitment_calculated.as_bytes() {
+            return Err(ProofError::InvalidCommitmentExtracted);
+        } else {
+            Ok((value, v_blinding, proof_message))
+        }
+    }
+
+    /// Rewinds a rangeproof for a given value commitment \\(V\\)
+    /// to get the value and 23 bytes extra data only. If the wrong
+    /// rewind_nonce is provided, garbage data will be returned.
+    #[cfg(feature = "std")]
+    pub fn rewind_single_get_value_only(
+        &self,
+        bp_gens: &BulletproofGens,
+        transcript: &mut Transcript,
+        V: &CompressedRistretto,
+        n: usize,
+        rewind_nonce_1: &Scalar,
+        rewind_nonce_2: &Scalar,
+    ) -> Result<(u64, [u8; 23]), ProofError> {
+        let result = self.rewind_single_get_commitment_value(
+            bp_gens,
+            transcript,
+            V,
+            n,
+            &rewind_nonce_1,
+            &rewind_nonce_2,
+        );
+        let result: Result<(u64, [u8; 23]), ProofError> =
+            Ok((result.clone().unwrap().0, result.clone().unwrap().1));
+        result
+    }
+
+    /// Rewinds a rangeproof for a given value commitment \\(V\\)
+    /// to retrieve the value, challenge scalars x and y and 23
+    /// bytes extra data.
+    fn rewind_single_get_commitment_value(
+        &self,
+        bp_gens: &BulletproofGens,
+        transcript: &mut Transcript,
+        value_commitment: &CompressedRistretto,
+        n: usize,
+        rewind_nonce_1: &Scalar,
+        rewind_nonce_2: &Scalar,
+    ) -> Result<(u64, [u8; 23], Scalar, Scalar), ProofError> {
+        // First, replay the "interactive" protocol using the proof
+        // data to recompute all challenges.
+        if !(n == 8 || n == 16 || n == 32 || n == 64) {
+            return Err(ProofError::InvalidBitsize);
+        }
+        if bp_gens.gens_capacity < n {
+            return Err(ProofError::InvalidGeneratorsLength);
+        }
+        if bp_gens.party_capacity < 1 {
+            return Err(ProofError::InvalidGeneratorsLength);
+        }
+
+        transcript.rangeproof_domain_sep(n as u64, 1u64);
+        transcript.append_point(b"V", value_commitment);
+        transcript.validate_and_append_point(b"A", &self.A)?;
+        transcript.validate_and_append_point(b"S", &self.S)?;
+        transcript.challenge_scalar(b"y");
+        let z = transcript.challenge_scalar(b"z");
+        transcript.validate_and_append_point(b"T_1", &self.T_1)?;
+        transcript.validate_and_append_point(b"T_2", &self.T_2)?;
+        let x = transcript.challenge_scalar(b"x");
+
+        // Extract s_blinding:
+        //   e_blinding = a_blinding + x * s_blinding
+        //   s_blinding = (e_blinding - a_blinding) * (1/x)
+        //   a_blinding: replaced by rewind_nonce_1
+        let s_blinding = (self.e_blinding - rewind_nonce_1) * x.invert();
+        // Extract the value and extra data
+        let xor_s_blinding = xor_32_bytes(&rewind_nonce_2.as_bytes(), &s_blinding.as_bytes());
+        let value = bytes_to_usize(&xor_s_blinding, 1, 8) as u64;
+        let mut proof_message = [0u8; 23];
+        for (place, element) in proof_message.iter_mut().zip(xor_s_blinding.iter().skip(8)) {
+            *place = *element;
+        }
+
+        Ok((value, proof_message, x, z))
+    }
 }
 
 impl Serialize for RangeProof {
@@ -590,6 +945,29 @@ fn delta(n: usize, m: usize, y: &Scalar, z: &Scalar) -> Scalar {
     let sum_z = util::sum_of_powers(z, m);
 
     (z - z * z) * sum_y - z * z * z * sum_2 * sum_z
+}
+
+/// Calculate a rewind nonce from a private key and the value commitment.
+pub fn get_rewind_nonce_from_pvt_key(pvt_key: &Scalar, commitment: &CompressedRistretto) -> Scalar {
+    let pub_key = (pvt_key * &RISTRETTO_BASEPOINT_TABLE).compress();
+    get_rewind_nonce_from_pub_key(&pub_key, commitment)
+}
+
+/// Calculate a rewind nonce from a public key and the value commitment.
+pub fn get_rewind_nonce_from_pub_key(
+    pub_key: &CompressedRistretto,
+    commitment: &CompressedRistretto,
+) -> Scalar {
+    let rewind_nonce = Scalar::hash_from_bytes::<Sha3_512>(pub_key.to_bytes().as_ref());
+    let rewind_nonce = [rewind_nonce.as_bytes(), commitment.to_bytes().as_ref()].concat();
+    Scalar::hash_from_bytes::<Sha3_512>(&rewind_nonce)
+}
+
+/// Calculate a secret nonce from a private key and the value commitment.
+pub fn get_secret_nonce_from_pvt_key(pvt_key: &Scalar, commitment: &CompressedRistretto) -> Scalar {
+    let secret_nonce = Scalar::hash_from_bytes::<Sha3_512>(pvt_key.to_bytes().as_ref());
+    let secret_nonce = [secret_nonce.as_bytes(), commitment.to_bytes().as_ref()].concat();
+    Scalar::hash_from_bytes::<Sha3_512>(&secret_nonce)
 }
 
 #[cfg(test)]
@@ -730,6 +1108,9 @@ mod tests {
 
         use crate::errors::MPCError;
 
+        // Common data - rewind functionality not used
+        let not_used = Scalar::default();
+
         // Simulate four parties, two of which will be dishonest and use a 64-bit value.
         let m = 4;
         let n = 32;
@@ -744,20 +1125,60 @@ mod tests {
         // Parties 0, 2 are honest and use a 32-bit value
         let v0 = rng.gen::<u32>() as u64;
         let v0_blinding = Scalar::random(&mut rng);
-        let party0 = Party::new(&bp_gens, &pc_gens, v0, v0_blinding, n).unwrap();
+        let party0 = Party::new(
+            &bp_gens,
+            &pc_gens,
+            v0,
+            v0_blinding,
+            n,
+            not_used,
+            not_used,
+            not_used,
+        )
+        .unwrap();
 
         let v2 = rng.gen::<u32>() as u64;
         let v2_blinding = Scalar::random(&mut rng);
-        let party2 = Party::new(&bp_gens, &pc_gens, v2, v2_blinding, n).unwrap();
+        let party2 = Party::new(
+            &bp_gens,
+            &pc_gens,
+            v2,
+            v2_blinding,
+            n,
+            not_used,
+            not_used,
+            not_used,
+        )
+        .unwrap();
 
         // Parties 1, 3 are dishonest and use a 64-bit value
         let v1 = rng.gen::<u64>();
         let v1_blinding = Scalar::random(&mut rng);
-        let party1 = Party::new(&bp_gens, &pc_gens, v1, v1_blinding, n).unwrap();
+        let party1 = Party::new(
+            &bp_gens,
+            &pc_gens,
+            v1,
+            v1_blinding,
+            n,
+            not_used,
+            not_used,
+            not_used,
+        )
+        .unwrap();
 
         let v3 = rng.gen::<u64>();
         let v3_blinding = Scalar::random(&mut rng);
-        let party3 = Party::new(&bp_gens, &pc_gens, v3, v3_blinding, n).unwrap();
+        let party3 = Party::new(
+            &bp_gens,
+            &pc_gens,
+            v3,
+            v3_blinding,
+            n,
+            not_used,
+            not_used,
+            not_used,
+        )
+        .unwrap();
 
         let dealer = Dealer::new(&bp_gens, &pc_gens, &mut transcript, n, m).unwrap();
 
@@ -803,6 +1224,9 @@ mod tests {
         use self::party::*;
         use crate::errors::MPCError;
 
+        // Common data - rewind functionality not used
+        let not_used = Scalar::default();
+
         // Simulate one party
         let m = 1;
         let n = 32;
@@ -816,7 +1240,17 @@ mod tests {
 
         let v0 = rng.gen::<u32>() as u64;
         let v0_blinding = Scalar::random(&mut rng);
-        let party0 = Party::new(&bp_gens, &pc_gens, v0, v0_blinding, n).unwrap();
+        let party0 = Party::new(
+            &bp_gens,
+            &pc_gens,
+            v0,
+            v0_blinding,
+            n,
+            not_used,
+            not_used,
+            not_used,
+        )
+        .unwrap();
 
         let dealer = Dealer::new(&bp_gens, &pc_gens, &mut transcript, n, m).unwrap();
 
@@ -837,5 +1271,69 @@ mod tests {
         let maybe_share0 = party0.apply_challenge(&poly_challenge);
 
         assert!(maybe_share0.unwrap_err() == MPCError::MaliciousDealer);
+    }
+
+    #[test]
+    fn rewind_nonce_and_secret_nonce() {
+        // Static data
+        let pvt_rewind_key = Scalar::from_bits([
+            52, 177, 175, 139, 230, 130, 194, 20, 235, 30, 175, 83, 36, 74, 152, 44, 159, 164, 58,
+            224, 1, 145, 79, 3, 28, 84, 255, 124, 182, 63, 105, 2,
+        ]);
+        let pub_rewind_key =
+            RistrettoPoint::from(&pvt_rewind_key * &RISTRETTO_BASEPOINT_TABLE).compress();
+        let committed_value = CompressedRistretto::from_slice(
+            [
+                208, 101, 226, 203, 8, 161, 147, 169, 30, 0, 90, 57, 238, 214, 80, 108, 172, 123,
+                34, 250, 205, 128, 227, 180, 0, 157, 217, 236, 238, 229, 180, 36,
+            ]
+            .to_vec()
+            .as_slice(),
+        );
+
+        assert_eq!(
+            get_rewind_nonce_from_pub_key(&pub_rewind_key, &committed_value),
+            get_rewind_nonce_from_pvt_key(&pvt_rewind_key, &committed_value)
+        );
+        assert_eq!(
+            get_rewind_nonce_from_pub_key(&pub_rewind_key, &committed_value)
+                .as_bytes()
+                .to_vec(),
+            [
+                88, 38, 63, 128, 120, 246, 179, 65, 172, 254, 213, 32, 26, 126, 42, 168, 25, 172,
+                68, 174, 13, 24, 30, 83, 187, 187, 147, 104, 226, 85, 95, 15
+            ]
+            .to_vec()
+        );
+        assert_eq!(
+            get_secret_nonce_from_pvt_key(&pvt_rewind_key, &committed_value)
+                .as_bytes()
+                .to_vec(),
+            [
+                31, 26, 128, 21, 146, 109, 19, 144, 226, 7, 54, 79, 33, 220, 179, 249, 94, 212,
+                167, 146, 207, 239, 65, 79, 112, 95, 18, 61, 92, 11, 45, 15
+            ]
+            .to_vec()
+        );
+
+        // Dynamic data
+        let pvt_rewind_key = Scalar::random(&mut thread_rng());
+        let pub_rewind_key =
+            RistrettoPoint::from(&pvt_rewind_key * &RISTRETTO_BASEPOINT_TABLE).compress();
+        let committed_value = CompressedRistretto::from_slice(
+            Scalar::random(&mut thread_rng())
+                .as_bytes()
+                .to_vec()
+                .as_slice(),
+        );
+
+        assert_eq!(
+            get_rewind_nonce_from_pub_key(&pub_rewind_key, &committed_value),
+            get_rewind_nonce_from_pvt_key(&pvt_rewind_key, &committed_value)
+        );
+        assert_ne!(
+            get_rewind_nonce_from_pvt_key(&pvt_rewind_key, &committed_value),
+            get_secret_nonce_from_pvt_key(&pvt_rewind_key, &committed_value)
+        );
     }
 }
