@@ -2,14 +2,25 @@ use rand_core::SeedableRng;
 
 use rand_chacha::ChaChaRng;
 
-use curve25519_dalek::ristretto::CompressedRistretto;
+use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
+use curve25519_dalek::constants::{RISTRETTO_BASEPOINT_TABLE};
 
 use merlin::Transcript;
 
-use bulletproofs::{BulletproofGens, PedersenGens, RangeProof};
+use bulletproofs::{
+    BulletproofGens,
+    PedersenGens,
+    RangeProof,
+    ProofError,
+    range_proof::{
+        get_rewind_nonce_from_pub_key,
+        get_secret_nonce_from_pvt_key
+    }
+};
 
 use hex;
+use rand::thread_rng;
 
 // Tests that proofs generated with v1.0.0 continue to verify in later versions.
 #[test]
@@ -136,4 +147,173 @@ fn generate_test_vectors() {
     }
 
     panic!();
+}
+
+
+#[test]
+fn range_proof_rewind() {
+    let pc_gens = PedersenGens::default();
+    let bp_gens = BulletproofGens::new(64, 1);
+
+    // Rewind and blinding keys
+    let pvt_rewind_key = Scalar::random(&mut thread_rng());
+    let pvt_blinding_key = Scalar::random(&mut thread_rng());
+
+    // Commitment value and blinding factor
+    let confidential_value = 123456789u64;
+    let blinding_factor = Scalar::random(&mut thread_rng());
+    // Extra data (up 23 bytes) can be embedded in the range proof for later use
+    let proof_message: [u8; 23] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17,
+        18, 19, 20, 21, 22, 23];
+
+    // Create a rewindable ZK proof using the two private keys, also embedding some extra data
+    let mut prover_transcript = Transcript::new(b"Bulletproof-Rewind Test");
+    let (proof, committed_value) = RangeProof::prove_single_with_rewind_key(
+         &bp_gens,
+         &pc_gens,
+         &mut prover_transcript,
+         confidential_value,
+         &blinding_factor,
+         64,
+         &pvt_rewind_key,
+         &pvt_blinding_key,
+         &proof_message,
+    ).expect("A real program could handle errors");
+
+    // Verify the ZK proof as per normal proof
+    let mut verifier_transcript = Transcript::new(b"Bulletproof-Rewind Test");
+    assert!(
+         proof.verify_single(&bp_gens, &pc_gens, &mut verifier_transcript, &committed_value, 64).is_ok()
+    );
+
+    // The two rewind keys can be shared with a trusted 3rd party, whom will be able to extract
+    // the value of the commitment as well as the extra data
+    let pub_rewind_key_1 = RistrettoPoint::from(&pvt_rewind_key * &RISTRETTO_BASEPOINT_TABLE).compress();
+    let pub_rewind_key_2 = RistrettoPoint::from(&pvt_blinding_key * &RISTRETTO_BASEPOINT_TABLE).compress();
+    // The rewind nonces are derived from the public rewind keys and the Pedersen commitment
+    let rewind_nonce_1 = get_rewind_nonce_from_pub_key(&pub_rewind_key_1, &committed_value);
+    let rewind_nonce_2 = get_rewind_nonce_from_pub_key(&pub_rewind_key_2, &committed_value);
+    // Get secret nonces from the private keys - this emulates the owner of a wallet
+    let blinding_nonce_1 = get_secret_nonce_from_pvt_key(&pvt_rewind_key, &committed_value);
+    let blinding_nonce_2 = get_secret_nonce_from_pvt_key(&pvt_blinding_key, &committed_value);
+
+    // Get Value Test 1 - provide correct rewind nonces
+    let mut rewind_transcript = Transcript::new(b"Bulletproof-Rewind Test");
+    assert_eq!(
+        proof.rewind_single_get_value_only(
+            &bp_gens,
+            &mut rewind_transcript,
+            &committed_value,
+            64,
+            &rewind_nonce_1,
+            &rewind_nonce_2,
+        ),
+        Ok((confidential_value, proof_message))
+    );
+
+    // Get Value Test 2 - provide wrong rewind nonce (this does not produce an error, just gives back garbage)
+    let wrong_nonce = Scalar::random(&mut thread_rng());
+    let mut rewind_transcript = Transcript::new(b"Bulletproof-Rewind Test");
+    assert_ne!(
+        proof.rewind_single_get_value_only(
+            &bp_gens,
+            &mut rewind_transcript,
+            &committed_value,
+            64,
+            &wrong_nonce,
+            &rewind_nonce_2,
+        ),
+        Ok((confidential_value, proof_message))
+    );
+    let mut rewind_transcript = Transcript::new(b"Bulletproof-Rewind Test");
+    assert_ne!(
+        proof.rewind_single_get_value_only(
+            &bp_gens,
+            &mut rewind_transcript,
+            &committed_value,
+            64,
+            &rewind_nonce_1,
+            &wrong_nonce,
+        ),
+        Ok((confidential_value, proof_message))
+    );
+
+    // Rewind Test 1 - provide correct rewind nonces and blinding nonces
+    let mut rewind_transcript = Transcript::new(b"Bulletproof-Rewind Test");
+    assert_eq!(
+        proof.rewind_single_get_commitment_data(
+            &bp_gens,
+            &pc_gens,
+            &mut rewind_transcript,
+            &committed_value,
+            64,
+            &rewind_nonce_1,
+            &rewind_nonce_2,
+            &blinding_nonce_1,
+            &blinding_nonce_2,
+        ),
+        Ok((confidential_value, blinding_factor, proof_message))
+    );
+
+    // Rewind Test 2 - provide one wrong nonce
+    let mut rewind_transcript = Transcript::new(b"Bulletproof-Rewind Test");
+    assert_eq!(
+        proof.rewind_single_get_commitment_data(
+            &bp_gens,
+            &pc_gens,
+            &mut rewind_transcript,
+            &committed_value,
+            64,
+            &wrong_nonce,
+            &rewind_nonce_2,
+            &blinding_nonce_1,
+            &blinding_nonce_2,
+        ),
+        Err(ProofError::InvalidCommitmentExtracted)
+    );
+    let mut rewind_transcript = Transcript::new(b"Bulletproof-Rewind Test");
+    assert_eq!(
+        proof.rewind_single_get_commitment_data(
+            &bp_gens,
+            &pc_gens,
+            &mut rewind_transcript,
+            &committed_value,
+            64,
+            &rewind_nonce_1,
+            &wrong_nonce,
+            &blinding_nonce_1,
+            &blinding_nonce_2,
+        ),
+        Err(ProofError::InvalidCommitmentExtracted)
+    );
+    let mut rewind_transcript = Transcript::new(b"Bulletproof-Rewind Test");
+    assert_eq!(
+        proof.rewind_single_get_commitment_data(
+            &bp_gens,
+            &pc_gens,
+            &mut rewind_transcript,
+            &committed_value,
+            64,
+            &rewind_nonce_1,
+            &rewind_nonce_2,
+            &wrong_nonce,
+            &blinding_nonce_2,
+        ),
+        Err(ProofError::InvalidCommitmentExtracted)
+    );
+    let mut rewind_transcript = Transcript::new(b"Bulletproof-Rewind Test");
+    assert_eq!(
+        proof.rewind_single_get_commitment_data(
+            &bp_gens,
+            &pc_gens,
+            &mut rewind_transcript,
+            &committed_value,
+            64,
+            &rewind_nonce_1,
+            &rewind_nonce_2,
+            &blinding_nonce_1,
+            &wrong_nonce,
+        ),
+        Err(ProofError::InvalidCommitmentExtracted)
+    );
 }

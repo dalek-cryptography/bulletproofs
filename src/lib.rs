@@ -27,7 +27,8 @@ mod notes {
 mod errors;
 mod generators;
 mod inner_product_proof;
-mod range_proof;
+// TODO: Do not expose `range_proof` publicly
+pub mod range_proof;
 mod transcript;
 
 pub use crate::errors::ProofError;
