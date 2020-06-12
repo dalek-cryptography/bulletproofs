@@ -354,7 +354,8 @@ impl<'g, T: BorrowMut<Transcript>> Prover<'g, T> {
         (wL, wR, wO, wV)
     }
 
-    fn eval(&self, lc: &LinearCombination) -> Scalar {
+    /// Returns the secret value of the linear combination.
+    pub fn eval(&self, lc: &LinearCombination) -> Scalar {
         lc.terms
             .iter()
             .map(|(var, coeff)| {
