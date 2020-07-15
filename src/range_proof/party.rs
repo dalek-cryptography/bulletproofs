@@ -13,13 +13,13 @@
 extern crate alloc;
 
 use alloc::vec::Vec;
-#[cfg(feature = "zeroize")]
-use zeroize::Zeroize;
 use core::iter;
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::MultiscalarMul;
 use rand_core::{CryptoRng, RngCore};
+#[cfg(feature = "zeroize")]
+use zeroize::Zeroize;
 
 use crate::errors::MPCError;
 use crate::generators::{BulletproofGens, PedersenGens};

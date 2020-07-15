@@ -5,9 +5,9 @@ extern crate alloc;
 
 use alloc::vec;
 use alloc::vec::Vec;
+use curve25519_dalek::scalar::Scalar;
 #[cfg(feature = "zeroize")]
 use zeroize::Zeroize;
-use curve25519_dalek::scalar::Scalar;
 
 use crate::inner_product_proof::inner_product;
 

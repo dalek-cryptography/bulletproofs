@@ -1,12 +1,12 @@
 #![allow(non_snake_case)]
 
-#[cfg(feature = "zeroize")]
-use zeroize::Zeroize;
 use core::mem;
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::{Identity, MultiscalarMul};
 use merlin::Transcript;
+#[cfg(feature = "zeroize")]
+use zeroize::Zeroize;
 
 use super::{
     ConstraintSystem, LinearCombination, R1CSProof, RandomizableConstraintSystem,

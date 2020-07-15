@@ -25,7 +25,7 @@ use crate::util;
 use rand_core::{CryptoRng, RngCore};
 
 #[cfg(feature = "serde")]
-use serde::{self, Deserialize, Deserializer, Serialize, Serializer, de::Visitor};
+use serde::{self, de::Visitor, Deserialize, Deserializer, Serialize, Serializer};
 
 // Modules for MPC protocol
 
