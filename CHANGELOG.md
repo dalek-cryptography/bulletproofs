@@ -2,6 +2,13 @@
 
 Entries are listed in reverse chronological order.
 
+## 2.0.1
+
+* `Serde` is optional.
+* Adds new backends for `curve25519-dalek`: `u32_backend`, `u64_backend`, 
+  and `avx2_backend`(default on `std`).
+* Replace `clear_on_drop` by `zeroize`.
+
 ## 2.0.0
 
 * Switch from `failure` to `std`-compatible errors via `thiserror`.

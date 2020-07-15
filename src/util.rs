@@ -5,12 +5,14 @@ extern crate alloc;
 
 use alloc::vec;
 use alloc::vec::Vec;
-use clear_on_drop::clear::Clear;
+#[cfg(feature = "zeroize")]
+use zeroize::Zeroize;
 use curve25519_dalek::scalar::Scalar;
 
 use crate::inner_product_proof::inner_product;
 
 /// Represents a degree-1 vector polynomial \\(\mathbf{a} + \mathbf{b} \cdot x\\).
+#[cfg_attr(feature = "zeroize", derive(Zeroize), zeroize(drop))]
 pub struct VecPoly1(pub Vec<Scalar>, pub Vec<Scalar>);
 
 /// Represents a degree-3 vector polynomial
@@ -24,6 +26,7 @@ pub struct VecPoly3(
 );
 
 /// Represents a degree-2 scalar polynomial \\(a + b \cdot x + c \cdot x^2\\)
+#[cfg_attr(feature = "zeroize", derive(Zeroize), zeroize(drop))]
 pub struct Poly2(pub Scalar, pub Scalar, pub Scalar);
 
 /// Represents a degree-6 scalar polynomial, without the zeroth degree
@@ -164,25 +167,6 @@ impl Poly2 {
 impl Poly6 {
     pub fn eval(&self, x: Scalar) -> Scalar {
         x * (self.t1 + x * (self.t2 + x * (self.t3 + x * (self.t4 + x * (self.t5 + x * self.t6)))))
-    }
-}
-
-impl Drop for VecPoly1 {
-    fn drop(&mut self) {
-        for e in self.0.iter_mut() {
-            e.clear();
-        }
-        for e in self.1.iter_mut() {
-            e.clear();
-        }
-    }
-}
-
-impl Drop for Poly2 {
-    fn drop(&mut self) {
-        self.0.clear();
-        self.1.clear();
-        self.2.clear();
     }
 }
 
@@ -350,12 +334,13 @@ mod tests {
         assert_eq!(sum_of_powers_slow(&x, 6), Scalar::from(111111u64));
     }
 
+    #[cfg(feature = "zeroize")]
     #[test]
-    fn vec_of_scalars_clear_on_drop() {
+    fn vec_of_scalars_zeroize() {
         let mut v = vec![Scalar::from(24u64), Scalar::from(42u64)];
 
         for e in v.iter_mut() {
-            e.clear();
+            e.zeroize();
         }
 
         fn flat_slice<T>(x: &[T]) -> &[u8] {
@@ -370,17 +355,18 @@ mod tests {
         assert_eq!(v[1], Scalar::zero());
     }
 
+    #[cfg(feature = "zeroize")]
     #[test]
-    fn tuple_of_scalars_clear_on_drop() {
+    fn tuple_of_scalars_zeroize() {
         let mut v = Poly2(
             Scalar::from(24u64),
             Scalar::from(42u64),
             Scalar::from(255u64),
         );
 
-        v.0.clear();
-        v.1.clear();
-        v.2.clear();
+        v.0.zeroize();
+        v.1.zeroize();
+        v.2.zeroize();
 
         fn as_bytes<T>(x: &T) -> &[u8] {
             use core::mem;

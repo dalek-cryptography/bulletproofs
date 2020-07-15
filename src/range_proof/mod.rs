@@ -23,8 +23,9 @@ use crate::transcript::TranscriptProtocol;
 use crate::util;
 
 use rand_core::{CryptoRng, RngCore};
-use serde::de::Visitor;
-use serde::{self, Deserialize, Deserializer, Serialize, Serializer};
+
+#[cfg(feature = "serde")]
+use serde::{self, Deserialize, Deserializer, Serialize, Serializer, de::Visitor};
 
 // Modules for MPC protocol
 
@@ -538,6 +539,7 @@ impl RangeProof {
     }
 }
 
+#[cfg(feature = "serde")]
 impl Serialize for RangeProof {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -547,6 +549,7 @@ impl Serialize for RangeProof {
     }
 }
 
+#[cfg(feature = "serde")]
 impl<'de> Deserialize<'de> for RangeProof {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where

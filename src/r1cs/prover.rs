@@ -1,6 +1,7 @@
 #![allow(non_snake_case)]
 
-use clear_on_drop::clear::Clear;
+#[cfg(feature = "zeroize")]
+use zeroize::Zeroize;
 use core::mem;
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
@@ -62,26 +63,15 @@ pub struct RandomizingProver<'t, 'g> {
 }
 
 /// Overwrite secrets with null bytes when they go out of scope.
+#[cfg(feature = "zeroize")]
 impl<'t, 'g> Drop for Prover<'t, 'g> {
     fn drop(&mut self) {
-        self.v.clear();
-        self.v_blinding.clear();
+        self.v.zeroize();
+        self.v_blinding.zeroize();
 
-        // Important: due to how ClearOnDrop auto-implements InitializableFromZeroed
-        // for T: Default, calling .clear() on Vec compiles, but does not
-        // clear the content. Instead, it only clears the Vec's header.
-        // Clearing the underlying buffer item-by-item will do the job, but will
-        // keep the header as-is, which is fine since the header does not contain secrets.
-        for e in self.a_L.iter_mut() {
-            e.clear();
-        }
-        for e in self.a_R.iter_mut() {
-            e.clear();
-        }
-        for e in self.a_O.iter_mut() {
-            e.clear();
-        }
-        // XXX use ClearOnDrop instead of doing the above
+        self.a_L.zeroize();
+        self.a_R.zeroize();
+        self.a_O.zeroize();
     }
 }
 
@@ -666,16 +656,12 @@ impl<'t, 'g> Prover<'t, 'g> {
             r_vec,
         );
 
-        // We do not yet have a ClearOnDrop wrapper for Vec<Scalar>.
-        // When PR 202 [1] is merged, we can simply wrap s_L and s_R at the point of creation.
-        // [1] https://github.com/dalek-cryptography/curve25519-dalek/pull/202
-        for scalar in s_L1
-            .iter_mut()
-            .chain(s_L2.iter_mut())
-            .chain(s_R1.iter_mut())
-            .chain(s_R2.iter_mut())
+        #[cfg(feature = "zeroize")]
         {
-            scalar.clear();
+            s_L1.zeroize();
+            s_L2.zeroize();
+            s_R1.zeroize();
+            s_R2.zeroize();
         }
 
         Ok(R1CSProof {
