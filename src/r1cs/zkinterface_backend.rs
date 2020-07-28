@@ -7,7 +7,7 @@ extern crate zkinterface;
 
 use self::zkinterface::{
     Result,
-    reading::{Messages,Term},
+    reading::{Messages, Term},
 };
 use curve25519_dalek::scalar::Scalar;
 use errors::R1CSError;
@@ -35,8 +35,6 @@ pub fn prove(messages: &Messages) -> Result<R1CSProof> {
     let mut transcript = Transcript::new(b"zkInterfaceGadget");
     // /Common
 
-    println!("\n== Proving ==\n");
-
     // 1. Create a prover
     let prover = Prover::new(&bp_gens, &pc_gens, &mut transcript);
 
@@ -62,8 +60,6 @@ pub fn verify(messages: &Messages, proof: &R1CSProof) -> Result<()> {
     let bp_gens = BulletproofGens::new(128, 1);
     let mut transcript = Transcript::new(b"zkInterfaceGadget");
     // /Common
-
-    println!("\n== Verifying ==\n");
 
     // 1. Create a verifier
     let verifier = Verifier::new(&bp_gens, &pc_gens, &mut transcript);
@@ -115,9 +111,9 @@ pub fn gadget_from_messages<CS: ConstraintSystem>(
             id_to_value.insert(var.id, val);
         }
 
-        println!("public{} = {:?}", var.id, val);
+        // eprintln!("public{} = {:?}", var.id, val);
     }
-    println!();
+    // eprintln!();
 
     // Map witness (if prover).
     if prover {
@@ -125,9 +121,9 @@ pub fn gadget_from_messages<CS: ConstraintSystem>(
             let val = scalar_from_zkif(var.value)?;
             id_to_value.insert(var.id, val);
 
-            println!("private{} = {:?}", var.id, val);
+            // eprintln!("private{} = {:?}", var.id, val);
         }
-        println!();
+        // eprintln!();
     }
 
     // Step 1: Allocate one mult gate per R1CS constraint.
@@ -170,28 +166,28 @@ pub fn gadget_from_messages<CS: ConstraintSystem>(
                 .map_err(|e| e.compat())?;
 
             id_to_lc.insert(circuit_var.id, gate_var.into());
-            println!("private{} allocated to {:?}", circuit_var.id, gate_var);
+            // eprintln!("private{} allocated to {:?}", circuit_var.id, gate_var);
         }
     }
-    println!();
+    // eprintln!();
 
     // Step 3: Add linear constraints into each wire of each gate.
     for (i, constraint) in messages.iter_constraints().enumerate() {
-        println!("constraint {}:", i);
+        // eprintln!("constraint {}:", i);
 
         let lc_a = convert_zkif_lc(&id_to_lc, &constraint.a)?;
-        println!("  A = {:?}", lc_a);
+        // eprintln!("  A = {:?}", lc_a);
         cs.constrain(lc_a - gates_a[i]);
 
         let lc_b = convert_zkif_lc(&id_to_lc, &constraint.b)?;
-        println!("  B = {:?}", lc_b);
+        // eprintln!("  B = {:?}", lc_b);
         cs.constrain(lc_b - gates_b[i]);
 
         let lc_c = convert_zkif_lc(&id_to_lc, &constraint.c)?;
-        println!("  C = {:?}", lc_c);
+        // eprintln!("  C = {:?}", lc_c);
         cs.constrain(lc_c - gates_c[i]);
 
-        println!();
+        // eprintln!();
         // XXX: Skip trivial constraints where the lc was defined as just the gate var.
     }
 
