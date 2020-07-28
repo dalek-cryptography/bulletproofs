@@ -5,8 +5,10 @@ extern crate merlin;
 extern crate rand;
 extern crate zkinterface;
 
-use self::zkinterface::reading::Messages;
-use self::zkinterface::reading::Term;
+use self::zkinterface::{
+    Result,
+    reading::{Messages,Term},
+};
 use curve25519_dalek::scalar::Scalar;
 use errors::R1CSError;
 use failure::Fail;
@@ -19,7 +21,6 @@ use r1cs::Variable;
 use r1cs::Verifier;
 use std::cmp::min;
 use std::collections::HashMap;
-use std::error::Error;
 use BulletproofGens;
 use PedersenGens;
 
@@ -27,7 +28,7 @@ use PedersenGens;
 /// - `Circuit` contains the public inputs.
 /// - `R1CSConstraints` contains an R1CS which we convert to an arithmetic circuit on the fly.
 /// - `Witness` contains the values to assign to all variables.
-pub fn prove(messages: &Messages) -> Result<R1CSProof, Box<Error>> {
+pub fn prove(messages: &Messages) -> Result<R1CSProof> {
     // Common
     let pc_gens = PedersenGens::default();
     let bp_gens = BulletproofGens::new(128, 1);
@@ -55,7 +56,7 @@ pub fn prove(messages: &Messages) -> Result<R1CSProof, Box<Error>> {
 /// Verify a proof using zkInterface messages:
 /// - `Circuit` contains the public inputs.
 /// - `R1CSConstraints` contains an R1CS which we convert to an arithmetic circuit on the fly.
-pub fn verify(messages: &Messages, proof: &R1CSProof) -> Result<(), Box<Error>> {
+pub fn verify(messages: &Messages, proof: &R1CSProof) -> Result<()> {
     // Common
     let pc_gens = PedersenGens::default();
     let bp_gens = BulletproofGens::new(128, 1);
@@ -84,7 +85,7 @@ pub fn gadget_from_messages<CS: ConstraintSystem>(
     cs: &mut CS,
     messages: &Messages,
     prover: bool,
-) -> Result<(), Box<Error>> {
+) -> Result<()> {
     let public_vars = messages
         .connection_variables()
         .ok_or("Missing Circuit.connections")?;
@@ -206,7 +207,7 @@ pub fn gadget_from_messages<CS: ConstraintSystem>(
 }
 
 /// This is a gadget equivalent to the zkinterface example circuit: x^2 + y^2 = zz
-fn _example_gadget<CS: ConstraintSystem>(cs: &mut CS) -> Result<(), Box<Error>> {
+fn _example_gadget<CS: ConstraintSystem>(cs: &mut CS) -> Result<()> {
     let x = LinearCombination::from(3 as u64);
     let y = LinearCombination::from(4 as u64);
     let zz = LinearCombination::from(25 as u64);
@@ -220,7 +221,7 @@ fn _example_gadget<CS: ConstraintSystem>(cs: &mut CS) -> Result<(), Box<Error>> 
 }
 
 /// Convert zkInterface little-endian bytes to Dalek Scalar.
-fn scalar_from_zkif(le_bytes: &[u8]) -> Result<Scalar, Box<Error>> {
+fn scalar_from_zkif(le_bytes: &[u8]) -> Result<Scalar> {
     let mut bytes32 = [0; 32];
     let l = min(le_bytes.len(), 32);
     bytes32[..l].copy_from_slice(&le_bytes[..l]);
@@ -230,7 +231,7 @@ fn scalar_from_zkif(le_bytes: &[u8]) -> Result<Scalar, Box<Error>> {
 fn convert_zkif_lc(
     id_to_lc: &HashMap<u64, LinearCombination>,
     zkif_terms: &[Term],
-) -> Result<LinearCombination, Box<Error>> {
+) -> Result<LinearCombination> {
     let mut lc = LinearCombination::default();
 
     for term in zkif_terms {
@@ -265,9 +266,9 @@ fn test_zkinterface_backend() {
     // Load test messages common to the prover and verifier: Circuit and Constraints.
     let verifier_messages = {
         let mut buf = Vec::<u8>::new();
-        examples::example_circuit().write(&mut buf).unwrap();
+        examples::example_circuit().write_into(&mut buf).unwrap();
         examples::write_example_constraints(&mut buf).unwrap();
-        let mut msg = Messages::new(1);
+        let mut msg = Messages::new();
         msg.push_message(buf).unwrap();
         msg
     };
