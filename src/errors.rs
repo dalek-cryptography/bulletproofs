@@ -45,6 +45,18 @@ pub enum ProofError {
     /// consider its errors to be internal errors.
     #[cfg_attr(feature = "std", error("Internal error during proof creation: {0}"))]
     ProvingError(MPCError),
+    /// This error results from trying to rewind a proof with the wrong rewind nonce
+    #[cfg_attr(
+    feature = "std",
+    error("Rewinding the proof failed, invalid commitment extracted")
+    )]
+    InvalidCommitmentExtracted,
+    /// This error results from trying to rewind a proof with an invalid rewind key separator
+    #[cfg_attr(
+    feature = "std",
+    error("Trying to rewind a proof with the wrong rewind key separator")
+    )]
+    InvalidRewindKeySeparator,
 }
 
 impl From<MPCError> for ProofError {
