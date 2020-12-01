@@ -104,8 +104,8 @@ The following example shows how to create and verify a 32-bit rangeproof.
 # extern crate merlin;
 # use merlin::Transcript;
 #
-# extern crate bulletproofs;
-# use bulletproofs::{BulletproofGens, PedersenGens, RangeProof};
+# extern crate tari_bulletproofs;
+# use tari_bulletproofs::{BulletproofGens, PedersenGens, RangeProof};
 #
 # fn main() {
 // Generators for Pedersen commitments.  These can be selected

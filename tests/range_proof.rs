@@ -8,7 +8,7 @@ use curve25519_dalek::constants::{RISTRETTO_BASEPOINT_TABLE};
 
 use merlin::Transcript;
 
-use bulletproofs::{
+use tari_bulletproofs::{
     BulletproofGens,
     PedersenGens,
     RangeProof,

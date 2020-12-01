@@ -57,13 +57,13 @@ Connect `x_0` to `y_0` directly. Since there is only one permuatation of a 1-ele
 Code for creating constraints for a proof-of-shuffle constraint system:
 
 ```rust
-extern crate bulletproofs;
+extern crate tari_bulletproofs;
 extern crate curve25519_dalek;
 extern crate merlin;
 extern crate rand;
 
-use bulletproofs::r1cs::*;
-use bulletproofs::{BulletproofGens, PedersenGens};
+use tari_bulletproofs::r1cs::*;
+use tari_bulletproofs::{BulletproofGens, PedersenGens};
 use curve25519_dalek::ristretto::CompressedRistretto;
 use curve25519_dalek::scalar::Scalar;
 use merlin::Transcript;

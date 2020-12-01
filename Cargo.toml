@@ -1,11 +1,11 @@
 [package]
-name = "bulletproofs"
+name = "tari_bulletproofs"
 # Before doing a release:
 # - update version field 
 # - update html_root_url
 # - ensure yoloproofs was disabled in an atomic (revertable) commit
 # - update CHANGELOG
-version = "2.0.0"
+version = "2.1.0"
 authors = ["Cathie Yun <cathieyun@gmail.com>", 
            "Henry de Valence <hdevalence@hdevalence.ca>",
            "Oleg Andreev <oleganza@gmail.com>"]
