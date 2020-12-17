@@ -94,8 +94,8 @@ impl RangeProof {
     /// extern crate merlin;
     /// use merlin::Transcript;
     ///
-    /// extern crate bulletproofs;
-    /// use bulletproofs::{BulletproofGens, PedersenGens, RangeProof};
+    /// extern crate tari_bulletproofs;
+    /// use tari_bulletproofs::{BulletproofGens, PedersenGens, RangeProof};
     ///
     /// # fn main() {
     /// // Generators for Pedersen commitments.  These can be selected
@@ -173,15 +173,15 @@ impl RangeProof {
     /// extern crate merlin;
     /// use merlin::Transcript;
     ///
-    /// extern crate bulletproofs;
-    /// use bulletproofs::{BulletproofGens, PedersenGens, RangeProof};
+    /// extern crate tari_bulletproofs;
+    /// use tari_bulletproofs::{BulletproofGens, PedersenGens, RangeProof};
     ///
     /// # fn main() {
     /// // Generators for Pedersen commitments.  These can be selected
     /// // independently of the Bulletproofs generators.
     /// use curve25519_dalek::ristretto::RistrettoPoint;
     /// use curve25519_dalek::constants::RISTRETTO_BASEPOINT_TABLE;
-    /// use bulletproofs::range_proof::{get_rewind_nonce_from_pub_key, get_secret_nonce_from_pvt_key};
+    /// use tari_bulletproofs::range_proof::{get_rewind_nonce_from_pub_key, get_secret_nonce_from_pvt_key};
     /// let pc_gens = PedersenGens::default();
     ///
     /// // Generators for Bulletproofs, valid for proofs up to bitsize 64
@@ -379,8 +379,8 @@ impl RangeProof {
     /// extern crate merlin;
     /// use merlin::Transcript;
     ///
-    /// extern crate bulletproofs;
-    /// use bulletproofs::{BulletproofGens, PedersenGens, RangeProof};
+    /// extern crate tari_bulletproofs;
+    /// use tari_bulletproofs::{BulletproofGens, PedersenGens, RangeProof};
     ///
     /// # fn main() {
     /// // Generators for Pedersen commitments.  These can be selected

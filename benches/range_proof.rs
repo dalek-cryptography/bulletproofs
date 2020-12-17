@@ -10,8 +10,8 @@ use curve25519_dalek::scalar::Scalar;
 
 use merlin::Transcript;
 
-use bulletproofs::RangeProof;
-use bulletproofs::{BulletproofGens, PedersenGens};
+use tari_bulletproofs::RangeProof;
+use tari_bulletproofs::{BulletproofGens, PedersenGens};
 
 static AGGREGATION_SIZES: [usize; 6] = [1, 2, 4, 8, 16, 32];
 
