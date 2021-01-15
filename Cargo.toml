@@ -3,9 +3,8 @@ name = "bulletproofs"
 # Before doing a release:
 # - update version field 
 # - update html_root_url
-# - ensure yoloproofs was disabled in an atomic (revertable) commit
 # - update CHANGELOG
-version = "2.0.0"
+version = "3.0.0"
 authors = ["Cathie Yun <cathieyun@gmail.com>", 
            "Henry de Valence <hdevalence@hdevalence.ca>",
            "Oleg Andreev <oleganza@gmail.com>"]
@@ -18,8 +17,8 @@ description = "A pure-Rust implementation of Bulletproofs using Ristretto"
 edition = "2018"
 
 [dependencies]
-curve25519-dalek = { version = "3", default-features = false, features = ["u64_backend", "serde"] }
-subtle = { version = "2", default-features = false }
+curve25519-dalek = { package = "curve25519-dalek-ng", version = "3", default-features = false, features = ["u64_backend", "serde"] }
+subtle = { package = "subtle-ng", version = "2", default-features = false }
 sha3 = { version = "0.9.1", default-features = false }
 digest = { version = "0.9.0", default-features = false }
 rand_core = { version = "0.5", default-features = false, features = ["alloc"] }

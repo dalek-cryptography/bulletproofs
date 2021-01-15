@@ -2,6 +2,12 @@
 
 Entries are listed in reverse chronological order.
 
+## 3.0.0
+
+* Add support for stable Rust.
+* Update `curve25519-dalek` and internal dependencies.
+* Tweaks to the (unstable) R1CS API.
+
 ## 2.0.0
 
 * Switch from `failure` to `std`-compatible errors via `thiserror`.
