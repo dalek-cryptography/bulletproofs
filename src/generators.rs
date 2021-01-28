@@ -12,7 +12,7 @@ use curve25519_dalek::constants::RISTRETTO_BASEPOINT_POINT;
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::MultiscalarMul;
-use digest::{ExtendableOutput, Input, XofReader};
+use digest::{ExtendableOutputDirty, Update, XofReader};
 use sha3::{Sha3XofReader, Sha3_512, Shake256};
 
 /// Represents a pair of base points for Pedersen commitments.
@@ -63,11 +63,11 @@ impl GeneratorsChain {
     /// Creates a chain of generators, determined by the hash of `label`.
     fn new(label: &[u8]) -> Self {
         let mut shake = Shake256::default();
-        shake.input(b"GeneratorsChain");
-        shake.input(label);
+        shake.update(b"GeneratorsChain");
+        shake.update(label);
 
         GeneratorsChain {
-            reader: shake.xof_result(),
+            reader: shake.finalize_xof_dirty(),
         }
     }
 

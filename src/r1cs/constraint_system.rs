@@ -66,8 +66,8 @@ pub trait ConstraintSystem {
         input_assignments: Option<(Scalar, Scalar)>,
     ) -> Result<(Variable, Variable, Variable), R1CSError>;
 
-    /// Counts the amount of allocated multipliers.
-    fn multipliers_len(&self) -> usize;
+    /// Counts the amount of constraints in the constraint system.
+    fn metrics(&self) -> crate::r1cs::Metrics;
 
     /// Enforce the explicit constraint that
     /// ```text
@@ -106,7 +106,7 @@ pub trait RandomizableConstraintSystem: ConstraintSystem {
     /// ```
     fn specify_randomized_constraints<F>(&mut self, callback: F) -> Result<(), R1CSError>
     where
-        F: 'static + Fn(&mut Self::RandomizedCS) -> Result<(), R1CSError>;
+        F: 'static + FnOnce(&mut Self::RandomizedCS) -> Result<(), R1CSError>;
 }
 
 /// Represents a constraint system in the second phase:

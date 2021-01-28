@@ -3,9 +3,8 @@ name = "bulletproofs"
 # Before doing a release:
 # - update version field 
 # - update html_root_url
-# - ensure yoloproofs was disabled in an atomic (revertable) commit
 # - update CHANGELOG
-version = "2.0.0"
+version = "3.0.0"
 authors = ["Cathie Yun <cathieyun@gmail.com>", 
            "Henry de Valence <hdevalence@hdevalence.ca>",
            "Oleg Andreev <oleganza@gmail.com>"]
@@ -18,10 +17,10 @@ description = "A pure-Rust implementation of Bulletproofs using Ristretto"
 edition = "2018"
 
 [dependencies]
-curve25519-dalek = { version = "2", default-features = false, features = ["u64_backend", "nightly", "serde", "alloc"] }
-subtle = { version = "2", default-features = false }
-sha3 = { version = "0.8", default-features = false }
-digest = { version = "0.8", default-features = false }
+curve25519-dalek = { package = "curve25519-dalek-ng", version = "3", default-features = false, features = ["u64_backend", "serde"] }
+subtle = { package = "subtle-ng", version = "2", default-features = false }
+sha3 = { version = "0.9.1", default-features = false }
+digest = { version = "0.9.0", default-features = false }
 rand_core = { version = "0.5", default-features = false, features = ["alloc"] }
 rand = { version = "0.7", default-features = false, optional = true }
 byteorder = { version = "1", default-features = false }
@@ -29,7 +28,7 @@ serde = { version = "1", default-features = false, features = ["alloc"] }
 serde_derive = { version = "1", default-features = false }
 thiserror = { version = "1", optional = true }
 merlin = { version = "2", default-features = false }
-clear_on_drop = { version = "0.2", default-features = false, features = ["nightly"] }
+clear_on_drop = { version = "0.2", default-features = false }
 
 [dev-dependencies]
 hex = "0.3"
@@ -38,10 +37,13 @@ bincode = "1"
 rand_chacha = "0.2"
 
 [features]
-default = ["std", "avx2_backend"]
+default = ["std"]
 avx2_backend = ["curve25519-dalek/avx2_backend"]
-# yoloproofs = []
-std = ["rand", "rand/std", "thiserror"]
+yoloproofs = []
+std = ["rand", "rand/std", "thiserror", "curve25519-dalek/std"]
+nightly = ["curve25519-dalek/nightly", "curve25519-dalek/alloc", "subtle/nightly", "clear_on_drop/nightly"]
+docs = ["nightly"]
+
 
 [[test]]
 name = "range_proof"
@@ -53,6 +55,7 @@ required-features = ["yoloproofs"]
 [[bench]]
 name = "range_proof"
 harness = false
+required-features = ["avx2_backend"]
 
 [[bench]]
 name = "generators"
@@ -61,4 +64,4 @@ harness = false
 [[bench]]
 name = "r1cs"
 harness = false
-required-features = ["yoloproofs"]
+required-features = ["yoloproofs", "avx2_backend"]

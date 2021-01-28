@@ -1,5 +1,6 @@
 #![allow(non_snake_case)]
 
+use core::borrow::BorrowMut;
 use core::mem;
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
@@ -13,6 +14,7 @@ use super::{
 
 use crate::errors::R1CSError;
 use crate::generators::{BulletproofGens, PedersenGens};
+use crate::r1cs::Metrics;
 use crate::transcript::TranscriptProtocol;
 
 /// A [`ConstraintSystem`] implementation for use by the verifier.
@@ -24,8 +26,8 @@ use crate::transcript::TranscriptProtocol;
 /// When all constraints are added, the verifying code calls `verify`
 /// which consumes the `Verifier` instance, samples random challenges
 /// that instantiate the randomized constraints, and verifies the proof.
-pub struct Verifier<'t> {
-    transcript: &'t mut Transcript,
+pub struct Verifier<T: BorrowMut<Transcript>> {
+    transcript: T,
     constraints: Vec<LinearCombination>,
 
     /// Records the number of low-level variables allocated in the
@@ -42,7 +44,8 @@ pub struct Verifier<'t> {
     /// when non-randomized variables are committed.
     /// After that, the option will flip to None and additional calls to `randomize_constraints`
     /// will invoke closures immediately.
-    deferred_constraints: Vec<Box<dyn Fn(&mut RandomizingVerifier<'t>) -> Result<(), R1CSError>>>,
+    deferred_constraints:
+        Vec<Box<dyn FnOnce(&mut RandomizingVerifier<T>) -> Result<(), R1CSError>>>,
 
     /// Index of a pending multiplier that's not fully assigned yet.
     pending_multiplier: Option<usize>,
@@ -55,13 +58,13 @@ pub struct Verifier<'t> {
 /// monomorphize the closures for the proving and verifying code.
 /// However, this type cannot be instantiated by the user and therefore can only be used within
 /// the callback provided to `specify_randomized_constraints`.
-pub struct RandomizingVerifier<'t> {
-    verifier: Verifier<'t>,
+pub struct RandomizingVerifier<T: BorrowMut<Transcript>> {
+    verifier: Verifier<T>,
 }
 
-impl<'t> ConstraintSystem for Verifier<'t> {
+impl<T: BorrowMut<Transcript>> ConstraintSystem for Verifier<T> {
     fn transcript(&mut self) -> &mut Transcript {
-        self.transcript
+        self.transcript.borrow_mut()
     }
 
     fn multiply(
@@ -116,8 +119,13 @@ impl<'t> ConstraintSystem for Verifier<'t> {
         Ok((l_var, r_var, o_var))
     }
 
-    fn multipliers_len(&self) -> usize {
-        self.num_vars
+    fn metrics(&self) -> Metrics {
+        Metrics {
+            multipliers: self.num_vars,
+            constraints: self.constraints.len() + self.deferred_constraints.len(),
+            phase_one_constraints: self.constraints.len(),
+            phase_two_constraints: self.deferred_constraints.len(),
+        }
     }
 
     fn constrain(&mut self, lc: LinearCombination) {
@@ -128,21 +136,21 @@ impl<'t> ConstraintSystem for Verifier<'t> {
     }
 }
 
-impl<'t> RandomizableConstraintSystem for Verifier<'t> {
-    type RandomizedCS = RandomizingVerifier<'t>;
+impl<T: BorrowMut<Transcript>> RandomizableConstraintSystem for Verifier<T> {
+    type RandomizedCS = RandomizingVerifier<T>;
 
     fn specify_randomized_constraints<F>(&mut self, callback: F) -> Result<(), R1CSError>
     where
-        F: 'static + Fn(&mut Self::RandomizedCS) -> Result<(), R1CSError>,
+        F: 'static + FnOnce(&mut Self::RandomizedCS) -> Result<(), R1CSError>,
     {
         self.deferred_constraints.push(Box::new(callback));
         Ok(())
     }
 }
 
-impl<'t> ConstraintSystem for RandomizingVerifier<'t> {
+impl<T: BorrowMut<Transcript>> ConstraintSystem for RandomizingVerifier<T> {
     fn transcript(&mut self) -> &mut Transcript {
-        self.verifier.transcript
+        self.verifier.transcript.borrow_mut()
     }
 
     fn multiply(
@@ -164,8 +172,8 @@ impl<'t> ConstraintSystem for RandomizingVerifier<'t> {
         self.verifier.allocate_multiplier(input_assignments)
     }
 
-    fn multipliers_len(&self) -> usize {
-        self.verifier.multipliers_len()
+    fn metrics(&self) -> Metrics {
+        self.verifier.metrics()
     }
 
     fn constrain(&mut self, lc: LinearCombination) {
@@ -173,13 +181,16 @@ impl<'t> ConstraintSystem for RandomizingVerifier<'t> {
     }
 }
 
-impl<'t> RandomizedConstraintSystem for RandomizingVerifier<'t> {
+impl<T: BorrowMut<Transcript>> RandomizedConstraintSystem for RandomizingVerifier<T> {
     fn challenge_scalar(&mut self, label: &'static [u8]) -> Scalar {
-        self.verifier.transcript.challenge_scalar(label)
+        self.verifier
+            .transcript
+            .borrow_mut()
+            .challenge_scalar(label)
     }
 }
 
-impl<'t> Verifier<'t> {
+impl<T: BorrowMut<Transcript>> Verifier<T> {
     /// Construct an empty constraint system with specified external
     /// input variables.
     ///
@@ -205,8 +216,8 @@ impl<'t> Verifier<'t> {
     ///
     /// The second element is a list of [`Variable`]s corresponding to
     /// the external inputs, which can be used to form constraints.
-    pub fn new(transcript: &'t mut Transcript) -> Self {
-        transcript.r1cs_domain_sep();
+    pub fn new(mut transcript: T) -> Self {
+        transcript.borrow_mut().r1cs_domain_sep();
 
         Verifier {
             transcript,
@@ -237,7 +248,7 @@ impl<'t> Verifier<'t> {
         self.V.push(commitment);
 
         // Add the commitment to the transcript.
-        self.transcript.append_point(b"V", &commitment);
+        self.transcript.borrow_mut().append_point(b"V", &commitment);
 
         Variable::Committed(i)
     }
@@ -304,10 +315,10 @@ impl<'t> Verifier<'t> {
         self.pending_multiplier = None;
 
         if self.deferred_constraints.len() == 0 {
-            self.transcript.r1cs_1phase_domain_sep();
+            self.transcript.borrow_mut().r1cs_1phase_domain_sep();
             Ok(self)
         } else {
-            self.transcript.r1cs_2phase_domain_sep();
+            self.transcript.borrow_mut().r1cs_2phase_domain_sep();
             // Note: the wrapper could've used &mut instead of ownership,
             // but specifying lifetimes for boxed closures is not going to be nice,
             // so we move the self into wrapper and then move it back out afterwards.
@@ -327,27 +338,37 @@ impl<'t> Verifier<'t> {
     /// the number of multiplication constraints that will eventually
     /// be added into the constraint system.
     pub fn verify(
-        mut self,
+        self,
         proof: &R1CSProof,
         pc_gens: &PedersenGens,
         bp_gens: &BulletproofGens,
     ) -> Result<(), R1CSError> {
+        self.verify_and_return_transcript(proof, pc_gens, bp_gens)
+            .map(|_| ())
+    }
+    /// Same as `verify`, but also returns the transcript back to the user.
+    pub fn verify_and_return_transcript(
+        mut self,
+        proof: &R1CSProof,
+        pc_gens: &PedersenGens,
+        bp_gens: &BulletproofGens,
+    ) -> Result<T, R1CSError> {
         // Commit a length _suffix_ for the number of high-level variables.
         // We cannot do this in advance because user can commit variables one-by-one,
         // but this suffix provides safe disambiguation because each variable
         // is prefixed with a separate label.
-        self.transcript.append_u64(b"m", self.V.len() as u64);
+        let transcript = self.transcript.borrow_mut();
+        transcript.append_u64(b"m", self.V.len() as u64);
 
         let n1 = self.num_vars;
-        self.transcript
-            .validate_and_append_point(b"A_I1", &proof.A_I1)?;
-        self.transcript
-            .validate_and_append_point(b"A_O1", &proof.A_O1)?;
-        self.transcript
-            .validate_and_append_point(b"S1", &proof.S1)?;
+        transcript.validate_and_append_point(b"A_I1", &proof.A_I1)?;
+        transcript.validate_and_append_point(b"A_O1", &proof.A_O1)?;
+        transcript.validate_and_append_point(b"S1", &proof.S1)?;
 
         // Process the remaining constraints.
         self = self.create_randomized_constraints()?;
+
+        let transcript = self.transcript.borrow_mut();
 
         // If the number of multiplications is not 0 or a power of 2, then pad the circuit.
         let n = self.num_vars;
@@ -366,41 +387,34 @@ impl<'t> Verifier<'t> {
         let gens = bp_gens.share(0);
 
         // These points are the identity in the 1-phase unrandomized case.
-        self.transcript.append_point(b"A_I2", &proof.A_I2);
-        self.transcript.append_point(b"A_O2", &proof.A_O2);
-        self.transcript.append_point(b"S2", &proof.S2);
+        transcript.append_point(b"A_I2", &proof.A_I2);
+        transcript.append_point(b"A_O2", &proof.A_O2);
+        transcript.append_point(b"S2", &proof.S2);
 
-        let y = self.transcript.challenge_scalar(b"y");
-        let z = self.transcript.challenge_scalar(b"z");
+        let y = transcript.challenge_scalar(b"y");
+        let z = transcript.challenge_scalar(b"z");
 
-        self.transcript
-            .validate_and_append_point(b"T_1", &proof.T_1)?;
-        self.transcript
-            .validate_and_append_point(b"T_3", &proof.T_3)?;
-        self.transcript
-            .validate_and_append_point(b"T_4", &proof.T_4)?;
-        self.transcript
-            .validate_and_append_point(b"T_5", &proof.T_5)?;
-        self.transcript
-            .validate_and_append_point(b"T_6", &proof.T_6)?;
+        transcript.validate_and_append_point(b"T_1", &proof.T_1)?;
+        transcript.validate_and_append_point(b"T_3", &proof.T_3)?;
+        transcript.validate_and_append_point(b"T_4", &proof.T_4)?;
+        transcript.validate_and_append_point(b"T_5", &proof.T_5)?;
+        transcript.validate_and_append_point(b"T_6", &proof.T_6)?;
 
-        let u = self.transcript.challenge_scalar(b"u");
-        let x = self.transcript.challenge_scalar(b"x");
+        let u = transcript.challenge_scalar(b"u");
+        let x = transcript.challenge_scalar(b"x");
 
-        self.transcript.append_scalar(b"t_x", &proof.t_x);
-        self.transcript
-            .append_scalar(b"t_x_blinding", &proof.t_x_blinding);
-        self.transcript
-            .append_scalar(b"e_blinding", &proof.e_blinding);
+        transcript.append_scalar(b"t_x", &proof.t_x);
+        transcript.append_scalar(b"t_x_blinding", &proof.t_x_blinding);
+        transcript.append_scalar(b"e_blinding", &proof.e_blinding);
 
-        let w = self.transcript.challenge_scalar(b"w");
+        let w = transcript.challenge_scalar(b"w");
 
         let (wL, wR, wO, wV, wc) = self.flattened_constraints(&z);
 
         // Get IPP variables
         let (u_sq, u_inv_sq, s) = proof
             .ipp_proof
-            .verification_scalars(padded_n, self.transcript)
+            .verification_scalars(padded_n, self.transcript.borrow_mut())
             .map_err(|_| R1CSError::VerificationError)?;
 
         let a = proof.ipp_proof.a;
@@ -445,7 +459,11 @@ impl<'t> Verifier<'t> {
         // has no witness data to commit, so this just mixes external
         // randomness into the existing transcript.
         use rand::thread_rng;
-        let mut rng = self.transcript.build_rng().finalize(&mut thread_rng());
+        let mut rng = self
+            .transcript
+            .borrow_mut()
+            .build_rng()
+            .finalize(&mut thread_rng());
         let r = Scalar::random(&mut rng);
 
         let xx = x * x;
@@ -496,6 +514,6 @@ impl<'t> Verifier<'t> {
             return Err(R1CSError::VerificationError);
         }
 
-        Ok(())
+        Ok(self.transcript)
     }
 }
