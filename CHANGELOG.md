@@ -2,6 +2,11 @@
 
 Entries are listed in reverse chronological order.
 
+## 4.0.0
+
+* Update to `rand_core` `0.6`.  This requires a major version bump but the API
+  is otherwise unchanged from the `3.x` series.
+
 ## 3.0.1
 
 * Update repository URL.

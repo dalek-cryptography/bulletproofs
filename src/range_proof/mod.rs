@@ -650,7 +650,7 @@ mod tests {
 
             // 0. Create witness data
             let (min, max) = (0u64, ((1u128 << n) - 1) as u64);
-            let values: Vec<u64> = (0..m).map(|_| rng.gen_range(min, max)).collect();
+            let values: Vec<u64> = (0..m).map(|_| rng.gen_range(min..max)).collect();
             let blindings: Vec<Scalar> = (0..m).map(|_| Scalar::random(&mut rng)).collect();
 
             // 1. Create the proof
