@@ -4,7 +4,7 @@ name = "bulletproofs"
 # - update version field 
 # - update html_root_url
 # - update CHANGELOG
-version = "3.0.0"
+version = "3.0.1"
 authors = ["Cathie Yun <cathieyun@gmail.com>", 
            "Henry de Valence <hdevalence@hdevalence.ca>",
            "Oleg Andreev <oleganza@gmail.com>"]

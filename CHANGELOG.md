@@ -2,6 +2,10 @@
 
 Entries are listed in reverse chronological order.
 
+## 3.0.1
+
+* Update repository URL.
+
 ## 3.0.0
 
 * Add support for stable Rust.

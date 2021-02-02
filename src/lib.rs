@@ -4,7 +4,7 @@
 #![cfg_attr(feature = "docs", doc(include = "../README.md"))]
 #![cfg_attr(
     feature = "docs",
-    doc(html_root_url = "https://docs.rs/bulletproofs/3.0.0")
+    doc(html_root_url = "https://docs.rs/bulletproofs/3.0.1")
 )]
 
 extern crate alloc;
