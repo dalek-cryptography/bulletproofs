@@ -10,7 +10,7 @@ authors = ["Cathie Yun <cathieyun@gmail.com>",
            "Oleg Andreev <oleganza@gmail.com>"]
 readme = "README.md"
 license = "MIT"
-repository = "https://github.com/dalek-cryptography/bulletproofs"
+repository = "https://github.com/zkcrypto/bulletproofs"
 categories = ["cryptography"]
 keywords = ["cryptography", "crypto", "ristretto", "zero-knowledge", "bulletproofs"]
 description = "A pure-Rust implementation of Bulletproofs using Ristretto"
