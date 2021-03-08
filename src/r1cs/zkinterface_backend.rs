@@ -6,8 +6,7 @@ extern crate rand;
 extern crate zkinterface;
 
 use self::zkinterface::{
-    Result,
-    reading::{Messages, Term},
+    Result, Reader, consumers::reader::Term,
 };
 use curve25519_dalek::scalar::Scalar;
 use errors::R1CSError;
@@ -28,7 +27,7 @@ use PedersenGens;
 /// - `Circuit` contains the public inputs.
 /// - `R1CSConstraints` contains an R1CS which we convert to an arithmetic circuit on the fly.
 /// - `Witness` contains the values to assign to all variables.
-pub fn prove(messages: &Messages) -> Result<R1CSProof> {
+pub fn prove(messages: &Reader) -> Result<R1CSProof> {
     // Common
     let pc_gens = PedersenGens::default();
     let bp_gens = BulletproofGens::new(128, 1);
@@ -54,7 +53,7 @@ pub fn prove(messages: &Messages) -> Result<R1CSProof> {
 /// Verify a proof using zkInterface messages:
 /// - `Circuit` contains the public inputs.
 /// - `R1CSConstraints` contains an R1CS which we convert to an arithmetic circuit on the fly.
-pub fn verify(messages: &Messages, proof: &R1CSProof) -> Result<()> {
+pub fn verify(messages: &Reader, proof: &R1CSProof) -> Result<()> {
     // Common
     let pc_gens = PedersenGens::default();
     let bp_gens = BulletproofGens::new(128, 1);
@@ -79,11 +78,11 @@ pub fn verify(messages: &Messages, proof: &R1CSProof) -> Result<()> {
 /// A gadget using a circuit in zkInterface messages.
 pub fn gadget_from_messages<CS: ConstraintSystem>(
     cs: &mut CS,
-    messages: &Messages,
+    messages: &Reader,
     prover: bool,
 ) -> Result<()> {
     let public_vars = messages
-        .connection_variables()
+        .instance_variables()
         .ok_or("Missing Circuit.connections")?;
 
     let private_vars = messages
@@ -257,14 +256,14 @@ fn eval_zkif_lc(id_to_value: &HashMap<u64, Scalar>, terms: &[Term]) -> Scalar {
 
 #[test]
 fn test_zkinterface_backend() {
-    use self::zkinterface::examples;
+    use self::zkinterface::producers::examples;
 
     // Load test messages common to the prover and verifier: Circuit and Constraints.
     let verifier_messages = {
         let mut buf = Vec::<u8>::new();
-        examples::example_circuit().write_into(&mut buf).unwrap();
-        examples::write_example_constraints(&mut buf).unwrap();
-        let mut msg = Messages::new();
+        examples::example_circuit_header().write_into(&mut buf).unwrap();
+        examples::example_constraints().write_into(&mut buf).unwrap();
+        let mut msg = Reader::new();
         msg.push_message(buf).unwrap();
         msg
     };
@@ -273,7 +272,7 @@ fn test_zkinterface_backend() {
     let prover_messages = {
         let mut msg = verifier_messages.clone();
         let mut buf = Vec::<u8>::new();
-        examples::write_example_witness(&mut buf).unwrap();
+        examples::example_witness().write_into(&mut buf).unwrap();
         msg.push_message(buf).unwrap();
         msg
     };

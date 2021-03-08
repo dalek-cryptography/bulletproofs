@@ -1,6 +1,6 @@
-#![doc(include = "../docs/r1cs-docs-example.md")]
+#![doc(include = "../../docs/r1cs-docs-example.md")]
 
-#[doc(include = "../docs/cs-proof.md")]
+#[doc(include = "../../docs/cs-proof.md")]
 mod notes {}
 
 mod constraint_system;

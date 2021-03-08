@@ -6,7 +6,7 @@ use std::env;
 use std::io::{stdin, Read, Write};
 use std::fs::{File, create_dir_all};
 use std::path::Path;
-use zkinterface::{Result, reading::Messages};
+use self::zkinterface::{Result, Reader};
 use bulletproofs::r1cs::{zkinterface_backend, R1CSProof};
 
 const USAGE: &str = "Bulletproofs proving system.
@@ -34,8 +34,8 @@ pub fn main() -> Result<()> {
         create_dir_all(parent)?;
     }
 
-    let read = || -> Result<Messages> {
-        let mut messages = Messages::new();
+    let read = || -> Result<Reader> {
+        let mut messages = Reader::new();
         messages.read_from(&mut stdin())?;
         Ok(messages)
     };
@@ -50,7 +50,7 @@ pub fn main() -> Result<()> {
     }
 }
 
-fn main_prove(messages: Messages, proof_path: &Path) -> Result<()> {
+fn main_prove(messages: Reader, proof_path: &Path) -> Result<()> {
     let proof = zkinterface_backend::prove(&messages)?;
 
     // Save to file.
@@ -61,7 +61,7 @@ fn main_prove(messages: Messages, proof_path: &Path) -> Result<()> {
     Ok(())
 }
 
-fn main_verify(messages: Messages, proof_path: &Path) -> Result<()> {
+fn main_verify(messages: Reader, proof_path: &Path) -> Result<()> {
     eprintln!("Verifying proof in {}", proof_path.display());
 
     // Load from file.
