@@ -1,9 +1,9 @@
 #![cfg_attr(not(feature = "std"), no_std)]
-#![feature(nll)]
-#![feature(external_doc)]
-#![feature(try_trait)]
+// #![feature(nll)]
+#![cfg_attr(feature = "nightly", feature(external_doc))]
+#![cfg_attr(feature = "nightly", feature(try_trait))]
 #![deny(missing_docs)]
-#![doc(include = "../README.md")]
+#![cfg_attr(feature = "nightly", doc(include = "../README.md"))]
 #![doc(html_logo_url = "https://doc.dalek.rs/assets/dalek-logo-clear.png")]
 #![doc(html_root_url = "https://docs.rs/bulletproofs/2.0.0")]
 
@@ -14,13 +14,13 @@ extern crate serde_derive;
 
 mod util;
 
-#[doc(include = "../docs/notes-intro.md")]
+#[cfg_attr(feature = "nightly", doc(include = "../docs/notes-intro.md"))]
 mod notes {
-    #[doc(include = "../docs/notes-ipp.md")]
+    #[cfg_attr(feature = "nightly", doc(include = "../docs/notes-ipp.md"))]
     mod inner_product_proof {}
-    #[doc(include = "../docs/notes-rp.md")]
+    #[cfg_attr(feature = "nightly", doc(include = "../docs/notes-rp.md"))]
     mod range_proof {}
-    #[doc(include = "../docs/notes-r1cs.md")]
+    #[cfg_attr(feature = "nightly", doc(include = "../docs/notes-r1cs.md"))]
     mod r1cs_proof {}
 }
 
@@ -35,7 +35,7 @@ pub use crate::errors::ProofError;
 pub use crate::generators::{BulletproofGens, BulletproofGensShare, PedersenGens};
 pub use crate::range_proof::RangeProof;
 
-#[doc(include = "../docs/aggregation-api.md")]
+#[cfg_attr(feature = "nightly", doc(include = "../docs/aggregation-api.md"))]
 pub mod range_proof_mpc {
     pub use crate::errors::MPCError;
     pub use crate::range_proof::dealer;
