@@ -2,6 +2,21 @@
 
 Entries are listed in reverse chronological order.
 
+## 4.0.0
+
+* Update to `rand_core` `0.6`.  This requires a major version bump but the API
+  is otherwise unchanged from the `3.x` series.
+
+## 3.0.1
+
+* Update repository URL.
+
+## 3.0.0
+
+* Add support for stable Rust.
+* Update `curve25519-dalek` and internal dependencies.
+* Tweaks to the (unstable) R1CS API.
+
 ## 2.0.0
 
 * Switch from `failure` to `std`-compatible errors via `thiserror`.

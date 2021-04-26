@@ -547,10 +547,7 @@ let (proof, in_commitments, out_commitments) = {
 };
 
 let mut verifier_transcript = Transcript::new(b"ShuffleProofTest");
-assert!(
-    proof
-        .verify(&pc_gens, &bp_gens, &mut verifier_transcript, &in_commitments, &out_commitments)
-        .is_ok()
-);
+let verification_result = proof.verify(&pc_gens, &bp_gens, &mut verifier_transcript, &in_commitments, &out_commitments);
+assert!(verification_result.is_ok(), "{:?}", verification_result);
 # }
 ```

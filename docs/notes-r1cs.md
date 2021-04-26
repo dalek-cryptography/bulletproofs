@@ -67,7 +67,7 @@ Then, the prover performs a combination of the following operations to generate 
 
 Gadgets are buildings blocks of a constraint system that map to some functions in a higher-level protocol.
 Gadgets receive some [variables](#variables) as inputs, may [allocate more variables](#building-constraints) for internal use,
-and produce constrains involving all these variables.
+and produce constraints involving all these variables.
 
 Examples:
 * a **shuffle gadget** creates constraints that prove that two sets of variables are equal up to a permutation;
