@@ -47,14 +47,14 @@ pub enum ProofError {
     ProvingError(MPCError),
     /// This error results from trying to rewind a proof with the wrong rewind nonce
     #[cfg_attr(
-    feature = "std",
-    error("Rewinding the proof failed, invalid commitment extracted")
+        feature = "std",
+        error("Rewinding the proof failed, invalid commitment extracted")
     )]
     InvalidCommitmentExtracted,
     /// This error results from trying to rewind a proof with an invalid rewind key separator
     #[cfg_attr(
-    feature = "std",
-    error("Trying to rewind a proof with the wrong rewind key separator")
+        feature = "std",
+        error("Trying to rewind a proof with the wrong rewind key separator")
     )]
     InvalidRewindKeySeparator,
 }

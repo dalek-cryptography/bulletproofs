@@ -29,7 +29,7 @@ use rand::thread_rng;
 
 use super::messages::*;
 use crate::range_proof::{get_rewind_nonce_from_pvt_key, get_secret_nonce_from_pvt_key};
-use crate::util::{xor_32_bytes, add_bytes_to_word};
+use crate::util::{add_bytes_to_word, xor_32_bytes};
 
 /// Used to construct a party for the aggregated rangeproof MPC protocol.
 pub struct Party {}
@@ -54,21 +54,22 @@ impl Party {
         }
 
         let V = pc_gens.commit(v.into(), v_blinding).compress();
-        let (rewind_nonce_1, rewind_nonce_2, blinding_nonce_1, blinding_nonce_2) = if pvt_rewind_key == Scalar::default() {
-            (
-                Scalar::default(),
-                Scalar::default(),
-                Scalar::default(),
-                Scalar::default()
-            )
-        } else {
-            (
-                get_rewind_nonce_from_pvt_key(&pvt_rewind_key, &V),
-                get_rewind_nonce_from_pvt_key(&pvt_blinding_key, &V),
-                get_secret_nonce_from_pvt_key(&pvt_rewind_key, &V),
-                get_secret_nonce_from_pvt_key(&pvt_blinding_key, &V)
-            )
-        };
+        let (rewind_nonce_1, rewind_nonce_2, blinding_nonce_1, blinding_nonce_2) =
+            if pvt_rewind_key == Scalar::default() {
+                (
+                    Scalar::default(),
+                    Scalar::default(),
+                    Scalar::default(),
+                    Scalar::default(),
+                )
+            } else {
+                (
+                    get_rewind_nonce_from_pvt_key(&pvt_rewind_key, &V),
+                    get_rewind_nonce_from_pvt_key(&pvt_blinding_key, &V),
+                    get_secret_nonce_from_pvt_key(&pvt_rewind_key, &V),
+                    get_secret_nonce_from_pvt_key(&pvt_blinding_key, &V),
+                )
+            };
 
         Ok(PartyAwaitingPosition {
             bp_gens,
@@ -148,10 +149,11 @@ impl<'a> PartyAwaitingPosition<'a> {
         let s_blinding = if self.rewind_nonce_2 == Scalar::default() {
             Scalar::random(rng)
         } else {
-            let value_and_extra_data = add_bytes_to_word(*self.proof_message.as_bytes(), &self.v.to_le_bytes(), 0);
+            let value_and_extra_data =
+                add_bytes_to_word(*self.proof_message.as_bytes(), &self.v.to_le_bytes(), 0);
             let xor = xor_32_bytes(
                 &Scalar::from_bits(value_and_extra_data).as_bytes(),
-                &self.rewind_nonce_2.as_bytes()
+                &self.rewind_nonce_2.as_bytes(),
             );
             Scalar::from_bits(xor)
         };

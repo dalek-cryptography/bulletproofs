@@ -1,12 +1,12 @@
 #![allow(non_snake_case)]
 
-use tari_bulletproofs::r1cs::*;
-use tari_bulletproofs::{BulletproofGens, PedersenGens};
 use curve25519_dalek::ristretto::CompressedRistretto;
 use curve25519_dalek::scalar::Scalar;
 use merlin::Transcript;
 use rand::seq::SliceRandom;
 use rand::thread_rng;
+use tari_bulletproofs::r1cs::*;
+use tari_bulletproofs::{BulletproofGens, PedersenGens};
 
 // Shuffle gadget (documented in markdown file)
 

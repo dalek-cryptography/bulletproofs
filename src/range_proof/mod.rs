@@ -23,11 +23,11 @@ use crate::transcript::TranscriptProtocol;
 use crate::util;
 use sha3::Sha3_512;
 
+use crate::util::{add_bytes_to_word, bytes_to_usize, xor_32_bytes};
+use curve25519_dalek::constants::{RISTRETTO_BASEPOINT_COMPRESSED, RISTRETTO_BASEPOINT_TABLE};
 use rand_core::{CryptoRng, RngCore};
 use serde::de::Visitor;
 use serde::{self, Deserialize, Deserializer, Serialize, Serializer};
-use curve25519_dalek::constants::{RISTRETTO_BASEPOINT_TABLE, RISTRETTO_BASEPOINT_COMPRESSED};
-use crate::util::{xor_32_bytes, bytes_to_usize, add_bytes_to_word};
 
 // Modules for MPC protocol
 
@@ -291,11 +291,15 @@ impl RangeProof {
         let blindings = &[*v_blinding];
         // Temporarily borrow the blindings array to pass the additional parameters
         // into the next function
-        let mut blindings= blindings.to_vec();
+        let mut blindings = blindings.to_vec();
         blindings.push(RangeProof::get_rewind_key_separator());
         blindings.push(*pvt_rewind_key);
         blindings.push(*pvt_blinding_key);
-        blindings.push(Scalar::from_bits(add_bytes_to_word([0u8; 32], proof_message, 8)));
+        blindings.push(Scalar::from_bits(add_bytes_to_word(
+            [0u8; 32],
+            proof_message,
+            8,
+        )));
 
         let (p, Vs) = RangeProof::prove_multiple_with_rng(
             bp_gens,
@@ -433,17 +437,28 @@ impl RangeProof {
         use self::party::*;
 
         //Extract the rewind key and extra bytes from the blindings vector where it was temporarily assigned
-        let (pvt_rewind_key, pvt_blinding_key, proof_message, blindings) = if values.len() + 4 == blindings.len() {
-            if blindings[blindings.len() - 4] != RangeProof::get_rewind_key_separator() {
-                return Err(ProofError::InvalidRewindKeySeparator);
-            }
-            let rewind_key = blindings[blindings.len() - 3].to_owned();
-            let blinding_key = blindings[blindings.len() - 2].to_owned();
-            let data = blindings[blindings.len() - 1].to_owned();
-            (rewind_key, blinding_key, data, &blindings[0..blindings.len() - 4])
-        } else {
-            (Scalar::default().to_owned(), Scalar::default().to_owned(), Scalar::default().to_owned(), &blindings[0..blindings.len()])
-        };
+        let (pvt_rewind_key, pvt_blinding_key, proof_message, blindings) =
+            if values.len() + 4 == blindings.len() {
+                if blindings[blindings.len() - 4] != RangeProof::get_rewind_key_separator() {
+                    return Err(ProofError::InvalidRewindKeySeparator);
+                }
+                let rewind_key = blindings[blindings.len() - 3].to_owned();
+                let blinding_key = blindings[blindings.len() - 2].to_owned();
+                let data = blindings[blindings.len() - 1].to_owned();
+                (
+                    rewind_key,
+                    blinding_key,
+                    data,
+                    &blindings[0..blindings.len() - 4],
+                )
+            } else {
+                (
+                    Scalar::default().to_owned(),
+                    Scalar::default().to_owned(),
+                    Scalar::default().to_owned(),
+                    &blindings[0..blindings.len()],
+                )
+            };
 
         if values.len() != blindings.len() {
             return Err(ProofError::WrongNumBlindingFactors);
@@ -454,7 +469,18 @@ impl RangeProof {
         let parties: Vec<_> = values
             .iter()
             .zip(blindings.iter())
-            .map(|(&v, &v_blinding)| Party::new(bp_gens, pc_gens, v, v_blinding, n, pvt_rewind_key, pvt_blinding_key, proof_message))
+            .map(|(&v, &v_blinding)| {
+                Party::new(
+                    bp_gens,
+                    pc_gens,
+                    v,
+                    v_blinding,
+                    n,
+                    pvt_rewind_key,
+                    pvt_blinding_key,
+                    proof_message,
+                )
+            })
             // Collect the iterator of Results into a Result<Vec>, then unwrap it
             .collect::<Result<Vec<_>, _>>()?;
 
@@ -759,7 +785,6 @@ impl RangeProof {
         blinding_nonce_1: &Scalar,
         blinding_nonce_2: &Scalar,
     ) -> Result<(u64, Scalar, [u8; 23]), ProofError> {
-
         let result = self.rewind_single_get_commitment_value(
             bp_gens,
             transcript,
@@ -768,8 +793,8 @@ impl RangeProof {
             &rewind_nonce_1,
             &rewind_nonce_2,
         )?;
-        let value= result.0;
-        let proof_message= result.1;
+        let value = result.0;
+        let proof_message = result.1;
         let x = result.2;
         let z = result.3;
 
@@ -778,8 +803,9 @@ impl RangeProof {
         //   v_blinding = (1 / z^2) * (t_x_blinding - x * t_1_blinding - x^2 * t_2_blinding)
         //   t_1_blinding: replaced by blinding_nonce_1
         //   t_2_blinding: replaced by blinding_nonce_2
-        let v_blinding = z.invert() * z.invert() *
-            (self.t_x_blinding - x * blinding_nonce_1 - x * x * blinding_nonce_2);
+        let v_blinding = z.invert()
+            * z.invert()
+            * (self.t_x_blinding - x * blinding_nonce_1 - x * x * blinding_nonce_2);
 
         //Verify if the correct value and blinding factor was extracted
         let value_commitment_calculated = pc_gens.commit(value.into(), v_blinding).compress();
@@ -811,7 +837,8 @@ impl RangeProof {
             &rewind_nonce_1,
             &rewind_nonce_2,
         );
-        let result: Result<(u64, [u8; 23]), ProofError> = Ok((result.clone().unwrap().0, result.clone().unwrap().1,));
+        let result: Result<(u64, [u8; 23]), ProofError> =
+            Ok((result.clone().unwrap().0, result.clone().unwrap().1));
         result
     }
 
@@ -827,7 +854,6 @@ impl RangeProof {
         rewind_nonce_1: &Scalar,
         rewind_nonce_2: &Scalar,
     ) -> Result<(u64, [u8; 23], Scalar, Scalar), ProofError> {
-
         // First, replay the "interactive" protocol using the proof
         // data to recompute all challenges.
         if !(n == 8 || n == 16 || n == 32 || n == 64) {
@@ -858,7 +884,7 @@ impl RangeProof {
         // Extract the value and extra data
         let xor_s_blinding = xor_32_bytes(&rewind_nonce_2.as_bytes(), &s_blinding.as_bytes());
         let value = bytes_to_usize(&xor_s_blinding, 1, 8) as u64;
-        let mut proof_message= [0u8; 23];
+        let mut proof_message = [0u8; 23];
         for (place, element) in proof_message.iter_mut().zip(xor_s_blinding.iter().skip(8)) {
             *place = *element;
         }
@@ -922,10 +948,7 @@ fn delta(n: usize, m: usize, y: &Scalar, z: &Scalar) -> Scalar {
 }
 
 /// Calculate a rewind nonce from a private key and the value commitment.
-pub fn get_rewind_nonce_from_pvt_key(
-    pvt_key: &Scalar,
-    commitment: &CompressedRistretto,
-) -> Scalar {
+pub fn get_rewind_nonce_from_pvt_key(pvt_key: &Scalar, commitment: &CompressedRistretto) -> Scalar {
     let pub_key = (pvt_key * &RISTRETTO_BASEPOINT_TABLE).compress();
     get_rewind_nonce_from_pub_key(&pub_key, commitment)
 }
@@ -941,10 +964,7 @@ pub fn get_rewind_nonce_from_pub_key(
 }
 
 /// Calculate a secret nonce from a private key and the value commitment.
-pub fn get_secret_nonce_from_pvt_key(
-    pvt_key: &Scalar,
-    commitment: &CompressedRistretto,
-) -> Scalar {
+pub fn get_secret_nonce_from_pvt_key(pvt_key: &Scalar, commitment: &CompressedRistretto) -> Scalar {
     let secret_nonce = Scalar::hash_from_bytes::<Sha3_512>(pvt_key.to_bytes().as_ref());
     let secret_nonce = [secret_nonce.as_bytes(), commitment.to_bytes().as_ref()].concat();
     Scalar::hash_from_bytes::<Sha3_512>(&secret_nonce)
@@ -1105,20 +1125,60 @@ mod tests {
         // Parties 0, 2 are honest and use a 32-bit value
         let v0 = rng.gen::<u32>() as u64;
         let v0_blinding = Scalar::random(&mut rng);
-        let party0 = Party::new(&bp_gens, &pc_gens, v0, v0_blinding, n, not_used, not_used, not_used).unwrap();
+        let party0 = Party::new(
+            &bp_gens,
+            &pc_gens,
+            v0,
+            v0_blinding,
+            n,
+            not_used,
+            not_used,
+            not_used,
+        )
+        .unwrap();
 
         let v2 = rng.gen::<u32>() as u64;
         let v2_blinding = Scalar::random(&mut rng);
-        let party2 = Party::new(&bp_gens, &pc_gens, v2, v2_blinding, n, not_used, not_used, not_used).unwrap();
+        let party2 = Party::new(
+            &bp_gens,
+            &pc_gens,
+            v2,
+            v2_blinding,
+            n,
+            not_used,
+            not_used,
+            not_used,
+        )
+        .unwrap();
 
         // Parties 1, 3 are dishonest and use a 64-bit value
         let v1 = rng.gen::<u64>();
         let v1_blinding = Scalar::random(&mut rng);
-        let party1 = Party::new(&bp_gens, &pc_gens, v1, v1_blinding, n, not_used, not_used, not_used).unwrap();
+        let party1 = Party::new(
+            &bp_gens,
+            &pc_gens,
+            v1,
+            v1_blinding,
+            n,
+            not_used,
+            not_used,
+            not_used,
+        )
+        .unwrap();
 
         let v3 = rng.gen::<u64>();
         let v3_blinding = Scalar::random(&mut rng);
-        let party3 = Party::new(&bp_gens, &pc_gens, v3, v3_blinding, n, not_used, not_used, not_used).unwrap();
+        let party3 = Party::new(
+            &bp_gens,
+            &pc_gens,
+            v3,
+            v3_blinding,
+            n,
+            not_used,
+            not_used,
+            not_used,
+        )
+        .unwrap();
 
         let dealer = Dealer::new(&bp_gens, &pc_gens, &mut transcript, n, m).unwrap();
 
@@ -1180,7 +1240,17 @@ mod tests {
 
         let v0 = rng.gen::<u32>() as u64;
         let v0_blinding = Scalar::random(&mut rng);
-        let party0 = Party::new(&bp_gens, &pc_gens, v0, v0_blinding, n, not_used, not_used, not_used).unwrap();
+        let party0 = Party::new(
+            &bp_gens,
+            &pc_gens,
+            v0,
+            v0_blinding,
+            n,
+            not_used,
+            not_used,
+            not_used,
+        )
+        .unwrap();
 
         let dealer = Dealer::new(&bp_gens, &pc_gens, &mut transcript, n, m).unwrap();
 
@@ -1206,33 +1276,55 @@ mod tests {
     #[test]
     fn rewind_nonce_and_secret_nonce() {
         // Static data
-        let pvt_rewind_key = Scalar::from_bits([52, 177, 175, 139, 230, 130, 194, 20, 235, 30, 175, 83,
-            36, 74, 152, 44, 159, 164, 58, 224, 1, 145, 79, 3, 28, 84, 255, 124, 182, 63, 105, 2]);
-        let pub_rewind_key = RistrettoPoint::from(&pvt_rewind_key * &RISTRETTO_BASEPOINT_TABLE).compress();
-        let committed_value = CompressedRistretto::from_slice([208, 101, 226, 203, 8, 161,
-            147, 169, 30, 0, 90, 57, 238, 214, 80, 108, 172, 123, 34, 250, 205, 128, 227, 180, 0, 157, 217,
-            236, 238, 229, 180, 36].to_vec().as_slice());
+        let pvt_rewind_key = Scalar::from_bits([
+            52, 177, 175, 139, 230, 130, 194, 20, 235, 30, 175, 83, 36, 74, 152, 44, 159, 164, 58,
+            224, 1, 145, 79, 3, 28, 84, 255, 124, 182, 63, 105, 2,
+        ]);
+        let pub_rewind_key =
+            RistrettoPoint::from(&pvt_rewind_key * &RISTRETTO_BASEPOINT_TABLE).compress();
+        let committed_value = CompressedRistretto::from_slice(
+            [
+                208, 101, 226, 203, 8, 161, 147, 169, 30, 0, 90, 57, 238, 214, 80, 108, 172, 123,
+                34, 250, 205, 128, 227, 180, 0, 157, 217, 236, 238, 229, 180, 36,
+            ]
+            .to_vec()
+            .as_slice(),
+        );
 
         assert_eq!(
             get_rewind_nonce_from_pub_key(&pub_rewind_key, &committed_value),
             get_rewind_nonce_from_pvt_key(&pvt_rewind_key, &committed_value)
         );
         assert_eq!(
-            get_rewind_nonce_from_pub_key(&pub_rewind_key, &committed_value).as_bytes().to_vec(),
-            [88, 38, 63, 128, 120, 246, 179, 65, 172, 254, 213, 32, 26, 126, 42, 168, 25, 172, 68, 174,
-                13, 24, 30, 83, 187, 187, 147, 104, 226, 85, 95, 15].to_vec()
+            get_rewind_nonce_from_pub_key(&pub_rewind_key, &committed_value)
+                .as_bytes()
+                .to_vec(),
+            [
+                88, 38, 63, 128, 120, 246, 179, 65, 172, 254, 213, 32, 26, 126, 42, 168, 25, 172,
+                68, 174, 13, 24, 30, 83, 187, 187, 147, 104, 226, 85, 95, 15
+            ]
+            .to_vec()
         );
         assert_eq!(
-            get_secret_nonce_from_pvt_key(&pvt_rewind_key, &committed_value).as_bytes().to_vec(),
-            [31, 26, 128, 21, 146, 109, 19, 144, 226, 7, 54, 79, 33, 220, 179, 249, 94, 212, 167, 146,
-                207, 239, 65, 79, 112, 95, 18, 61, 92, 11, 45, 15].to_vec()
+            get_secret_nonce_from_pvt_key(&pvt_rewind_key, &committed_value)
+                .as_bytes()
+                .to_vec(),
+            [
+                31, 26, 128, 21, 146, 109, 19, 144, 226, 7, 54, 79, 33, 220, 179, 249, 94, 212,
+                167, 146, 207, 239, 65, 79, 112, 95, 18, 61, 92, 11, 45, 15
+            ]
+            .to_vec()
         );
 
         // Dynamic data
         let pvt_rewind_key = Scalar::random(&mut thread_rng());
-        let pub_rewind_key = RistrettoPoint::from(&pvt_rewind_key * &RISTRETTO_BASEPOINT_TABLE).compress();
+        let pub_rewind_key =
+            RistrettoPoint::from(&pvt_rewind_key * &RISTRETTO_BASEPOINT_TABLE).compress();
         let committed_value = CompressedRistretto::from_slice(
-            Scalar::random(&mut thread_rng()).as_bytes().to_vec().as_slice()
+            Scalar::random(&mut thread_rng())
+                .as_bytes()
+                .to_vec()
+                .as_slice(),
         );
 
         assert_eq!(
