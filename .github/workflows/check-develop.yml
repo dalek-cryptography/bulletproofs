@@ -1,0 +1,43 @@
+name: Rust
+
+on:
+  push:
+    branches: [ develop ]
+  pull_request:
+    branches: [ develop ]
+
+jobs:
+  check-stable:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Install the stable
+      uses: actions-rs/toolchain@v1
+      with:
+          toolchain: stable
+          override: true
+          components: rustfmt
+    - name: Cargo fmt
+      run: cargo fmt --all -- --check
+    - name: Run tests
+      run: cargo test --features="yoloproofs" --verbose
+    - name: Build benchmarks
+      run: cargo bench --features="yoloproofs" --verbose DONTRUNBENCHMARKS
+
+  check-nightly:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Install the nightly
+      uses: actions-rs/toolchain@v1
+      with:
+          toolchain: nightly
+          override: true
+    - name: Run tests
+      run: cargo test --features="std,nightly,yoloproofs" --verbose
+    - name: Build benchmarks
+      run: cargo bench --features="std,nightly,yoloproofs" --verbose DONTRUNBENCHMARKS
