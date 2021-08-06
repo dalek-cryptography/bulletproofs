@@ -1,12 +1,12 @@
 [package]
-name = "bulletproofs"
+name = "bulletproofs-og"
 # Before doing a release:
-# - update version field 
+# - update version field
 # - update html_root_url
 # - ensure yoloproofs was disabled in an atomic (revertable) commit
 # - update CHANGELOG
-version = "2.0.0"
-authors = ["Cathie Yun <cathieyun@gmail.com>", 
+version = "3.0.0-pre.0"
+authors = ["Cathie Yun <cathieyun@gmail.com>",
            "Henry de Valence <hdevalence@hdevalence.ca>",
            "Oleg Andreev <oleganza@gmail.com>"]
 readme = "README.md"
@@ -18,17 +18,17 @@ description = "A pure-Rust implementation of Bulletproofs using Ristretto"
 edition = "2018"
 
 [dependencies]
-curve25519-dalek = { version = "3", default-features = false, features = ["u64_backend", "serde"] }
+curve25519-dalek = { version = "4.0.0-pre.1", default-features = false, features = ["u64_backend", "serde"] }
 subtle = { version = "2", default-features = false }
 sha3 = { version = "0.9.1", default-features = false }
 digest = { version = "0.9.0", default-features = false }
-rand_core = { version = "0.5", default-features = false, features = ["alloc"] }
-rand = { version = "0.7", default-features = false, optional = true }
+rand_core = { version = "0.6", default-features = false, features = ["alloc"] }
+rand = { version = "0.8", default-features = false, optional = true }
 byteorder = { version = "1", default-features = false }
 serde = { version = "1", default-features = false, features = ["alloc"] }
 serde_derive = { version = "1", default-features = false }
 thiserror = { version = "1", optional = true }
-merlin = { version = "2", default-features = false }
+merlin = { version = "3", default-features = false }
 clear_on_drop = { version = "0.2", default-features = false }
 
 [dev-dependencies]
@@ -66,3 +66,7 @@ harness = false
 name = "r1cs"
 harness = false
 required-features = ["yoloproofs", "avx2_backend"]
+
+[patch.crates-io]
+# Fixes for nightly-2021-07-21
+curve25519-dalek = { git = "https://github.com/jcape/curve25519-dalek.git", rev = "46d07765b228d43fe910eb6a1769143f8fc366bb" }
