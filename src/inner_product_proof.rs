@@ -338,6 +338,8 @@ impl InnerProductProof {
     /// The layout of the inner product proof is:
     /// * \\(n\\) pairs of compressed Ristretto points \\(L_0, R_0 \dots, L_{n-1}, R_{n-1}\\),
     /// * two scalars \\(a, b\\).
+    // FIXME: find the real combination of features which cause this to be invoked.
+    #[allow(dead_code)]
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut buf = Vec::with_capacity(self.serialized_size());
         for (l, r) in self.L_vec.iter().zip(self.R_vec.iter()) {
