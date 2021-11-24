@@ -1,8 +1,14 @@
 //! Defines a `TranscriptProtocol` trait for using a Merlin transcript.
 
-use curve25519_dalek::ristretto::CompressedRistretto;
-use curve25519_dalek::scalar::Scalar;
+use blstrs::{
+    group::{ff::Field, Group},
+    G1Projective, Scalar,
+};
+use digest::Digest;
 use merlin::Transcript;
+use rand::SeedableRng;
+use rand_chacha::ChaCha20Rng;
+use sha3::Sha3_256;
 
 use crate::errors::ProofError;
 
@@ -26,14 +32,14 @@ pub trait TranscriptProtocol {
     fn append_scalar(&mut self, label: &'static [u8], scalar: &Scalar);
 
     /// Append a `point` with the given `label`.
-    fn append_point(&mut self, label: &'static [u8], point: &CompressedRistretto);
+    fn append_point(&mut self, label: &'static [u8], point: &G1Projective);
 
     /// Check that a point is not the identity, then append it to the
     /// transcript.  Otherwise, return an error.
     fn validate_and_append_point(
         &mut self,
         label: &'static [u8],
-        point: &CompressedRistretto,
+        point: &G1Projective,
     ) -> Result<(), ProofError>;
 
     /// Compute a `label`ed challenge variable.
@@ -65,24 +71,22 @@ impl TranscriptProtocol for Transcript {
     }
 
     fn append_scalar(&mut self, label: &'static [u8], scalar: &Scalar) {
-        self.append_message(label, scalar.as_bytes());
+        self.append_message(label, &scalar.to_bytes_le());
     }
 
-    fn append_point(&mut self, label: &'static [u8], point: &CompressedRistretto) {
-        self.append_message(label, point.as_bytes());
+    fn append_point(&mut self, label: &'static [u8], point: &G1Projective) {
+        self.append_message(label, &point.to_compressed());
     }
 
     fn validate_and_append_point(
         &mut self,
         label: &'static [u8],
-        point: &CompressedRistretto,
+        point: &G1Projective,
     ) -> Result<(), ProofError> {
-        use curve25519_dalek::traits::IsIdentity;
-
-        if point.is_identity() {
+        if bool::from(point.is_identity()) {
             Err(ProofError::VerificationError)
         } else {
-            Ok(self.append_message(label, point.as_bytes()))
+            Ok(self.append_message(label, &point.to_compressed()))
         }
     }
 
@@ -90,6 +94,11 @@ impl TranscriptProtocol for Transcript {
         let mut buf = [0u8; 64];
         self.challenge_bytes(label, &mut buf);
 
-        Scalar::from_bytes_mod_order_wide(&buf)
+        let mut sha3 = Sha3_256::new();
+        sha3.update(b"TranscriptChallenge");
+        sha3.update(buf);
+
+        let mut rng = ChaCha20Rng::from_seed(sha3.finalize().into());
+        Scalar::random(&mut rng)
     }
 }

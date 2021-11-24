@@ -7,18 +7,20 @@
 extern crate alloc;
 
 use alloc::vec::Vec;
+use blstrs::{
+    group::{ff::Field, Group},
+    G1Projective, Scalar,
+};
 use core::iter;
-use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
-use curve25519_dalek::scalar::Scalar;
 
 use crate::generators::{BulletproofGens, PedersenGens};
 
 /// A commitment to the bits of a party's value.
 #[derive(Serialize, Deserialize, Copy, Clone, Debug)]
 pub struct BitCommitment {
-    pub(super) V_j: CompressedRistretto,
-    pub(super) A_j: RistrettoPoint,
-    pub(super) S_j: RistrettoPoint,
+    pub(super) V_j: G1Projective,
+    pub(super) A_j: G1Projective,
+    pub(super) S_j: G1Projective,
 }
 
 /// Challenge values derived from all parties' [`BitCommitment`]s.
@@ -31,8 +33,8 @@ pub struct BitChallenge {
 /// A commitment to a party's polynomial coefficents.
 #[derive(Serialize, Deserialize, Copy, Clone, Debug)]
 pub struct PolyCommitment {
-    pub(super) T_1_j: RistrettoPoint,
-    pub(super) T_2_j: RistrettoPoint,
+    pub(super) T_1_j: G1Projective,
+    pub(super) T_2_j: G1Projective,
 }
 
 /// Challenge values derived from all parties' [`PolyCommitment`]s.
@@ -91,8 +93,6 @@ impl ProofShare {
         poly_commitment: &PolyCommitment,
         poly_challenge: &PolyChallenge,
     ) -> Result<(), ()> {
-        use curve25519_dalek::traits::{IsIdentity, VartimeMultiscalarMul};
-
         use crate::inner_product_proof::inner_product;
         use crate::util;
 
@@ -108,8 +108,8 @@ impl ProofShare {
         let minus_z = -z;
         let z_j = util::scalar_exp_vartime(z, j as u64); // z^j
         let y_jn = util::scalar_exp_vartime(y, (j * n) as u64); // y^(j*n)
-        let y_jn_inv = y_jn.invert(); // y^(-j*n)
-        let y_inv = y.invert(); // y^(-1)
+        let y_jn_inv: Scalar = Option::from(y_jn.invert()).ok_or(())?; // y^(-j*n)
+        let y_inv = Option::from(y.invert()).ok_or(())?; // y^(-1)
 
         if self.t_x != inner_product(&self.l_vec, &self.r_vec) {
             return Err(());
@@ -125,41 +125,43 @@ impl ProofShare {
                 z + exp_y_inv * y_jn_inv * (-r_i) + exp_y_inv * y_jn_inv * (zz * z_j * exp_2)
             });
 
-        let P_check = RistrettoPoint::vartime_multiscalar_mul(
-            iter::once(Scalar::one())
-                .chain(iter::once(*x))
-                .chain(iter::once(-self.e_blinding))
-                .chain(g)
-                .chain(h),
-            iter::once(&bit_commitment.A_j)
-                .chain(iter::once(&bit_commitment.S_j))
-                .chain(iter::once(&pc_gens.B_blinding))
-                .chain(bp_gens.share(j).G(n))
-                .chain(bp_gens.share(j).H(n)),
-        );
-        if !P_check.is_identity() {
+        let P_check: G1Projective = iter::once(Scalar::one())
+            .chain(iter::once(*x))
+            .chain(iter::once(-self.e_blinding))
+            .chain(g)
+            .chain(h)
+            .zip(
+                iter::once(&bit_commitment.A_j)
+                    .chain(iter::once(&bit_commitment.S_j))
+                    .chain(iter::once(&pc_gens.B_blinding))
+                    .chain(bp_gens.share(j).G(n))
+                    .chain(bp_gens.share(j).H(n)),
+            )
+            .map(|(s, P)| P * s)
+            .sum();
+        if !bool::from(P_check.is_identity()) {
             return Err(());
         }
-
-        let V_j = bit_commitment.V_j.decompress().ok_or(())?;
 
         let sum_of_powers_y = util::sum_of_powers(&y, n);
         let sum_of_powers_2 = util::sum_of_powers(&Scalar::from(2u64), n);
         let delta = (z - zz) * sum_of_powers_y * y_jn - z * zz * sum_of_powers_2 * z_j;
-        let t_check = RistrettoPoint::vartime_multiscalar_mul(
-            iter::once(zz * z_j)
-                .chain(iter::once(*x))
-                .chain(iter::once(x * x))
-                .chain(iter::once(delta - self.t_x))
-                .chain(iter::once(-self.t_x_blinding)),
-            iter::once(&V_j)
-                .chain(iter::once(&poly_commitment.T_1_j))
-                .chain(iter::once(&poly_commitment.T_2_j))
-                .chain(iter::once(&pc_gens.B))
-                .chain(iter::once(&pc_gens.B_blinding)),
-        );
+        let t_check: G1Projective = iter::once(zz * z_j)
+            .chain(iter::once(*x))
+            .chain(iter::once(x * x))
+            .chain(iter::once(delta - self.t_x))
+            .chain(iter::once(-self.t_x_blinding))
+            .zip(
+                iter::once(&bit_commitment.V_j)
+                    .chain(iter::once(&poly_commitment.T_1_j))
+                    .chain(iter::once(&poly_commitment.T_2_j))
+                    .chain(iter::once(&pc_gens.B))
+                    .chain(iter::once(&pc_gens.B_blinding)),
+            )
+            .map(|(s, P)| P * s)
+            .sum();
 
-        if t_check.is_identity() {
+        if bool::from(t_check.is_identity()) {
             Ok(())
         } else {
             Err(())

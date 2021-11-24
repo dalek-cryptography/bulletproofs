@@ -5,8 +5,9 @@ extern crate alloc;
 
 use alloc::vec;
 use alloc::vec::Vec;
+use blstrs::group::ff::Field;
+use blstrs::Scalar;
 use clear_on_drop::clear::Clear;
-use curve25519_dalek::scalar::Scalar;
 
 use crate::inner_product_proof::inner_product;
 
@@ -265,6 +266,13 @@ pub fn read32(data: &[u8]) -> [u8; 32] {
     let mut buf32 = [0u8; 32];
     buf32[..].copy_from_slice(&data[..32]);
     buf32
+}
+
+/// Given `data` with `len >= 48`, return the first 48 bytes.
+pub fn read48(data: &[u8]) -> [u8; 48] {
+    let mut buf48 = [0u8; 48];
+    buf48[..].copy_from_slice(&data[..48]);
+    buf48
 }
 
 #[cfg(test)]
