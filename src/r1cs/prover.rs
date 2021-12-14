@@ -727,4 +727,19 @@ impl<'g, T: BorrowMut<Transcript>> Prover<'g, T> {
         };
         Ok((proof, self.transcript))
     }
+
+    /// returns the number of constraints in the prover system
+    pub fn num_constraints(&self) -> usize {
+        self.constraints.len()
+    }
+
+    /// returns the constraints field
+    pub fn constraints(&self) -> &Vec<LinearCombination> {
+        &self.constraints
+    }
+
+    /// returns the number of multiplications in the prover constraint system
+    pub fn get_num_multiplications(&self) -> usize {
+        self.a_L.len()
+    }
 }

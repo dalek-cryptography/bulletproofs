@@ -516,4 +516,9 @@ impl<T: BorrowMut<Transcript>> Verifier<T> {
 
         Ok(self.transcript)
     }
+
+    /// return the number of variables used in the verifier constraint system
+    pub fn get_num_vars(&self) -> usize {
+        self.num_vars
+    }
 }
