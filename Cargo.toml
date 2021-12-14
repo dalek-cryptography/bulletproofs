@@ -19,6 +19,7 @@ edition = "2018"
 
 [dependencies]
 curve25519-dalek = { version = "3", default-features = false, features = ["u64_backend", "serde"] }
+packed_simd_2 = "0.3.6"
 subtle = { version = "2", default-features = false }
 sha3 = { version = "0.9.1", default-features = false }
 digest = { version = "0.9.0", default-features = false }
