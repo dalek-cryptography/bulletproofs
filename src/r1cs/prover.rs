@@ -740,6 +740,6 @@ impl<'g, T: BorrowMut<Transcript>> Prover<'g, T> {
 
     /// returns the number of multiplications in the prover constraint system
     pub fn get_num_multiplications(&self) -> usize {
-        self.a_L.len()
+        self.secrets.a_L.len()
     }
 }
