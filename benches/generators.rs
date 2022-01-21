@@ -1,4 +1,4 @@
-use bulletproofs::{BulletproofGens, PedersenGens};
+use bulletproofs_og::{BulletproofGens, PedersenGens};
 
 #[macro_use]
 extern crate criterion;
