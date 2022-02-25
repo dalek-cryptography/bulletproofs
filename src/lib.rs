@@ -7,7 +7,7 @@
 )]
 #![cfg_attr(
     feature = "docs",
-    doc(html_root_url = "https://docs.rs/bulletproofs/2.0.0")
+    doc(html_root_url = "https://docs.rs/bulletproofs-og/4.0.0-pre.2")
 )]
 
 extern crate alloc;

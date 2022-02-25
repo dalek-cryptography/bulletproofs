@@ -57,13 +57,13 @@ Connect `x_0` to `y_0` directly. Since there is only one permuatation of a 1-ele
 Code for creating constraints for a proof-of-shuffle constraint system:
 
 ```rust
-extern crate bulletproofs;
+extern crate bulletproofs_og;
 extern crate curve25519_dalek;
 extern crate merlin;
 extern crate rand;
 
-use bulletproofs::r1cs::*;
-use bulletproofs::{BulletproofGens, PedersenGens};
+use bulletproofs_og::r1cs::*;
+use bulletproofs_og::{BulletproofGens, PedersenGens};
 use curve25519_dalek::ristretto::CompressedRistretto;
 use curve25519_dalek::scalar::Scalar;
 use merlin::Transcript;
@@ -138,13 +138,13 @@ For simplicity, in this example the `prove` function does not take a list of bli
 
 
 ```rust
-# extern crate bulletproofs;
+# extern crate bulletproofs_og;
 # extern crate curve25519_dalek;
 # extern crate merlin;
 # extern crate rand;
 # 
-# use bulletproofs::r1cs::*;
-# use bulletproofs::{BulletproofGens, PedersenGens};
+# use bulletproofs_og::r1cs::*;
+# use bulletproofs_og::{BulletproofGens, PedersenGens};
 # use curve25519_dalek::ristretto::CompressedRistretto;
 # use curve25519_dalek::scalar::Scalar;
 # use merlin::Transcript;
@@ -245,13 +245,13 @@ The verifier receives a proof, and a list of committed inputs and outputs, from 
 
 
 ```rust
-# extern crate bulletproofs;
+# extern crate bulletproofs_og;
 # extern crate curve25519_dalek;
 # extern crate merlin;
 # extern crate rand;
 # 
-# use bulletproofs::r1cs::*;
-# use bulletproofs::{BulletproofGens, PedersenGens};
+# use bulletproofs_og::r1cs::*;
+# use bulletproofs_og::{BulletproofGens, PedersenGens};
 # use curve25519_dalek::ristretto::CompressedRistretto;
 # use curve25519_dalek::scalar::Scalar;
 # use merlin::Transcript;
@@ -385,13 +385,13 @@ The prover passes the proof and the commitments to the verifier. The verifier th
 Because only the prover knows the scalar values of the inputs and outputs, and the verifier only sees the committed inputs and outputs and not the scalar values themselves, the verifier has no knowledge of what the underlying inputs and outputs are. Therefore, the only information the verifier learns from this protocol is whether or not the committed outputs are a valid shuffle of the committed inputs - this is why it is a zero-knowledge proof.
 
 ```rust
-# extern crate bulletproofs;
+# extern crate bulletproofs_og;
 # extern crate curve25519_dalek;
 # extern crate merlin;
 # extern crate rand;
 # 
-# use bulletproofs::r1cs::*;
-# use bulletproofs::{BulletproofGens, PedersenGens};
+# use bulletproofs_og::r1cs::*;
+# use bulletproofs_og::{BulletproofGens, PedersenGens};
 # use curve25519_dalek::ristretto::CompressedRistretto;
 # use curve25519_dalek::scalar::Scalar;
 # use merlin::Transcript;
