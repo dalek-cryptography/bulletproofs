@@ -1,12 +1,12 @@
 #![allow(non_snake_case)]
 
-use clear_on_drop::clear::Clear;
 use core::borrow::BorrowMut;
 use core::mem;
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::{Identity, MultiscalarMul};
 use merlin::Transcript;
+use zeroize::Zeroize;
 
 use super::{
     ConstraintSystem, LinearCombination, R1CSProof, RandomizableConstraintSystem,
@@ -74,24 +74,18 @@ pub struct RandomizingProver<'g, T: BorrowMut<Transcript>> {
 /// Overwrite secrets with null bytes when they go out of scope.
 impl Drop for Secrets {
     fn drop(&mut self) {
-        self.v.clear();
-        self.v_blinding.clear();
+        self.v.zeroize();
+        self.v_blinding.zeroize();
 
-        // Important: due to how ClearOnDrop auto-implements InitializableFromZeroed
-        // for T: Default, calling .clear() on Vec compiles, but does not
-        // clear the content. Instead, it only clears the Vec's header.
-        // Clearing the underlying buffer item-by-item will do the job, but will
-        // keep the header as-is, which is fine since the header does not contain secrets.
         for e in self.a_L.iter_mut() {
-            e.clear();
+            e.zeroize();
         }
         for e in self.a_R.iter_mut() {
-            e.clear();
+            e.zeroize();
         }
         for e in self.a_O.iter_mut() {
-            e.clear();
+            e.zeroize();
         }
-        // XXX use ClearOnDrop instead of doing the above
     }
 }
 
@@ -697,16 +691,13 @@ impl<'g, T: BorrowMut<Transcript>> Prover<'g, T> {
             r_vec,
         );
 
-        // We do not yet have a ClearOnDrop wrapper for Vec<Scalar>.
-        // When PR 202 [1] is merged, we can simply wrap s_L and s_R at the point of creation.
-        // [1] https://github.com/dalek-cryptography/curve25519-dalek/pull/202
         for scalar in s_L1
             .iter_mut()
             .chain(s_L2.iter_mut())
             .chain(s_R1.iter_mut())
             .chain(s_R2.iter_mut())
         {
-            scalar.clear();
+            scalar.zeroize();
         }
         let proof = R1CSProof {
             A_I1,

@@ -744,6 +744,7 @@ impl RangeProof {
 
         use crate::util::read32;
 
+        #[allow(clippy::erasing_op)]
         let A = CompressedRistretto(read32(&slice[0 * 32..]));
         let S = CompressedRistretto(read32(&slice[1 * 32..]));
         let T_1 = CompressedRistretto(read32(&slice[2 * 32..]));

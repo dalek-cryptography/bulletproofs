@@ -5,8 +5,8 @@ extern crate alloc;
 
 use alloc::vec;
 use alloc::vec::Vec;
-use clear_on_drop::clear::Clear;
 use curve25519_dalek::scalar::Scalar;
+use zeroize::Zeroize;
 
 use crate::inner_product_proof::inner_product;
 use std::cmp::{max, min};
@@ -171,19 +171,19 @@ impl Poly6 {
 impl Drop for VecPoly1 {
     fn drop(&mut self) {
         for e in self.0.iter_mut() {
-            e.clear();
+            e.zeroize();
         }
         for e in self.1.iter_mut() {
-            e.clear();
+            e.zeroize();
         }
     }
 }
 
 impl Drop for Poly2 {
     fn drop(&mut self) {
-        self.0.clear();
-        self.1.clear();
-        self.2.clear();
+        self.0.zeroize();
+        self.1.zeroize();
+        self.2.zeroize();
     }
 }
 
@@ -191,16 +191,16 @@ impl Drop for Poly2 {
 impl Drop for VecPoly3 {
     fn drop(&mut self) {
         for e in self.0.iter_mut() {
-            e.clear();
+            e.zeroize();
         }
         for e in self.1.iter_mut() {
-            e.clear();
+            e.zeroize();
         }
         for e in self.2.iter_mut() {
-            e.clear();
+            e.zeroize();
         }
         for e in self.3.iter_mut() {
-            e.clear();
+            e.zeroize();
         }
     }
 }
@@ -208,12 +208,12 @@ impl Drop for VecPoly3 {
 #[cfg(feature = "yoloproofs")]
 impl Drop for Poly6 {
     fn drop(&mut self) {
-        self.t1.clear();
-        self.t2.clear();
-        self.t3.clear();
-        self.t4.clear();
-        self.t5.clear();
-        self.t6.clear();
+        self.t1.zeroize();
+        self.t2.zeroize();
+        self.t3.zeroize();
+        self.t4.zeroize();
+        self.t5.zeroize();
+        self.t6.zeroize();
     }
 }
 
@@ -422,11 +422,11 @@ mod tests {
     }
 
     #[test]
-    fn vec_of_scalars_clear_on_drop() {
+    fn vec_of_scalars_zeroize() {
         let mut v = vec![Scalar::from(24u64), Scalar::from(42u64)];
 
         for e in v.iter_mut() {
-            e.clear();
+            e.zeroize();
         }
 
         fn flat_slice<T>(x: &[T]) -> &[u8] {
@@ -442,16 +442,16 @@ mod tests {
     }
 
     #[test]
-    fn tuple_of_scalars_clear_on_drop() {
+    fn tuple_of_scalars_zeroize() {
         let mut v = Poly2(
             Scalar::from(24u64),
             Scalar::from(42u64),
             Scalar::from(255u64),
         );
 
-        v.0.clear();
-        v.1.clear();
-        v.2.clear();
+        v.0.zeroize();
+        v.1.zeroize();
+        v.2.zeroize();
 
         fn as_bytes<T>(x: &T) -> &[u8] {
             use core::mem;

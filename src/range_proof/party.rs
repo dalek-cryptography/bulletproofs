@@ -13,12 +13,12 @@
 extern crate alloc;
 
 use alloc::vec::Vec;
-use clear_on_drop::clear::Clear;
 use core::iter;
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::MultiscalarMul;
 use rand_core::{CryptoRng, RngCore};
+use zeroize::Zeroize;
 
 use crate::errors::MPCError;
 use crate::generators::{BulletproofGens, PedersenGens};
@@ -194,8 +194,8 @@ impl<'a> PartyAwaitingPosition<'a> {
 /// Overwrite secrets with null bytes when they go out of scope.
 impl<'a> Drop for PartyAwaitingPosition<'a> {
     fn drop(&mut self) {
-        self.v.clear();
-        self.v_blinding.clear();
+        self.v.zeroize();
+        self.v_blinding.zeroize();
     }
 }
 
@@ -297,21 +297,16 @@ impl<'a> PartyAwaitingBitChallenge<'a> {
 /// Overwrite secrets with null bytes when they go out of scope.
 impl<'a> Drop for PartyAwaitingBitChallenge<'a> {
     fn drop(&mut self) {
-        self.v.clear();
-        self.v_blinding.clear();
-        self.a_blinding.clear();
-        self.s_blinding.clear();
+        self.v.zeroize();
+        self.v_blinding.zeroize();
+        self.a_blinding.zeroize();
+        self.s_blinding.zeroize();
 
-        // Important: due to how ClearOnDrop auto-implements InitializableFromZeroed
-        // for T: Default, calling .clear() on Vec compiles, but does not
-        // clear the content. Instead, it only clears the Vec's header.
-        // Clearing the underlying buffer item-by-item will do the job, but will
-        // keep the header as-is, which is fine since the header does not contain secrets.
         for e in self.s_L.iter_mut() {
-            e.clear();
+            e.zeroize();
         }
         for e in self.s_R.iter_mut() {
-            e.clear();
+            e.zeroize();
         }
     }
 }
@@ -365,11 +360,11 @@ impl PartyAwaitingPolyChallenge {
 /// Overwrite secrets with null bytes when they go out of scope.
 impl Drop for PartyAwaitingPolyChallenge {
     fn drop(&mut self) {
-        self.v_blinding.clear();
-        self.a_blinding.clear();
-        self.s_blinding.clear();
-        self.t_1_blinding.clear();
-        self.t_2_blinding.clear();
+        self.v_blinding.zeroize();
+        self.a_blinding.zeroize();
+        self.s_blinding.zeroize();
+        self.t_1_blinding.zeroize();
+        self.t_2_blinding.zeroize();
 
         // Note: polynomials r_poly, l_poly and t_poly
         // are cleared within their own Drop impls.
