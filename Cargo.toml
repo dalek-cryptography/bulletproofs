@@ -20,7 +20,6 @@ edition = "2018"
 curve25519-dalek = { package = "curve25519-dalek-ng", version = "4.1", default-features = false, features = ["u64_backend", "serde", "alloc"] }
 subtle = { package = "subtle-ng", version = "2.5", default-features = false }
 sha3 = { version = "0.9.1", default-features = false }
-blake2 = "0.9.1"
 digest = { version = "0.9.0", default-features = false }
 rand_core = { version = "0.6", default-features = false, features = ["alloc"] }
 rand = { version = "0.8", default-features = false, optional = true }
