@@ -21,7 +21,7 @@ use crate::generators::{BulletproofGens, PedersenGens};
 use crate::inner_product_proof::InnerProductProof;
 use crate::transcript::TranscriptProtocol;
 use crate::util;
-use sha3::Sha3_512;
+use blake2::{Blake2b, Digest};
 
 use crate::util::{add_bytes_to_word, bytes_to_usize, xor_32_bytes};
 use curve25519_dalek::constants::{RISTRETTO_BASEPOINT_COMPRESSED, RISTRETTO_BASEPOINT_TABLE};
@@ -959,16 +959,38 @@ pub fn get_rewind_nonce_from_pub_key(
     pub_key: &CompressedRistretto,
     commitment: &CompressedRistretto,
 ) -> Scalar {
-    let rewind_nonce = Scalar::hash_from_bytes::<Sha3_512>(pub_key.to_bytes().as_ref());
-    let rewind_nonce = [rewind_nonce.as_bytes(), commitment.to_bytes().as_ref()].concat();
-    Scalar::hash_from_bytes::<Sha3_512>(&rewind_nonce)
+    let rewind_nonce_initial =
+        Blake2b::with_params(&pub_key.to_bytes().as_ref(), &[], "Rewind sep 1".as_bytes())
+            .finalize();
+    let rewind_nonce_data = [
+        rewind_nonce_initial.to_vec().as_slice(),
+        commitment.to_bytes().as_ref(),
+    ]
+    .concat();
+    let rewind_nonce_final = Blake2b::with_params(
+        &Blake2b::digest(&rewind_nonce_data),
+        &[],
+        "Rewind sep 2".as_bytes(),
+    );
+    Scalar::from_hash(rewind_nonce_final)
 }
 
 /// Calculate a secret nonce from a private key and the value commitment.
 pub fn get_secret_nonce_from_pvt_key(pvt_key: &Scalar, commitment: &CompressedRistretto) -> Scalar {
-    let secret_nonce = Scalar::hash_from_bytes::<Sha3_512>(pvt_key.to_bytes().as_ref());
-    let secret_nonce = [secret_nonce.as_bytes(), commitment.to_bytes().as_ref()].concat();
-    Scalar::hash_from_bytes::<Sha3_512>(&secret_nonce)
+    let secret_nonce_initial =
+        Blake2b::with_params(&pvt_key.to_bytes().as_ref(), &[], "Secret sep 1".as_bytes())
+            .finalize();
+    let secret_nonce_data = [
+        secret_nonce_initial.to_vec().as_slice(),
+        commitment.to_bytes().as_ref(),
+    ]
+    .concat();
+    let secret_nonce_final = Blake2b::with_params(
+        &Blake2b::digest(&secret_nonce_data),
+        &[],
+        "Secret sep 2".as_bytes(),
+    );
+    Scalar::from_hash(secret_nonce_final)
 }
 
 #[cfg(test)]
@@ -1301,8 +1323,8 @@ mod tests {
                 .as_bytes()
                 .to_vec(),
             [
-                88, 38, 63, 128, 120, 246, 179, 65, 172, 254, 213, 32, 26, 126, 42, 168, 25, 172,
-                68, 174, 13, 24, 30, 83, 187, 187, 147, 104, 226, 85, 95, 15
+                96, 129, 189, 122, 3, 143, 202, 124, 159, 114, 5, 6, 215, 201, 79, 169, 222, 245,
+                78, 216, 172, 107, 49, 168, 117, 193, 119, 138, 93, 83, 47, 8
             ]
             .to_vec()
         );
@@ -1311,8 +1333,8 @@ mod tests {
                 .as_bytes()
                 .to_vec(),
             [
-                31, 26, 128, 21, 146, 109, 19, 144, 226, 7, 54, 79, 33, 220, 179, 249, 94, 212,
-                167, 146, 207, 239, 65, 79, 112, 95, 18, 61, 92, 11, 45, 15
+                85, 7, 115, 151, 38, 196, 12, 17, 39, 183, 224, 49, 161, 52, 38, 108, 106, 223,
+                233, 81, 219, 109, 253, 129, 250, 223, 236, 228, 191, 172, 167, 14
             ]
             .to_vec()
         );
