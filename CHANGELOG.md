@@ -1,6 +1,13 @@
 # Changelog
 
-Entries are listed in reverse chronological order.
+All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
+
+## [4.2.0](https://github.com/tari-project/bulletproofs/compare/v4.1.2...v4.2.0) (2022-05-25)
+
+
+### Features
+
+* swap out curve25519-dalek-ng for curve25519-dalek ([#14](https://github.com/tari-project/bulletproofs/issues/14)) ([b8ff1f0](https://github.com/tari-project/bulletproofs/commit/b8ff1f0694575957d1ca928b60710c23bd85d260))
 
 ## 4.0.0
 
