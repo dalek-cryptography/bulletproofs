@@ -23,7 +23,6 @@ use crate::transcript::TranscriptProtocol;
 use crate::util;
 use blake2::{Blake2b, Digest};
 
-use crate::protocols::ScalarProtocol;
 use crate::util::{add_bytes_to_word, bytes_to_usize, xor_32_bytes};
 use curve25519_dalek::constants::{RISTRETTO_BASEPOINT_COMPRESSED, RISTRETTO_BASEPOINT_TABLE};
 use rand_core::{CryptoRng, RngCore};
@@ -973,7 +972,7 @@ pub fn get_rewind_nonce_from_pub_key(
         &[],
         "Rewind sep 2".as_bytes(),
     );
-    Scalar::from_hasher_blake2b(rewind_nonce_final)
+    Scalar::from_hash(rewind_nonce_final)
 }
 
 /// Calculate a secret nonce from a private key and the value commitment.
@@ -991,7 +990,7 @@ pub fn get_secret_nonce_from_pvt_key(pvt_key: &Scalar, commitment: &CompressedRi
         &[],
         "Secret sep 2".as_bytes(),
     );
-    Scalar::from_hasher_blake2b(secret_nonce_final)
+    Scalar::from_hash(secret_nonce_final)
 }
 
 #[cfg(test)]

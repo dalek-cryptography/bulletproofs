@@ -338,7 +338,6 @@ impl InnerProductProof {
     /// The layout of the inner product proof is:
     /// * \\(n\\) pairs of compressed Ristretto points \\(L_0, R_0 \dots, L_{n-1}, R_{n-1}\\),
     /// * two scalars \\(a, b\\).
-    #[allow(dead_code)]
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut buf = Vec::with_capacity(self.serialized_size());
         for (l, r) in self.L_vec.iter().zip(self.R_vec.iter()) {
@@ -428,8 +427,8 @@ pub fn inner_product(a: &[Scalar], b: &[Scalar]) -> Scalar {
 mod tests {
     use super::*;
 
-    use crate::protocols::RistrettoPointProtocol;
     use crate::util;
+    use sha3::Sha3_512;
 
     fn test_helper_create(n: usize) {
         let mut rng = rand::thread_rng();
@@ -440,7 +439,7 @@ mod tests {
         let H: Vec<RistrettoPoint> = bp_gens.share(0).H(n).cloned().collect();
 
         // Q would be determined upstream in the protocol, so we pick a random one.
-        let Q = RistrettoPoint::hash_from_bytes_sha3_512(b"test point");
+        let Q = RistrettoPoint::hash_from_bytes::<Sha3_512>(b"test point");
 
         // a and b are the vectors for which we want to prove c = <a,b>
         let a: Vec<_> = (0..n).map(|_| Scalar::random(&mut rng)).collect();

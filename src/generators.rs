@@ -6,7 +6,6 @@
 
 extern crate alloc;
 
-use crate::protocols::RistrettoPointProtocol;
 use alloc::vec::Vec;
 use curve25519_dalek::constants::RISTRETTO_BASEPOINT_COMPRESSED;
 use curve25519_dalek::constants::RISTRETTO_BASEPOINT_POINT;
@@ -14,7 +13,7 @@ use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::MultiscalarMul;
 use digest::{ExtendableOutputDirty, Update, XofReader};
-use sha3::{Sha3XofReader, Shake256};
+use sha3::{Sha3XofReader, Sha3_512, Shake256};
 
 /// Represents a pair of base points for Pedersen commitments.
 ///
@@ -46,7 +45,7 @@ impl Default for PedersenGens {
     fn default() -> Self {
         PedersenGens {
             B: RISTRETTO_BASEPOINT_POINT,
-            B_blinding: RistrettoPoint::hash_from_bytes_sha3_512(
+            B_blinding: RistrettoPoint::hash_from_bytes::<Sha3_512>(
                 RISTRETTO_BASEPOINT_COMPRESSED.as_bytes(),
             ),
         }

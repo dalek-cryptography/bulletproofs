@@ -18,7 +18,6 @@ use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::MultiscalarMul;
 use rand_core::{CryptoRng, RngCore};
-use subtle::{Choice, ConditionallySelectable};
 use zeroize::Zeroize;
 
 use crate::errors::MPCError;
@@ -135,6 +134,7 @@ impl<'a> PartyAwaitingPosition<'a> {
         // Compute A = <a_L, G> + <a_R, H> + a_blinding * B_blinding
         let mut A = self.pc_gens.B_blinding * a_blinding;
 
+        use subtle::{Choice, ConditionallySelectable};
         let mut i = 0;
         for (G_i, H_i) in bp_share.G(self.n).zip(bp_share.H(self.n)) {
             // If v_i = 0, we add a_L[i] * G[i] + a_R[i] * H[i] = - H[i]

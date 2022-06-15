@@ -42,7 +42,6 @@ pub mod range_proof_mpc {
     pub use crate::range_proof::party;
 }
 
-mod protocols;
 #[cfg(feature = "yoloproofs")]
 #[cfg(feature = "std")]
 pub mod r1cs;
