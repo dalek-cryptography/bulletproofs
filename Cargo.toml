@@ -38,7 +38,8 @@ bincode = "1"
 rand_chacha = "0.3"
 
 [features]
-default = ["std", "yoloproofs"]
+default = ["std", "yoloproofs", "u64_backend"]
+u64_backend = ["curve25519-dalek/u64_backend"]
 simd_backend = ["curve25519-dalek/simd_backend"]
 avx2_backend = ["simd_backend"] # deprecated alias for simd_backend
 yoloproofs = []
