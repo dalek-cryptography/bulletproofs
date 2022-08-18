@@ -62,3 +62,8 @@ harness = false
 name = "r1cs"
 harness = false
 required-features = ["yoloproofs"]
+
+[[bench]]
+name = "linear_proof"
+harness = false
+
