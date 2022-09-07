@@ -257,7 +257,7 @@ fn example_gadget_proof(
     // 2. Commit high-level variables
     let (commitments, vars): (Vec<_>, Vec<_>) = [a1, a2, b1, b2, c1]
         .into_iter()
-        .map(|x| prover.commit(Scalar::from(*x), Scalar::random(&mut thread_rng())))
+        .map(|x| prover.commit(Scalar::from(x), Scalar::random(&mut thread_rng())))
         .unzip();
 
     // 3. Build a CS

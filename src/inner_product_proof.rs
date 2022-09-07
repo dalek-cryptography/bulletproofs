@@ -334,6 +334,7 @@ impl InnerProductProof {
         (self.L_vec.len() * 2 + 2) * 32
     }
 
+    #[allow(dead_code)]
     /// Serializes the proof into a byte array of \\(2n+2\\) 32-byte elements.
     /// The layout of the inner product proof is:
     /// * \\(n\\) pairs of compressed Ristretto points \\(L_0, R_0 \dots, L_{n-1}, R_{n-1}\\),

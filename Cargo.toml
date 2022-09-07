@@ -15,7 +15,7 @@ repository = "https://github.com/dalek-cryptography/bulletproofs"
 categories = ["cryptography"]
 keywords = ["cryptography", "crypto", "ristretto", "zero-knowledge", "bulletproofs"]
 description = "A pure-Rust implementation of Bulletproofs using Ristretto"
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 curve25519-dalek = { version = "3", default-features = false, features = ["u64_backend", "serde"] }
