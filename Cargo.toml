@@ -4,7 +4,7 @@ name = "tari_bulletproofs"
 # - update version field
 # - update html_root_url
 # - update CHANGELOG
-version = "4.2.1"
+version = "4.3.0"
 authors = ["Cathie Yun <cathieyun@gmail.com>",
            "Henry de Valence <hdevalence@hdevalence.ca>",
            "Oleg Andreev <oleganza@gmail.com>"]
@@ -17,25 +17,25 @@ description = "A pure-Rust implementation of Bulletproofs using Ristretto"
 edition = "2018"
 
 [dependencies]
-curve25519-dalek = { package = "curve25519-dalek-ng", version = "4.1", default-features = false, features = ["u64_backend", "serde", "alloc"] }
-subtle = { package = "subtle-ng", version = "2.5", default-features = false }
+curve25519-dalek = { package = "curve25519-dalek", version = "3.2.1", default-features = false, features = ["u64_backend", "serde", "alloc"] }
+subtle = { package = "subtle", version = "2.4.1", default-features = false }
 sha3 = { version = "0.9.1", default-features = false }
 blake2 = "0.9.1"
 digest = { version = "0.9.0", default-features = false }
-rand_core = { version = "0.6", default-features = false, features = ["alloc"] }
-rand = { version = "0.8", default-features = false, optional = true }
+rand_core = { version = "0.5", default-features = false, features = ["alloc"] }
+rand = { version = "0.7", default-features = false, optional = true }
 byteorder = { version = "1", default-features = false }
 serde = { version = "1", default-features = false, features = ["alloc"] }
 serde_derive = { version = "1", default-features = false }
 thiserror = { version = "1", optional = true }
-merlin = { version = "3", default-features = false }
-zeroize = "1.4"
+merlin = { version = "2.0.1", default-features = false }
+zeroize = "1.3.0"
 
 [dev-dependencies]
 hex = "0.3"
 criterion = "0.3"
 bincode = "1"
-rand_chacha = "0.3"
+rand_chacha = "0.2.2"
 
 [features]
 default = ["std", "yoloproofs", "u64_backend"]
@@ -43,7 +43,7 @@ u64_backend = ["curve25519-dalek/u64_backend"]
 simd_backend = ["curve25519-dalek/simd_backend"]
 avx2_backend = ["simd_backend"] # deprecated alias for simd_backend
 yoloproofs = []
-std = ["rand", "rand/std", "rand/std_rng", "thiserror", "curve25519-dalek/std"]
+std = ["rand", "rand/std", "thiserror", "curve25519-dalek/std"]
 nightly = ["curve25519-dalek/nightly", "curve25519-dalek/alloc", "subtle/nightly"]
 docs = ["nightly"]
 
