@@ -1,5 +1,14 @@
 # Changelog
 
+All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
+
+## [4.3.0](https://github.com/tari-project/bulletproofs/compare/v4.2.1...v4.3.0) (2022-10-03)
+
+
+### Features
+
+* port over to dalek lib ([#17](https://github.com/tari-project/bulletproofs/issues/17)) ([a9828c7](https://github.com/tari-project/bulletproofs/commit/a9828c7586ffa113d8a2c287bbe1033d152267ca))
+
 ### [4.2.1](https://github.com/tari-project/bulletproofs/compare/v4.2.0...v4.2.1) (2022-06-23)
 
 ## [4.2.0](https://github.com/tari-project/bulletproofs/compare/v4.1.2...v4.2.0) (2022-05-25)
