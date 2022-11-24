@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [4.4.0](https://github.com/tari-project/bulletproofs/compare/v4.3.0...v4.4.0) (2022-11-24)
+
+
+### Features
+
+* relax zeroize ([#18](https://github.com/tari-project/bulletproofs/issues/18)) ([5305945](https://github.com/tari-project/bulletproofs/commit/53059458e2a85cec149a0d26ae8db039e8f2455e))
+
 ## [4.3.0](https://github.com/tari-project/bulletproofs/compare/v4.2.1...v4.3.0) (2022-10-03)
 
 
