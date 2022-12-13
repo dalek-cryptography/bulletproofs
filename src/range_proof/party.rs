@@ -37,7 +37,7 @@ impl Party {
     pub fn new<'a>(
         bp_gens: &'a BulletproofGens,
         pc_gens: &'a PedersenGens,
-        v: u64,
+        v: Scalar,
         v_blinding: Scalar,
         n: usize,
     ) -> Result<PartyAwaitingPosition<'a>, MPCError> {
@@ -48,7 +48,7 @@ impl Party {
             return Err(MPCError::InvalidGeneratorsLength);
         }
 
-        let V = pc_gens.commit(v.into(), v_blinding).compress();
+        let V = pc_gens.commit(v, v_blinding).compress();
 
         Ok(PartyAwaitingPosition {
             bp_gens,
@@ -66,7 +66,7 @@ pub struct PartyAwaitingPosition<'a> {
     bp_gens: &'a BulletproofGens,
     pc_gens: &'a PedersenGens,
     n: usize,
-    v: u64,
+    v: Scalar,
     v_blinding: Scalar,
     V: CompressedRistretto,
 }
@@ -104,7 +104,7 @@ impl<'a> PartyAwaitingPosition<'a> {
         for (G_i, H_i) in bp_share.G(self.n).zip(bp_share.H(self.n)) {
             // If v_i = 0, we add a_L[i] * G[i] + a_R[i] * H[i] = - H[i]
             // If v_i = 1, we add a_L[i] * G[i] + a_R[i] * H[i] =   G[i]
-            let v_i = Choice::from(((self.v >> i) & 1) as u8);
+            let v_i = Choice::from(extract_scalar_bit(&self.v, i));
             let mut point = -H_i;
             point.conditional_assign(G_i, v_i);
             A += point;
@@ -156,7 +156,7 @@ impl<'a> Drop for PartyAwaitingPosition<'a> {
 /// and is waiting for the aggregated value challenge from the dealer.
 pub struct PartyAwaitingBitChallenge<'a> {
     n: usize, // bitsize of the range
-    v: u64,
+    v: Scalar,
     v_blinding: Scalar,
     j: usize,
     pc_gens: &'a PedersenGens,
@@ -196,7 +196,7 @@ impl<'a> PartyAwaitingBitChallenge<'a> {
         let mut exp_y = offset_y; // start at y^j
         let mut exp_2 = Scalar::one(); // start at 2^0 = 1
         for i in 0..n {
-            let a_L_i = Scalar::from((self.v >> i) & 1);
+            let a_L_i = Scalar::from(extract_scalar_bit(&self.v, i));
             let a_R_i = a_L_i - Scalar::one();
 
             l_poly.0[i] = a_L_i - vc.z;
@@ -317,4 +317,11 @@ impl Drop for PartyAwaitingPolyChallenge {
         // Note: polynomials r_poly, l_poly and t_poly
         // are cleared within their own Drop impls.
     }
+}
+
+fn extract_scalar_bit(scalar: &Scalar, index: usize) -> u8 {
+    let u8_bits = u8::BITS as usize;
+    let byte_index = index / u8_bits;
+    let bit_index = index % u8_bits;
+    (scalar[byte_index] >> bit_index) & 1
 }

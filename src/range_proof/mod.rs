@@ -9,7 +9,7 @@ extern crate rand;
 use self::rand::thread_rng;
 use alloc::vec::Vec;
 
-use core::iter;
+use core::{iter, slice};
 
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
@@ -104,7 +104,7 @@ impl RangeProof {
     /// let bp_gens = BulletproofGens::new(64, 1);
     ///
     /// // A secret value we want to prove lies in the range [0, 2^32)
-    /// let secret_value = 1037578891u64;
+    /// let secret_value = Scalar::from(1037578891u64);
     ///
     /// // The API takes a blinding factor for the commitment.
     /// let blinding = Scalar::random(&mut thread_rng());
@@ -118,7 +118,7 @@ impl RangeProof {
     ///     &bp_gens,
     ///     &pc_gens,
     ///     &mut prover_transcript,
-    ///     secret_value,
+    ///     &secret_value,
     ///     &blinding,
     ///     32,
     /// ).expect("A real program could handle errors");
@@ -136,7 +136,7 @@ impl RangeProof {
         bp_gens: &BulletproofGens,
         pc_gens: &PedersenGens,
         transcript: &mut Transcript,
-        v: u64,
+        v: &Scalar,
         v_blinding: &Scalar,
         n: usize,
         rng: &mut T,
@@ -145,8 +145,8 @@ impl RangeProof {
             bp_gens,
             pc_gens,
             transcript,
-            &[v],
-            &[*v_blinding],
+            slice::from_ref(v),
+            slice::from_ref(v_blinding),
             n,
             rng,
         )?;
@@ -162,7 +162,7 @@ impl RangeProof {
         bp_gens: &BulletproofGens,
         pc_gens: &PedersenGens,
         transcript: &mut Transcript,
-        v: u64,
+        v: &Scalar,
         v_blinding: &Scalar,
         n: usize,
     ) -> Result<(RangeProof, CompressedRistretto), ProofError> {
@@ -203,7 +203,12 @@ impl RangeProof {
     /// let bp_gens = BulletproofGens::new(64, 16);
     ///
     /// // Four secret values we want to prove lie in the range [0, 2^32)
-    /// let secrets = [4242344947u64, 3718732727u64, 2255562556u64, 2526146994u64];
+    /// let secrets = [
+    ///     Scalar::from(4242344947u64),
+    ///     Scalar::from(3718732727u64),
+    ///     Scalar::from(2255562556u64),
+    ///     Scalar::from(2526146994u64),
+    /// ];
     ///
     /// // The API takes blinding factors for the commitments.
     /// let blindings: Vec<_> = (0..4).map(|_| Scalar::random(&mut thread_rng())).collect();
@@ -235,7 +240,7 @@ impl RangeProof {
         bp_gens: &BulletproofGens,
         pc_gens: &PedersenGens,
         transcript: &mut Transcript,
-        values: &[u64],
+        values: &[Scalar],
         blindings: &[Scalar],
         n: usize,
         rng: &mut T,
@@ -295,7 +300,7 @@ impl RangeProof {
         bp_gens: &BulletproofGens,
         pc_gens: &PedersenGens,
         transcript: &mut Transcript,
-        values: &[u64],
+        values: &[Scalar],
         blindings: &[Scalar],
         n: usize,
     ) -> Result<(RangeProof, Vec<CompressedRistretto>), ProofError> {
@@ -650,7 +655,7 @@ mod tests {
 
             // 0. Create witness data
             let (min, max) = (0u128, u128::MAX >> (u128::BITS as usize - n));
-            let values: Vec<u64> = (0..m).map(|_| rng.gen_range(min, max)).collect();
+            let values: Vec<Scalar> = (0..m).map(|_| rng.gen_range(min, max).into()).collect();
             let blindings: Vec<Scalar> = (0..m).map(|_| Scalar::random(&mut rng)).collect();
 
             // 1. Create the proof
@@ -762,20 +767,20 @@ mod tests {
         let mut transcript = Transcript::new(b"AggregatedRangeProofTest");
 
         // Parties 0, 2 are honest and use a 32-bit value
-        let v0 = rng.gen::<u32>() as u64;
+        let v0 = Scalar::from(rng.gen::<u32>());
         let v0_blinding = Scalar::random(&mut rng);
         let party0 = Party::new(&bp_gens, &pc_gens, v0, v0_blinding, n).unwrap();
 
-        let v2 = rng.gen::<u32>() as u64;
+        let v2 = Scalar::from(rng.gen::<u32>());
         let v2_blinding = Scalar::random(&mut rng);
         let party2 = Party::new(&bp_gens, &pc_gens, v2, v2_blinding, n).unwrap();
 
         // Parties 1, 3 are dishonest and use a 64-bit value
-        let v1 = rng.gen::<u64>();
+        let v1 = Scalar::from(rng.gen::<u64>());
         let v1_blinding = Scalar::random(&mut rng);
         let party1 = Party::new(&bp_gens, &pc_gens, v1, v1_blinding, n).unwrap();
 
-        let v3 = rng.gen::<u64>();
+        let v3 = Scalar::from(rng.gen::<u64>());
         let v3_blinding = Scalar::random(&mut rng);
         let party3 = Party::new(&bp_gens, &pc_gens, v3, v3_blinding, n).unwrap();
 
@@ -834,7 +839,7 @@ mod tests {
         let mut rng = rand::thread_rng();
         let mut transcript = Transcript::new(b"AggregatedRangeProofTest");
 
-        let v0 = rng.gen::<u32>() as u64;
+        let v0 = Scalar::from(rng.gen::<u32>());
         let v0_blinding = Scalar::random(&mut rng);
         let party0 = Party::new(&bp_gens, &pc_gens, v0, v0_blinding, n).unwrap();
 
