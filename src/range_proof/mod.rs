@@ -44,7 +44,7 @@ pub mod party;
 /// the verifier.
 ///
 /// This implementation requires that both the bitsize `n` and the
-/// aggregation size `m` be powers of two, so that `n = 8, 16, 32, 64`
+/// aggregation size `m` be powers of two, so that `n = 8, 16, 32, 64, 128`
 /// and `m = 1, 2, 4, 8, 16, ...`.  Note that the aggregation size is
 /// not given as an explicit parameter, but is determined by the
 /// number of values or commitments passed to the prover or verifier.
@@ -355,7 +355,7 @@ impl RangeProof {
 
         // First, replay the "interactive" protocol using the proof
         // data to recompute all challenges.
-        if !(n == 8 || n == 16 || n == 32 || n == 64) {
+        if !(n == 8 || n == 16 || n == 32 || n == 64 || n == 128) {
             return Err(ProofError::InvalidBitsize);
         }
         if bp_gens.gens_capacity < n {
@@ -638,7 +638,7 @@ mod tests {
         //use bincode; // already present in lib.rs
 
         // Both prover and verifier have access to the generators and the proof
-        let max_bitsize = 64;
+        let max_bitsize = 128;
         let max_parties = 8;
         let pc_gens = PedersenGens::default();
         let bp_gens = BulletproofGens::new(max_bitsize, max_parties);
@@ -649,7 +649,7 @@ mod tests {
             let mut rng = rand::thread_rng();
 
             // 0. Create witness data
-            let (min, max) = (0u64, ((1u128 << n) - 1) as u64);
+            let (min, max) = (0u128, u128::MAX >> (u128::BITS as usize - n));
             let values: Vec<u64> = (0..m).map(|_| rng.gen_range(min, max)).collect();
             let blindings: Vec<Scalar> = (0..m).map(|_| Scalar::random(&mut rng)).collect();
 
@@ -721,6 +721,26 @@ mod tests {
     #[test]
     fn create_and_verify_n_64_m_8() {
         singleparty_create_and_verify_helper(64, 8);
+    }
+
+    #[test]
+    fn create_and_verify_n_128_m_1() {
+        singleparty_create_and_verify_helper(128, 1);
+    }
+
+    #[test]
+    fn create_and_verify_n_128_m_2() {
+        singleparty_create_and_verify_helper(128, 2);
+    }
+
+    #[test]
+    fn create_and_verify_n_128_m_4() {
+        singleparty_create_and_verify_helper(128, 4);
+    }
+
+    #[test]
+    fn create_and_verify_n_128_m_8() {
+        singleparty_create_and_verify_helper(128, 8);
     }
 
     #[test]

@@ -101,7 +101,7 @@ fn deserialize_and_verify() {
 #[allow(dead_code)]
 fn generate_test_vectors() {
     let pc_gens = PedersenGens::default();
-    let bp_gens = BulletproofGens::new(64, 8);
+    let bp_gens = BulletproofGens::new(128, 8);
 
     // Use a deterministic RNG for proving, so the test vectors can be
     // generated reproducibly.
@@ -112,7 +112,7 @@ fn generate_test_vectors() {
         .map(|_| Scalar::random(&mut test_rng))
         .collect::<Vec<_>>();
 
-    for n in &[8, 16, 32, 64] {
+    for n in &[8, 16, 32, 64, 128] {
         for m in &[1, 2, 4, 8] {
             let mut transcript = Transcript::new(b"Deserialize-And-Verify Test");
             let (proof, value_commitments) = RangeProof::prove_multiple(

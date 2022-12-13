@@ -41,7 +41,7 @@ impl Dealer {
         n: usize,
         m: usize,
     ) -> Result<DealerAwaitingBitCommitments<'a, 'b>, MPCError> {
-        if !(n == 8 || n == 16 || n == 32 || n == 64) {
+        if !(n == 8 || n == 16 || n == 32 || n == 64 || n == 128) {
             return Err(MPCError::InvalidBitsize);
         }
         if !m.is_power_of_two() {
