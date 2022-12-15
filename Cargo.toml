@@ -28,7 +28,7 @@ byteorder = { version = "1", default-features = false }
 serde = { version = "1", default-features = false, features = ["alloc"] }
 serde_derive = { version = "1", default-features = false }
 thiserror = { version = "1", optional = true }
-merlin = { version = "2", default-features = false }
+merlin = { version = "3", default-features = false }
 clear_on_drop = { version = "0.2", default-features = false, features = ["nightly"] }
 
 [dev-dependencies]
