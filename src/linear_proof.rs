@@ -74,6 +74,9 @@ impl LinearProof {
 
         transcript.innerproduct_domain_sep(n as u64);
         transcript.append_point(b"C", &C);
+        for i in 0..n {
+            transcript.append_scalar(b"b_i", &b[i]);
+        }
 
         let lg_n = n.next_power_of_two().trailing_zeros() as usize;
         let mut L_vec = Vec::with_capacity(lg_n);
@@ -165,7 +168,12 @@ impl LinearProof {
         b_vec: Vec<Scalar>,
     ) -> Result<(), ProofError> {
         transcript.innerproduct_domain_sep(n as u64);
+        assert_eq!(b_vec.len(), n);
+
         transcript.append_point(b"C", &C);
+        for i in 0..n {
+            transcript.append_scalar(b"b_i", &b_vec[i]);
+        }
         let (x_vec, x_inv_vec, b_0) = self.verification_scalars(n, transcript, b_vec)?;
 
         transcript.append_point(b"S", &self.S);
