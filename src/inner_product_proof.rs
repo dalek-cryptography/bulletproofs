@@ -1,5 +1,5 @@
 #![allow(non_snake_case)]
-#![doc(include = "../docs/inner-product-protocol.md")]
+#![doc = include_str!("../docs/inner-product-protocol.md")]
 
 extern crate alloc;
 
@@ -15,6 +15,7 @@ use merlin::Transcript;
 use crate::errors::ProofError;
 use crate::transcript::TranscriptProtocol;
 
+/// Inner-product proof.
 #[derive(Clone, Debug)]
 pub struct InnerProductProof {
     pub(crate) L_vec: Vec<CompressedRistretto>,
