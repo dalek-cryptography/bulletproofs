@@ -232,13 +232,13 @@ impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
         let mut bad_shares = Vec::<usize>::new(); // no allocations until we append
         for (j, share) in proof_shares.iter().enumerate() {
             share
-                .check_size(self.n, &self.bp_gens, j)
+                .check_size(self.n, self.bp_gens, j)
                 .unwrap_or_else(|_| {
                     bad_shares.push(j);
                 });
         }
 
-        if bad_shares.len() > 0 {
+        if !bad_shares.is_empty() {
             return Err(MPCError::MalformedProofShares { bad_shares });
         }
 
@@ -335,10 +335,10 @@ impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
         } else {
             // Proof verification failed. Now audit the parties:
             let mut bad_shares = Vec::new();
-            for j in 0..self.m {
-                match proof_shares[j].audit_share(
-                    &self.bp_gens,
-                    &self.pc_gens,
+            for (j, proof_share) in proof_shares.iter().enumerate().take(self.m) {
+                match proof_share.audit_share(
+                    self.bp_gens,
+                    self.pc_gens,
                     j,
                     &self.bit_commitments[j],
                     &self.bit_challenge,

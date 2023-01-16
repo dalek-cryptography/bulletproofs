@@ -447,7 +447,7 @@ impl RangeProof {
                 .chain(bp_gens.H(n, m).map(|&x| Some(x)))
                 .chain(value_commitments.iter().map(|V| V.decompress())),
         )
-        .ok_or_else(|| ProofError::VerificationError)?;
+        .ok_or(ProofError::VerificationError)?;
 
         if mega_check.is_identity() {
             Ok(())
@@ -516,8 +516,8 @@ impl RangeProof {
 
         use crate::util::read32;
 
-        let A = CompressedRistretto(read32(&slice[0 * 32..]));
-        let S = CompressedRistretto(read32(&slice[1 * 32..]));
+        let A = CompressedRistretto(read32(&slice[0..]));
+        let S = CompressedRistretto(read32(&slice[32..]));
         let T_1 = CompressedRistretto(read32(&slice[2 * 32..]));
         let T_2 = CompressedRistretto(read32(&slice[3 * 32..]));
 

@@ -143,7 +143,7 @@ impl ProofShare {
 
         let V_j = bit_commitment.V_j.decompress().ok_or(())?;
 
-        let sum_of_powers_y = util::sum_of_powers(&y, n);
+        let sum_of_powers_y = util::sum_of_powers(y, n);
         let sum_of_powers_2 = util::sum_of_powers(&Scalar::from(2u64), n);
         let delta = (z - zz) * sum_of_powers_y * y_jn - z * zz * sum_of_powers_2 * z_j;
         let t_check = RistrettoPoint::vartime_multiscalar_mul(
