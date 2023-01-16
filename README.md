@@ -117,7 +117,7 @@ let pc_gens = PedersenGens::default();
 let bp_gens = BulletproofGens::new(64, 1);
 
 // A secret value we want to prove lies in the range [0, 2^32)
-let secret_value = 1037578891u64;
+let secret_value = Scalar::from(1037578891u64);
 
 // The API takes a blinding factor for the commitment.
 let blinding = Scalar::random(&mut thread_rng());
@@ -131,7 +131,7 @@ let (proof, committed_value) = RangeProof::prove_single(
     &bp_gens,
     &pc_gens,
     &mut prover_transcript,
-    secret_value,
+    &secret_value,
     &blinding,
     32,
 ).expect("A real program could handle errors");
