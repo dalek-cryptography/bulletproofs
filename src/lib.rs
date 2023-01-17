@@ -1,11 +1,8 @@
 #![cfg_attr(not(feature = "std"), no_std)]
-#![feature(nll)]
-#![feature(external_doc)]
-#![feature(try_trait)]
 #![deny(missing_docs)]
-#![doc(include = "../README.md")]
+#![doc = include_str!("../README.md")]
 #![doc(html_logo_url = "https://doc.dalek.rs/assets/dalek-logo-clear.png")]
-#![doc(html_root_url = "https://docs.rs/bulletproofs/2.0.0")]
+#![doc(html_root_url = "https://docs.rs/bulletproofs/3.0.0")]
 
 extern crate alloc;
 
@@ -14,13 +11,13 @@ extern crate serde_derive;
 
 mod util;
 
-#[doc(include = "../docs/notes-intro.md")]
+#[doc = include_str!("../docs/notes-intro.md")]
 mod notes {
-    #[doc(include = "../docs/notes-ipp.md")]
+    #[doc = include_str!("../docs/notes-ipp.md")]
     mod inner_product_proof {}
-    #[doc(include = "../docs/notes-rp.md")]
+    #[doc = include_str!("../docs/notes-rp.md")]
     mod range_proof {}
-    #[doc(include = "../docs/notes-r1cs.md")]
+    #[doc = include_str!("../docs/notes-r1cs.md")]
     mod r1cs_proof {}
 }
 
@@ -33,10 +30,11 @@ mod transcript;
 
 pub use crate::errors::ProofError;
 pub use crate::generators::{BulletproofGens, BulletproofGensShare, PedersenGens};
+pub use crate::inner_product_proof::{inner_product, InnerProductProof};
 pub use crate::linear_proof::LinearProof;
 pub use crate::range_proof::RangeProof;
 
-#[doc(include = "../docs/aggregation-api.md")]
+#[doc = include_str!("../docs/aggregation-api.md")]
 pub mod range_proof_mpc {
     pub use crate::errors::MPCError;
     pub use crate::range_proof::dealer;

@@ -1,5 +1,5 @@
 #![allow(non_snake_case)]
-#![doc(include = "../../docs/range-proof-protocol.md")]
+#![doc = include_str!("../../docs/range-proof-protocol.md")]
 
 extern crate alloc;
 #[cfg(feature = "std")]
@@ -10,6 +10,8 @@ use self::rand::thread_rng;
 use alloc::vec::Vec;
 
 use core::iter;
+#[cfg(feature = "scalar_range_proof")]
+use core::slice;
 
 use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
 use curve25519_dalek::scalar::Scalar;
@@ -44,7 +46,7 @@ pub mod party;
 /// the verifier.
 ///
 /// This implementation requires that both the bitsize `n` and the
-/// aggregation size `m` be powers of two, so that `n = 8, 16, 32, 64`
+/// aggregation size `m` be powers of two, so that `n = 8, 16, 32, 64, 128`
 /// and `m = 1, 2, 4, 8, 16, ...`.  Note that the aggregation size is
 /// not given as an explicit parameter, but is determined by the
 /// number of values or commitments passed to the prover or verifier.
@@ -104,7 +106,85 @@ impl RangeProof {
     /// let bp_gens = BulletproofGens::new(64, 1);
     ///
     /// // A secret value we want to prove lies in the range [0, 2^32)
-    /// let secret_value = 1037578891u64;
+    /// let secret_value = Scalar::from(1037578891u64);
+    ///
+    /// // The API takes a blinding factor for the commitment.
+    /// let blinding = Scalar::random(&mut thread_rng());
+    ///
+    /// // The proof can be chained to an existing transcript.
+    /// // Here we create a transcript with a doctest domain separator.
+    /// let mut prover_transcript = Transcript::new(b"doctest example");
+    ///
+    /// // Create a 32-bit rangeproof.
+    /// let (proof, committed_value) = RangeProof::prove_single(
+    ///     &bp_gens,
+    ///     &pc_gens,
+    ///     &mut prover_transcript,
+    ///     &secret_value,
+    ///     &blinding,
+    ///     32,
+    /// ).expect("A real program could handle errors");
+    ///
+    /// // Verification requires a transcript with identical initial state:
+    /// let mut verifier_transcript = Transcript::new(b"doctest example");
+    /// assert!(
+    ///     proof
+    ///         .verify_single(&bp_gens, &pc_gens, &mut verifier_transcript, &committed_value, 32)
+    ///         .is_ok()
+    /// );
+    /// # }
+    /// ```
+    #[cfg(feature = "scalar_range_proof")]
+    pub fn prove_single_with_rng<T: RngCore + CryptoRng>(
+        bp_gens: &BulletproofGens,
+        pc_gens: &PedersenGens,
+        transcript: &mut Transcript,
+        v: &Scalar,
+        v_blinding: &Scalar,
+        n: usize,
+        rng: &mut T,
+    ) -> Result<(RangeProof, CompressedRistretto), ProofError> {
+        let (p, Vs) = RangeProof::prove_multiple_with_rng(
+            bp_gens,
+            pc_gens,
+            transcript,
+            slice::from_ref(v),
+            slice::from_ref(v_blinding),
+            n,
+            rng,
+        )?;
+        Ok((p, Vs[0]))
+    }
+
+    /// Create a rangeproof for a given pair of value `v` and
+    /// blinding scalar `v_blinding`.
+    /// This is a convenience wrapper around [`RangeProof::prove_multiple`].
+    ///
+    /// # Example
+    /// ```
+    /// extern crate rand;
+    /// use rand::thread_rng;
+    ///
+    /// extern crate curve25519_dalek;
+    /// use curve25519_dalek::scalar::Scalar;
+    ///
+    /// extern crate merlin;
+    /// use merlin::Transcript;
+    ///
+    /// extern crate bulletproofs;
+    /// use bulletproofs::{BulletproofGens, PedersenGens, RangeProof};
+    ///
+    /// # fn main() {
+    /// // Generators for Pedersen commitments.  These can be selected
+    /// // independently of the Bulletproofs generators.
+    /// let pc_gens = PedersenGens::default();
+    ///
+    /// // Generators for Bulletproofs, valid for proofs up to bitsize 128
+    /// // and aggregation size up to 1.
+    /// let bp_gens = BulletproofGens::new(128, 1);
+    ///
+    /// // A secret value we want to prove lies in the range [0, 2^32)
+    /// let secret_value = 1037578891u128;
     ///
     /// // The API takes a blinding factor for the commitment.
     /// let blinding = Scalar::random(&mut thread_rng());
@@ -132,11 +212,12 @@ impl RangeProof {
     /// );
     /// # }
     /// ```
+    #[cfg(not(feature = "scalar_range_proof"))]
     pub fn prove_single_with_rng<T: RngCore + CryptoRng>(
         bp_gens: &BulletproofGens,
         pc_gens: &PedersenGens,
         transcript: &mut Transcript,
-        v: u64,
+        v: u128,
         v_blinding: &Scalar,
         n: usize,
         rng: &mut T,
@@ -157,12 +238,36 @@ impl RangeProof {
     /// blinding scalar `v_blinding`.
     /// This is a convenience wrapper around [`RangeProof::prove_single_with_rng`],
     /// passing in a threadsafe RNG.
-    #[cfg(feature = "std")]
+    #[cfg(all(feature = "std", feature = "scalar_range_proof"))]
     pub fn prove_single(
         bp_gens: &BulletproofGens,
         pc_gens: &PedersenGens,
         transcript: &mut Transcript,
-        v: u64,
+        v: &Scalar,
+        v_blinding: &Scalar,
+        n: usize,
+    ) -> Result<(RangeProof, CompressedRistretto), ProofError> {
+        RangeProof::prove_single_with_rng(
+            bp_gens,
+            pc_gens,
+            transcript,
+            v,
+            v_blinding,
+            n,
+            &mut thread_rng(),
+        )
+    }
+
+    /// Create a rangeproof for a given pair of value `v` and
+    /// blinding scalar `v_blinding`.
+    /// This is a convenience wrapper around [`RangeProof::prove_single_with_rng`],
+    /// passing in a threadsafe RNG.
+    #[cfg(all(feature = "std", not(feature = "scalar_range_proof")))]
+    pub fn prove_single(
+        bp_gens: &BulletproofGens,
+        pc_gens: &PedersenGens,
+        transcript: &mut Transcript,
+        v: u128,
         v_blinding: &Scalar,
         n: usize,
     ) -> Result<(RangeProof, CompressedRistretto), ProofError> {
@@ -203,7 +308,12 @@ impl RangeProof {
     /// let bp_gens = BulletproofGens::new(64, 16);
     ///
     /// // Four secret values we want to prove lie in the range [0, 2^32)
-    /// let secrets = [4242344947u64, 3718732727u64, 2255562556u64, 2526146994u64];
+    /// let secrets = [
+    ///     Scalar::from(4242344947u64),
+    ///     Scalar::from(3718732727u64),
+    ///     Scalar::from(2255562556u64),
+    ///     Scalar::from(2526146994u64),
+    /// ];
     ///
     /// // The API takes blinding factors for the commitments.
     /// let blindings: Vec<_> = (0..4).map(|_| Scalar::random(&mut thread_rng())).collect();
@@ -231,11 +341,12 @@ impl RangeProof {
     /// );
     /// # }
     /// ```
+    #[cfg(feature = "scalar_range_proof")]
     pub fn prove_multiple_with_rng<T: RngCore + CryptoRng>(
         bp_gens: &BulletproofGens,
         pc_gens: &PedersenGens,
         transcript: &mut Transcript,
-        values: &[u64],
+        values: &[Scalar],
         blindings: &[Scalar],
         n: usize,
         rng: &mut T,
@@ -256,6 +367,101 @@ impl RangeProof {
             // Collect the iterator of Results into a Result<Vec>, then unwrap it
             .collect::<Result<Vec<_>, _>>()?;
 
+        RangeProof::prove_multiple_with_rng_internal(parties, dealer, rng)
+    }
+
+    /// Create a rangeproof for a set of values.
+    ///
+    /// # Example
+    /// ```
+    /// extern crate rand;
+    /// use rand::thread_rng;
+    ///
+    /// extern crate curve25519_dalek;
+    /// use curve25519_dalek::scalar::Scalar;
+    ///
+    /// extern crate merlin;
+    /// use merlin::Transcript;
+    ///
+    /// extern crate bulletproofs;
+    /// use bulletproofs::{BulletproofGens, PedersenGens, RangeProof};
+    ///
+    /// # fn main() {
+    /// // Generators for Pedersen commitments.  These can be selected
+    /// // independently of the Bulletproofs generators.
+    /// let pc_gens = PedersenGens::default();
+    ///
+    /// // Generators for Bulletproofs, valid for proofs up to bitsize 64
+    /// // and aggregation size up to 16.
+    /// let bp_gens = BulletproofGens::new(128, 16);
+    ///
+    /// // Four secret values we want to prove lie in the range [0, 2^32)
+    /// let secrets = [
+    ///     4242344947u128,
+    ///     3718732727u128,
+    ///     2255562556u128,
+    ///     2526146994u128,
+    /// ];
+    ///
+    /// // The API takes blinding factors for the commitments.
+    /// let blindings: Vec<_> = (0..4).map(|_| Scalar::random(&mut thread_rng())).collect();
+    ///
+    /// // The proof can be chained to an existing transcript.
+    /// // Here we create a transcript with a doctest domain separator.
+    /// let mut prover_transcript = Transcript::new(b"doctest example");
+    ///
+    /// // Create an aggregated 32-bit rangeproof and corresponding commitments.
+    /// let (proof, commitments) = RangeProof::prove_multiple(
+    ///     &bp_gens,
+    ///     &pc_gens,
+    ///     &mut prover_transcript,
+    ///     &secrets,
+    ///     &blindings,
+    ///     32,
+    /// ).expect("A real program could handle errors");
+    ///
+    /// // Verification requires a transcript with identical initial state:
+    /// let mut verifier_transcript = Transcript::new(b"doctest example");
+    /// assert!(
+    ///     proof
+    ///         .verify_multiple(&bp_gens, &pc_gens, &mut verifier_transcript, &commitments, 32)
+    ///         .is_ok()
+    /// );
+    /// # }
+    /// ```
+    #[cfg(not(feature = "scalar_range_proof"))]
+    pub fn prove_multiple_with_rng<T: RngCore + CryptoRng>(
+        bp_gens: &BulletproofGens,
+        pc_gens: &PedersenGens,
+        transcript: &mut Transcript,
+        values: &[u128],
+        blindings: &[Scalar],
+        n: usize,
+        rng: &mut T,
+    ) -> Result<(RangeProof, Vec<CompressedRistretto>), ProofError> {
+        use self::dealer::*;
+        use self::party::*;
+
+        if values.len() != blindings.len() {
+            return Err(ProofError::WrongNumBlindingFactors);
+        }
+
+        let dealer = Dealer::new(bp_gens, pc_gens, transcript, n, values.len())?;
+
+        let parties: Vec<_> = values
+            .iter()
+            .zip(blindings.iter())
+            .map(|(&v, &v_blinding)| Party::new(bp_gens, pc_gens, v, v_blinding, n))
+            // Collect the iterator of Results into a Result<Vec>, then unwrap it
+            .collect::<Result<Vec<_>, _>>()?;
+        RangeProof::prove_multiple_with_rng_internal(parties, dealer, rng)
+    }
+
+    fn prove_multiple_with_rng_internal<T: RngCore + CryptoRng>(
+        parties: Vec<party::PartyAwaitingPosition>,
+        dealer: dealer::DealerAwaitingBitCommitments,
+        rng: &mut T,
+    ) -> Result<(RangeProof, Vec<CompressedRistretto>), ProofError> {
         let (parties, bit_commitments): (Vec<_>, Vec<_>) = parties
             .into_iter()
             .enumerate()
@@ -290,12 +496,35 @@ impl RangeProof {
     /// Create a rangeproof for a set of values.
     /// This is a convenience wrapper around [`RangeProof::prove_multiple_with_rng`],
     /// passing in a threadsafe RNG.
-    #[cfg(feature = "std")]
+    #[cfg(all(feature = "std", feature = "scalar_range_proof"))]
     pub fn prove_multiple(
         bp_gens: &BulletproofGens,
         pc_gens: &PedersenGens,
         transcript: &mut Transcript,
-        values: &[u64],
+        values: &[Scalar],
+        blindings: &[Scalar],
+        n: usize,
+    ) -> Result<(RangeProof, Vec<CompressedRistretto>), ProofError> {
+        RangeProof::prove_multiple_with_rng(
+            bp_gens,
+            pc_gens,
+            transcript,
+            values,
+            blindings,
+            n,
+            &mut thread_rng(),
+        )
+    }
+
+    /// Create a rangeproof for a set of values.
+    /// This is a convenience wrapper around [`RangeProof::prove_multiple_with_rng`],
+    /// passing in a threadsafe RNG.
+    #[cfg(all(feature = "std", not(feature = "scalar_range_proof")))]
+    pub fn prove_multiple(
+        bp_gens: &BulletproofGens,
+        pc_gens: &PedersenGens,
+        transcript: &mut Transcript,
+        values: &[u128],
         blindings: &[Scalar],
         n: usize,
     ) -> Result<(RangeProof, Vec<CompressedRistretto>), ProofError> {
@@ -355,7 +584,7 @@ impl RangeProof {
 
         // First, replay the "interactive" protocol using the proof
         // data to recompute all challenges.
-        if !(n == 8 || n == 16 || n == 32 || n == 64) {
+        if !(n == 8 || n == 16 || n == 32 || n == 64 || n == 128) {
             return Err(ProofError::InvalidBitsize);
         }
         if bp_gens.gens_capacity < n {
@@ -442,7 +671,7 @@ impl RangeProof {
                 .chain(bp_gens.H(n, m).map(|&x| Some(x)))
                 .chain(value_commitments.iter().map(|V| V.decompress())),
         )
-        .ok_or_else(|| ProofError::VerificationError)?;
+        .ok_or(ProofError::VerificationError)?;
 
         if mega_check.is_identity() {
             Ok(())
@@ -511,8 +740,8 @@ impl RangeProof {
 
         use crate::util::read32;
 
-        let A = CompressedRistretto(read32(&slice[0 * 32..]));
-        let S = CompressedRistretto(read32(&slice[1 * 32..]));
+        let A = CompressedRistretto(read32(&slice[0..]));
+        let S = CompressedRistretto(read32(&slice[32..]));
         let T_1 = CompressedRistretto(read32(&slice[2 * 32..]));
         let T_2 = CompressedRistretto(read32(&slice[3 * 32..]));
 
@@ -638,7 +867,7 @@ mod tests {
         //use bincode; // already present in lib.rs
 
         // Both prover and verifier have access to the generators and the proof
-        let max_bitsize = 64;
+        let max_bitsize = 128;
         let max_parties = 8;
         let pc_gens = PedersenGens::default();
         let bp_gens = BulletproofGens::new(max_bitsize, max_parties);
@@ -649,8 +878,13 @@ mod tests {
             let mut rng = rand::thread_rng();
 
             // 0. Create witness data
-            let (min, max) = (0u64, ((1u128 << n) - 1) as u64);
-            let values: Vec<u64> = (0..m).map(|_| rng.gen_range(min, max)).collect();
+            let (min, max) = (0u128, u128::MAX >> (u128::BITS as usize - n));
+
+            #[cfg(feature = "scalar_range_proof")]
+            let values: Vec<Scalar> = (0..m).map(|_| rng.gen_range(min, max).into()).collect();
+            #[cfg(not(feature = "scalar_range_proof"))]
+            let values: Vec<u128> = (0..m).map(|_| rng.gen_range(min, max)).collect();
+
             let blindings: Vec<Scalar> = (0..m).map(|_| Scalar::random(&mut rng)).collect();
 
             // 1. Create the proof
@@ -724,15 +958,35 @@ mod tests {
     }
 
     #[test]
+    fn create_and_verify_n_128_m_1() {
+        singleparty_create_and_verify_helper(128, 1);
+    }
+
+    #[test]
+    fn create_and_verify_n_128_m_2() {
+        singleparty_create_and_verify_helper(128, 2);
+    }
+
+    #[test]
+    fn create_and_verify_n_128_m_4() {
+        singleparty_create_and_verify_helper(128, 4);
+    }
+
+    #[test]
+    fn create_and_verify_n_128_m_8() {
+        singleparty_create_and_verify_helper(128, 8);
+    }
+
+    #[test]
     fn detect_dishonest_party_during_aggregation() {
         use self::dealer::*;
         use self::party::*;
 
         use crate::errors::MPCError;
 
-        // Simulate four parties, two of which will be dishonest and use a 64-bit value.
+        // Simulate four parties, two of which will be dishonest and use a 128-bit value.
         let m = 4;
-        let n = 32;
+        let n = 64;
 
         let pc_gens = PedersenGens::default();
         let bp_gens = BulletproofGens::new(n, m);
@@ -742,20 +996,33 @@ mod tests {
         let mut transcript = Transcript::new(b"AggregatedRangeProofTest");
 
         // Parties 0, 2 are honest and use a 32-bit value
-        let v0 = rng.gen::<u32>() as u64;
+
+        #[cfg(feature = "scalar_range_proof")]
+        let v0 = Scalar::from(rng.gen::<u64>());
+        #[cfg(not(feature = "scalar_range_proof"))]
+        let v0 = rng.gen::<u64>() as u128;
         let v0_blinding = Scalar::random(&mut rng);
         let party0 = Party::new(&bp_gens, &pc_gens, v0, v0_blinding, n).unwrap();
 
-        let v2 = rng.gen::<u32>() as u64;
+        #[cfg(feature = "scalar_range_proof")]
+        let v2 = Scalar::from(rng.gen::<u64>());
+        #[cfg(not(feature = "scalar_range_proof"))]
+        let v2 = rng.gen::<u64>() as u128;
         let v2_blinding = Scalar::random(&mut rng);
         let party2 = Party::new(&bp_gens, &pc_gens, v2, v2_blinding, n).unwrap();
 
         // Parties 1, 3 are dishonest and use a 64-bit value
-        let v1 = rng.gen::<u64>();
+        #[cfg(feature = "scalar_range_proof")]
+        let v1 = Scalar::from(rng.gen::<u128>());
+        #[cfg(not(feature = "scalar_range_proof"))]
+        let v1 = rng.gen::<u128>();
         let v1_blinding = Scalar::random(&mut rng);
         let party1 = Party::new(&bp_gens, &pc_gens, v1, v1_blinding, n).unwrap();
 
-        let v3 = rng.gen::<u64>();
+        #[cfg(feature = "scalar_range_proof")]
+        let v3 = Scalar::from(rng.gen::<u128>());
+        #[cfg(not(feature = "scalar_range_proof"))]
+        let v3 = rng.gen::<u128>();
         let v3_blinding = Scalar::random(&mut rng);
         let party3 = Party::new(&bp_gens, &pc_gens, v3, v3_blinding, n).unwrap();
 
@@ -814,7 +1081,10 @@ mod tests {
         let mut rng = rand::thread_rng();
         let mut transcript = Transcript::new(b"AggregatedRangeProofTest");
 
-        let v0 = rng.gen::<u32>() as u64;
+        #[cfg(feature = "scalar_range_proof")]
+        let v0 = Scalar::from(rng.gen::<u64>());
+        #[cfg(not(feature = "scalar_range_proof"))]
+        let v0 = rng.gen::<u64>() as u128;
         let v0_blinding = Scalar::random(&mut rng);
         let party0 = Party::new(&bp_gens, &pc_gens, v0, v0_blinding, n).unwrap();
 

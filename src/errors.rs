@@ -21,8 +21,11 @@ pub enum ProofError {
     #[cfg_attr(feature = "std", error("Wrong number of blinding factors supplied."))]
     WrongNumBlindingFactors,
     /// This error occurs when attempting to create a proof with
-    /// bitsize other than \\(8\\), \\(16\\), \\(32\\), or \\(64\\).
-    #[cfg_attr(feature = "std", error("Invalid bitsize, must have n = 8,16,32,64."))]
+    /// bitsize other than \\(8\\), \\(16\\), \\(32\\), \\(64\\) or \\(128\\).
+    #[cfg_attr(
+        feature = "std",
+        error("Invalid bitsize, must have n = 8,16,32,64,128.")
+    )]
     InvalidBitsize,
     /// This error occurs when attempting to create an aggregated
     /// proof with non-power-of-two aggregation size.
@@ -73,8 +76,11 @@ pub enum MPCError {
     #[cfg_attr(feature = "std", error("Dealer gave a malicious challenge value."))]
     MaliciousDealer,
     /// This error occurs when attempting to create a proof with
-    /// bitsize other than \\(8\\), \\(16\\), \\(32\\), or \\(64\\).
-    #[cfg_attr(feature = "std", error("Invalid bitsize, must have n = 8,16,32,64"))]
+    /// bitsize other than \\(8\\), \\(16\\), \\(32\\), \\(64\\) or \\(128\\).
+    #[cfg_attr(
+        feature = "std",
+        error("Invalid bitsize, must have n = 8,16,32,64,128")
+    )]
     InvalidBitsize,
     /// This error occurs when attempting to create an aggregated
     /// proof with non-power-of-two aggregation size.

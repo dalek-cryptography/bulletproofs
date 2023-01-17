@@ -112,12 +112,15 @@ The following example shows how to create and verify a 32-bit rangeproof.
 // independently of the Bulletproofs generators.
 let pc_gens = PedersenGens::default();
 
-// Generators for Bulletproofs, valid for proofs up to bitsize 64
+// Generators for Bulletproofs, valid for proofs up to bitsize 128
 // and aggregation size up to 1.
-let bp_gens = BulletproofGens::new(64, 1);
+let bp_gens = BulletproofGens::new(128, 1);
 
 // A secret value we want to prove lies in the range [0, 2^32)
-let secret_value = 1037578891u64;
+# #[cfg(not(feature = "scalar_range_proof"))]
+let secret_value = 1037578891u128;
+# #[cfg(feature = "scalar_range_proof")]
+# let secret_value = &Scalar::from(1037578891u128);
 
 // The API takes a blinding factor for the commitment.
 let blinding = Scalar::random(&mut thread_rng());

@@ -82,7 +82,8 @@ impl TranscriptProtocol for Transcript {
         if point.is_identity() {
             Err(ProofError::VerificationError)
         } else {
-            Ok(self.append_message(label, point.as_bytes()))
+            self.append_message(label, point.as_bytes());
+            Ok(())
         }
     }
 

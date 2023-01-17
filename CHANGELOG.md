@@ -2,6 +2,13 @@
 
 Entries are listed in reverse chronological order.
 
+## 3.0.0
+
+* Update `curve25519-dalek`, `sha3`, `digest` and `merlin` versions.
+* Add `scalar_range_proof` feature, which allow `RangeProof` to be used with `Scalar`.
+* Allow range proof with bitsize n = 128.
+* Use `u128` instead of `u64` in range proof.
+
 ## 2.0.0
 
 * Switch from `failure` to `std`-compatible errors via `thiserror`.
