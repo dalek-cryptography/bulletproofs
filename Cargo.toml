@@ -5,7 +5,7 @@ name = "bulletproofs"
 # - update html_root_url
 # - ensure yoloproofs was disabled in an atomic (revertable) commit
 # - update CHANGELOG
-version = "2.0.0"
+version = "3.0.0"
 authors = ["Cathie Yun <cathieyun@gmail.com>", 
            "Henry de Valence <hdevalence@hdevalence.ca>",
            "Oleg Andreev <oleganza@gmail.com>"]
