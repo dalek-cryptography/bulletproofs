@@ -16,9 +16,6 @@ use bulletproofs::{BulletproofGens, PedersenGens};
 static AGGREGATION_SIZES: [usize; 6] = [1, 2, 4, 8, 16, 32];
 
 fn create_aggregated_rangeproof_helper(n: usize, c: &mut Criterion) {
-    #[cfg(not(feature = "scalar_range_proof"))]
-    let label = format!("Aggregated {}-bit rangeproof verification", n);
-    #[cfg(feature = "scalar_range_proof")]
     let label = format!("Aggregated {}-bit rangeproof verification using Scalar", n);
 
     c.bench_function_over_inputs(
@@ -29,12 +26,7 @@ fn create_aggregated_rangeproof_helper(n: usize, c: &mut Criterion) {
             let mut rng = rand::thread_rng();
 
             let (min, max) = (0u128, u128::MAX >> (u128::BITS as usize - n));
-
-            #[cfg(not(feature = "scalar_range_proof"))]
-            let values: Vec<u128> = (0..m).map(|_| rng.gen_range(min, max)).collect();
-            #[cfg(feature = "scalar_range_proof")]
             let values: Vec<Scalar> = (0..m).map(|_| rng.gen_range(min, max).into()).collect();
-
             let blindings: Vec<Scalar> = (0..m).map(|_| Scalar::random(&mut rng)).collect();
 
             b.iter(|| {
@@ -76,9 +68,6 @@ fn create_aggregated_rangeproof_n_128(c: &mut Criterion) {
 }
 
 fn verify_aggregated_rangeproof_helper(n: usize, c: &mut Criterion) {
-    #[cfg(not(feature = "scalar_range_proof"))]
-    let label = format!("Aggregated {}-bit rangeproof verification", n);
-    #[cfg(feature = "scalar_range_proof")]
     let label = format!("Aggregated {}-bit rangeproof verification using Scalar", n);
 
     c.bench_function_over_inputs(
@@ -89,12 +78,7 @@ fn verify_aggregated_rangeproof_helper(n: usize, c: &mut Criterion) {
             let mut rng = rand::thread_rng();
 
             let (min, max) = (0u128, u128::MAX >> (u128::BITS as usize - n));
-
-            #[cfg(not(feature = "scalar_range_proof"))]
-            let values: Vec<u128> = (0..m).map(|_| rng.gen_range(min, max)).collect();
-            #[cfg(feature = "scalar_range_proof")]
             let values: Vec<Scalar> = (0..m).map(|_| rng.gen_range(min, max).into()).collect();
-
             let blindings: Vec<Scalar> = (0..m).map(|_| Scalar::random(&mut rng)).collect();
 
             let mut transcript = Transcript::new(b"AggregateRangeProofBenchmark");

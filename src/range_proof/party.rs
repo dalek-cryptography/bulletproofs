@@ -34,6 +34,7 @@ pub struct Party {}
 
 impl Party {
     /// Constructs a `PartyAwaitingPosition` with the given rangeproof parameters.
+    #[cfg(feature = "scalar_range_proof")]
     pub fn new<'a>(
         bp_gens: &'a BulletproofGens,
         pc_gens: &'a PedersenGens,
@@ -59,14 +60,54 @@ impl Party {
             V,
         })
     }
+
+    /// Constructs a `PartyAwaitingPosition` with the given rangeproof parameters.
+    #[cfg(not(feature = "scalar_range_proof"))]
+    pub fn new<'a>(
+        bp_gens: &'a BulletproofGens,
+        pc_gens: &'a PedersenGens,
+        v: u128,
+        v_blinding: Scalar,
+        n: usize,
+    ) -> Result<PartyAwaitingPosition<'a>, MPCError> {
+        if !(n == 8 || n == 16 || n == 32 || n == 64 || n == 128) {
+            return Err(MPCError::InvalidBitsize);
+        }
+        if bp_gens.gens_capacity < n {
+            return Err(MPCError::InvalidGeneratorsLength);
+        }
+
+        let V = pc_gens.commit(v.into(), v_blinding).compress();
+
+        Ok(PartyAwaitingPosition {
+            bp_gens,
+            pc_gens,
+            n,
+            v,
+            v_blinding,
+            V,
+        })
+    }
 }
 
 /// A party waiting for the dealer to assign their position in the aggregation.
+#[cfg(feature = "scalar_range_proof")]
 pub struct PartyAwaitingPosition<'a> {
     bp_gens: &'a BulletproofGens,
     pc_gens: &'a PedersenGens,
     n: usize,
     v: Scalar,
+    v_blinding: Scalar,
+    V: CompressedRistretto,
+}
+
+/// A party waiting for the dealer to assign their position in the aggregation.
+#[cfg(not(feature = "scalar_range_proof"))]
+pub struct PartyAwaitingPosition<'a> {
+    bp_gens: &'a BulletproofGens,
+    pc_gens: &'a PedersenGens,
+    n: usize,
+    v: u128,
     v_blinding: Scalar,
     V: CompressedRistretto,
 }
@@ -103,7 +144,11 @@ impl<'a> PartyAwaitingPosition<'a> {
         for (i, (G_i, H_i)) in bp_share.G(self.n).zip(bp_share.H(self.n)).enumerate() {
             // If v_i = 0, we add a_L[i] * G[i] + a_R[i] * H[i] = - H[i]
             // If v_i = 1, we add a_L[i] * G[i] + a_R[i] * H[i] =   G[i]
+            #[cfg(feature = "scalar_range_proof")]
             let v_i = Choice::from(extract_scalar_bit(&self.v, i));
+            #[cfg(not(feature = "scalar_range_proof"))]
+            let v_i = Choice::from(((self.v >> i) & 1) as u8);
+
             let mut point = -H_i;
             point.conditional_assign(G_i, v_i);
             A += point;
@@ -152,9 +197,25 @@ impl<'a> Drop for PartyAwaitingPosition<'a> {
 
 /// A party which has committed to the bits of its value
 /// and is waiting for the aggregated value challenge from the dealer.
+#[cfg(feature = "scalar_range_proof")]
 pub struct PartyAwaitingBitChallenge<'a> {
     n: usize, // bitsize of the range
     v: Scalar,
+    v_blinding: Scalar,
+    j: usize,
+    pc_gens: &'a PedersenGens,
+    a_blinding: Scalar,
+    s_blinding: Scalar,
+    s_L: Vec<Scalar>,
+    s_R: Vec<Scalar>,
+}
+
+/// A party which has committed to the bits of its value
+/// and is waiting for the aggregated value challenge from the dealer.
+#[cfg(not(feature = "scalar_range_proof"))]
+pub struct PartyAwaitingBitChallenge<'a> {
+    n: usize, // bitsize of the range
+    v: u128,
     v_blinding: Scalar,
     j: usize,
     pc_gens: &'a PedersenGens,
@@ -194,7 +255,11 @@ impl<'a> PartyAwaitingBitChallenge<'a> {
         let mut exp_y = offset_y; // start at y^j
         let mut exp_2 = Scalar::one(); // start at 2^0 = 1
         for i in 0..n {
+            #[cfg(not(feature = "scalar_range_proof"))]
+            let a_L_i = Scalar::from((self.v >> i) & 1);
+            #[cfg(feature = "scalar_range_proof")]
             let a_L_i = Scalar::from(extract_scalar_bit(&self.v, i));
+
             let a_R_i = a_L_i - Scalar::one();
 
             l_poly.0[i] = a_L_i - vc.z;
@@ -317,6 +382,7 @@ impl Drop for PartyAwaitingPolyChallenge {
     }
 }
 
+#[cfg(feature = "scalar_range_proof")]
 fn extract_scalar_bit(scalar: &Scalar, index: usize) -> u8 {
     let u8_bits = u8::BITS as usize;
     let byte_index = index / u8_bits;

@@ -42,9 +42,14 @@ default = ["std", "avx2_backend"]
 avx2_backend = ["curve25519-dalek/avx2_backend"]
 # yoloproofs = []
 std = ["rand", "rand/std", "thiserror"]
+scalar_range_proof = []
 
 [[test]]
 name = "range_proof"
+
+[[test]]
+name = "scalar_range_proof"
+required-features = ["scalar_range_proof"]
 
 [[test]]
 name = "r1cs"
@@ -67,3 +72,7 @@ required-features = ["yoloproofs"]
 name = "linear_proof"
 harness = false
 
+[[bench]]
+name = "scalar_range_proof"
+harness = false
+required-features = ["scalar_range_proof"]

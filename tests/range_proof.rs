@@ -1,8 +1,10 @@
+#[cfg(not(feature = "scalar_range_proof"))]
+use rand_chacha::ChaChaRng;
+#[cfg(not(feature = "scalar_range_proof"))]
 use rand_core::SeedableRng;
 
-use rand_chacha::ChaChaRng;
-
 use curve25519_dalek::ristretto::CompressedRistretto;
+#[cfg(not(feature = "scalar_range_proof"))]
 use curve25519_dalek::scalar::Scalar;
 
 use merlin::Transcript;
@@ -98,6 +100,7 @@ fn deserialize_and_verify() {
 // It can be run by uncommenting the #[test] annotation.
 // We allow(dead_code) to ensure that it continues to compile.
 //#[test]
+#[cfg(not(feature = "scalar_range_proof"))]
 #[allow(dead_code)]
 fn generate_test_vectors() {
     let pc_gens = PedersenGens::default();
@@ -107,9 +110,8 @@ fn generate_test_vectors() {
     // generated reproducibly.
     let mut test_rng = ChaChaRng::from_seed([24u8; 32]);
 
-    let value_range = 0u64..8;
-    let values = value_range.clone().map(Scalar::from).collect::<Vec<_>>();
-    let blindings = value_range
+    let values = vec![0u128, 1, 2, 3, 4, 5, 6, 7];
+    let blindings = (0..8)
         .map(|_| Scalar::random(&mut test_rng))
         .collect::<Vec<_>>();
 
