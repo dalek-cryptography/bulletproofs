@@ -1,5 +1,5 @@
 [package]
-name = "bulletproofs-og"
+name = "bulletproofs"
 # Before doing a release:
 # - update version field
 # - update html_root_url
