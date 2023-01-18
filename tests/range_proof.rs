@@ -100,6 +100,7 @@ fn deserialize_and_verify() {
 //#[test]
 #[allow(dead_code)]
 fn generate_test_vectors() {
+    use rand_chacha::rand_core::SeedableRng;
     let pc_gens = PedersenGens::default();
     let bp_gens = BulletproofGens::new(64, 8);
 

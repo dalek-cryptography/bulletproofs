@@ -12,8 +12,7 @@ use curve25519_dalek::constants::RISTRETTO_BASEPOINT_POINT;
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::MultiscalarMul;
-use digest::{ExtendableOutput, Update, XofReader};
-use sha3::{Sha3_512, Shake256};
+use sha3::{Sha3_512, Shake256, Shake256Reader, digest::{Update, ExtendableOutput, XofReader}};
 
 /// Represents a pair of base points for Pedersen commitments.
 ///
@@ -56,17 +55,26 @@ impl Default for PedersenGens {
 /// orthogonal generators.  The sequence can be deterministically
 /// produced starting with an arbitrary point.
 struct GeneratorsChain {
+<<<<<<< HEAD
     // This should just be Shake256::Reader, but rustc trips up on that.
     // https://github.com/rust-lang/rust/issues/38078
     reader: <Shake256 as ExtendableOutput>::Reader,
+=======
+    reader: Shake256Reader,
+>>>>>>> b540a5b (Update sha3 crate and other crates)
 }
 
 impl GeneratorsChain {
     /// Creates a chain of generators, determined by the hash of `label`.
     fn new(label: &[u8]) -> Self {
         let mut shake = Shake256::default();
+<<<<<<< HEAD
         shake.update(b"GeneratorsChain");
         shake.update(label);
+=======
+        let _ = shake.update(b"GeneratorsChain");
+        let _ = shake.update(label);
+>>>>>>> b540a5b (Update sha3 crate and other crates)
 
         GeneratorsChain {
             reader: shake.finalize_xof(),
