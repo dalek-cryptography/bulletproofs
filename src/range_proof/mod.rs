@@ -2,11 +2,8 @@
 #![cfg_attr(feature = "docs", doc(include = "../../docs/range-proof-protocol.md"))]
 
 extern crate alloc;
-#[cfg(feature = "std")]
-extern crate rand;
 
-#[cfg(feature = "std")]
-use self::rand::thread_rng;
+use rand::thread_rng;
 use alloc::vec::Vec;
 
 use core::iter;
@@ -645,8 +642,8 @@ mod tests {
 
         // Prover's scope
         let (proof_bytes, value_commitments) = {
-            use self::rand::Rng;
-            let mut rng = rand::thread_rng();
+            use rand::Rng;
+            let mut rng = thread_rng();
 
             // 0. Create witness data
             let (min, max) = (0u64, ((1u128 << n) - 1) as u64);
@@ -737,8 +734,8 @@ mod tests {
         let pc_gens = PedersenGens::default();
         let bp_gens = BulletproofGens::new(n, m);
 
-        use self::rand::Rng;
-        let mut rng = rand::thread_rng();
+        use rand::Rng;
+        let mut rng = thread_rng();
         let mut transcript = Transcript::new(b"AggregatedRangeProofTest");
 
         // Parties 0, 2 are honest and use a 32-bit value
@@ -810,8 +807,8 @@ mod tests {
         let pc_gens = PedersenGens::default();
         let bp_gens = BulletproofGens::new(n, m);
 
-        use self::rand::Rng;
-        let mut rng = rand::thread_rng();
+        use rand::Rng;
+        let mut rng = thread_rng();
         let mut transcript = Transcript::new(b"AggregatedRangeProofTest");
 
         let v0 = rng.gen::<u32>() as u64;
