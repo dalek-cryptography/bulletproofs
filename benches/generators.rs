@@ -5,7 +5,7 @@ extern crate criterion;
 use criterion::Criterion;
 
 fn pc_gens(c: &mut Criterion) {
-    c.bench_function("PedersenGens::new", |b| b.iter(|| PedersenGens::default()));
+    c.bench_function("PedersenGens::new", |b| b.iter(PedersenGens::default));
 }
 
 fn bp_gens(c: &mut Criterion) {

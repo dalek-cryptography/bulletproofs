@@ -7,7 +7,7 @@ use merlin::Transcript;
 
 use bulletproofs_og::{BulletproofGens, PedersenGens, RangeProof};
 
-use hex;
+
 
 // Tests that proofs generated with v1.0.0 continue to verify in later versions.
 #[test]
