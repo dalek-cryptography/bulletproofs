@@ -18,7 +18,7 @@ description = "A pure-Rust implementation of Bulletproofs using Ristretto"
 edition = "2018"
 
 [dependencies]
-curve25519-dalek = { version = "4.0.0-pre.5", default-features = false, features = ["serde", "alloc"] }
+curve25519-dalek = { version = "4.0.0-pre.5", default-features = false, features = ["rand_core", "serde", "alloc"] }
 subtle = { version = "2", default-features = false }
 sha3 = { version = "0.10", default-features = false }
 digest = "0.10"
@@ -49,7 +49,6 @@ name = "range_proof"
 
 [[test]]
 name = "r1cs"
-required-features = ["yoloproofs"]
 
 [[bench]]
 name = "range_proof"
@@ -63,7 +62,10 @@ harness = false
 [[bench]]
 name = "r1cs"
 harness = false
+<<<<<<< HEAD
 required-features = ["yoloproofs", "avx2_backend"]
 
 [patch.crates-io]
 curve25519-dalek = { git = "https://github.com/mobilecoinfoundation/curve25519-dalek.git", rev = "8791722e0273762552c9a056eaccb7df6baf44d7" }
+=======
+>>>>>>> bc883b8 (Fix rand dependency)
