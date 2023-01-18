@@ -1,12 +1,11 @@
 #![allow(non_snake_case)]
 
-extern crate bulletproofs_og;
 extern crate curve25519_dalek;
 extern crate merlin;
 extern crate rand;
 
-use bulletproofs_og::r1cs::*;
-use bulletproofs_og::{BulletproofGens, PedersenGens};
+use bulletproofs::r1cs::*;
+use bulletproofs::{Prover, BulletproofGens, PedersenGens};
 use curve25519_dalek::ristretto::CompressedRistretto;
 use curve25519_dalek::scalar::Scalar;
 use merlin::Transcript;
