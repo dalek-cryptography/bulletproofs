@@ -7,7 +7,7 @@ use curve25519_dalek::scalar::Scalar;
 
 use merlin::Transcript;
 
-use bulletproofs_og::{BulletproofGens, PedersenGens, RangeProof};
+use bulletproofs::{BulletproofGens, PedersenGens, RangeProof};
 
 use hex;
 
