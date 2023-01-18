@@ -35,7 +35,7 @@ clear_on_drop = { version = "0.2", default-features = false }
 hex = "0.4"
 criterion = "0.3"
 bincode = "1"
-rand_chacha = "0.3"
+rand_chacha = "0.3.1"
 
 [features]
 default = ["std"]
@@ -49,6 +49,7 @@ name = "range_proof"
 
 [[test]]
 name = "r1cs"
+required-features = ["yoloproofs"]
 
 [[bench]]
 name = "range_proof"
@@ -62,10 +63,4 @@ harness = false
 [[bench]]
 name = "r1cs"
 harness = false
-<<<<<<< HEAD
-required-features = ["yoloproofs", "avx2_backend"]
-
-[patch.crates-io]
-curve25519-dalek = { git = "https://github.com/mobilecoinfoundation/curve25519-dalek.git", rev = "8791722e0273762552c9a056eaccb7df6baf44d7" }
-=======
->>>>>>> bc883b8 (Fix rand dependency)
+required-features = ["yoloproofs"]
