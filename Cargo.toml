@@ -39,12 +39,10 @@ rand_chacha = "0.3"
 
 [features]
 default = ["std"]
-avx2_backend = ["curve25519-dalek/avx2_backend"]
 yoloproofs = []
-std = ["rand", "rand/std", "rand/std_rng", "thiserror", "curve25519-dalek/std", "digest/std"]
-nightly = ["curve25519-dalek/nightly", "curve25519-dalek/alloc", "subtle/nightly", "clear_on_drop/nightly"]
+std = ["rand", "rand/std", "rand/std_rng", "thiserror", "digest/std"]
+nightly = ["curve25519-dalek/alloc", "subtle/nightly", "clear_on_drop/nightly"]
 docs = ["nightly"]
-
 
 [[test]]
 name = "range_proof"
