@@ -22,7 +22,7 @@ pub enum Variable {
 impl From<Variable> for LinearCombination {
     fn from(v: Variable) -> LinearCombination {
         LinearCombination {
-            terms: vec![(v, Scalar::one())],
+            terms: vec![(v, Scalar::ONE)],
         }
     }
 }
@@ -78,7 +78,7 @@ impl Add<Variable> for Scalar {
 
     fn add(self, other: Variable) -> Self::Output {
         LinearCombination {
-            terms: vec![(Variable::One(), self), (other, Scalar::one())],
+            terms: vec![(Variable::One(), self), (other, Scalar::ONE)],
         }
     }
 }
@@ -88,7 +88,7 @@ impl Sub<Variable> for Scalar {
 
     fn sub(self, other: Variable) -> Self::Output {
         LinearCombination {
-            terms: vec![(Variable::One(), self), (other, -Scalar::one())],
+            terms: vec![(Variable::One(), self), (other, -Scalar::ONE)],
         }
     }
 }

@@ -373,7 +373,7 @@ pub fn range_proof<CS: ConstraintSystem>(
     v_assignment: Option<u64>,
     n: usize,
 ) -> Result<(), R1CSError> {
-    let mut exp_2 = Scalar::one();
+    let mut exp_2 = Scalar::ONE;
     for i in 0..n {
         // Create low-level variables and add them to constraints
         let (a, b, o) = cs.allocate_multiplier(v_assignment.map(|q| {

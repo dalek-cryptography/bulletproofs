@@ -126,7 +126,7 @@ impl ProofShare {
             });
 
         let P_check = RistrettoPoint::vartime_multiscalar_mul(
-            iter::once(Scalar::one())
+            iter::once(Scalar::ONE)
                 .chain(iter::once(*x))
                 .chain(iter::once(-self.e_blinding))
                 .chain(g)

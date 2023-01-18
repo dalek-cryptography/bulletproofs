@@ -16,7 +16,21 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="7c999ca2-2a8b-4523-b981-edf083275c4f" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/Cargo.toml" beforeDir="false" afterPath="$PROJECT_DIR$/Cargo.toml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/.gitignore" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/bulletproofs.iml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/modules.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/inner_product_proof.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/inner_product_proof.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/lib.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/r1cs/linear_combination.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/r1cs/linear_combination.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/r1cs/prover.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/r1cs/prover.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/r1cs/verifier.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/r1cs/verifier.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/range_proof/dealer.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/range_proof/dealer.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/range_proof/messages.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/range_proof/messages.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/range_proof/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/range_proof/mod.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/range_proof/party.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/range_proof/party.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/util.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/util.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/r1cs.rs" beforeDir="false" afterPath="$PROJECT_DIR$/tests/r1cs.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -71,7 +85,7 @@
       <option name="presentableId" value="Default" />
       <updated>1674004467774</updated>
       <workItem from="1674004468863" duration="7232000" />
-      <workItem from="1674015245968" duration="2587000" />
+      <workItem from="1674015245968" duration="2956000" />
     </task>
     <servers />
   </component>
