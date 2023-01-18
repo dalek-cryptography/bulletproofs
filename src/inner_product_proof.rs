@@ -1,5 +1,5 @@
 #![allow(non_snake_case)]
-#![cfg_attr(feature = "docs", doc(include = "../docs/inner-product-protocol.md"))]
+#![doc = include_str!("../docs/inner-product-protocol.md")]
 
 extern crate alloc;
 
@@ -185,8 +185,8 @@ impl InnerProductProof {
         }
 
         InnerProductProof {
-            L_vec: L_vec,
-            R_vec: R_vec,
+            L_vec,
+            R_vec,
             a: a[0],
             b: b[0],
         }
