@@ -498,6 +498,7 @@ impl RangeProof {
     /// Deserializes the proof from a byte slice.
     ///
     /// Returns an error if the byte slice cannot be parsed into a `RangeProof`.
+    #[allow(clippy::erasing_op)]
     pub fn from_bytes(slice: &[u8]) -> Result<RangeProof, ProofError> {
         if slice.len() % 32 != 0 {
             return Err(ProofError::FormatError);
@@ -513,12 +514,12 @@ impl RangeProof {
         let T_1 = CompressedRistretto(read32(&slice[2 * 32..]));
         let T_2 = CompressedRistretto(read32(&slice[3 * 32..]));
 
-        let t_x = Scalar::from_canonical_bytes(read32(&slice[4 * 32..]))
-            .ok_or(ProofError::FormatError)?;
-        let t_x_blinding = Scalar::from_canonical_bytes(read32(&slice[5 * 32..]))
-            .ok_or(ProofError::FormatError)?;
-        let e_blinding = Scalar::from_canonical_bytes(read32(&slice[6 * 32..]))
-            .ok_or(ProofError::FormatError)?;
+        let t_x = Scalar::from_canonical_bytes(read32(&slice[4 * 32..]));
+        let t_x = Option::from(t_x).ok_or(ProofError::FormatError)?;
+        let t_x_blinding = Scalar::from_canonical_bytes(read32(&slice[5 * 32..]));
+        let t_x_blinding = Option::from(t_x_blinding).ok_or(ProofError::FormatError)?;
+        let e_blinding = Scalar::from_canonical_bytes(read32(&slice[6 * 32..]));
+        let e_blinding = Option::from(e_blinding).ok_or(ProofError::FormatError)?;
 
         let ipp_proof = InnerProductProof::from_bytes(&slice[7 * 32..])?;
 
@@ -647,7 +648,7 @@ mod tests {
 
             // 0. Create witness data
             let (min, max) = (0u64, ((1u128 << n) - 1) as u64);
-            let values: Vec<u64> = (0..m).map(|_| rng.gen_range(min..max)).collect();
+            let values: Vec<u64> = (0..m).map(|_| rng.gen_range(min..=max)).collect();
             let blindings: Vec<Scalar> = (0..m).map(|_| Scalar::random(&mut rng)).collect();
 
             // 1. Create the proof
