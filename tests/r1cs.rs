@@ -4,8 +4,8 @@ extern crate curve25519_dalek;
 extern crate merlin;
 extern crate rand;
 
-use bulletproofs::r1cs::*;
-use bulletproofs::{BulletproofGens, PedersenGens};
+use bulletproofs_og::r1cs::*;
+use bulletproofs_og::{BulletproofGens, PedersenGens};
 use curve25519_dalek::ristretto::CompressedRistretto;
 use curve25519_dalek::scalar::Scalar;
 use merlin::Transcript;

@@ -1,5 +1,4 @@
 #![cfg_attr(not(feature = "std"), no_std)]
-#![cfg_attr(feature = "docs", deny(missing_docs))]
 #![cfg_attr(feature = "docs", doc(include = "../README.md"))]
 #![cfg_attr(
     feature = "docs",
@@ -7,7 +6,7 @@
 )]
 #![cfg_attr(
     feature = "docs",
-    doc(html_root_url = "https://docs.rs/bulletproofs/4.0.0-pre.5")
+    doc(html_root_url = "https://docs.rs/bulletproofs-og/4.0.0-pre.2")
 )]
 
 extern crate alloc;
