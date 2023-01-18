@@ -3,8 +3,8 @@
 
 extern crate alloc;
 
-use rand::thread_rng;
 use alloc::vec::Vec;
+use rand::thread_rng;
 
 use core::iter;
 

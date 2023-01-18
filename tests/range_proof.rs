@@ -7,8 +7,6 @@ use merlin::Transcript;
 
 use bulletproofs_og::{BulletproofGens, PedersenGens, RangeProof};
 
-
-
 // Tests that proofs generated with v1.0.0 continue to verify in later versions.
 #[test]
 fn deserialize_and_verify() {

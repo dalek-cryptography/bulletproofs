@@ -400,8 +400,7 @@ impl InnerProductProof {
         }
 
         let pos = 2 * lg_n * 32;
-        let a =
-            Scalar::from_canonical_bytes(read32(&slice[pos..]));
+        let a = Scalar::from_canonical_bytes(read32(&slice[pos..]));
         let a = Option::from(a).ok_or(ProofError::FormatError)?;
         let b = Scalar::from_canonical_bytes(read32(&slice[pos + 32..]));
         let b = Option::from(b).ok_or(ProofError::FormatError)?;

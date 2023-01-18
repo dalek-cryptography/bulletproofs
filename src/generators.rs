@@ -12,7 +12,10 @@ use curve25519_dalek::constants::RISTRETTO_BASEPOINT_POINT;
 use curve25519_dalek::ristretto::RistrettoPoint;
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::MultiscalarMul;
-use sha3::{Sha3_512, Shake256, Shake256Reader, digest::{Update, ExtendableOutput, XofReader}};
+use sha3::{
+    digest::{ExtendableOutput, Update, XofReader},
+    Sha3_512, Shake256, Shake256Reader,
+};
 
 /// Represents a pair of base points for Pedersen commitments.
 ///

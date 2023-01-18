@@ -1,5 +1,4 @@
 #![doc = include_str!("../../docs/r1cs-docs-example.md")]
-
 #![doc = include_str!("../../docs/cs-proof.md")]
 mod notes {}
 
