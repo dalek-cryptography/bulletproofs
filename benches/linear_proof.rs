@@ -64,7 +64,8 @@ fn create_linear_proof_helper(c: &mut Criterion) {
                     G.clone(),
                     &F,
                     &B,
-                ).unwrap();
+                )
+                .unwrap();
             })
         },
         TEST_SIZES,
@@ -141,7 +142,8 @@ fn linear_verify(c: &mut Criterion) {
                     G.clone(),
                     &F,
                     &B,
-                ).unwrap();
+                )
+                .unwrap();
 
                 (proof, C)
             };
