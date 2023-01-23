@@ -54,8 +54,31 @@ impl LinearProof {
         F: &RistrettoPoint,
         // Pedersen generator B, for committing to the blinding value
         B: &RistrettoPoint,
-    ) -> LinearProof {
-        let mut n = a_vec.len();
+    ) -> Result<LinearProof, ProofError> {
+        let mut n = b_vec.len();
+        // All of the input vectors must have the same length.
+        if G_vec.len() != n {
+            return Err(ProofError::InvalidGeneratorsLength);
+        }
+        if a_vec.len() != n {
+            return Err(ProofError::InvalidInputLength);
+        }
+        // All of the input vectors must have a length that is a power of two.
+        if !n.is_power_of_two() {
+            return Err(ProofError::InvalidInputLength);
+        }
+
+        // Append all public data to the transcript
+        transcript.innerproduct_domain_sep(n as u64);
+        transcript.append_point(b"C", &C);
+        for b_i in &b_vec {
+            transcript.append_scalar(b"b_i", b_i);
+        }
+        for G_i in &G_vec {
+            transcript.append_point(b"G_i", &G_i.compress());
+        }
+        transcript.append_point(b"F", &F.compress());
+        transcript.append_point(b"B", &B.compress());
 
         // Create slices G, H, a, b backed by their respective
         // vectors. This lets us reslice as we compress the lengths
@@ -63,20 +86,6 @@ impl LinearProof {
         let mut G = &mut G_vec[..];
         let mut a = &mut a_vec[..];
         let mut b = &mut b_vec[..];
-
-        // All of the input vectors must have the same length.
-        assert_eq!(G.len(), n);
-        assert_eq!(a.len(), n);
-        assert_eq!(b.len(), n);
-
-        // All of the input vectors must have a length that is a power of two.
-        assert!(n.is_power_of_two());
-
-        transcript.innerproduct_domain_sep(n as u64);
-        transcript.append_point(b"C", &C);
-        for i in 0..n {
-            transcript.append_scalar(b"b_i", &b[i]);
-        }
 
         let lg_n = n.next_power_of_two().trailing_zeros() as usize;
         let mut L_vec = Vec::with_capacity(lg_n);
@@ -143,18 +152,17 @@ impl LinearProof {
         let a_star = s_star + x_star * a[0];
         let r_star = t_star + x_star * r;
 
-        LinearProof {
+        Ok(LinearProof {
             L_vec,
             R_vec,
             S,
             a: a_star,
             r: r_star,
-        }
+        })
     }
 
     pub fn verify(
         &self,
-        n: usize,
         transcript: &mut Transcript,
         // Commitment to witness
         C: &CompressedRistretto,
@@ -167,15 +175,24 @@ impl LinearProof {
         // Public scalar vector b
         b_vec: Vec<Scalar>,
     ) -> Result<(), ProofError> {
-        transcript.innerproduct_domain_sep(n as u64);
-        assert_eq!(b_vec.len(), n);
-
-        transcript.append_point(b"C", &C);
-        for i in 0..n {
-            transcript.append_scalar(b"b_i", &b_vec[i]);
+        let n = b_vec.len();
+        if G.len() != n {
+            return Err(ProofError::InvalidGeneratorsLength);
         }
-        let (x_vec, x_inv_vec, b_0) = self.verification_scalars(n, transcript, b_vec)?;
 
+        // Append all public data to the transcript
+        transcript.innerproduct_domain_sep(n as u64);
+        transcript.append_point(b"C", &C);
+        for b_i in &b_vec {
+            transcript.append_scalar(b"b_i", b_i);
+        }
+        for G_i in G {
+            transcript.append_point(b"G_i", &G_i.compress());
+        }
+        transcript.append_point(b"F", &F.compress());
+        transcript.append_point(b"B", &B.compress());
+
+        let (x_vec, x_inv_vec, b_0) = self.verification_scalars(n, transcript, b_vec)?;
         transcript.append_point(b"S", &self.S);
         let x_star = transcript.challenge_scalar(b"x_star");
 
@@ -430,11 +447,12 @@ mod tests {
             G.clone(),
             &F,
             &B,
-        );
+        )
+        .unwrap();
 
         let mut verifier_transcript = Transcript::new(b"linearprooftest");
         assert!(proof
-            .verify(n, &mut verifier_transcript, &C, &G, &F, &B, b.clone())
+            .verify(&mut verifier_transcript, &C, &G, &F, &B, b.clone())
             .is_ok());
 
         // Test serialization and deserialization
@@ -444,7 +462,7 @@ mod tests {
         let deserialized_proof = LinearProof::from_bytes(&serialized_proof).unwrap();
         let mut serde_verifier_transcript = Transcript::new(b"linearprooftest");
         assert!(deserialized_proof
-            .verify(n, &mut serde_verifier_transcript, &C, &G, &F, &B, b)
+            .verify(&mut serde_verifier_transcript, &C, &G, &F, &B, b)
             .is_ok());
     }
 
