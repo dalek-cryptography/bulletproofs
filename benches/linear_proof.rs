@@ -64,7 +64,8 @@ fn create_linear_proof_helper(c: &mut Criterion) {
                     G.clone(),
                     &F,
                     &B,
-                );
+                )
+                .unwrap();
             })
         },
         TEST_SIZES,
@@ -141,7 +142,8 @@ fn linear_verify(c: &mut Criterion) {
                     G.clone(),
                     &F,
                     &B,
-                );
+                )
+                .unwrap();
 
                 (proof, C)
             };
@@ -150,7 +152,7 @@ fn linear_verify(c: &mut Criterion) {
             bench.iter(|| {
                 let mut verifier_transcript = Transcript::new(b"LinearProofBenchmark");
                 proof
-                    .verify(*n, &mut verifier_transcript, &C, &G, &F, &B, b.clone())
+                    .verify(&mut verifier_transcript, &C, &G, &F, &B, b.clone())
                     .unwrap();
             });
         },

@@ -37,6 +37,12 @@ pub enum ProofError {
         error("Invalid generators size, too few generators for proof")
     )]
     InvalidGeneratorsLength,
+    /// This error occurs when inputs are the incorrect length for the proof.
+    #[cfg_attr(
+        feature = "std",
+        error("Invalid input size, incorrect input length for proof")
+    )]
+    InvalidInputLength,
     /// This error results from an internal error during proving.
     ///
     /// The single-party prover is implemented by performing
