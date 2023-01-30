@@ -18,7 +18,7 @@ description = "A pure-Rust implementation of Bulletproofs using Ristretto"
 edition = "2021"
 
 [dependencies]
-curve25519-dalek = { version = "3.2.1", default-features = false, features = ["u64_backend", "nightly", "serde", "alloc"] }
+curve25519-dalek = { version = "3.2.0", default-features = false, features = ["u64_backend", "nightly", "serde", "alloc"] }
 subtle = { version = "2", default-features = false }
 sha3 = { version = "0.9", default-features = false }
 digest = { version = "0.9", default-features = false }
