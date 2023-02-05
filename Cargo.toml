@@ -5,7 +5,7 @@ name = "bulletproofs"
 # - update html_root_url
 # - ensure yoloproofs was disabled in an atomic (revertable) commit
 # - update CHANGELOG
-version = "2.0.0"
+version = "2.0.1"
 authors = ["Cathie Yun <cathieyun@gmail.com>", 
            "Henry de Valence <hdevalence@hdevalence.ca>",
            "Oleg Andreev <oleganza@gmail.com>"]
@@ -18,18 +18,18 @@ description = "A pure-Rust implementation of Bulletproofs using Ristretto"
 edition = "2018"
 
 [dependencies]
-curve25519-dalek = { version = "2", default-features = false, features = ["u64_backend", "nightly", "serde", "alloc"] }
+curve25519-dalek = { version = "2", default-features = false, features = [ "alloc", "nightly"] }
 subtle = { version = "2", default-features = false }
 sha3 = { version = "0.8", default-features = false }
 digest = { version = "0.8", default-features = false }
 rand_core = { version = "0.5", default-features = false, features = ["alloc"] }
-rand = { version = "0.7", default-features = false, optional = true }
+rand = { version = "0.7", default-features = false }
 byteorder = { version = "1", default-features = false }
-serde = { version = "1", default-features = false, features = ["alloc"] }
-serde_derive = { version = "1", default-features = false }
+serde = { version = "1", default-features = false, features = ["alloc"], optional = true }
+serde_derive = { version = "1", default-features = false, optional = true }
 thiserror = { version = "1", optional = true }
 merlin = { version = "2", default-features = false }
-clear_on_drop = { version = "0.2", default-features = false, features = ["nightly"] }
+zeroize = { version = "1.1.0", default-features = false, features = ["alloc"], optional = true }
 
 [dev-dependencies]
 hex = "0.3"
@@ -38,10 +38,20 @@ bincode = "1"
 rand_chacha = "0.2"
 
 [features]
-default = ["std", "avx2_backend"]
+default = ["std", "avx2_backend", "zeroize"]
+
+u64_backend = ["curve25519-dalek/u64_backend", ]
 avx2_backend = ["curve25519-dalek/avx2_backend"]
+u32_backend = ["curve25519-dalek/u32_backend"] 
 # yoloproofs = []
-std = ["rand", "rand/std", "thiserror"]
+
+std = [
+	"serde",
+	"serde_derive",
+	"curve25519-dalek/serde",
+	"rand/std", 
+	"thiserror", 
+]
 
 [[test]]
 name = "range_proof"
