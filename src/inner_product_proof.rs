@@ -16,7 +16,7 @@ use crate::errors::ProofError;
 use crate::transcript::TranscriptProtocol;
 
 /// Inner-product proof.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct InnerProductProof {
     pub(crate) L_vec: Vec<CompressedRistretto>,
     pub(crate) R_vec: Vec<CompressedRistretto>,
