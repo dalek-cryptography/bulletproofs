@@ -1,5 +1,6 @@
 #![cfg_attr(not(feature = "std"), no_std)]
-#![doc = include_str!("../README.md")]
+#![cfg_attr(feature = "docs", deny(missing_docs))]
+#![cfg_attr(feature = "docs", doc(include = "../README.md"))]
 #![cfg_attr(
     feature = "docs",
     doc(html_logo_url = "https://doc.dalek.rs/assets/dalek-logo-clear.png")
@@ -16,13 +17,13 @@ extern crate serde_derive;
 
 mod util;
 
-#[doc = include_str!("../docs/notes-intro.md")]
+#[cfg_attr(feature = "docs", doc(include = "../docs/notes-intro.md"))]
 mod notes {
-    #[doc = include_str!("../docs/notes-ipp.md")]
+    #[cfg_attr(feature = "docs", doc(include = "../docs/notes-ipp.md"))]
     mod inner_product_proof {}
-    #[doc = include_str!("../docs/notes-rp.md")]
+    #[cfg_attr(feature = "docs", doc(include = "../docs/notes-rp.md"))]
     mod range_proof {}
-    #[doc = include_str!("../docs/notes-r1cs.md")]
+    #[cfg_attr(feature = "docs", doc(include = "../docs/notes-r1cs.md"))]
     mod r1cs_proof {}
 }
 
