@@ -2,9 +2,13 @@
 #![doc = include_str!("../../docs/range-proof-protocol.md")]
 
 extern crate alloc;
+#[cfg(feature = "std")]
+extern crate rand;
+
+#[cfg(feature = "std")]
+use self::rand::thread_rng;
 
 use alloc::vec::Vec;
-use rand::thread_rng;
 
 use core::iter;
 
