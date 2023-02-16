@@ -37,7 +37,7 @@ pub use crate::errors::ProofError;
 pub use crate::generators::{BulletproofGens, BulletproofGensShare, PedersenGens};
 pub use crate::range_proof::RangeProof;
 
-#[cfg_attr(feature = "docs", doc(include = "../docs/aggregation-api.md"))]
+#[doc = include_str!("../docs/aggregation-api.md")]
 pub mod range_proof_mpc {
     pub use crate::errors::MPCError;
     pub use crate::range_proof::dealer;

@@ -194,10 +194,10 @@ impl<'a> PartyAwaitingBitChallenge<'a> {
 
         let offset_zz = vc.z * vc.z * offset_z;
         let mut exp_y = offset_y; // start at y^j
-        let mut exp_2 = Scalar::one(); // start at 2^0 = 1
+        let mut exp_2 = Scalar::ONE; // start at 2^0 = 1
         for i in 0..n {
             let a_L_i = Scalar::from((self.v >> i) & 1);
-            let a_R_i = a_L_i - Scalar::one();
+            let a_R_i = a_L_i - Scalar::ONE;
 
             l_poly.0[i] = a_L_i - vc.z;
             l_poly.1[i] = self.s_L[i];
@@ -279,7 +279,7 @@ impl PartyAwaitingPolyChallenge {
     pub fn apply_challenge(self, pc: &PolyChallenge) -> Result<ProofShare, MPCError> {
         // Prevent a malicious dealer from annihilating the blinding
         // factors by supplying a zero challenge.
-        if pc.x == Scalar::zero() {
+        if pc.x == Scalar::ZERO {
             return Err(MPCError::MaliciousDealer);
         }
 

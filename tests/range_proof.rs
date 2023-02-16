@@ -1,5 +1,3 @@
-use rand_core::SeedableRng;
-
 use rand_chacha::ChaChaRng;
 
 use curve25519_dalek::ristretto::CompressedRistretto;
@@ -8,8 +6,6 @@ use curve25519_dalek::scalar::Scalar;
 use merlin::Transcript;
 
 use bulletproofs_og::{BulletproofGens, PedersenGens, RangeProof};
-
-use hex;
 
 // Tests that proofs generated with v1.0.0 continue to verify in later versions.
 #[test]
@@ -100,6 +96,7 @@ fn deserialize_and_verify() {
 //#[test]
 #[allow(dead_code)]
 fn generate_test_vectors() {
+    use rand_chacha::rand_core::SeedableRng;
     let pc_gens = PedersenGens::default();
     let bp_gens = BulletproofGens::new(64, 8);
 

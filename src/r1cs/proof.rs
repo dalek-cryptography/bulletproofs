@@ -177,9 +177,12 @@ impl R1CSProof {
         let T_4 = CompressedRistretto(read32!());
         let T_5 = CompressedRistretto(read32!());
         let T_6 = CompressedRistretto(read32!());
-        let t_x = Scalar::from_canonical_bytes(read32!()).ok_or(R1CSError::FormatError)?;
-        let t_x_blinding = Scalar::from_canonical_bytes(read32!()).ok_or(R1CSError::FormatError)?;
-        let e_blinding = Scalar::from_canonical_bytes(read32!()).ok_or(R1CSError::FormatError)?;
+        let t_x = Scalar::from_canonical_bytes(read32!());
+        let t_x = Option::from(t_x).ok_or(R1CSError::FormatError)?;
+        let t_x_blinding = Scalar::from_canonical_bytes(read32!());
+        let t_x_blinding = Option::from(t_x_blinding).ok_or(R1CSError::FormatError)?;
+        let e_blinding = Scalar::from_canonical_bytes(read32!());
+        let e_blinding = Option::from(e_blinding).ok_or(R1CSError::FormatError)?;
 
         // XXX: IPPProof from_bytes gives ProofError.
         let ipp_proof = InnerProductProof::from_bytes(slice).map_err(|_| R1CSError::FormatError)?;

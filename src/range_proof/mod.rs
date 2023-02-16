@@ -1,5 +1,5 @@
 #![allow(non_snake_case)]
-#![cfg_attr(feature = "docs", doc(include = "../../docs/range-proof-protocol.md"))]
+#![doc = include_str!("../../docs/range-proof-protocol.md")]
 
 extern crate alloc;
 #[cfg(feature = "std")]
@@ -7,6 +7,7 @@ extern crate rand;
 
 #[cfg(feature = "std")]
 use self::rand::thread_rng;
+
 use alloc::vec::Vec;
 
 use core::iter;
@@ -419,7 +420,7 @@ impl RangeProof {
         let basepoint_scalar = w * (self.t_x - a * b) + c * (delta(n, m, &y, &z) - self.t_x);
 
         let mega_check = RistrettoPoint::optional_multiscalar_mul(
-            iter::once(Scalar::one())
+            iter::once(Scalar::ONE)
                 .chain(iter::once(x))
                 .chain(iter::once(c * x))
                 .chain(iter::once(c * x * x))
@@ -501,6 +502,7 @@ impl RangeProof {
     /// Deserializes the proof from a byte slice.
     ///
     /// Returns an error if the byte slice cannot be parsed into a `RangeProof`.
+    #[allow(clippy::erasing_op)]
     pub fn from_bytes(slice: &[u8]) -> Result<RangeProof, ProofError> {
         if slice.len() % 32 != 0 {
             return Err(ProofError::FormatError);
@@ -516,12 +518,12 @@ impl RangeProof {
         let T_1 = CompressedRistretto(read32(&slice[2 * 32..]));
         let T_2 = CompressedRistretto(read32(&slice[3 * 32..]));
 
-        let t_x = Scalar::from_canonical_bytes(read32(&slice[4 * 32..]))
-            .ok_or(ProofError::FormatError)?;
-        let t_x_blinding = Scalar::from_canonical_bytes(read32(&slice[5 * 32..]))
-            .ok_or(ProofError::FormatError)?;
-        let e_blinding = Scalar::from_canonical_bytes(read32(&slice[6 * 32..]))
-            .ok_or(ProofError::FormatError)?;
+        let t_x = Scalar::from_canonical_bytes(read32(&slice[4 * 32..]));
+        let t_x = Option::from(t_x).ok_or(ProofError::FormatError)?;
+        let t_x_blinding = Scalar::from_canonical_bytes(read32(&slice[5 * 32..]));
+        let t_x_blinding = Option::from(t_x_blinding).ok_or(ProofError::FormatError)?;
+        let e_blinding = Scalar::from_canonical_bytes(read32(&slice[6 * 32..]));
+        let e_blinding = Option::from(e_blinding).ok_or(ProofError::FormatError)?;
 
         let ipp_proof = InnerProductProof::from_bytes(&slice[7 * 32..])?;
 
@@ -611,9 +613,9 @@ mod tests {
         // code copied from previous implementation
         let z2 = z * z;
         let z3 = z2 * z;
-        let mut power_g = Scalar::zero();
-        let mut exp_y = Scalar::one(); // start at y^0 = 1
-        let mut exp_2 = Scalar::one(); // start at 2^0 = 1
+        let mut power_g = Scalar::ZERO;
+        let mut exp_y = Scalar::ONE; // start at y^0 = 1
+        let mut exp_2 = Scalar::ONE; // start at 2^0 = 1
         for _ in 0..n {
             power_g += (z - z2) * exp_y - z3 * exp_2;
 
@@ -645,8 +647,8 @@ mod tests {
 
         // Prover's scope
         let (proof_bytes, value_commitments) = {
-            use self::rand::Rng;
-            let mut rng = rand::thread_rng();
+            use rand::Rng;
+            let mut rng = thread_rng();
 
             // 0. Create witness data
             let (min, max) = (0u64, ((1u128 << n) - 1) as u64);
@@ -737,8 +739,8 @@ mod tests {
         let pc_gens = PedersenGens::default();
         let bp_gens = BulletproofGens::new(n, m);
 
-        use self::rand::Rng;
-        let mut rng = rand::thread_rng();
+        use rand::Rng;
+        let mut rng = thread_rng();
         let mut transcript = Transcript::new(b"AggregatedRangeProofTest");
 
         // Parties 0, 2 are honest and use a 32-bit value
@@ -810,8 +812,8 @@ mod tests {
         let pc_gens = PedersenGens::default();
         let bp_gens = BulletproofGens::new(n, m);
 
-        use self::rand::Rng;
-        let mut rng = rand::thread_rng();
+        use rand::Rng;
+        let mut rng = thread_rng();
         let mut transcript = Transcript::new(b"AggregatedRangeProofTest");
 
         let v0 = rng.gen::<u32>() as u64;
@@ -832,7 +834,7 @@ mod tests {
             dealer.receive_poly_commitments(vec![poly_com0]).unwrap();
 
         // But now simulate a malicious dealer choosing x = 0
-        poly_challenge.x = Scalar::zero();
+        poly_challenge.x = Scalar::ZERO;
 
         let maybe_share0 = party0.apply_challenge(&poly_challenge);
 
