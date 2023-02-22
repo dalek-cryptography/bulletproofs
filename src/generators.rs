@@ -278,7 +278,7 @@ pub struct BulletproofGensShare<'a> {
 
 impl<'a> BulletproofGensShare<'a> {
     /// Return an iterator over this party's G generators with given size `n`.
-    pub(crate) fn G(&self, n: usize) -> impl Iterator<Item = &'a RistrettoPoint> {
+    pub fn G(&self, n: usize) -> impl Iterator<Item = &'a RistrettoPoint> {
         self.gens.G_vec[self.share].iter().take(n)
     }
 
