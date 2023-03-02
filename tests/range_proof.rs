@@ -42,35 +42,43 @@ fn deserialize_and_verify() {
         CompressedRistretto::from_slice(
             &hex::decode("90b0c2fe57934dff9f5396e135e7d72b82b3c5393e1843178918eb2cf28a5f3c")
                 .unwrap(),
-        ),
+        )
+        .unwrap(),
         CompressedRistretto::from_slice(
             &hex::decode("74256a3e2a7fe948210c4095195ae4db3e3498c6c5fddc2afb226c0f1e97e468")
                 .unwrap(),
-        ),
+        )
+        .unwrap(),
         CompressedRistretto::from_slice(
             &hex::decode("7e348def6d03dc7bcbe7e03736ca2898e2efa9f6ff8ae4ed1cb5252ec1744075")
                 .unwrap(),
-        ),
+        )
+        .unwrap(),
         CompressedRistretto::from_slice(
             &hex::decode("861859f5d4c14f5d6d7ad88dcf43c9a98064a7d8702ffc9bad9eba2ed766702a")
                 .unwrap(),
-        ),
+        )
+        .unwrap(),
         CompressedRistretto::from_slice(
             &hex::decode("4c09b1260c833fefe25b1c3d3becc80979beca5e864d57fcb410bb15c7ba5c14")
                 .unwrap(),
-        ),
+        )
+        .unwrap(),
         CompressedRistretto::from_slice(
             &hex::decode("08cf26bfdf2e6b731536f5e48b4c0ac7b5fc846d36aaa3fe0d28f07c207f0814")
                 .unwrap(),
-        ),
+        )
+        .unwrap(),
         CompressedRistretto::from_slice(
             &hex::decode("a6e2d1c2770333c9a8a5ac10d9eb28e8609d5954428261335b2fd6ff0e0e8d69")
                 .unwrap(),
-        ),
+        )
+        .unwrap(),
         CompressedRistretto::from_slice(
             &hex::decode("30beef3b58fd2c18dde771d5c77e32f8dc01361e284aef517bce54a5c74c4665")
                 .unwrap(),
-        ),
+        )
+        .unwrap(),
     ];
 
     let pc_gens = PedersenGens::default();
