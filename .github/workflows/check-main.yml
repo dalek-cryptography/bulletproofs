@@ -18,8 +18,10 @@ jobs:
       with:
           toolchain: stable
           override: true
+    - name: Check with no default features
+      run: cargo check --no-default-features
     - name: Run tests
-      run: cargo test --verbose
+      run: cargo test --release --verbose
 
   check-nightly:
 
@@ -35,5 +37,7 @@ jobs:
           components: rustfmt
     - name: Cargo fmt
       run: cargo +nightly fmt --all -- --check
+    - name: No std
+      run: cargo check --no-default-features
     - name: Run tests
-      run: cargo test --features="std,nightly" --verbose
+      run: cargo test --release --features="std,nightly" --verbose

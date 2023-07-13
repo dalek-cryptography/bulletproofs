@@ -4,7 +4,7 @@
 extern crate alloc;
 
 use alloc::{vec, vec::Vec};
-use std::cmp::{max, min};
+use core::cmp::{max, min};
 
 use curve25519_dalek::scalar::Scalar;
 use zeroize::Zeroize;
@@ -52,7 +52,7 @@ impl Iterator for ScalarExp {
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        (usize::max_value(), None)
+        (usize::MAX, None)
     }
 }
 
