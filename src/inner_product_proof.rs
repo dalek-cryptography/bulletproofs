@@ -3,17 +3,17 @@
 
 extern crate alloc;
 
-use alloc::borrow::Borrow;
-use alloc::vec::Vec;
-
+use alloc::{borrow::Borrow, vec::Vec};
 use core::iter;
-use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
-use curve25519_dalek::scalar::Scalar;
-use curve25519_dalek::traits::VartimeMultiscalarMul;
+
+use curve25519_dalek::{
+    ristretto::{CompressedRistretto, RistrettoPoint},
+    scalar::Scalar,
+    traits::VartimeMultiscalarMul,
+};
 use merlin::Transcript;
 
-use crate::errors::ProofError;
-use crate::transcript::TranscriptProtocol;
+use crate::{errors::ProofError, transcript::TranscriptProtocol};
 
 #[derive(Clone, Debug)]
 pub struct InnerProductProof {
@@ -88,11 +88,7 @@ impl InnerProductProof {
                 a_L.iter()
                     .zip(G_factors[n..2 * n].into_iter())
                     .map(|(a_L_i, g)| a_L_i * g)
-                    .chain(
-                        b_R.iter()
-                            .zip(H_factors[0..n].into_iter())
-                            .map(|(b_R_i, h)| b_R_i * h),
-                    )
+                    .chain(b_R.iter().zip(H_factors[0..n].into_iter()).map(|(b_R_i, h)| b_R_i * h))
                     .chain(iter::once(c_L)),
                 G_R.iter().chain(H_L.iter()).chain(iter::once(Q)),
             )
@@ -124,14 +120,12 @@ impl InnerProductProof {
             for i in 0..n {
                 a_L[i] = a_L[i] * u + u_inv * a_R[i];
                 b_L[i] = b_L[i] * u_inv + u * b_R[i];
-                G_L[i] = RistrettoPoint::vartime_multiscalar_mul(
-                    &[u_inv * G_factors[i], u * G_factors[n + i]],
-                    &[G_L[i], G_R[i]],
-                );
-                H_L[i] = RistrettoPoint::vartime_multiscalar_mul(
-                    &[u * H_factors[i], u_inv * H_factors[n + i]],
-                    &[H_L[i], H_R[i]],
-                )
+                G_L[i] = RistrettoPoint::vartime_multiscalar_mul(&[u_inv * G_factors[i], u * G_factors[n + i]], &[
+                    G_L[i], G_R[i],
+                ]);
+                H_L[i] = RistrettoPoint::vartime_multiscalar_mul(&[u * H_factors[i], u_inv * H_factors[n + i]], &[
+                    H_L[i], H_R[i],
+                ])
             }
 
             a = a_L;
@@ -185,16 +179,17 @@ impl InnerProductProof {
         }
 
         InnerProductProof {
-            L_vec: L_vec,
-            R_vec: R_vec,
+            L_vec,
+            R_vec,
             a: a[0],
             b: b[0],
         }
     }
 
-    /// Computes three vectors of verification scalars \\([u\_{i}^{2}]\\), \\([u\_{i}^{-2}]\\) and \\([s\_{i}]\\) for combined multiscalar multiplication
-    /// in a parent protocol. See [inner product protocol notes](index.html#verification-equation) for details.
-    /// The verifier must provide the input length \\(n\\) explicitly to avoid unbounded allocation within the inner product proof.
+    /// Computes three vectors of verification scalars \\([u\_{i}^{2}]\\), \\([u\_{i}^{-2}]\\) and \\([s\_{i}]\\) for
+    /// combined multiscalar multiplication in a parent protocol. See [inner product protocol
+    /// notes](index.html#verification-equation) for details. The verifier must provide the input length \\(n\\)
+    /// explicitly to avoid unbounded allocation within the inner product proof.
     pub(crate) fn verification_scalars(
         &self,
         n: usize,
@@ -399,9 +394,9 @@ impl InnerProductProof {
         }
 
         let pos = 2 * lg_n * 32;
-        let a =
-            Scalar::from_canonical_bytes(read32(&slice[pos..])).ok_or(ProofError::FormatError)?;
-        let b = Scalar::from_canonical_bytes(read32(&slice[pos + 32..]))
+        let a = Into::<Option<Scalar>>::into(Scalar::from_canonical_bytes(read32(&slice[pos..])))
+            .ok_or(ProofError::FormatError)?;
+        let b = Into::<Option<Scalar>>::into(Scalar::from_canonical_bytes(read32(&slice[pos + 32..])))
             .ok_or(ProofError::FormatError)?;
 
         Ok(InnerProductProof { L_vec, R_vec, a, b })
@@ -414,7 +409,7 @@ impl InnerProductProof {
 /// \\]
 /// Panics if the lengths of \\(\mathbf{a}\\) and \\(\mathbf{b}\\) are not equal.
 pub fn inner_product(a: &[Scalar], b: &[Scalar]) -> Scalar {
-    let mut out = Scalar::zero();
+    let mut out = Scalar::ZERO;
     if a.len() != b.len() {
         panic!("inner_product(a,b): lengths of vectors do not match");
     }
@@ -426,10 +421,10 @@ pub fn inner_product(a: &[Scalar], b: &[Scalar]) -> Scalar {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
-    use crate::util;
     use sha3::Sha3_512;
+
+    use super::*;
+    use crate::util;
 
     fn test_helper_create(n: usize) {
         let mut rng = rand::thread_rng();
@@ -447,7 +442,7 @@ mod tests {
         let b: Vec<_> = (0..n).map(|_| Scalar::random(&mut rng)).collect();
         let c = inner_product(&a, &b);
 
-        let G_factors: Vec<Scalar> = iter::repeat(Scalar::one()).take(n).collect();
+        let G_factors: Vec<Scalar> = iter::repeat(Scalar::ONE).take(n).collect();
 
         // y_inv is (the inverse of) a random challenge
         let y_inv = Scalar::random(&mut rng);
@@ -484,7 +479,7 @@ mod tests {
             .verify(
                 n,
                 &mut verifier,
-                iter::repeat(Scalar::one()).take(n),
+                iter::repeat(Scalar::ONE).take(n),
                 util::exp_iter(y_inv).take(n),
                 &P,
                 &Q,
@@ -499,7 +494,7 @@ mod tests {
             .verify(
                 n,
                 &mut verifier,
-                iter::repeat(Scalar::one()).take(n),
+                iter::repeat(Scalar::ONE).take(n),
                 util::exp_iter(y_inv).take(n),
                 &P,
                 &Q,

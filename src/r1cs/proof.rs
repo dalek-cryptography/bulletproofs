@@ -1,16 +1,14 @@
 #![allow(non_snake_case)]
 //! Definition of the proof struct.
 
-use curve25519_dalek::ristretto::CompressedRistretto;
-use curve25519_dalek::scalar::Scalar;
-use curve25519_dalek::traits::{Identity, IsIdentity};
+use curve25519_dalek::{
+    ristretto::CompressedRistretto,
+    scalar::Scalar,
+    traits::{Identity, IsIdentity},
+};
+use serde::{self, de::Visitor, Deserialize, Deserializer, Serialize, Serializer};
 
-use crate::errors::R1CSError;
-use crate::inner_product_proof::InnerProductProof;
-use crate::util;
-
-use serde::de::Visitor;
-use serde::{self, Deserialize, Deserializer, Serialize, Serializer};
+use crate::{errors::R1CSError, inner_product_proof::InnerProductProof, util};
 
 const ONE_PHASE_COMMITMENTS: u8 = 0;
 const TWO_PHASE_COMMITMENTS: u8 = 1;
@@ -111,11 +109,7 @@ impl R1CSProof {
     /// Returns the size in bytes required to serialize the `R1CSProof`.
     pub fn serialized_size(&self) -> usize {
         // version tag + (11 or 14) elements + the ipp
-        let elements = if self.missing_phase2_commitments() {
-            11
-        } else {
-            14
-        };
+        let elements = if self.missing_phase2_commitments() { 11 } else { 14 };
         1 + elements * 32 + self.ipp_proof.serialized_size()
     }
 
@@ -177,9 +171,12 @@ impl R1CSProof {
         let T_4 = CompressedRistretto(read32!());
         let T_5 = CompressedRistretto(read32!());
         let T_6 = CompressedRistretto(read32!());
-        let t_x = Scalar::from_canonical_bytes(read32!()).ok_or(R1CSError::FormatError)?;
-        let t_x_blinding = Scalar::from_canonical_bytes(read32!()).ok_or(R1CSError::FormatError)?;
-        let e_blinding = Scalar::from_canonical_bytes(read32!()).ok_or(R1CSError::FormatError)?;
+        let t_x =
+            Into::<Option<Scalar>>::into(Scalar::from_canonical_bytes(read32!())).ok_or(R1CSError::FormatError)?;
+        let t_x_blinding =
+            Into::<Option<Scalar>>::into(Scalar::from_canonical_bytes(read32!())).ok_or(R1CSError::FormatError)?;
+        let e_blinding =
+            Into::<Option<Scalar>>::into(Scalar::from_canonical_bytes(read32!())).ok_or(R1CSError::FormatError)?;
 
         // XXX: IPPProof from_bytes gives ProofError.
         let ipp_proof = InnerProductProof::from_bytes(slice).map_err(|_| R1CSError::FormatError)?;
@@ -206,18 +203,14 @@ impl R1CSProof {
 
 impl Serialize for R1CSProof {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
+    where S: Serializer {
         serializer.serialize_bytes(&self.to_bytes()[..])
     }
 }
 
 impl<'de> Deserialize<'de> for R1CSProof {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
+    where D: Deserializer<'de> {
         struct R1CSProofVisitor;
 
         impl<'de> Visitor<'de> for R1CSProofVisitor {
@@ -228,17 +221,14 @@ impl<'de> Deserialize<'de> for R1CSProof {
             }
 
             fn visit_bytes<E>(self, v: &[u8]) -> Result<R1CSProof, E>
-            where
-                E: serde::de::Error,
-            {
+            where E: serde::de::Error {
                 // Using Error::custom requires T: Display, which our error
                 // type only implements when it implements std::error::Error.
                 #[cfg(feature = "std")]
                 return R1CSProof::from_bytes(v).map_err(serde::de::Error::custom);
                 // In no-std contexts, drop the error message.
                 #[cfg(not(feature = "std"))]
-                return R1CSProof::from_bytes(v)
-                    .map_err(|_| serde::de::Error::custom("deserialization error"));
+                return R1CSProof::from_bytes(v).map_err(|_| serde::de::Error::custom("deserialization error"));
             }
         }
 

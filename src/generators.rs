@@ -7,13 +7,15 @@
 extern crate alloc;
 
 use alloc::vec::Vec;
-use curve25519_dalek::constants::RISTRETTO_BASEPOINT_COMPRESSED;
-use curve25519_dalek::constants::RISTRETTO_BASEPOINT_POINT;
-use curve25519_dalek::ristretto::RistrettoPoint;
-use curve25519_dalek::scalar::Scalar;
-use curve25519_dalek::traits::MultiscalarMul;
-use digest::{ExtendableOutputDirty, Update, XofReader};
-use sha3::{Sha3XofReader, Sha3_512, Shake256};
+
+use curve25519_dalek::{
+    constants::{RISTRETTO_BASEPOINT_COMPRESSED, RISTRETTO_BASEPOINT_POINT},
+    ristretto::RistrettoPoint,
+    scalar::Scalar,
+    traits::MultiscalarMul,
+};
+use digest::{core_api::XofReaderCoreWrapper, ExtendableOutput, Update, XofReader};
+use sha3::{Sha3_512, Shake256, Shake256ReaderCore};
 
 /// Represents a pair of base points for Pedersen commitments.
 ///
@@ -45,9 +47,7 @@ impl Default for PedersenGens {
     fn default() -> Self {
         PedersenGens {
             B: RISTRETTO_BASEPOINT_POINT,
-            B_blinding: RistrettoPoint::hash_from_bytes::<Sha3_512>(
-                RISTRETTO_BASEPOINT_COMPRESSED.as_bytes(),
-            ),
+            B_blinding: RistrettoPoint::hash_from_bytes::<Sha3_512>(RISTRETTO_BASEPOINT_COMPRESSED.as_bytes()),
         }
     }
 }
@@ -56,7 +56,7 @@ impl Default for PedersenGens {
 /// orthogonal generators.  The sequence can be deterministically
 /// produced starting with an arbitrary point.
 struct GeneratorsChain {
-    reader: Sha3XofReader,
+    reader: XofReaderCoreWrapper<Shake256ReaderCore>,
 }
 
 impl GeneratorsChain {
@@ -67,7 +67,7 @@ impl GeneratorsChain {
         shake.update(label);
 
         GeneratorsChain {
-            reader: shake.finalize_xof_dirty(),
+            reader: shake.finalize_xof(),
         }
     }
 
@@ -146,14 +146,11 @@ impl BulletproofGens {
     ///
     /// # Inputs
     ///
-    /// * `gens_capacity` is the number of generators to precompute
-    ///    for each party.  For rangeproofs, it is sufficient to pass
-    ///    `64`, the maximum bitsize of the rangeproofs.  For circuit
-    ///    proofs, the capacity must be greater than the number of
-    ///    multipliers, rounded up to the next power of two.
+    /// * `gens_capacity` is the number of generators to precompute for each party.  For rangeproofs, it is sufficient
+    ///   to pass `64`, the maximum bitsize of the rangeproofs.  For circuit proofs, the capacity must be greater than
+    ///   the number of multipliers, rounded up to the next power of two.
     ///
-    /// * `party_capacity` is the maximum number of parties that can
-    ///    produce an aggregated proof.
+    /// * `party_capacity` is the maximum number of parties that can produce an aggregated proof.
     pub fn new(gens_capacity: usize, party_capacity: usize) -> Self {
         let mut gens = BulletproofGens {
             gens_capacity: 0,
@@ -168,10 +165,7 @@ impl BulletproofGens {
     /// Returns j-th share of generators, with an appropriate
     /// slice of vectors G and H for the j-th range proof.
     pub fn share(&self, j: usize) -> BulletproofGensShare<'_> {
-        BulletproofGensShare {
-            gens: &self,
-            share: j,
-        }
+        BulletproofGensShare { gens: &self, share: j }
     }
 
     /// Increases the generators' capacity to the amount specified.

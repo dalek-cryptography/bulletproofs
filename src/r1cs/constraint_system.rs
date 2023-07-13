@@ -1,8 +1,9 @@
 //! Definition of the constraint system trait.
 
-use super::{LinearCombination, R1CSError, Variable};
 use curve25519_dalek::scalar::Scalar;
 use merlin::Transcript;
+
+use super::{LinearCombination, R1CSError, Variable};
 
 /// The interface for a constraint system, abstracting over the prover
 /// and verifier's roles.
@@ -36,11 +37,7 @@ pub trait ConstraintSystem {
     /// ```
     ///
     /// Returns `(left, right, out)` for use in further constraints.
-    fn multiply(
-        &mut self,
-        left: LinearCombination,
-        right: LinearCombination,
-    ) -> (Variable, Variable, Variable);
+    fn multiply(&mut self, left: LinearCombination, right: LinearCombination) -> (Variable, Variable, Variable);
 
     /// Allocate a single variable.
     ///
@@ -105,8 +102,7 @@ pub trait RandomizableConstraintSystem: ConstraintSystem {
     /// })
     /// ```
     fn specify_randomized_constraints<F>(&mut self, callback: F) -> Result<(), R1CSError>
-    where
-        F: 'static + FnOnce(&mut Self::RandomizedCS) -> Result<(), R1CSError>;
+    where F: 'static + FnOnce(&mut Self::RandomizedCS) -> Result<(), R1CSError>;
 }
 
 /// Represents a constraint system in the second phase:

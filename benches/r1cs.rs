@@ -18,13 +18,10 @@ extern crate merlin;
 extern crate rand;
 extern crate tari_bulletproofs;
 
-use curve25519_dalek::ristretto::CompressedRistretto;
-use curve25519_dalek::scalar::Scalar;
+use curve25519_dalek::{ristretto::CompressedRistretto, scalar::Scalar};
 use merlin::Transcript;
-use rand::seq::SliceRandom;
-use rand::Rng;
-use tari_bulletproofs::r1cs::*;
-use tari_bulletproofs::{BulletproofGens, PedersenGens};
+use rand::{seq::SliceRandom, Rng};
+use tari_bulletproofs::{r1cs::*, BulletproofGens, PedersenGens};
 
 // Shuffle gadget (documented in markdown file)
 
@@ -84,14 +81,7 @@ impl ShuffleProof {
         transcript: &'a mut Transcript,
         input: &[Scalar],
         output: &[Scalar],
-    ) -> Result<
-        (
-            ShuffleProof,
-            Vec<CompressedRistretto>,
-            Vec<CompressedRistretto>,
-        ),
-        R1CSError,
-    > {
+    ) -> Result<(ShuffleProof, Vec<CompressedRistretto>, Vec<CompressedRistretto>), R1CSError> {
         // Apply a domain separator with the shuffle parameters to the transcript
         // XXX should this be part of the gadget?
         let k = input.len();
@@ -140,15 +130,9 @@ impl ShuffleProof {
 
         let mut verifier = Verifier::new(transcript);
 
-        let input_vars: Vec<_> = input_commitments
-            .iter()
-            .map(|V| verifier.commit(*V))
-            .collect();
+        let input_vars: Vec<_> = input_commitments.iter().map(|V| verifier.commit(*V)).collect();
 
-        let output_vars: Vec<_> = output_commitments
-            .iter()
-            .map(|V| verifier.commit(*V))
-            .collect();
+        let output_vars: Vec<_> = output_commitments.iter().map(|V| verifier.commit(*V)).collect();
 
         ShuffleProof::gadget(&mut verifier, input_vars, output_vars)?;
 
@@ -174,22 +158,17 @@ fn bench_kshuffle_prove(c: &mut Criterion) {
             // Generate inputs and outputs to kshuffle
             let mut rng = rand::thread_rng();
             let (min, max) = (0u64, std::u64::MAX);
-            let input: Vec<Scalar> = (0..*k)
-                .map(|_| Scalar::from(rng.gen_range(min, max)))
-                .collect();
+            let input: Vec<Scalar> = (0..*k).map(|_| Scalar::from(rng.gen_range(min, max))).collect();
             let mut output = input.clone();
             output.shuffle(&mut rand::thread_rng());
 
             // Make kshuffle proof
             b.iter(|| {
                 let mut prover_transcript = Transcript::new(b"ShuffleBenchmark");
-                ShuffleProof::prove(&pc_gens, &bp_gens, &mut prover_transcript, &input, &output)
-                    .unwrap();
+                ShuffleProof::prove(&pc_gens, &bp_gens, &mut prover_transcript, &input, &output).unwrap();
             })
         },
-        (1..=LG_MAX_SHUFFLE_SIZE)
-            .map(|i| 1 << i)
-            .collect::<Vec<_>>(),
+        (1..=LG_MAX_SHUFFLE_SIZE).map(|i| 1 << i).collect::<Vec<_>>(),
     );
 }
 
@@ -216,16 +195,13 @@ fn bench_kshuffle_verify(c: &mut Criterion) {
                 // Generate inputs and outputs to kshuffle
                 let mut rng = rand::thread_rng();
                 let (min, max) = (0u64, std::u64::MAX);
-                let input: Vec<Scalar> = (0..*k)
-                    .map(|_| Scalar::from(rng.gen_range(min, max)))
-                    .collect();
+                let input: Vec<Scalar> = (0..*k).map(|_| Scalar::from(rng.gen_range(min, max))).collect();
                 let mut output = input.clone();
                 output.shuffle(&mut rand::thread_rng());
 
                 let mut prover_transcript = Transcript::new(b"ShuffleBenchmark");
 
-                ShuffleProof::prove(&pc_gens, &bp_gens, &mut prover_transcript, &input, &output)
-                    .unwrap()
+                ShuffleProof::prove(&pc_gens, &bp_gens, &mut prover_transcript, &input, &output).unwrap()
             };
 
             // Verify kshuffle proof
@@ -242,9 +218,7 @@ fn bench_kshuffle_verify(c: &mut Criterion) {
                     .unwrap();
             })
         },
-        (1..=LG_MAX_SHUFFLE_SIZE)
-            .map(|i| 1 << i)
-            .collect::<Vec<_>>(),
+        (1..=LG_MAX_SHUFFLE_SIZE).map(|i| 1 << i).collect::<Vec<_>>(),
     );
 }
 

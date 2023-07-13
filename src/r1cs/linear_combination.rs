@@ -1,8 +1,11 @@
 //! Definition of linear combinations.
 
+use std::{
+    iter::FromIterator,
+    ops::{Add, Mul, Neg, Sub},
+};
+
 use curve25519_dalek::scalar::Scalar;
-use std::iter::FromIterator;
-use std::ops::{Add, Mul, Neg, Sub};
 
 /// Represents a variable in a constraint system.
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -22,7 +25,7 @@ pub enum Variable {
 impl From<Variable> for LinearCombination {
     fn from(v: Variable) -> LinearCombination {
         LinearCombination {
-            terms: vec![(v, Scalar::one())],
+            terms: vec![(v, Scalar::ONE)],
         }
     }
 }
@@ -78,7 +81,7 @@ impl Add<Variable> for Scalar {
 
     fn add(self, other: Variable) -> Self::Output {
         LinearCombination {
-            terms: vec![(Variable::One(), self), (other, Scalar::one())],
+            terms: vec![(Variable::One(), self), (other, Scalar::ONE)],
         }
     }
 }
@@ -88,7 +91,7 @@ impl Sub<Variable> for Scalar {
 
     fn sub(self, other: Variable) -> Self::Output {
         LinearCombination {
-            terms: vec![(Variable::One(), self), (other, -Scalar::one())],
+            terms: vec![(Variable::One(), self), (other, -Scalar::ONE)],
         }
     }
 }
@@ -119,9 +122,7 @@ impl Default for LinearCombination {
 
 impl FromIterator<(Variable, Scalar)> for LinearCombination {
     fn from_iter<T>(iter: T) -> Self
-    where
-        T: IntoIterator<Item = (Variable, Scalar)>,
-    {
+    where T: IntoIterator<Item = (Variable, Scalar)> {
         LinearCombination {
             terms: iter.into_iter().collect(),
         }
@@ -130,9 +131,7 @@ impl FromIterator<(Variable, Scalar)> for LinearCombination {
 
 impl<'a> FromIterator<&'a (Variable, Scalar)> for LinearCombination {
     fn from_iter<T>(iter: T) -> Self
-    where
-        T: IntoIterator<Item = &'a (Variable, Scalar)>,
-    {
+    where T: IntoIterator<Item = &'a (Variable, Scalar)> {
         LinearCombination {
             terms: iter.into_iter().cloned().collect(),
         }

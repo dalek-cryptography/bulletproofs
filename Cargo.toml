@@ -17,34 +17,31 @@ description = "A pure-Rust implementation of Bulletproofs using Ristretto"
 edition = "2018"
 
 [dependencies]
-curve25519-dalek = { package="tari-curve25519-dalek", version = "4.0.2", default-features = false, features = ["serde", "alloc"] }
-subtle = { package = "subtle", version = "2.4.1", default-features = false }
-sha3 = { version = "0.9.1", default-features = false }
-blake2 = "0.9.1"
-digest = { version = "0.9.0", default-features = false }
-rand_core = { version = "0.5", default-features = false, features = ["alloc"] }
-rand = { version = "0.7", default-features = false, optional = true }
+curve25519-dalek = {package = "tari-curve25519-dalek", git = "https://github.com/tari-project/curve25519-dalek", version = "4.0.3", default-features = false, features = ["alloc", "zeroize", "rand_core","precomputed-tables","digest"] }
+subtle = { package = "subtle", version = "2.4", default-features = false }
+sha3 = { version = "0.10", default-features = false }
+blake2 = "0.10"
+digest = { version = "0.10", default-features = false }
+rand_core = { version = "0.6", default-features = false, features = ["alloc"] }
+rand = { version = "0.8", default-features = false, optional = true, features = ["std_rng"] }
 byteorder = { version = "1", default-features = false }
 serde = { version = "1", default-features = false, features = ["alloc"] }
 serde_derive = { version = "1", default-features = false }
 thiserror = { version = "1", optional = true }
-merlin = { version = "2.0.1", default-features = false }
+merlin = { version = "3", default-features = false }
 zeroize = "1"
 
 [dev-dependencies]
 hex = "0.3"
-criterion = "0.3"
+criterion = "0.5"
 bincode = "1"
-rand_chacha = "0.2.2"
+rand_chacha = "0.3"
 
 [features]
-default = ["std", "yoloproofs", "u64_backend"]
-u64_backend = ["curve25519-dalek/u64_backend"]
-simd_backend = ["curve25519-dalek/simd_backend"]
-avx2_backend = ["simd_backend"] # deprecated alias for simd_backend
+default = ["std", "yoloproofs"]
 yoloproofs = []
-std = ["rand", "rand/std", "thiserror", "curve25519-dalek/std"]
-nightly = ["curve25519-dalek/nightly", "curve25519-dalek/alloc", "subtle/nightly"]
+std = ["rand", "rand/std", "rand/std_rng", "thiserror"]
+nightly = ["curve25519-dalek/alloc"]
 docs = ["nightly"]
 
 
@@ -58,7 +55,6 @@ required-features = ["yoloproofs"]
 [[bench]]
 name = "range_proof"
 harness = false
-required-features = ["avx2_backend"]
 
 [[bench]]
 name = "generators"
@@ -67,4 +63,4 @@ harness = false
 [[bench]]
 name = "r1cs"
 harness = false
-required-features = ["yoloproofs", "avx2_backend"]
+required-features = ["yoloproofs"]

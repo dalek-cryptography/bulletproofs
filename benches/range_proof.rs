@@ -2,16 +2,10 @@
 #[macro_use]
 extern crate criterion;
 use criterion::Criterion;
-
-use rand;
-use rand::Rng;
-
 use curve25519_dalek::scalar::Scalar;
-
 use merlin::Transcript;
-
-use tari_bulletproofs::RangeProof;
-use tari_bulletproofs::{BulletproofGens, PedersenGens};
+use rand::{self, Rng};
+use tari_bulletproofs::{BulletproofGens, PedersenGens, RangeProof};
 
 static AGGREGATION_SIZES: [usize; 6] = [1, 2, 4, 8, 16, 32];
 
@@ -33,14 +27,7 @@ fn create_aggregated_rangeproof_helper(n: usize, c: &mut Criterion) {
                 // Each proof creation requires a clean transcript.
                 let mut transcript = Transcript::new(b"AggregateRangeProofBenchmark");
 
-                RangeProof::prove_multiple(
-                    &bp_gens,
-                    &pc_gens,
-                    &mut transcript,
-                    &values,
-                    &blindings,
-                    n,
-                )
+                RangeProof::prove_multiple(&bp_gens, &pc_gens, &mut transcript, &values, &blindings, n)
             })
         },
         &AGGREGATION_SIZES,
@@ -78,15 +65,8 @@ fn verify_aggregated_rangeproof_helper(n: usize, c: &mut Criterion) {
             let blindings: Vec<Scalar> = (0..m).map(|_| Scalar::random(&mut rng)).collect();
 
             let mut transcript = Transcript::new(b"AggregateRangeProofBenchmark");
-            let (proof, value_commitments) = RangeProof::prove_multiple(
-                &bp_gens,
-                &pc_gens,
-                &mut transcript,
-                &values,
-                &blindings,
-                n,
-            )
-            .unwrap();
+            let (proof, value_commitments) =
+                RangeProof::prove_multiple(&bp_gens, &pc_gens, &mut transcript, &values, &blindings, n).unwrap();
 
             b.iter(|| {
                 // Each proof creation requires a clean transcript.

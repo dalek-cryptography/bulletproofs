@@ -2,7 +2,8 @@
 //! engaging in an aggregated multiparty computation protocol.
 //!
 //! For more explanation of how the `dealer`, `party`, and `messages` modules orchestrate the protocol execution, see
-//! [the API for the aggregated multiparty computation protocol](../aggregation/index.html#api-for-the-aggregated-multiparty-computation-protocol).
+//! [the API for the aggregated multiparty computation
+//! protocol](../aggregation/index.html#api-for-the-aggregated-multiparty-computation-protocol).
 
 use core::iter;
 
@@ -10,24 +11,21 @@ extern crate alloc;
 
 use alloc::vec::Vec;
 
-use curve25519_dalek::ristretto::RistrettoPoint;
-use curve25519_dalek::scalar::Scalar;
+use curve25519_dalek::{ristretto::RistrettoPoint, scalar::Scalar};
 use merlin::Transcript;
-
-use crate::errors::MPCError;
-use crate::generators::{BulletproofGens, PedersenGens};
-use crate::inner_product_proof;
-use crate::range_proof::RangeProof;
-use crate::transcript::TranscriptProtocol;
-
 use rand_core::{CryptoRng, RngCore};
 
-use crate::util;
-
-#[cfg(feature = "std")]
-use rand::thread_rng;
-
 use super::messages::*;
+#[cfg(feature = "std")]
+use crate::range_proof::thread_rng;
+use crate::{
+    errors::MPCError,
+    generators::{BulletproofGens, PedersenGens},
+    inner_product_proof,
+    range_proof::RangeProof,
+    transcript::TranscriptProtocol,
+    util,
+};
 
 /// Used to construct a dealer for the aggregated rangeproof MPC protocol.
 pub struct Dealer {}
@@ -231,11 +229,9 @@ impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
         // Validate lengths for each share
         let mut bad_shares = Vec::<usize>::new(); // no allocations until we append
         for (j, share) in proof_shares.iter().enumerate() {
-            share
-                .check_size(self.n, &self.bp_gens, j)
-                .unwrap_or_else(|_| {
-                    bad_shares.push(j);
-                });
+            share.check_size(self.n, &self.bp_gens, j).unwrap_or_else(|_| {
+                bad_shares.push(j);
+            });
         }
 
         if bad_shares.len() > 0 {
@@ -247,15 +243,14 @@ impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
         let e_blinding: Scalar = proof_shares.iter().map(|ps| ps.e_blinding).sum();
 
         self.transcript.append_scalar(b"t_x", &t_x);
-        self.transcript
-            .append_scalar(b"t_x_blinding", &t_x_blinding);
+        self.transcript.append_scalar(b"t_x_blinding", &t_x_blinding);
         self.transcript.append_scalar(b"e_blinding", &e_blinding);
 
         // Get a challenge value to combine statements for the IPP
         let w = self.transcript.challenge_scalar(b"w");
         let Q = w * self.pc_gens.B;
 
-        let G_factors: Vec<Scalar> = iter::repeat(Scalar::one()).take(self.n * self.m).collect();
+        let G_factors: Vec<Scalar> = iter::repeat(Scalar::ONE).take(self.n * self.m).collect();
         let H_factors: Vec<Scalar> = util::exp_iter(self.bit_challenge.y.invert())
             .take(self.n * self.m)
             .collect();
@@ -297,7 +292,6 @@ impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
     /// `ProofShare`s were well-formed.
     ///
     /// This is a convenience wrapper around receive_shares_with_rng
-    ///
     #[cfg(feature = "std")]
     pub fn receive_shares(self, proof_shares: &[ProofShare]) -> Result<RangeProof, MPCError> {
         self.receive_shares_with_rng(proof_shares, &mut thread_rng())
@@ -345,7 +339,7 @@ impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
                     &self.poly_commitments[j],
                     &self.poly_challenge,
                 ) {
-                    Ok(_) => {}
+                    Ok(_) => {},
                     Err(_) => bad_shares.push(j),
                 }
             }
@@ -367,10 +361,7 @@ impl<'a, 'b> DealerAwaitingProofShares<'a, 'b> {
     /// [`receive_shares`](DealerAwaitingProofShares::receive_shares),
     /// which validates that all shares are well-formed, or else
     /// detects which party(ies) submitted malformed shares.
-    pub fn receive_trusted_shares(
-        mut self,
-        proof_shares: &[ProofShare],
-    ) -> Result<RangeProof, MPCError> {
+    pub fn receive_trusted_shares(mut self, proof_shares: &[ProofShare]) -> Result<RangeProof, MPCError> {
         self.assemble_shares(proof_shares)
     }
 }

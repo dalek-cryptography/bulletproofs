@@ -1,12 +1,9 @@
 #![allow(non_snake_case)]
 
-use curve25519_dalek::ristretto::CompressedRistretto;
-use curve25519_dalek::scalar::Scalar;
+use curve25519_dalek::{ristretto::CompressedRistretto, scalar::Scalar};
 use merlin::Transcript;
-use rand::seq::SliceRandom;
-use rand::thread_rng;
-use tari_bulletproofs::r1cs::*;
-use tari_bulletproofs::{BulletproofGens, PedersenGens};
+use rand::{seq::SliceRandom, thread_rng};
+use tari_bulletproofs::{r1cs::*, BulletproofGens, PedersenGens};
 
 // Shuffle gadget (documented in markdown file)
 
@@ -66,14 +63,7 @@ impl ShuffleProof {
         transcript: &'a mut Transcript,
         input: &[Scalar],
         output: &[Scalar],
-    ) -> Result<
-        (
-            ShuffleProof,
-            Vec<CompressedRistretto>,
-            Vec<CompressedRistretto>,
-        ),
-        R1CSError,
-    > {
+    ) -> Result<(ShuffleProof, Vec<CompressedRistretto>, Vec<CompressedRistretto>), R1CSError> {
         // Apply a domain separator with the shuffle parameters to the transcript
         // XXX should this be part of the gadget?
         let k = input.len();
@@ -122,15 +112,9 @@ impl ShuffleProof {
 
         let mut verifier = Verifier::new(transcript);
 
-        let input_vars: Vec<_> = input_commitments
-            .iter()
-            .map(|V| verifier.commit(*V))
-            .collect();
+        let input_vars: Vec<_> = input_commitments.iter().map(|V| verifier.commit(*V)).collect();
 
-        let output_vars: Vec<_> = output_commitments
-            .iter()
-            .map(|V| verifier.commit(*V))
-            .collect();
+        let output_vars: Vec<_> = output_commitments.iter().map(|V| verifier.commit(*V)).collect();
 
         ShuffleProof::gadget(&mut verifier, input_vars, output_vars)?;
 
@@ -150,9 +134,7 @@ fn kshuffle_helper(k: usize) {
         // Randomly generate inputs and outputs to kshuffle
         let mut rng = rand::thread_rng();
         let (min, max) = (0u64, std::u64::MAX);
-        let input: Vec<Scalar> = (0..k)
-            .map(|_| Scalar::from(rng.gen_range(min, max)))
-            .collect();
+        let input: Vec<Scalar> = (0..k).map(|_| Scalar::from(rng.gen_range(min..max))).collect();
         let mut output = input.clone();
         output.shuffle(&mut rand::thread_rng());
 
@@ -305,14 +287,7 @@ fn example_gadget_verify(
         .map_err(|_| R1CSError::VerificationError)
 }
 
-fn example_gadget_roundtrip_helper(
-    a1: u64,
-    a2: u64,
-    b1: u64,
-    b2: u64,
-    c1: u64,
-    c2: u64,
-) -> Result<(), R1CSError> {
+fn example_gadget_roundtrip_helper(a1: u64, a2: u64, b1: u64, b2: u64, c1: u64, c2: u64) -> Result<(), R1CSError> {
     // Common
     let pc_gens = PedersenGens::default();
     let bp_gens = BulletproofGens::new(128, 1);
@@ -368,7 +343,7 @@ pub fn range_proof<CS: ConstraintSystem>(
     v_assignment: Option<u64>,
     n: usize,
 ) -> Result<(), R1CSError> {
-    let mut exp_2 = Scalar::one();
+    let mut exp_2 = Scalar::ONE;
     for i in 0..n {
         // Create low-level variables and add them to constraints
         let (a, b, o) = cs.allocate_multiplier(v_assignment.map(|q| {
@@ -398,15 +373,14 @@ pub fn range_proof<CS: ConstraintSystem>(
 
 #[test]
 fn range_proof_gadget() {
-    use rand::thread_rng;
-    use rand::Rng;
+    use rand::{thread_rng, Rng};
 
     let mut rng = thread_rng();
     let m = 3; // number of values to test per `n`
 
     for n in [2, 10, 32, 63].iter() {
         let (min, max) = (0u64, ((1u128 << n) - 1) as u64);
-        let values: Vec<u64> = (0..m).map(|_| rng.gen_range(min, max)).collect();
+        let values: Vec<u64> = (0..m).map(|_| rng.gen_range(min..max)).collect();
         for v in values {
             assert!(range_proof_helper(v.into(), *n).is_ok());
         }

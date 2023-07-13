@@ -26,16 +26,10 @@ pub enum ProofError {
     InvalidBitsize,
     /// This error occurs when attempting to create an aggregated
     /// proof with non-power-of-two aggregation size.
-    #[cfg_attr(
-        feature = "std",
-        error("Invalid aggregation size, m must be a power of 2.")
-    )]
+    #[cfg_attr(feature = "std", error("Invalid aggregation size, m must be a power of 2."))]
     InvalidAggregation,
     /// This error occurs when there are insufficient generators for the proof.
-    #[cfg_attr(
-        feature = "std",
-        error("Invalid generators size, too few generators for proof")
-    )]
+    #[cfg_attr(feature = "std", error("Invalid generators size, too few generators for proof"))]
     InvalidGeneratorsLength,
     /// This error results from an internal error during proving.
     ///
@@ -46,10 +40,7 @@ pub enum ProofError {
     #[cfg_attr(feature = "std", error("Internal error during proof creation: {0}"))]
     ProvingError(MPCError),
     /// This error results from trying to rewind a proof with the wrong rewind nonce
-    #[cfg_attr(
-        feature = "std",
-        error("Rewinding the proof failed, invalid commitment extracted")
-    )]
+    #[cfg_attr(feature = "std", error("Rewinding the proof failed, invalid commitment extracted"))]
     InvalidCommitmentExtracted,
     /// This error results from trying to rewind a proof with an invalid rewind key separator
     #[cfg_attr(
@@ -90,16 +81,10 @@ pub enum MPCError {
     InvalidBitsize,
     /// This error occurs when attempting to create an aggregated
     /// proof with non-power-of-two aggregation size.
-    #[cfg_attr(
-        feature = "std",
-        error("Invalid aggregation size, m must be a power of 2")
-    )]
+    #[cfg_attr(feature = "std", error("Invalid aggregation size, m must be a power of 2"))]
     InvalidAggregation,
     /// This error occurs when there are insufficient generators for the proof.
-    #[cfg_attr(
-        feature = "std",
-        error("Invalid generators size, too few generators for proof")
-    )]
+    #[cfg_attr(feature = "std", error("Invalid generators size, too few generators for proof"))]
     InvalidGeneratorsLength,
     /// This error occurs when the dealer is given the wrong number of
     /// value commitments.
@@ -115,10 +100,7 @@ pub enum MPCError {
     WrongNumProofShares,
     /// This error occurs when one or more parties submit malformed
     /// proof shares.
-    #[cfg_attr(
-        feature = "std",
-        error("Malformed proof shares from parties {bad_shares:?}")
-    )]
+    #[cfg_attr(feature = "std", error("Malformed proof shares from parties {bad_shares:?}"))]
     MalformedProofShares {
         /// A vector with the indexes of the parties whose shares were malformed.
         bad_shares: Vec<usize>,
@@ -133,10 +115,7 @@ pub enum MPCError {
 #[cfg_attr(feature = "std", derive(Error))]
 pub enum R1CSError {
     /// Occurs when there are insufficient generators for the proof.
-    #[cfg_attr(
-        feature = "std",
-        error("Invalid generators size, too few generators for proof")
-    )]
+    #[cfg_attr(feature = "std", error("Invalid generators size, too few generators for proof"))]
     InvalidGeneratorsLength,
     /// This error occurs when the proof encoding is malformed.
     #[cfg_attr(feature = "std", error("Proof data could not be parsed."))]

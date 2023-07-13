@@ -1,20 +1,19 @@
-use rand_core::SeedableRng;
-
-use rand_chacha::ChaChaRng;
-
-use curve25519_dalek::constants::RISTRETTO_BASEPOINT_TABLE;
-use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
-use curve25519_dalek::scalar::Scalar;
-
+use curve25519_dalek::{
+    constants::RISTRETTO_BASEPOINT_TABLE,
+    ristretto::{CompressedRistretto, RistrettoPoint},
+    scalar::Scalar,
+};
+use hex;
 use merlin::Transcript;
-
+use rand::thread_rng;
+use rand_chacha::{rand_core::SeedableRng, ChaChaRng};
 use tari_bulletproofs::{
     range_proof::{get_rewind_nonce_from_pub_key, get_secret_nonce_from_pvt_key},
-    BulletproofGens, PedersenGens, ProofError, RangeProof,
+    BulletproofGens,
+    PedersenGens,
+    ProofError,
+    RangeProof,
 };
-
-use hex;
-use rand::thread_rng;
 
 // Tests that proofs generated with v1.0.0 continue to verify in later versions.
 #[test]
@@ -49,37 +48,37 @@ fn deserialize_and_verify() {
 
     let vc = [
         CompressedRistretto::from_slice(
-            &hex::decode("90b0c2fe57934dff9f5396e135e7d72b82b3c5393e1843178918eb2cf28a5f3c")
-                .unwrap(),
-        ),
+            &hex::decode("90b0c2fe57934dff9f5396e135e7d72b82b3c5393e1843178918eb2cf28a5f3c").unwrap(),
+        )
+        .unwrap(),
         CompressedRistretto::from_slice(
-            &hex::decode("74256a3e2a7fe948210c4095195ae4db3e3498c6c5fddc2afb226c0f1e97e468")
-                .unwrap(),
-        ),
+            &hex::decode("74256a3e2a7fe948210c4095195ae4db3e3498c6c5fddc2afb226c0f1e97e468").unwrap(),
+        )
+        .unwrap(),
         CompressedRistretto::from_slice(
-            &hex::decode("7e348def6d03dc7bcbe7e03736ca2898e2efa9f6ff8ae4ed1cb5252ec1744075")
-                .unwrap(),
-        ),
+            &hex::decode("7e348def6d03dc7bcbe7e03736ca2898e2efa9f6ff8ae4ed1cb5252ec1744075").unwrap(),
+        )
+        .unwrap(),
         CompressedRistretto::from_slice(
-            &hex::decode("861859f5d4c14f5d6d7ad88dcf43c9a98064a7d8702ffc9bad9eba2ed766702a")
-                .unwrap(),
-        ),
+            &hex::decode("861859f5d4c14f5d6d7ad88dcf43c9a98064a7d8702ffc9bad9eba2ed766702a").unwrap(),
+        )
+        .unwrap(),
         CompressedRistretto::from_slice(
-            &hex::decode("4c09b1260c833fefe25b1c3d3becc80979beca5e864d57fcb410bb15c7ba5c14")
-                .unwrap(),
-        ),
+            &hex::decode("4c09b1260c833fefe25b1c3d3becc80979beca5e864d57fcb410bb15c7ba5c14").unwrap(),
+        )
+        .unwrap(),
         CompressedRistretto::from_slice(
-            &hex::decode("08cf26bfdf2e6b731536f5e48b4c0ac7b5fc846d36aaa3fe0d28f07c207f0814")
-                .unwrap(),
-        ),
+            &hex::decode("08cf26bfdf2e6b731536f5e48b4c0ac7b5fc846d36aaa3fe0d28f07c207f0814").unwrap(),
+        )
+        .unwrap(),
         CompressedRistretto::from_slice(
-            &hex::decode("a6e2d1c2770333c9a8a5ac10d9eb28e8609d5954428261335b2fd6ff0e0e8d69")
-                .unwrap(),
-        ),
+            &hex::decode("a6e2d1c2770333c9a8a5ac10d9eb28e8609d5954428261335b2fd6ff0e0e8d69").unwrap(),
+        )
+        .unwrap(),
         CompressedRistretto::from_slice(
-            &hex::decode("30beef3b58fd2c18dde771d5c77e32f8dc01361e284aef517bce54a5c74c4665")
-                .unwrap(),
-        ),
+            &hex::decode("30beef3b58fd2c18dde771d5c77e32f8dc01361e284aef517bce54a5c74c4665").unwrap(),
+        )
+        .unwrap(),
     ];
 
     let pc_gens = PedersenGens::default();
@@ -113,9 +112,7 @@ fn generate_test_vectors() {
     let mut test_rng = ChaChaRng::from_seed([24u8; 32]);
 
     let values = vec![0u64, 1, 2, 3, 4, 5, 6, 7];
-    let blindings = (0..8)
-        .map(|_| Scalar::random(&mut test_rng))
-        .collect::<Vec<_>>();
+    let blindings = (0..8).map(|_| Scalar::random(&mut test_rng)).collect::<Vec<_>>();
 
     for n in &[8, 16, 32, 64] {
         for m in &[1, 2, 4, 8] {
@@ -178,21 +175,13 @@ fn range_proof_rewind() {
     // Verify the ZK proof as per normal proof
     let mut verifier_transcript = Transcript::new(b"Bulletproof-Rewind Test");
     assert!(proof
-        .verify_single(
-            &bp_gens,
-            &pc_gens,
-            &mut verifier_transcript,
-            &committed_value,
-            64
-        )
+        .verify_single(&bp_gens, &pc_gens, &mut verifier_transcript, &committed_value, 64)
         .is_ok());
 
     // The two rewind keys can be shared with a trusted 3rd party, whom will be able to extract
     // the value of the commitment as well as the extra data
-    let pub_rewind_key_1 =
-        RistrettoPoint::from(&pvt_rewind_key * &RISTRETTO_BASEPOINT_TABLE).compress();
-    let pub_rewind_key_2 =
-        RistrettoPoint::from(&pvt_blinding_key * &RISTRETTO_BASEPOINT_TABLE).compress();
+    let pub_rewind_key_1 = RistrettoPoint::from(&pvt_rewind_key * RISTRETTO_BASEPOINT_TABLE).compress();
+    let pub_rewind_key_2 = RistrettoPoint::from(&pvt_blinding_key * RISTRETTO_BASEPOINT_TABLE).compress();
     // The rewind nonces are derived from the public rewind keys and the Pedersen commitment
     let rewind_nonce_1 = get_rewind_nonce_from_pub_key(&pub_rewind_key_1, &committed_value);
     let rewind_nonce_2 = get_rewind_nonce_from_pub_key(&pub_rewind_key_2, &committed_value);

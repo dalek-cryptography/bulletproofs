@@ -2,19 +2,23 @@
 //! in an aggregated multiparty computation protocol.
 //!
 //! For more explanation of how the `dealer`, `party`, and `messages` modules orchestrate the protocol execution, see
-//! [the API for the aggregated multiparty computation protocol](../aggregation/index.html#api-for-the-aggregated-multiparty-computation-protocol).
+//! [the API for the aggregated multiparty computation
+//! protocol](../aggregation/index.html#api-for-the-aggregated-multiparty-computation-protocol).
 
 extern crate alloc;
 
 use alloc::vec::Vec;
 use core::iter;
-use curve25519_dalek::ristretto::{CompressedRistretto, RistrettoPoint};
-use curve25519_dalek::scalar::Scalar;
+
+use curve25519_dalek::{
+    ristretto::{CompressedRistretto, RistrettoPoint},
+    scalar::Scalar,
+};
 
 use crate::generators::{BulletproofGens, PedersenGens};
 
 /// A commitment to the bits of a party's value.
-#[derive(Serialize, Deserialize, Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug)]
 pub struct BitCommitment {
     pub(super) V_j: CompressedRistretto,
     pub(super) A_j: RistrettoPoint,
@@ -22,28 +26,28 @@ pub struct BitCommitment {
 }
 
 /// Challenge values derived from all parties' [`BitCommitment`]s.
-#[derive(Serialize, Deserialize, Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug)]
 pub struct BitChallenge {
     pub(super) y: Scalar,
     pub(super) z: Scalar,
 }
 
 /// A commitment to a party's polynomial coefficents.
-#[derive(Serialize, Deserialize, Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug)]
 pub struct PolyCommitment {
     pub(super) T_1_j: RistrettoPoint,
     pub(super) T_2_j: RistrettoPoint,
 }
 
 /// Challenge values derived from all parties' [`PolyCommitment`]s.
-#[derive(Serialize, Deserialize, Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug)]
 pub struct PolyChallenge {
     pub(super) x: Scalar,
 }
 
 /// A party's proof share, ready for aggregation into the final
 /// [`RangeProof`](::RangeProof).
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct ProofShare {
     pub(super) t_x: Scalar,
     pub(super) t_x_blinding: Scalar,
@@ -54,12 +58,7 @@ pub struct ProofShare {
 
 impl ProofShare {
     /// Checks consistency of all sizes in the proof share and returns the size of the l/r vector.
-    pub(super) fn check_size(
-        &self,
-        expected_n: usize,
-        bp_gens: &BulletproofGens,
-        j: usize,
-    ) -> Result<(), ()> {
+    pub(super) fn check_size(&self, expected_n: usize, bp_gens: &BulletproofGens, j: usize) -> Result<(), ()> {
         if self.l_vec.len() != expected_n {
             return Err(());
         }
@@ -93,8 +92,7 @@ impl ProofShare {
     ) -> Result<(), ()> {
         use curve25519_dalek::traits::{IsIdentity, VartimeMultiscalarMul};
 
-        use crate::inner_product_proof::inner_product;
-        use crate::util;
+        use crate::{inner_product_proof::inner_product, util};
 
         let n = self.l_vec.len();
 
@@ -126,7 +124,7 @@ impl ProofShare {
             });
 
         let P_check = RistrettoPoint::vartime_multiscalar_mul(
-            iter::once(Scalar::one())
+            iter::once(Scalar::ONE)
                 .chain(iter::once(*x))
                 .chain(iter::once(-self.e_blinding))
                 .chain(g)
