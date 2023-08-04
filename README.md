@@ -1,3 +1,6 @@
+# Deprecated
+This [fork](https://github.com/dalek-cryptography/bulletproofs) is deprecated and replaced by [BulletproofPlus](https://github.com/tari-project/bulletproofs-plus)
+
 # Bulletproofs
 
 <img
