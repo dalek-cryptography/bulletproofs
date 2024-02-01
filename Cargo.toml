@@ -33,7 +33,7 @@ clear_on_drop = { version = "0.2", default-features = false }
 
 [dev-dependencies]
 hex = "0.3"
-criterion = "0.3"
+criterion = "0.5"
 bincode = "1"
 rand_chacha = "0.2"
 
