@@ -1,6 +1,6 @@
 #![allow(non_snake_case)]
 
-use criterion::{Criterion, criterion_group, criterion_main};
+use criterion::{criterion_group, criterion_main, Criterion};
 
 // Code below copied from ../tests/r1cs.rs
 //

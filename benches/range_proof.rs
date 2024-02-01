@@ -1,6 +1,6 @@
 #![allow(non_snake_case)]
 use criterion::BenchmarkId;
-use criterion::{Criterion, criterion_group, criterion_main};
+use criterion::{criterion_group, criterion_main, Criterion};
 
 use rand;
 use rand::Rng;
@@ -19,10 +19,7 @@ fn create_aggregated_rangeproof_helper(n: usize, c: &mut Criterion) {
     let mut group = c.benchmark_group(&label);
 
     for size in AGGREGATION_SIZES {
-        group.bench_with_input(
-            BenchmarkId::from_parameter(size),
-            &size,
-        move |b, &m| {
+        group.bench_with_input(BenchmarkId::from_parameter(size), &size, move |b, &m| {
             let pc_gens = PedersenGens::default();
             let bp_gens = BulletproofGens::new(n, m);
             let mut rng = rand::thread_rng();
@@ -44,8 +41,7 @@ fn create_aggregated_rangeproof_helper(n: usize, c: &mut Criterion) {
                     n,
                 )
             })
-        },
-        );
+        });
     }
 }
 
@@ -70,10 +66,7 @@ fn verify_aggregated_rangeproof_helper(n: usize, c: &mut Criterion) {
     let mut group = c.benchmark_group(&label);
 
     for size in AGGREGATION_SIZES {
-        group.bench_with_input(
-            BenchmarkId::from_parameter(size),
-            &size,
-        move |b, &m| {
+        group.bench_with_input(BenchmarkId::from_parameter(size), &size, move |b, &m| {
             let pc_gens = PedersenGens::default();
             let bp_gens = BulletproofGens::new(n, m);
             let mut rng = rand::thread_rng();
@@ -99,8 +92,7 @@ fn verify_aggregated_rangeproof_helper(n: usize, c: &mut Criterion) {
 
                 proof.verify_multiple(&bp_gens, &pc_gens, &mut transcript, &value_commitments, n)
             });
-        },
-        );
+        });
     }
 }
 
