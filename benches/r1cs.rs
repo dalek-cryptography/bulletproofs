@@ -1,8 +1,6 @@
 #![allow(non_snake_case)]
 
-#[macro_use]
-extern crate criterion;
-use criterion::Criterion;
+use criterion::{Criterion, criterion_group, criterion_main};
 
 // Code below copied from ../tests/r1cs.rs
 //
