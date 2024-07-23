@@ -1,5 +1,7 @@
 # Bulletproofs
 
+## NOTE: work on this crate has moved to <https://github.com/zkcrypto/bulletproofs>
+
 <img
  width="100%"
  src="https://doc.dalek.rs/assets/bulletproofs-rangeproof.png"
