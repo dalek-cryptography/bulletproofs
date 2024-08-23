@@ -50,7 +50,7 @@ The last multipliers connect the two last variables (on each side)
     muly_right[k-2] = y_{k-1} - z
 ```
 For `K = 1`:
-Connect `x_0` to `y_0` directly. Since there is only one permuatation of a 1-element list, we can omit the challenge entirely as it cancels out.
+Connect `x_0` to `y_0` directly. Since there is only one permutation of a 1-element list, we can omit the challenge entirely as it cancels out.
 ```ascii,no_run
     x_0 = y_0
 ```
