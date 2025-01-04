@@ -46,7 +46,7 @@ pub trait ConstraintSystem {
     ///
     /// This either allocates a new multiplier and returns its `left` variable,
     /// or returns a `right` variable of a multiplier previously allocated by this method.
-    /// The output of a multiplier is assigned on a even call, when `right` is assigned.
+    /// The output of a multiplier is assigned on an even call, when `right` is assigned.
     ///
     /// When CS is committed at the end of the first or second phase, the half-assigned multiplier
     /// has the `right` assigned to zero and all its variables committed.
