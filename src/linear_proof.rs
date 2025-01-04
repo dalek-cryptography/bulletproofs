@@ -15,7 +15,7 @@ use crate::errors::ProofError;
 use crate::inner_product_proof::inner_product;
 use crate::transcript::TranscriptProtocol;
 
-/// A linear proof, which is an "lightweight" version of a Bulletproofs inner-product proof
+/// A linear proof, which is a "lightweight" version of a Bulletproofs inner-product proof
 /// Protocol: Section E.3 of [GHL'21](https://eprint.iacr.org/2021/1397.pdf)
 ///
 /// Prove that <a, b> = c where a is secret and b is public.
