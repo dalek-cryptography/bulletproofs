@@ -35,7 +35,7 @@ challenge value \\(u\_{j} {\xleftarrow{\\$}}{\mathbb{Z}\_p}\\). The prover uses
 \\[
 \begin{aligned}
   {\mathbf{a}} &\gets {\mathbf{a}}\_{\operatorname{lo}} \cdot u\_{j} + u\_{j}^{-1} \cdot {\mathbf{a}}\_{\operatorname{hi}}, \\\\
-  {\mathbf{b}} &\gets {\mathbf{b}}\_{\operatorname{lo}} \cdot u\_{j}^{-1} + u\_{j} \cdot {\mathbf{a}}\_{\operatorname{hi}},
+  {\mathbf{b}} &\gets {\mathbf{b}}\_{\operatorname{lo}} \cdot u\_{j}^{-1} + u\_{j} \cdot {\mathbf{b}}\_{\operatorname{hi}},
 \end{aligned}
 \\]
 the prover and verifier both compute
