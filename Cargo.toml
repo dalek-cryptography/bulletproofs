@@ -6,7 +6,7 @@ name = "bulletproofs"
 # - ensure yoloproofs was disabled in an atomic (revertable) commit
 # - update CHANGELOG
 version = "2.0.0"
-authors = ["Cathie Yun <cathieyun@gmail.com>", 
+authors = ["guanlong huang <jace833@pm.me>", 
            "Henry de Valence <hdevalence@hdevalence.ca>",
            "Oleg Andreev <oleganza@gmail.com>"]
 readme = "README.md"
